@@ -20,6 +20,7 @@ import {
   sweepLiveness,
   sweepScheduledReassessments,
 } from './monitoring.ts';
+import { sweepAlertPush } from './push.ts';
 
 export const POLL_INTERVAL_MS = 5_000;
 export const REPORT_SWEEP_INTERVAL_MS = 30_000;
@@ -134,6 +135,11 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
     );
     void sweepBadgeExpiryWarnings(pool, log).catch((error) =>
       log('badge expiry sweep failed', { error: String(error) }),
+    );
+    // Alerts reach phones from here. The console is still the record; a push is
+    // a copy of it, and one that fails is retried rather than lost.
+    void sweepAlertPush(pool, undefined, log).catch((error) =>
+      log('alert push sweep failed', { error: String(error) }),
     );
   }, MONITOR_SWEEP_INTERVAL_MS);
   monitor.unref();

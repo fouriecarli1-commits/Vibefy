@@ -104,6 +104,22 @@ describe('copy lint', () => {
     ].join('\n');
     expect(lintText(source).filter((v) => v.rule === 'unqualified-absolute')).toHaveLength(0);
   });
+  it('ignores a package name in an import, and only in an import', () => {
+    // `react-native-safe-area-context` is not a claim that anything is safe.
+    // Suppressing it file by file would train contributors to reach for the
+    // suppression comment, which is the one habit this gate cannot afford.
+    expect(
+      lintText("import { SafeAreaProvider } from 'react-native-safe-area-context';"),
+    ).toHaveLength(0);
+    expect(lintText("const x = require('node-safe-thing');")).toHaveLength(0);
+
+    // The exemption is the line, not the word. Prose on the next line is still
+    // checked, and so is prose that merely mentions importing.
+    expect(
+      lintText("import { A } from 'b';\n\nYour application is safe to release."),
+    ).not.toHaveLength(0);
+    expect(lintText('We import a library, and your data is safe.')).not.toHaveLength(0);
+  });
 });
 
 describe('secret scan', () => {

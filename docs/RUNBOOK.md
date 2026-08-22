@@ -303,6 +303,47 @@ select created_at, kind, format, row_count, sha256, period_start, period_end
 Hash the file they are holding and compare. Two things are never in one of those
 files by design: a full IP address, and anybody's email address.
 
+## The mobile app
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=... EXPO_PUBLIC_SUPABASE_ANON_KEY=... pnpm dev:mobile
+```
+
+Both values are public by design. **There is no service-role key in the app and
+no mobile API** — the phone reads the same tables through the same policies as
+the console, so an authorisation rule cannot be right in one place and wrong in
+the other.
+
+### A customer says they are not getting notifications
+
+Three things, in order:
+
+```sql
+-- 1. Does the handset have a live token?
+select id, platform, disabled_at, disabled_reason, last_seen_at
+  from public.device_tokens where user_id = '<user id>';
+
+-- 2. Was the alert one we push at all? Only warning and critical are pushed.
+select id, severity, delivered_at, delivery_channel from public.alerts
+ where organisation_id = '<org id>' order by created_at desc limit 10;
+
+-- 3. What did Expo say?
+select ad.status, ad.detail, ad.attempted_at
+  from public.alert_deliveries ad
+  join public.device_tokens dt on dt.id = ad.device_token_id
+ where dt.user_id = '<user id>' order by ad.attempted_at desc limit 10;
+```
+
+`disabled_reason` naming `DeviceNotRegistered` means the app was uninstalled or
+the token rotated — reinstalling and signing in registers a new one. An
+informational alert is never pushed; it waits in the app, which is deliberate.
+
+### Icons
+
+`pnpm brand:build` writes `icon.png`, `adaptive-icon.png` and `splash.png` into
+`apps/mobile/assets/` from the same masters as the favicon and the badge. Never
+hand-edit them.
+
 ## Changing a legal document
 
 1. Edit the file in `/legal`, bump its `**Version:**`.

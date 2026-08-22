@@ -254,6 +254,45 @@ no email sender yet.
 report, which has the findings; the dashboard row does not carry them, so it evaluates the
 score-and-dimension rules only. Registered in OPEN_ITEMS.md.
 
-## M6–M8 — not started
+## M6 — Native mobile app ✅
 
-See PART 2 of the build brief.
+| Gate | Status |
+| --- | --- |
+| 1. `pnpm verify` green | ✅ 472 tests, six gates, ten workspace projects typechecked |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ The one write that spends money checks the authorisation gate before it queues; push delivery is tested for scope, duplication and dead tokens |
+| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
+| 4. RLS verified | ✅ A device token belongs to one person and only that person; delivery records are platform-only and append-only |
+| 5. No secrets in the repo | ✅ The app ships the anon key and nothing else — no service-role key ever reaches a phone |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ There is no mobile sign-up, precisely so consent is recorded where the wording is shown in full |
+| 7. Docs updated | ✅ 118 decisions recorded |
+| 8. Cost per run recorded and visible | ✅ A re-test requested from a phone carries the same per-run ceiling as one requested in the console |
+
+### What M6 built
+
+- **`packages/api`** — one client, two front ends. The phone talks to the same database, through
+  the same anon key, under the same row-level security as the console. There is no mobile API.
+- **An Expo Router app** with five screens: applications, alerts, account, one application, one
+  report — plus adding an application. Read-and-monitor first, as the brief asks.
+- **An explicit boundary**, listed on the Account tab: ownership verification, badge licence
+  acceptance, billing and workspace administration are console-only, and the app says why.
+- **The same single-sign-on domain check** on mobile sign-in as on the web, because a second front
+  end is exactly where an enforcement rule gets forgotten.
+- **Push notifications** — `warning` and `critical` only, one delivery row per alert per device,
+  dead tokens disabled rather than retried, an outage retried rather than recorded as a loss, and
+  the alert stamped `delivered_at`/`delivery_channel` so the console can say we told you and how.
+- **Mobile icons and splash** built by `pnpm brand:build` from the same masters as the favicon and
+  the badge.
+
+### Outstanding from M6
+
+**EAS build and store submission are not configured.** The app runs in Expo Go and in a
+development build; `eas.json`, the credentials and the store listings are an account-level step
+that needs the bundle identifier and the Apple/Google accounts, which follow the entity decision.
+
+**Email alerts are still not sent.** M6 closes the delivery gap for people who install the app;
+`alerts.delivered_at` stays null for everyone else. Still registered in OPEN_ITEMS.md.
+
+## M7–M8 — not started
+
+See PART 2 of the build brief. M8 is blocked on M7 being live and on the independence policy in
+PART 8 being implemented and documented.

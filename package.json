@@ -27,7 +27,8 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "legal:registry": "node tools/legal-registry.mjs",
     "dev:worker": "pnpm --filter @vibefy/worker start",
-    "badge:keygen": "tsx tools/generate-badge-key.mts"
+    "badge:keygen": "tsx tools/generate-badge-key.mts",
+    "dev:mobile": "pnpm -F @vibefy/mobile start"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

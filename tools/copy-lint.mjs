@@ -255,6 +255,16 @@ function isMeaningfulReason(raw) {
   return reason.length >= 10;
 }
 
+/**
+ * A module specifier is somebody else's package name, not our copy.
+ *
+ * `react-native-safe-area-context` is not a claim that anything is safe, and
+ * suppressing it file by file would train contributors to reach for the
+ * suppression comment — which is the one habit this gate cannot afford.
+ */
+const MODULE_SPECIFIER =
+  /^\s*(?:import\b|export\s+(?:\*|\{)|const\s+.*=\s*require\(|from\s+['"]|@import\b)/;
+
 /** Consecutive non-blank lines, joined, so wrapped prose is judged as the sentence it is. */
 function paragraphsOf(lines, suppressed = new Set()) {
   const blocks = [];
@@ -265,6 +275,10 @@ function paragraphsOf(lines, suppressed = new Set()) {
       return;
     }
     if (line.trim() === '') {
+      current = null;
+      return;
+    }
+    if (MODULE_SPECIFIER.test(line)) {
       current = null;
       return;
     }

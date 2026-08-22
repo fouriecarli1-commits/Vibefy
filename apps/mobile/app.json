@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Vibefy",
+    "slug": "vibefy",
+    "scheme": "vibefy",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.vibefy.mobile"
+    },
+    "android": {
+      "package": "app.vibefy.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "plugins": ["expo-router", "expo-notifications"],
+    "experiments": { "typedRoutes": false },
+    "extra": {
+      "$comment": "Both values are public by design. The anon key is safe to ship because row-level security is the guard, exactly as in the web app. No service-role key ever reaches a phone.",
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
+    }
+  }
+}

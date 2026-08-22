@@ -22,7 +22,7 @@ codebase must appear here. Nothing leaves this list silently.
 | Badge issuance, signing, verification page | M3          | The Ed25519 key pair is not generated until M3 so it is never committed to a repo that predates it |
 | Continuous monitoring and drift detection  | M4          | Delivered — see MILESTONES.md                                                                      |
 | Agency and organisation surfaces, SSO      | M5          | Delivered — see MILESTONES.md                                                                      |
-| Expo mobile app                            | M6          |                                                                                                    |
+| Expo mobile app                            | M6          | Delivered — see MILESTONES.md                                                                      |
 | Public directory                           | M7          | Cold-start: a directory of nothing helps nobody                                                    |
 | Marketing arm                              | M8          | Blocked on the independence policy being implemented and documented                                |
 
@@ -33,7 +33,8 @@ mistaken for finished.
 
 | Gap | Where | Why it is acceptable for now |
 | --- | --- | --- |
-| Alerts are never delivered outside the console | `alerts.delivered_at` and `delivery_channel` are written by nothing | There is no email sender yet. The columns exist so adding one later is a sweep, not a migration — and the console is the record either way. |
+| Email alerts are not sent | `alerts.delivery_channel` is only ever `push` | M6 delivers to phones that have the app installed. For everyone else the console is still the only place an alert appears. Adding an email sender is another sweep beside `sweepAlertPush`, not a migration. |
+| EAS build and store submission are not configured | `apps/mobile` | The app runs in Expo Go and a development build. `eas.json`, signing credentials and store listings need the Apple and Google accounts, which follow the legal-entity decision. |
 | The liveness probe bypasses the scope guard | `apps/worker/src/monitoring.ts`, `httpLivenessProbe` | It is a single GET to the badge's own certified origin, which is narrower than any authorised scope. It should still go through the guarded dispatcher so there is one egress path, not two. |
 | Badge fidelity against the supplied artwork | `packages/badge/src/render.ts` | The marks are traced from 300dpi JPEG; vector originals would close the delta. |
 | The `verify.` subdomain is not deployed | Routing | The routes exist and work; host-based routing is blocked on the domain decision. |

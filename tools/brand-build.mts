@@ -22,6 +22,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const svgDir = join(root, 'brand/svg');
 const pngDir = join(root, 'brand/png');
 const iconDir = join(root, 'brand/icons');
+const mobileAssetDir = join(root, 'apps/mobile/assets');
 // The web app serves the marks from its own public directory, populated by this
 // pipeline rather than by a manual copy.
 const webPublicDir = join(root, 'apps/web/public/brand');
@@ -87,6 +88,11 @@ const ICON_TARGETS = [
   { name: 'android-chrome-192.png', size: 192 },
   { name: 'android-chrome-512.png', size: 512 },
   { name: 'maskable-512.png', size: 512, background: '#FFFFFF', padding: 0.2 },
+  // Expo. `icon` is the App Store / Play listing icon and must be opaque;
+  // `adaptive-icon` is the Android foreground layer and carries its own safe-area
+  // padding, because Android crops it to whatever shape the launcher wants.
+  { name: 'icon.png', size: 1024, background: '#FFFFFF', padding: 0.12 },
+  { name: 'adaptive-icon.png', size: 1024, padding: 0.26 },
 ] as const;
 
 async function main(): Promise<void> {
@@ -142,6 +148,19 @@ async function main(): Promise<void> {
     await pipeline.png({ compressionLevel: 9 }).toFile(join(iconDir, icon.name));
   }
   console.log(`✓ ${ICON_TARGETS.length} app icons written to brand/icons/`);
+
+  // The mobile app gets its icons from the same masters as the favicon and the
+  // badge, so a phone icon cannot drift away from the mark on the website.
+  mkdirSync(mobileAssetDir, { recursive: true });
+  for (const name of ['icon.png', 'adaptive-icon.png']) {
+    copyFileSync(join(iconDir, name), join(mobileAssetDir, name));
+  }
+  await sharp(join(svgDir, 'vibefy-logo-horizontal.svg'), { density: 600 })
+    .resize({ width: 1200, height: 600, fit: 'contain', background: '#FFFFFF' })
+    .flatten({ background: '#FFFFFF' })
+    .png({ compressionLevel: 9 })
+    .toFile(join(mobileAssetDir, 'splash.png'));
+  console.log('✓ Mobile icons and splash written to apps/mobile/assets/');
 
   mkdirSync(webPublicDir, { recursive: true });
   for (const [name] of SVG_TARGETS) copyFileSync(join(svgDir, name), join(webPublicDir, name));
