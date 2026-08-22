@@ -85,6 +85,34 @@ If it refuses to start as root, it drops to the `postgres` account automatically
 4. Add or extend the isolation test in `tests/rls-isolation.test.ts`.
 5. `pnpm test`.
 
+## Running an assessment locally
+
+1. `pnpm dev` and `pnpm dev:worker` in two terminals.
+2. Submit an application at `/console/apps/new`.
+3. Accept the authorisation warranty and declare a scope.
+4. Publish the DNS TXT record or the well-known file the page shows you, then verify. **Nothing
+   runs before this**: `assessments` cannot be inserted without a verified authorisation, and the
+   worker re-checks at dispatch and again before writing.
+5. Enqueue a job on `assessment.run` with `{ appId, depth, requestedBy }`.
+6. Watch the worker's structured log, then review the result at `/review`.
+
+Costs land in `cost_records` as the run proceeds, and `/admin/costs` shows them against the
+price of the tier each depth serves.
+
+### When the browser will not launch
+
+The runner resolves Playwright's browser itself. Two overrides exist: `VIBEFY_BROWSER_EXECUTABLE`
+for a container image that bakes one in, and a discovery fallback for a machine whose cached
+browser build predates the pinned Playwright version. If neither finds one, the browser pass is
+skipped with a note rather than failing the run — but the report is thinner, so fix it.
+
+### When a stage aborts
+
+A stage that stops at a cost, rate or wall-clock ceiling is recorded as `aborted`, not `failed`,
+and the pipeline stops rather than retrying. That is deliberate: retrying a ceiling breach spends
+money to break the same rule twice. Everything assessed before that point still stands, and the
+report says what came after was not assessed.
+
 ## Changing the rubric
 
 Rubric versions are immutable once published — the database refuses to edit one, and issued

@@ -25,7 +25,8 @@
     "check:stubs": "node tools/stub-check.mjs",
     "tokens:build": "node tools/tokens-build.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
-    "legal:registry": "node tools/legal-registry.mjs"
+    "legal:registry": "node tools/legal-registry.mjs",
+    "dev:worker": "pnpm --filter @vibefy/worker start"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

@@ -42,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="ml-auto flex flex-wrap items-center gap-5 text-sm">
               <Link href="/methodology">Methodology</Link>
               <Link href="/console">Console</Link>
+              <Link href="/review">Review</Link>
               <Link
                 href="/sign-in"
                 className="rounded-lg border border-line-strong px-3 py-1.5 font-medium"

@@ -35,15 +35,44 @@ The assessment engine, payments, the badge issuer, monitoring, agency surfaces, 
 the directory and the marketing arm. M1 to M3 is the product that can take money; M5 to M8 are
 the parts to slip if anything slips.
 
-## M1 — Assessment engine · not started
+## M1 — Assessment engine · complete, with the container image outstanding
 
-Intake → authorisation-to-test verification → sandboxed runner → Claude analysis → rubric
-scoring → report object → human reviewer queue. Plus the cost dashboard from item 8 above.
+| Definition of Done                                             | Status                                                                                                                                             |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Works end-to-end locally with one command                   | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview                                                                                 |
+| 2. Tests pass, including the four mandatory areas              | ✅ 259 tests. The engine is proven against a deliberately flawed fixture app, not a mock                                                           |
+| 3. The independence test passes                                | ✅ Unchanged, and the scoring input still structurally cannot carry commercial data                                                                |
+| 4. RLS verified                                                | ✅ Extended to `finding_evidence`                                                                                                                  |
+| 5. No secrets in the repo                                      | ✅ Scanner now covers untracked files and requires a reason on every suppression                                                                   |
+| 6. Legal artefacts surfaced with acceptance recorded           | ✅ The authorisation warranty is accepted in-product, with version, hash, IP and user agent, in an append-only row                                 |
+| 7. Docs updated                                                | ✅ 40 decisions recorded                                                                                                                           |
+| 8. Cost per run recorded and visible on the internal dashboard | ✅ `/admin/costs` — cost per run by depth against the price of the tier it serves, daily spend against the global cap, and the most expensive runs |
 
-The database gate is already in place: `assessments` cannot be inserted without a verified,
-unexpired authorisation for that app. M1 builds the flows that produce one — DNS TXT records,
-well-known files, verified email domains and repository OAuth — and the sandbox that enforces
-the declared scope at network level.
+### What M1 built
+
+- **The scope boundary.** Host allowlist with exclusions winning, a non-destructive method
+  ceiling, request/rate/wall-clock ceilings that kill the run, resolved-address checking against
+  private ranges and cloud metadata, and manual redirect handling. Enforced in-process as an
+  undici dispatcher and on Playwright's route handler, so requests the page's own JavaScript
+  makes are bounded too.
+- **Six stages.** Static intake (no model, no network), deterministic checks (transport,
+  headers, cookies, CORS, exposure, credentials, accessibility, mobile layout), functional
+  exploration, the adversarial pass, store readiness, and synthesis.
+- **Evidence enforcement in code.** A finding citing an id we did not mint is dropped before it
+  can reach a report, and the drop is recorded.
+- **Ownership verification** by DNS TXT or well-known file, constant-time compared, with the
+  authorisable scope derived from what was actually verified.
+- **Intake screening** that clears legitimate apps which merely sound alarming, defers to a human
+  when the description is too thin, and never fails open.
+- **The reviewer queue**, where approval, adjustment and rejection each write an append-only row
+  with a reason before the assessment moves — because the database refuses the move without one.
+- **The worker**, on pg-boss, checking the authorisation gate at dispatch and again before writing.
+
+### Outstanding from M1
+
+The **sandbox container image** — an ephemeral machine with a default-deny egress policy — is a
+deployment artefact and is blocked on the hosting decision. The in-process guard is built and
+tested; it is the inner half of that boundary, not a replacement for it.
 
 ## M2–M8 — not started
 

@@ -12,8 +12,10 @@ Vibefy is not an app store, and a Vibefy badge is not a security guarantee. See
 
 ## Status
 
-Milestone **M0 — Foundations**. The assessment engine (M1), payments (M2) and the badge
-system (M3) are not built yet. See `docs/OPEN_ITEMS.md` for what is deferred and why.
+Milestone **M1 — Assessment engine**. Intake, ownership verification, the authorisation gate,
+the six-stage pipeline, the reviewer queue and the cost dashboard are built. Payments (M2) and
+the badge system (M3) are not. See `docs/MILESTONES.md` for what each milestone delivered and
+`docs/OPEN_ITEMS.md` for what is deferred and why.
 
 ## Getting started
 
@@ -21,6 +23,7 @@ system (M3) are not built yet. See `docs/OPEN_ITEMS.md` for what is deferred and
 pnpm install
 cp .env.example .env.local     # fill in the values printed by `supabase start`
 pnpm dev                       # one command: database + migrations + web app
+pnpm dev:worker                # in another terminal: the assessment runner
 ```
 
 `pnpm dev` needs [Docker](https://docs.docker.com/get-docker/) and the
@@ -47,12 +50,16 @@ Runs, in order:
 ## Repository layout
 
 ```
-apps/web           Next.js App Router console and public pages
+apps/web           Next.js App Router console, review queue and public pages
+apps/worker        The assessment runner: pg-boss consumer, pipeline, persistence
+packages/engine    The assessment engine — scope boundary, stages, evidence, cost
 packages/shared    Types, design tokens, and the guarantees shared by every surface
 packages/rubric    The rubric as versioned data, plus the scoring functions
+prompts/           Versioned prompts, hashed and recorded in every report
 supabase/          Schema migrations — every table ships with its RLS policy
 brand/             Brand marks: JPEG originals, SVG masters, generated derivatives
 legal/             Drafted legal artefacts — DRAFTS, pending counsel review
+config/            Pricing and ceilings, changeable without a deploy
 docs/              Decisions, open items, data map, policies, runbook
 tools/             The CI gates listed above
 ```
@@ -68,6 +75,9 @@ tools/             The CI gates listed above
 3. **No finding without evidence.** Model claims that cannot be evidenced are dropped, not
    published.
 4. **Every badge expires and every badge can be revoked**, because we serve the image.
+5. **The scope boundary is below the model, not in it.** Requests are checked against the
+   resolved address, destructive methods never leave the process, and the browser's own
+   requests go through the same guard. A model cannot widen what it is allowed to reach.
 
 ## What a Vibefy assessment is not
 
