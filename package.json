@@ -1,0 +1,31 @@
+{
+  "name": "vibefy",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.33.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "build": "pnpm -r --filter ./packages/** build && pnpm --filter @vibefy/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "brand:build": "node tools/brand-build.mjs",
+    "check:copy": "node tools/copy-lint.mjs",
+    "check:secrets": "node tools/secret-scan.mjs",
+    "check:contrast": "node tools/contrast-check.mjs",
+    "check:brand": "node tools/brand-check.mjs",
+    "verify": "pnpm check:secrets && pnpm check:copy && pnpm check:contrast && pnpm check:brand && pnpm typecheck && pnpm test",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "prettier": "3.6.2",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

@@ -1,0 +1,18 @@
+# Architecture Decision Log
+
+One sentence per decision, in plain English, newest at the bottom. Every deviation from
+PART 5 of the build brief must appear here with its reason.
+
+| # | Date | Decision | Why, in one sentence |
+|---|---|---|---|
+| 001 | 2026-08-22 | pnpm workspaces + TypeScript monorepo | One repo means one dependency graph, one CI run and one command to start everything, which matters more than package independence for a solo founder. |
+| 002 | 2026-08-22 | Next.js App Router for `apps/web`, deployed on Vercel | It is the most widely documented React stack, so the answer to any problem I hit already exists on the internet. |
+| 003 | 2026-08-22 | Supabase for Postgres, Auth and Storage | It gives me database, authentication and file storage with row-level security as a first-class feature, instead of three services to wire together. |
+| 004 | 2026-08-22 | Row-level security policies live in the same migration as the table they protect | A table shipped without its policy is a data leak waiting for a deadline, so the two are physically inseparable in this repo. |
+| 005 | 2026-08-22 | EU data region (Frankfurt/Ireland) | The legal baseline is GDPR-grade, and hosting in the EU removes the cross-border transfer question for the strictest customers we will face. |
+| 006 | 2026-08-22 | Legal artefacts written GDPR-grade with a jurisdiction-swap layer | The entity is not yet formed, and writing to the strictest standard means the later choice is a variant selection rather than a rewrite. |
+| 007 | 2026-08-22 | Repository access required for the paid tier, free tier is URL-only | Source code gives materially better security findings, but holding it for free users would multiply our breach exposure for customers who pay us nothing. |
+| 008 | 2026-08-22 | Customer source code is never persisted to our database | It is processed in the ephemeral runner volume and deleted on completion, because the safest place to store a customer's source is nowhere. |
+| 009 | 2026-08-22 | Design tokens generated from one JSON file into CSS, TypeScript and PDF styles | The badge, the report PDF and the dashboard must not drift in colour, so they read the same source rather than three copies of the same hex codes. |
+| 010 | 2026-08-22 | Brand marks rebuilt as hand-authored SVG rather than auto-traced | An auto-trace of a gradient JPEG produces thousands of noisy paths that render badly at the 96px badge minimum, so the marks are rebuilt as clean vector geometry from the supplied artwork. |
+| 011 | 2026-08-22 | Copy lint, secret scan and contrast check are CI gates, not advisory scripts | Each one guards a claim we sell — no over-claiming, no leaked credentials, an accessible product — so a warning nobody reads is worthless. |
