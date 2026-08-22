@@ -9,6 +9,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client, Pool } from 'pg';
 import { createPublicKey } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   buildKeySet,
   generateSigningKey,
@@ -434,5 +436,37 @@ describe('the rendered badge', () => {
     const svg = renderBadgeSvg({ status: 'active' });
     expect(svg).toContain('Verified by Vibefy');
     expect(svg).not.toContain('assessed ');
+  });
+});
+
+describe('the licence version in force', () => {
+  it('comes from the legal registry, not from a constant beside it', async () => {
+    // Two copies of this number is a silent failure with an expensive shape:
+    // bump the document, forget the constant, and issuance stops finding any
+    // accepted licence — no error, just an empty candidate list for ever.
+    const registry = JSON.parse(
+      readFileSync(join(process.cwd(), 'legal/registry.json'), 'utf8'),
+    ) as { documents: Record<string, { version: string }> };
+    expect(BADGE_LICENCE_VERSION).toBe(registry.documents['badge-licence.md']!.version);
+  });
+
+  it('refuses to issue against an acceptance of a superseded version', async () => {
+    const owner = await seedAccount(db, 'stale-licence-owner');
+    const seeded = await seedAssessment(db, owner);
+    await seedFinding(db, owner, seeded.assessmentId, { severity: 'low' });
+    await approveAssessment(db, owner, seeded.assessmentId, reviewer.userId, { score: 84 });
+    await db.query(
+      `insert into public.consents (user_id, organisation_id, document_type, document_version, document_sha256, action)
+       values ($1, $2, 'badge_licence', '0.9.0-superseded', $3, 'accepted')`,
+      [owner.userId, owner.organisationId, sha256('old-badge-licence')],
+    );
+
+    const client = await pool.connect();
+    try {
+      const candidates = await findIssuanceCandidates(client);
+      expect(candidates.map((candidate) => candidate.appId)).not.toContain(seeded.appId);
+    } finally {
+      client.release();
+    }
   });
 });

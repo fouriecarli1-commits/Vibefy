@@ -292,7 +292,52 @@ that needs the bundle identifier and the Apple/Google accounts, which follow the
 **Email alerts are still not sent.** M6 closes the delivery gap for people who install the app;
 `alerts.delivered_at` stays null for everyone else. Still registered in OPEN_ITEMS.md.
 
-## M7–M8 — not started
+## M7 — Public directory ✅
 
-See PART 2 of the build brief. M8 is blocked on M7 being live and on the independence policy in
-PART 8 being implemented and documented.
+| Gate | Status |
+| --- | --- |
+| 1. `pnpm verify` green | ✅ 495 tests, six gates |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Ordering is asserted identical with and without a paid relationship; the public view is asserted to expose nothing beyond the verification page |
+| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
+| 4. RLS verified | ✅ The listing table is member-only; the directory view is the one thing `anon` may read, and it exposes only published columns |
+| 5. No secrets in the repo | ✅ Unchanged |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ The Badge Licence gained a directory clause and bumped to 1.1.0-draft; the console now asks for re-acceptance rather than carrying the old one forward |
+| 7. Docs updated | ✅ 129 decisions recorded |
+| 8. Cost per run recorded and visible | ✅ Unchanged |
+
+### What M7 built
+
+- **`packages/directory`** — search, ordering and disclosure, with the same structural guard as
+  scoring. The comparator receives four fields and the marketing-client flag is not among them,
+  so placement cannot be bought even by mistake.
+- **A derived listing.** The public view joins `badge_effective_status`, so a suspended, expired
+  or revoked badge removes its listing in the same instant it changes the verification page.
+  There is no stored flag to go stale and no cache to invalidate.
+- **Opt-out that means it** — one control, immediate, and certification untouched, which is what
+  the Badge Licence now promises in writing. Every change of mind is kept in an append-only table.
+- **One disclosure, one wording**, in `@vibefy/shared`, used by both the verification page and the
+  listing. PART 8.1 requires it wherever a rating is displayed.
+- **A Badge Licence clause** covering listing, what it shows, the opt-out, the disclosure and the
+  no-paid-placement rule — which bumped the version and invalidated existing acceptances, because
+  publishing someone's score is a material change to what they agreed to.
+- **A real bug fixed on the way**: the licence version in force was a constant hardcoded beside
+  the document. Bumping one would have silently stopped badge issuance for ever. It now comes
+  from the generated registry, and the console compares what a customer accepted with what is
+  actually in force.
+
+### Outstanding from M7
+
+**Nothing is listed until something is certified.** That is the cold-start the brief warned about,
+and it is why M7 comes seventh rather than second. No code change makes it go away.
+
+**No paid placement exists, and none is built.** If it is ever introduced it must be labelled as
+advertising, visually and in words, and kept out of the organic ordering — the Badge Licence and
+the ordering note both say so, and the type system would need changing to allow it.
+
+## M8 — not started
+
+Blocked, per PART 2, on M7 being live and on the independence policy in PART 8 being implemented
+and documented. The policy is implemented (`docs/INDEPENDENCE_POLICY.md`, enforced by
+`tests/independence.test.ts`, `tests/directory.test.ts` and the compile-time boundaries in
+`packages/rubric`, `packages/monitoring`, `packages/policy` and `packages/directory`). What
+remains before M8 is a live directory, which needs paying customers, not code.

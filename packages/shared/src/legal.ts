@@ -57,3 +57,14 @@ export const PERMITTED_MARK_PHRASES = [
   'Vibefy-assessed',
   'Vibefy Rubric v1.0.0 — score X/100',
 ] as const;
+
+/**
+ * The paid-relationship disclosure.
+ *
+ * PART 8.1 requires it wherever a rating is displayed — the verification page,
+ * the directory listing, and anywhere else a score appears. It lives here, as
+ * one constant, because two surfaces wording the same disclosure differently is
+ * how the softer wording ends up in the place people actually look.
+ */
+export const MARKETING_CLIENT_DISCLOSURE =
+  'This application’s owner is also a client of our marketing services. That relationship had no part in this assessment: the score is produced by the published rubric from evidence, reviewed by a person, and there is no path by which any payment can change it.';

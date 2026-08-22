@@ -40,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-lg font-bold tracking-tight">Vibefy</span>
             </Link>
             <div className="ml-auto flex flex-wrap items-center gap-5 text-sm">
+              <Link href="/directory">Directory</Link>
               <Link href="/methodology">Methodology</Link>
               <Link href="/console">Console</Link>
               <Link href="/console/portfolio">Portfolio</Link>
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               is not evidence of absence of a defect.
             </p>
             <p className="mt-4 flex flex-wrap gap-4">
+              <Link href="/directory">Directory</Link>
               <Link href="/methodology">Methodology</Link>
               <Link href="/legal">Legal</Link>
               <Link href="/legal/rating-methodology-and-independence">Independence policy</Link>

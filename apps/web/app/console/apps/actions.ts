@@ -532,3 +532,66 @@ export async function acceptBadgeLicence(
       'Licence accepted. Your badge is issued shortly — the process that signs badges runs separately from the console, which is deliberate: it holds the signing key and the console never does.',
   };
 }
+
+// ---------------------------------------------------------------------------
+// The public directory
+// ---------------------------------------------------------------------------
+
+/**
+ * Listing an application, or removing it.
+ *
+ * Opting out takes effect on the next read: the directory is a view over the
+ * live badge and this row, with no cache and no stored "is listed" flag to go
+ * stale. Certification is untouched either way — the Badge Licence says you may
+ * opt out entirely and stay certified, and this is the control that has to make
+ * that true.
+ */
+export async function setDirectoryListing(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'You are signed out.' };
+
+  const appId = String(formData.get('appId') ?? '');
+  const listed = formData.get('listed') === 'on';
+  const tagline = String(formData.get('tagline') ?? '').trim();
+  const category = String(formData.get('category') ?? '').trim();
+
+  if (tagline && (tagline.length < 10 || tagline.length > 160)) {
+    return { error: 'A tagline is between 10 and 160 characters, or leave it blank.' };
+  }
+
+  const { data: app } = await supabase
+    .from('apps')
+    .select('organisation_id')
+    .eq('id', appId)
+    .maybeSingle();
+  if (!app) return { error: 'No such application.' };
+
+  const now = new Date().toISOString();
+  const { error } = await supabase.from('directory_listings').upsert(
+    {
+      app_id: appId,
+      organisation_id: app.organisation_id,
+      state: listed ? 'listed' : 'opted_out',
+      tagline: tagline || null,
+      category: category || null,
+      opted_out_at: listed ? null : now,
+      opted_out_by: listed ? null : user.id,
+    },
+    { onConflict: 'app_id' },
+  );
+  if (error) return { error: error.message };
+
+  revalidatePath('/directory');
+  revalidatePath(`/console/apps/${appId}`);
+  return {
+    notice: listed
+      ? 'Listed. It appears in the directory for as long as the badge is live, and disappears the moment it is not.'
+      : 'Removed from the directory. Your badge and its verification page are unaffected — you stay certified.',
+  };
+}

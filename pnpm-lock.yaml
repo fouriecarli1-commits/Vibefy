@@ -114,6 +114,9 @@ importers:
       '@vibefy/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@vibefy/directory':
+        specifier: workspace:*
+        version: link:../../packages/directory
       '@vibefy/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -250,6 +253,19 @@ importers:
       stripe:
         specifier: 22.5.0
         version: 22.5.0(@types/node@26.2.0)
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/directory:
+    dependencies:
+      '@vibefy/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: 26.2.0

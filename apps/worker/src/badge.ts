@@ -14,6 +14,7 @@
 import { randomBytes } from 'node:crypto';
 import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefy/badge';
 import { isMonitored, type MonitoredPlan } from '@vibefy/monitoring';
+import registry from '../../../legal/registry.json' with { type: 'json' };
 import type { PoolClient } from 'pg';
 
 /** Twelve months is the outside limit; continuous plans get less. */
@@ -24,7 +25,20 @@ const VALIDITY_MONTHS: Readonly<Record<string, number>> = {
   organisation: 3,
 };
 
-const BADGE_LICENCE_VERSION = '1.0.0-draft';
+/**
+ * The version of the Badge Licence currently in force.
+ *
+ * Read from the generated legal registry rather than hardcoded, because the two
+ * drifting apart is a silent failure with an expensive shape: bump the document
+ * and forget the constant, and badge issuance stops finding any accepted licence
+ * — no error, just an empty candidate list for ever.
+ *
+ * A version bump is *meant* to stop issuance until people re-accept. It is not
+ * meant to do so by accident.
+ */
+const BADGE_LICENCE_VERSION: string = (
+  registry as { documents: Record<string, { version: string }> }
+).documents['badge-licence.md']!.version;
 
 export interface IssuanceCandidate {
   readonly assessmentId: string;

@@ -7,6 +7,7 @@ import {
   acceptBadgeLicence,
   requestAssessment,
   revokeAuthorisation,
+  setDirectoryListing,
   startAuthorisation,
   verifyAuthorisation,
 } from '../actions';
@@ -14,6 +15,7 @@ import { setMonitoring } from '../../alerts/actions';
 import { assignPolicyProfile } from '../../workspace/actions';
 import { ActionForm, Checkbox, Field, Select } from '@/components/action-form';
 import { ScoreTrend, type TrendPoint } from '@/components/score-trend';
+import { currentVersionOf } from '@/lib/legal';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Application' };
@@ -91,6 +93,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     .limit(1)
     .maybeSingle();
 
+  // The version currently in force, not merely "some acceptance exists". A page
+  // that says "accepted" while issuance silently ignores an out-of-date consent
+  // is the worst kind of bug: nothing errors and nothing happens.
+  const badgeLicenceVersion = currentVersionOf('badge-licence.md');
+  const licenceIsCurrent = licence?.document_version === badgeLicenceVersion;
+
   const { data: authorisations } = await supabase
     .from('authorisations')
     .select('*')
@@ -122,6 +130,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     .is('read_at', null)
     .order('created_at', { ascending: false })
     .limit(3);
+
+  const { data: listing } = await supabase
+    .from('directory_listings')
+    .select('state, tagline, category')
+    .eq('app_id', id)
+    .maybeSingle();
 
   const { data: policyProfiles } = await supabase
     .from('policy_profiles')
@@ -440,15 +454,25 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                 </div>
               )}
             </div>
-          ) : licence ? (
+          ) : licenceIsCurrent ? (
             <p className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
-              The Badge Licence is accepted. A badge is issued once an assessment has been approved
-              by a reviewer and has met the certification threshold — those are separate gates, and
-              neither can be bought.
+              The Badge Licence is accepted at version {badgeLicenceVersion}. A badge is issued once
+              an assessment has been approved by a reviewer and has met the certification threshold —
+              those are separate gates, and neither can be bought.
             </p>
           ) : (
             <div className="rounded-xl border border-line p-6">
-              <h3 className="font-semibold">Accept the Badge Licence</h3>
+              <h3 className="font-semibold">
+                {licence ? 'Accept the updated Badge Licence' : 'Accept the Badge Licence'}
+              </h3>
+              {licence && (
+                <p className="mt-2 max-w-prose text-sm text-muted">
+                  You accepted version {String(licence.document_version)}; version{' '}
+                  {badgeLicenceVersion} is now in force. No badge is issued or renewed until the
+                  current version is accepted — we do not carry an acceptance forward onto wording
+                  nobody agreed to.
+                </p>
+              )}
               <p className="mt-2 max-w-prose text-sm text-muted">
                 "Verified by Vibefy" is a trade mark. The licence lets you display it for this
                 application, on this domain, until it expires — and sets out what you may not do: no
@@ -599,6 +623,52 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
               </p>
             </div>
           )}
+        </section>
+      )}
+
+      {badge && badge.status === 'active' && (
+        <section aria-labelledby="directory" className="space-y-4">
+          <h2 id="directory" className="text-2xl font-bold tracking-tight">
+            Public directory
+          </h2>
+          <div className="rounded-xl border border-line p-5 text-sm">
+            <p className="text-muted">
+              The directory lists applications with a live badge. A listing shows the name, the
+              certified origin, the score, the score by dimension, the rubric version and the date —
+              nothing that is not already on your verification page.
+            </p>
+            <p className="mt-2 text-muted">
+              You can remove the listing at any time and stay certified. Listings are ordered by the
+              rubric alone; placement is not for sale.
+            </p>
+            <div className="mt-5">
+              <ActionForm action={setDirectoryListing} submitLabel="Save listing">
+                <input type="hidden" name="appId" value={id} />
+                <Checkbox
+                  name="listed"
+                  label="List this application in the public directory"
+                  defaultChecked={String(listing?.state ?? 'listed') === 'listed'}
+                />
+                <Field
+                  label="Tagline"
+                  name="tagline"
+                  defaultValue={String(listing?.tagline ?? '')}
+                  hint="Yours, shown as yours. Between 10 and 160 characters, or leave it blank."
+                />
+                <Field
+                  label="Category"
+                  name="category"
+                  defaultValue={String(listing?.category ?? '')}
+                  hint="How someone browsing would look for it."
+                />
+              </ActionForm>
+            </div>
+            {listing?.state === 'listed' && (
+              <p className="mt-4">
+                <Link href={`/a/${badge.slug}`}>See how it appears</Link>
+              </p>
+            )}
+          </div>
         </section>
       )}
 

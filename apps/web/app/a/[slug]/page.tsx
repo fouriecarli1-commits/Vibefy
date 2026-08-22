@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { scopeStatement, AI_DISCLOSURE } from '@vibefy/shared';
+import { scopeStatement, AI_DISCLOSURE, MARKETING_CLIENT_DISCLOSURE } from '@vibefy/shared';
 import { readAsAnon } from '@/lib/sql';
 
 /**
@@ -137,10 +137,12 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
         <section role="note" className="rounded-xl border border-line p-5">
           <h2 className="font-semibold">Disclosure</h2>
           <p className="mt-2 text-sm text-muted">
-            The owner of this application is also a Vibefy marketing-services client. That
-            relationship has no effect on the score: scoring receives a data structure with no field
-            for it, and a test in our build pipeline asserts a maximally-paying customer and a free
-            one with identical applications score identically. See the{' '}
+            {/* One constant, used here and on the directory listing. PART 8.1 requires
+                the disclosure wherever a rating is displayed, and two wordings is how
+                the softer one ends up where people actually look. */}
+            {MARKETING_CLIENT_DISCLOSURE} Scoring receives a data structure with no field for it,
+            and a test in our build pipeline asserts a maximally-paying customer and a free one
+            with identical applications score identically. See the{' '}
             <Link href="/legal/rating-methodology-and-independence">independence policy</Link>.
           </p>
         </section>

@@ -35,12 +35,12 @@
       "sha256": "b51433344178d6169c582161568b9c6d84b654cab1f750eea674e6cab29a42a2"
     },
     "badge-licence.md": {
-      "version": "1.0.0-draft",
+      "version": "1.1.0-draft",
       "status": "not in force",
       "requiresConsent": true,
       "consentDocumentType": "badge_licence",
       "isDraft": true,
-      "sha256": "79a45cbdf3242cfdc8ae8fc5d534ecdf38142fc3850a376b625b5b0da982a5f2"
+      "sha256": "619f5ccb6c4f9a2c74cc72922b508ff9629b25760280babce90cbea7249e3536"
     },
     "cookie-notice.md": {
       "version": "1.0.0-draft",

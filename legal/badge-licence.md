@@ -3,7 +3,7 @@
 > **DRAFT — REQUIRES REVIEW BY QUALIFIED COUNSEL IN [JURISDICTION] BEFORE USE.**
 > Not legal advice. Not a substitute for a lawyer.
 
-**Version:** 1.0.0-draft · **Status:** not in force · **Baseline:** GDPR-grade
+**Version:** 1.1.0-draft · **Status:** not in force · **Baseline:** GDPR-grade
 
 ---
 
@@ -81,13 +81,32 @@ We will serve the badge with reasonable availability, keep the verification page
 publish the rubric version each badge was issued against, and give you notice before a
 suspension that is not caused by an immediate safety concern.
 
-## 8. No warranty, no reliance
+## 8. The public directory
+
+While a badge is live, the application is listed in the public Vibefy directory. The listing
+shows the application's name, the origin the badge certifies, the overall score, the score by
+dimension, the rubric version and the date of assessment. It shows nothing that is not already
+on the verification page that badge links to.
+
+**You may opt out at any time, including while certified, and remain certified.** Opting out
+removes the listing immediately; the badge and its verification page are unaffected. There is
+nothing to ask us for and no waiting period — it is a control in your console.
+
+Where you are also a client of our marketing services, that relationship is disclosed on the
+listing, in the same words as on the verification page. It is disclosed whether or not you opt
+in to anything, and it is not something you can pay to remove.
+
+Listings are ordered by the rubric alone. Placement in the directory is not for sale. If paid
+placement is ever introduced, it will be labelled as advertising, visually and in words, and it
+will not appear in the organic ordering.
+
+## 9. No warranty, no reliance
 
 The Mark states that an assessment happened and reached a threshold on a date. It is not a
 warranty by us to you or to anyone who sees it, and no third party may rely on it. The
 limitation of liability in the Terms of Service applies.
 
-## 9. Termination
+## 10. Termination
 
 Either party may terminate on notice. On termination the licence ends immediately and clause 5
-applies to removal.
+applies to removal, and any directory listing is removed with it.

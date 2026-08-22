@@ -75,3 +75,17 @@ export function consentPayload() {
     return { documentType, version: entry.version, sha256: entry.sha256 };
   });
 }
+
+/**
+ * The version of a document currently in force.
+ *
+ * Used wherever a surface has to compare "what they accepted" with "what is now
+ * asked of them". Reading it from the registry rather than hardcoding it means
+ * bumping a document cannot leave a page saying "accepted" about wording nobody
+ * has ever seen.
+ */
+export function currentVersionOf(file: string): string {
+  const entry = registry.documents[file];
+  if (!entry?.version) throw new Error(`No version recorded for ${file}.`);
+  return entry.version;
+}

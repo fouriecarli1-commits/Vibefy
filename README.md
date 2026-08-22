@@ -12,13 +12,13 @@ Vibefy is not an app store, and a Vibefy badge is not a security guarantee. See
 
 ## Status
 
-Milestone **M6 — Native mobile app**. Intake, ownership verification, the authorisation
+Milestone **M7 — Public directory**. Intake, ownership verification, the authorisation
 gate, the six-stage pipeline, the reviewer queue, reports with PDF export, entitlements, Stripe
 billing, the signed "Verified by Vibefy" badge with its public verification surface, and
 continuous monitoring, and the agency and organisation surfaces — shared workspaces, seats and
 roles, policy profiles, white-label reports, audit export, single sign-on and the portfolio
-dashboard — and the Expo mobile app with push notifications are built. The public directory (M7)
-is not. See `docs/MILESTONES.md` for what each milestone delivered and `docs/OPEN_ITEMS.md`
+dashboard — the Expo mobile app with push notifications, and the public directory are built. The marketing
+arm (M8) is deliberately not — see `docs/MILESTONES.md`. See `docs/MILESTONES.md` for what each milestone delivered and `docs/OPEN_ITEMS.md`
 for what is deferred and why.
 
 ## Getting started
@@ -64,6 +64,7 @@ packages/monitoring Drift between two assessments, and what makes a change mater
 packages/policy    An organisation's own bar, applied over a score and never to it
 packages/workspace Invitation tokens, seat arithmetic and the audit export
 packages/api       One typed client the console and the phone both use — there is no mobile API
+packages/directory Public listing: search, rubric-only ordering, and the disclosures
 packages/badge     Ed25519 signing, the published key set, and the badge renderer
 packages/shared    Types, design tokens, and the guarantees shared by every surface
 packages/rubric    The rubric as versioned data, plus the scoring functions

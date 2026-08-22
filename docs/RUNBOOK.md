@@ -344,6 +344,47 @@ informational alert is never pushed; it waits in the app, which is deliberate.
 `apps/mobile/assets/` from the same masters as the favicon and the badge. Never
 hand-edit them.
 
+## The public directory
+
+A listing is derived, not stored. `public.directory` joins the live badge through
+`badge_effective_status`, so there is nothing to invalidate and no sweep to miss:
+a suspension removes the listing at the same moment it changes the verification
+page.
+
+### A customer says their listing has disappeared
+
+In order of likelihood:
+
+```sql
+select b.status::text, public.badge_effective_status(b)::text as effective, b.expires_at,
+       b.suspension_reason
+  from public.badges b where b.app_id = '<app id>';
+
+select state::text, opted_out_at, opted_out_by
+  from public.directory_listings where app_id = '<app id>';
+
+select state::text, occurred_at, actor_id from public.listing_events
+ where app_id = '<app id>' order by occurred_at desc;
+```
+
+`listing_events` is append-only, so it settles "we never listed you" against "you
+opted out in March" without anyone's recollection being involved.
+
+### A customer wants to be delisted but stay certified
+
+They do it themselves, on the application page, and it takes effect on the next
+read. The Badge Licence promises exactly this, and a test asserts the badge is
+still `active` after an opt-out.
+
+### Someone asks for paid placement
+
+There is none, and there is no column for one. The ordering comparator receives
+four fields — slug, score, assessment date, dimension scores — and a compile-time
+assertion fails the build if a commercial key reaches that type. If paid
+placement is ever introduced it must be labelled as advertising, visually and in
+words, and kept out of the organic ordering; that is in the Badge Licence and in
+the note under every page of results.
+
 ## Changing a legal document
 
 1. Edit the file in `/legal`, bump its `**Version:**`.
@@ -351,6 +392,13 @@ hand-edit them.
 3. `pnpm test` — the legal suite checks the mandated clauses are still present.
 4. Existing consent records still point at the previous hash, which is the point: they record
    what that customer actually agreed to.
+
+**If the document requires consent, bumping it stops anything that depends on
+that consent until people re-accept.** That is deliberate, and for the Badge
+Licence it is enforced: the version in force is read from `legal/registry.json`
+by both the worker's issuance query and the console's acceptance prompt, so
+neither can drift from the file. Expect issuance to pause and the console to ask
+for re-acceptance. If you did not intend that, you did not want a version bump.
 
 ## Deploying
 
