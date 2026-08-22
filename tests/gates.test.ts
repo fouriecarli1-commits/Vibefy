@@ -127,6 +127,21 @@ describe('secret scan', () => {
     expect(finding!.preview).toMatch(/…/);
   });
 
+  it('honours a reasoned suppression on the flagged line or the one above it', () => {
+    const sameLine = 'const key = "sk_live_51AAAAAAAAAAAAAAAA"; // secret-scan-allow: fixture value';
+    const lineAbove = [
+      '// secret-scan-allow: fixture value the scanner is meant to find',
+      'const key = "sk_live_51AAAAAAAAAAAAAAAA";',
+    ].join('\n');
+    expect(scanText(sameLine)).toHaveLength(0);
+    expect(scanText(lineAbove)).toHaveLength(0);
+  });
+
+  it('ignores a suppression that gives no reason', () => {
+    const bare = 'const key = "sk_live_51AAAAAAAAAAAAAAAA"; // secret-scan-allow';
+    expect(scanText(bare)).not.toHaveLength(0);
+  });
+
   it('leaves placeholders and empty values alone', () => {
     for (const line of [
       'NEXT_PUBLIC_SUPABASE_ANON_KEY=',

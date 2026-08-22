@@ -11,10 +11,14 @@ import type { ModelTransport, TransportRequest, TransportResponse } from './clie
 import type { TokenUsage } from '../runtime/cost.ts';
 
 export interface ScriptedStep {
-  /** Plain text reply. */
-  readonly text?: string;
-  /** Structured reply, returned as `parsed` when the request had a schema. */
-  readonly parsed?: unknown;
+  /** Plain text reply, or a function of the request for context-dependent replies. */
+  readonly text?: string | ((request: TransportRequest) => string);
+  /**
+   * Structured reply, returned as `parsed` when the request had a schema. A
+   * function receives the request, so a test can react to the evidence ids the
+   * stage actually minted — the same way a real model reads them from context.
+   */
+  readonly parsed?: unknown | ((request: TransportRequest) => unknown);
   /** Tool calls the model should make on this step. */
   readonly toolUses?: readonly { name: string; input: Record<string, unknown> }[];
   readonly usage?: Partial<TokenUsage>;
@@ -62,11 +66,14 @@ export class ScriptedTransport implements ModelTransport {
       };
     }
 
+    const text = typeof step.text === 'function' ? step.text(request) : (step.text ?? '');
+    const parsed = typeof step.parsed === 'function' ? step.parsed(request) : step.parsed;
+
     return {
-      content: [{ type: 'text', text: step.text ?? '', citations: null }] as never,
+      content: [{ type: 'text', text, citations: null }] as never,
       stopReason: step.stopReason ?? 'end_turn',
       usage,
-      ...(step.parsed !== undefined ? { parsed: step.parsed } : {}),
+      ...(parsed !== undefined ? { parsed } : {}),
     };
   }
 }

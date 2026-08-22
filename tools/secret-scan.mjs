@@ -94,10 +94,23 @@ function gitFiles(staged) {
   return out.split('\n').filter(Boolean);
 }
 
+/**
+ * A suppression must give a reason, and may sit on the flagged line or the one
+ * above it — formatters move long strings onto their own line, and a rule that
+ * only reads the flagged line quietly stops working the first time that happens.
+ */
+function suppressed(line, previous) {
+  const match = /secret-scan-allow:?([^\n]*)/.exec(line) ?? /secret-scan-allow:?([^\n]*)/.exec(previous);
+  if (!match) return false;
+  const reason = match[1].replace(/(-->|\*\/)\s*$/, '').replace(/^[:\s]+/, '').trim();
+  return reason.length > 0;
+}
+
 export function scanText(text, path = '<input>') {
   const findings = [];
-  text.split('\n').forEach((line, index) => {
-    if (/secret-scan-allow/.test(line)) return;
+  const lines = text.split('\n');
+  lines.forEach((line, index) => {
+    if (suppressed(line, lines[index - 1] ?? '')) return;
     for (const { name, pattern } of SECRET_PATTERNS) {
       const match = pattern.exec(line);
       if (!match) continue;
