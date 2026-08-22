@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { recordSignUpConsents } from '@/lib/consent';
@@ -24,6 +25,11 @@ export default async function ConsolePage() {
   const { data: memberships, error } = await supabase
     .from('memberships')
     .select('role, organisations (id, name, slug, account_type, is_personal)');
+
+  const { data: apps } = await supabase
+    .from('apps')
+    .select('id, name, primary_url, screening_status')
+    .order('created_at', { ascending: false });
 
   return (
     <div className="space-y-8">

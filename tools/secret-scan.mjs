@@ -100,9 +100,13 @@ function gitFiles(staged) {
  * only reads the flagged line quietly stops working the first time that happens.
  */
 function suppressed(line, previous) {
-  const match = /secret-scan-allow:?([^\n]*)/.exec(line) ?? /secret-scan-allow:?([^\n]*)/.exec(previous);
+  const match =
+    /secret-scan-allow:?([^\n]*)/.exec(line) ?? /secret-scan-allow:?([^\n]*)/.exec(previous);
   if (!match) return false;
-  const reason = match[1].replace(/(-->|\*\/)\s*$/, '').replace(/^[:\s]+/, '').trim();
+  const reason = match[1]
+    .replace(/(-->|\*\/)\s*$/, '')
+    .replace(/^[:\s]+/, '')
+    .trim();
   return reason.length > 0;
 }
 

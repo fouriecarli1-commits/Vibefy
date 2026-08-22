@@ -128,7 +128,8 @@ describe('secret scan', () => {
   });
 
   it('honours a reasoned suppression on the flagged line or the one above it', () => {
-    const sameLine = 'const key = "sk_live_51AAAAAAAAAAAAAAAA"; // secret-scan-allow: fixture value';
+    const sameLine =
+      'const key = "sk_live_51AAAAAAAAAAAAAAAA"; // secret-scan-allow: fixture value';
     const lineAbove = [
       '// secret-scan-allow: fixture value the scanner is meant to find',
       'const key = "sk_live_51AAAAAAAAAAAAAAAA";',

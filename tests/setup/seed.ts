@@ -139,16 +139,15 @@ export async function seedFinding(
   const findingId = rows[0]!.id;
 
   if (overrides.withEvidence !== false) {
+    const evidence = await client.query<{ id: string }>(
+      `insert into public.evidence (assessment_id, organisation_id, kind, storage_path, sha256)
+       values ($1, $2, 'header_scan', $3, $4) returning id`,
+      [assessmentId, account.organisationId, `evidence/${findingId}.json`, sha256(findingId)],
+    );
     await client.query(
-      `insert into public.evidence (finding_id, assessment_id, organisation_id, kind, storage_path, sha256)
-       values ($1, $2, $3, 'header_scan', $4, $5)`,
-      [
-        findingId,
-        assessmentId,
-        account.organisationId,
-        `evidence/${findingId}.json`,
-        sha256(findingId),
-      ],
+      `insert into public.finding_evidence (finding_id, evidence_id, organisation_id)
+       values ($1, $2, $3)`,
+      [findingId, evidence.rows[0]!.id, account.organisationId],
     );
   }
   return findingId;

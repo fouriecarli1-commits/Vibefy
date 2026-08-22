@@ -94,8 +94,10 @@ describe('evidence retention', () => {
     const { assessmentId } = await seedAssessment(db, account);
     const findingId = await seedFinding(db, account, assessmentId);
     const { rows } = await db.query<{ days: string }>(
-      `select round(extract(epoch from (retention_until - captured_at)) / 86400) as days
-         from public.evidence where finding_id = $1`,
+      `select round(extract(epoch from (e.retention_until - e.captured_at)) / 86400) as days
+         from public.evidence e
+         join public.finding_evidence fe on fe.evidence_id = e.id
+        where fe.finding_id = $1`,
       [findingId],
     );
     expect(Number(rows[0]!.days)).toBe(30);

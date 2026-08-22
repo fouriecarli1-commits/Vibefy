@@ -99,7 +99,8 @@ describe('a customer cannot read another customer’s data', () => {
     ['assessments', () => aliceAssets.assessmentId],
     ['assessment_runs', () => aliceAssets.assessmentId],
     ['findings', () => aliceAssets.findingId],
-    ['evidence', () => aliceAssets.findingId],
+    ['evidence', () => aliceAssets.assessmentId],
+    ['finding_evidence', () => aliceAssets.findingId],
     ['reports', () => aliceAssets.reportId],
     ['badges', () => aliceAssets.badgeId],
     ['badge_events', () => aliceAssets.badgeId],
@@ -107,10 +108,17 @@ describe('a customer cannot read another customer’s data', () => {
     await actingAs(db, { userId: mallory.userId }, async (client) => {
       const { rows } = await client.query(`select * from public.${table}`);
       expect(rows).toHaveLength(0);
-      const direct = await client.query(
-        `select * from public.${table} where ${table === 'badge_events' ? 'badge_id' : table === 'evidence' ? 'finding_id' : 'id'} = $1`,
-        [id()],
-      );
+      const column =
+        table === 'badge_events'
+          ? 'badge_id'
+          : table === 'evidence' || table === 'assessment_runs'
+            ? 'assessment_id'
+            : table === 'finding_evidence'
+              ? 'finding_id'
+              : 'id';
+      const direct = await client.query(`select * from public.${table} where ${column} = $1`, [
+        id(),
+      ]);
       expect(direct.rows).toHaveLength(0);
     });
   });
