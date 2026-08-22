@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-label="Vibefy — vibe app rating system">
+  <title>Vibefy — vibe app rating system</title>
+  <defs>
+    <linearGradient id="vibefy-lockup-gradient" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1F5FE0"/>
+      <stop offset="55%" stop-color="#2E9BE0"/>
+      <stop offset="100%" stop-color="#2FD3C4"/>
+    </linearGradient>
+    <linearGradient id="vibefy-lockup-check" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2E9BE0"/>
+      <stop offset="100%" stop-color="#39E4D2"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(20 30) scale(0.72)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M88 176 C112 306 162 378 212 398 C266 418 306 360 334 302 C368 230 404 164 434 122" stroke="url(#vibefy-lockup-gradient)" stroke-width="60"/>
+    <path d="M196 272 L250 328 L332 218" stroke="url(#vibefy-lockup-check)" stroke-width="32"/>
+    <g stroke="#2FD3C4" stroke-width="14">
+      <path d="M394.8 90.2 A60 60 0 0 1 454.4 124.6" opacity="0.95"/>
+      <path d="M392.5 64.3 A86 86 0 0 1 477.9 113.7" opacity="0.8"/>
+      <path d="M390.2 38.4 A112 112 0 0 1 501.5 102.7" opacity="0.65"/>
+    </g>
+  </g>
+  <g font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" lengthAdjust="spacingAndGlyphs" fill="#16205A">
+    <text x="430" y="262" font-size="180" font-weight="700" textLength="520">Vibefy</text>
+    <text x="436" y="330" font-size="60" font-weight="500" textLength="500">vibe app rating system</text>
+  </g>
+</svg>

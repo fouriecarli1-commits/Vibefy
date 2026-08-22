@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@10.33.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "bash scripts/dev.sh",
     "build": "pnpm -r --filter ./packages/** build && pnpm --filter @vibefy/web build",
@@ -23,9 +25,17 @@
   },
   "devDependencies": {
     "@types/node": "26.2.0",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.0",
     "prettier": "3.6.2",
+    "sharp": "0.35.3",
     "tsx": "4.23.12",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

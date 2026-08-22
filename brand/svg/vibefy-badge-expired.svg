@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Not currently verified by Vibefy — Expired">
+  <title>Not currently verified by Vibefy — Expired</title>
+  <g fill="none" stroke="#6B7280">
+    <circle cx="256" cy="256" r="243" stroke-width="17"/>
+    <circle cx="256" cy="256" r="219" stroke-width="11"/>
+  </g>
+  <g transform="translate(256 190) scale(0.58) translate(-204 -272)">
+    <path d="M204 116 C240 148 286 164 318 167 L318 288 C318 354 272 400 204 428 C136 400 90 354 90 288 L90 167 C122 164 168 148 204 116 Z" fill="#9CA3AF"/>
+    <path d="M204 132 C238 161 280 176 308 179 L308 287 C308 346 266 388 204 413 C142 388 100 346 100 287 L100 179 C128 176 170 161 204 132 Z" fill="none" stroke="#6B7280" stroke-width="9" opacity="0.55"/>
+    <path d="M150 272 L262 272" fill="none" stroke="#FFFFFF"
+          stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g fill="#374151" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+     text-anchor="middle" lengthAdjust="spacingAndGlyphs">
+    <text x="256" y="308" font-size="46" font-weight="700" textLength="190">Expired</text>
+    <text x="256" y="358" font-size="31" font-weight="500" textLength="176">Not currently</text>
+    <text x="256" y="396" font-size="31" font-weight="500" textLength="266">verified by Vibefy</text>
+  </g>
+</svg>

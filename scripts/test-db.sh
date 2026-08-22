@@ -79,6 +79,7 @@ start() {
 
 apply() {
   local psql="$PG_BIN/psql -v ON_ERROR_STOP=1 -q -h $SOCKET_DIR -U postgres -d $DB_NAME"
+  export PGOPTIONS="-c client_min_messages=warning"
   $psql -f "$ROOT/supabase/shim/local-postgres-shim.sql" >/dev/null
   for migration in "$ROOT"/supabase/migrations/*.sql; do
     if ! $psql -f "$migration"; then

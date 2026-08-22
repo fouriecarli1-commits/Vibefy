@@ -1,0 +1,19 @@
+{
+  "name": "@vibefy/rubric",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./versions/1.0.0.json": "./versions/1.0.0.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vibefy/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0"
+  }
+}
