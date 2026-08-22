@@ -11,7 +11,21 @@ type Mode = 'sign-in' | 'sign-up';
  * recorded at sign-up with the version, timestamp and user — the consents table
  * is append-only, so this record is evidence rather than a checkbox.
  */
-export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined }) {
+export interface AcceptedDocument {
+  documentType: string;
+  version: string;
+  sha256: string;
+}
+
+export function AuthForm({
+  mode,
+  next,
+  acceptedDocuments = [],
+}: {
+  mode: Mode;
+  next?: string | undefined;
+  acceptedDocuments?: AcceptedDocument[];
+}) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +45,13 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
         email,
         password,
         options: {
-          data: { full_name: fullName },
+          // Carried in metadata because there is no session yet to write a
+          // consent row under; lib/consent.ts materialises it on first sign-in.
+          data: {
+            full_name: fullName,
+            accepted_documents: acceptedDocuments,
+            accepted_at: new Date().toISOString(),
+          },
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next ?? '/console')}`,
         },
       });
@@ -109,8 +129,10 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string | undefined
 
       {mode === 'sign-up' && (
         <p className="text-sm text-muted">
-          Creating an account records your acceptance of the Terms of Service and the Privacy
-          Policy, with the version and timestamp. Both are drafts pending legal review.
+          Creating an account records your acceptance of the{' '}
+          <a href="/legal/terms-of-service">Terms of Service</a> and the{' '}
+          <a href="/legal/privacy-policy">Privacy Policy</a>, with the version, the timestamp and a
+          hash of the exact wording. Both are drafts pending legal review.
         </p>
       )}
 

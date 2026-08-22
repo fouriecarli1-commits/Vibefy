@@ -59,6 +59,44 @@ describe('copy lint', () => {
     expect(violations.some((v) => v.rule === 'suppression-without-reason')).toBe(true);
   });
 
+  it('honours a reasoned block suppression, which the Badge Licence needs to name what it forbids', () => {
+    const source = [
+      '<!-- vibefy-copy-lint-allow-block: the licence must name the phrases it prohibits -->',
+      'Not permitted: "Vibefy Approved", "Guaranteed by Vibefy".',
+      '<!-- vibefy-copy-lint-allow-block-end -->',
+      'Everything after the block is checked again.',
+    ].join('\n');
+    expect(lintText(source)).toHaveLength(0);
+  });
+
+  it('rejects a block suppression with no reason', () => {
+    const source = [
+      '<!-- vibefy-copy-lint-allow-block: -->',
+      'Vibefy Approved',
+      '<!-- vibefy-copy-lint-allow-block-end -->',
+    ].join('\n');
+    expect(lintText(source).some((v) => v.rule === 'suppression-without-reason')).toBe(true);
+  });
+
+  it('rejects a block suppression that is never closed, so it cannot silence a whole file', () => {
+    const source = [
+      '<!-- vibefy-copy-lint-allow-block: opened and forgotten -->',
+      'Vibefy Approved',
+    ].join('\n');
+    expect(lintText(source).some((v) => v.rule === 'unclosed-suppression')).toBe(true);
+  });
+
+  it('still checks the lines after a closed block', () => {
+    const source = [
+      '<!-- vibefy-copy-lint-allow-block: naming what is prohibited -->',
+      'Vibefy Approved',
+      '<!-- vibefy-copy-lint-allow-block-end -->',
+      '',
+      'Your application is secure.',
+    ].join('\n');
+    expect(lintText(source).some((v) => v.rule === 'unqualified-absolute')).toBe(true);
+  });
+
   it('honours a suppression that gives one', () => {
     const source = [
       '// vibefy-copy-lint-allow: quoting a store policy verbatim',

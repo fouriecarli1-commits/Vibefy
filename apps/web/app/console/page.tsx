@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { recordSignUpConsents } from '@/lib/consent';
 
 export const metadata: Metadata = { title: 'Console' };
 
@@ -17,6 +18,8 @@ export default async function ConsolePage() {
   } = await supabase.auth.getUser();
 
   if (!user) redirect('/sign-in?next=/console');
+
+  await recordSignUpConsents();
 
   const { data: memberships, error } = await supabase
     .from('memberships')

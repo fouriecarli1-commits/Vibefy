@@ -88,7 +88,6 @@ export const RESTRICTED_WORDS = [
   'risk-free',
   'bug-free',
   'error-free',
-  'approved by',
 ];
 
 /** Markers that make a restricted word acceptable, because the sentence limits it. */
@@ -138,9 +137,12 @@ function sentencesOf(line) {
 export function lintText(text, path = '<input>') {
   const violations = [];
   const lines = text.split('\n');
+  const { suppressed, blockViolations } = suppressedBlocks(lines, path);
+  violations.push(...blockViolations);
 
   // Phrase-level rules are line-local: a forbidden phrase is forbidden wherever it appears.
   lines.forEach((line, index) => {
+    if (suppressed.has(index)) return;
     const lower = line.toLowerCase();
     for (const phrase of FORBIDDEN_PHRASES) {
       if (lower.includes(phrase)) {
@@ -161,7 +163,8 @@ export function lintText(text, path = '<input>') {
         detail: `"${markMatch[0]}" extends the certification mark. Permitted forms: "Verified by Vibefy", "Vibefy-assessed", "Vibefy Rubric vX — score N/100".`,
       });
     }
-    if (/vibefy-copy-lint-allow:\s*$/.test(lower)) {
+    const inline = /vibefy-copy-lint-allow:([^\n]*)/.exec(lower);
+    if (inline && !isMeaningfulReason(inline[1])) {
       violations.push({
         path,
         line: index + 1,
@@ -173,8 +176,9 @@ export function lintText(text, path = '<input>') {
 
   // Restricted words are judged per paragraph, not per line: prose wraps, and a negation
   // that lands on the previous physical line still scopes the sentence it belongs to.
-  for (const block of paragraphsOf(lines)) {
-    if (/vibefy-copy-lint-allow:\s*\S/.test(block.text)) continue;
+  for (const block of paragraphsOf(lines, suppressed)) {
+    const inlineAllow = /vibefy-copy-lint-allow:([^\n]*)/.exec(block.text);
+    if (inlineAllow && isMeaningfulReason(inlineAllow[1])) continue;
     const lower = block.text.toLowerCase();
     for (const sentence of sentencesOf(lower)) {
       for (const word of RESTRICTED_WORDS) {
@@ -194,11 +198,72 @@ export function lintText(text, path = '<input>') {
   return violations;
 }
 
+/**
+ * Marks the line numbers inside a reasoned block suppression, and reports blocks
+ * that give no reason or are never closed.
+ */
+function suppressedBlocks(lines, path) {
+  const suppressed = new Set();
+  const blockViolations = [];
+  let openedAt = null;
+
+  lines.forEach((line, index) => {
+    if (/vibefy-copy-lint-allow-block-end/.test(line)) {
+      if (openedAt !== null) suppressed.add(index);
+      openedAt = null;
+      return;
+    }
+    const opener = /vibefy-copy-lint-allow-block:(.*)$/.exec(line);
+    if (opener) {
+      if (!isMeaningfulReason(opener[1])) {
+        blockViolations.push({
+          path,
+          line: index + 1,
+          rule: 'suppression-without-reason',
+          detail: 'A copy-lint block suppression must state why the wording is correct.',
+        });
+      }
+      openedAt = index;
+      suppressed.add(index);
+      return;
+    }
+    if (openedAt !== null) suppressed.add(index);
+  });
+
+  if (openedAt !== null) {
+    blockViolations.push({
+      path,
+      line: openedAt + 1,
+      rule: 'unclosed-suppression',
+      detail:
+        'A copy-lint block suppression was opened and never closed, silencing the rest of the file.',
+    });
+  }
+
+  return { suppressed, blockViolations };
+}
+
+/**
+ * A suppression must say why. Comment terminators are stripped first, so
+ * `<!-- vibefy-copy-lint-allow-block: -->` reads as the empty reason it is
+ * rather than as the string "-->".
+ */
+function isMeaningfulReason(raw) {
+  const reason = String(raw ?? '')
+    .replace(/(-->|\*\/|#>)\s*$/, '')
+    .trim();
+  return reason.length >= 10;
+}
+
 /** Consecutive non-blank lines, joined, so wrapped prose is judged as the sentence it is. */
-function paragraphsOf(lines) {
+function paragraphsOf(lines, suppressed = new Set()) {
   const blocks = [];
   let current = null;
   lines.forEach((line, index) => {
+    if (suppressed.has(index)) {
+      current = null;
+      return;
+    }
     if (line.trim() === '') {
       current = null;
       return;

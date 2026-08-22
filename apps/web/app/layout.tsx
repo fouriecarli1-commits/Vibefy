@@ -64,6 +64,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               penetration test, a security audit, or a guarantee of any kind. Absence of a finding
               is not evidence of absence of a defect.
             </p>
+            <p className="mt-4 flex flex-wrap gap-4">
+              <Link href="/methodology">Methodology</Link>
+              <Link href="/legal">Legal</Link>
+              <Link href="/legal/rating-methodology-and-independence">Independence policy</Link>
+              <Link href="/legal/responsible-disclosure">Responsible disclosure</Link>
+            </p>
             <p className="mt-4">© {new Date().getFullYear()} Vibefy</p>
           </div>
         </footer>
