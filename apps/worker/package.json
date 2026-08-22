@@ -19,7 +19,8 @@
     "@vibefy/report": "workspace:*",
     "playwright": "1.62.1",
     "@vibefy/billing": "workspace:*",
-    "@vibefy/badge": "workspace:*"
+    "@vibefy/badge": "workspace:*",
+    "@vibefy/monitoring": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

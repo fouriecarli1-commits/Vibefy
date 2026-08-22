@@ -91,7 +91,17 @@ export function Field({
   );
 }
 
-export function Checkbox({ label, name, hint }: { label: string; name: string; hint?: string }) {
+export function Checkbox({
+  label,
+  name,
+  hint,
+  defaultChecked = false,
+}: {
+  label: string;
+  name: string;
+  hint?: string;
+  defaultChecked?: boolean;
+}) {
   const id = `field-${name}`;
   const hintId = hint ? `${id}-hint` : undefined;
   return (
@@ -100,6 +110,7 @@ export function Checkbox({ label, name, hint }: { label: string; name: string; h
         id={id}
         name={name}
         type="checkbox"
+        defaultChecked={defaultChecked}
         aria-describedby={hintId}
         className="mt-1.5 size-4"
       />

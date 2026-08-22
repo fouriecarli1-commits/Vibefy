@@ -95,15 +95,30 @@ export interface SeededAssessment {
 export async function seedAssessment(
   client: Client,
   account: SeededAccount,
-  options: { depth?: string } = {},
+  options: {
+    depth?: string;
+    /** Reuse an existing application, so a test can build a history on one app. */
+    appId?: string;
+    authorisationId?: string;
+    rubricVersion?: string;
+  } = {},
 ): Promise<SeededAssessment> {
-  await seedRubric(client);
-  const appId = await seedApp(client, account);
-  const authorisationId = await seedAuthorisation(client, account, appId);
+  const rubricVersion = options.rubricVersion ?? '1.0.0';
+  await seedRubric(client, rubricVersion);
+  const appId = options.appId ?? (await seedApp(client, account));
+  const authorisationId =
+    options.authorisationId ?? (await seedAuthorisation(client, account, appId));
   const { rows } = await client.query<{ id: string }>(
     `insert into public.assessments (app_id, organisation_id, authorisation_id, rubric_version, depth, requested_by)
-     values ($1, $2, $3, '1.0.0', $4, $5) returning id`,
-    [appId, account.organisationId, authorisationId, options.depth ?? 'limited', account.userId],
+     values ($1, $2, $3, $6, $4, $5) returning id`,
+    [
+      appId,
+      account.organisationId,
+      authorisationId,
+      options.depth ?? 'limited',
+      account.userId,
+      rubricVersion,
+    ],
   );
   return { assessmentId: rows[0]!.id, appId, authorisationId };
 }
@@ -117,6 +132,7 @@ export async function seedFinding(
     severity?: string;
     confidence?: string;
     ruleId?: string;
+    title?: string;
     withEvidence?: boolean;
   } = {},
 ): Promise<string> {
@@ -131,7 +147,7 @@ export async function seedFinding(
       overrides.severity ?? 'medium',
       overrides.confidence ?? 'high',
       overrides.ruleId ?? 'SEC-02',
-      'Missing Content-Security-Policy header',
+      overrides.title ?? 'Missing Content-Security-Policy header',
       'The application responds without a Content-Security-Policy header on any assessed route.',
       'Add a Content-Security-Policy header appropriate to the application, starting in report-only mode.',
     ],

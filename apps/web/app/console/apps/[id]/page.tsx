@@ -10,7 +10,9 @@ import {
   startAuthorisation,
   verifyAuthorisation,
 } from '../actions';
+import { setMonitoring } from '../../alerts/actions';
 import { ActionForm, Checkbox, Field } from '@/components/action-form';
+import { ScoreTrend, type TrendPoint } from '@/components/score-trend';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Application' };
@@ -93,6 +95,42 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     .select('*')
     .eq('app_id', id)
     .order('created_at', { ascending: false });
+
+  // The trend and the comparison behind it. `assessment_history` is a view over
+  // the same rows the report is built from, so the two can never disagree.
+  const { data: history } = await supabase
+    .from('assessment_history')
+    .select('assessment_id, overall_score, assessed_at, score_delta, material_regression')
+    .eq('app_id', id)
+    .limit(12);
+
+  const { data: drift } = await supabase
+    .from('drift_reports')
+    .select(
+      'id, score_before, score_after, score_delta, findings_new, findings_resolved, findings_persisting, new_finding_titles, resolved_finding_titles, material_regression, regression_reasons, created_at',
+    )
+    .eq('app_id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: appAlerts } = await supabase
+    .from('alerts')
+    .select('id, title, severity, created_at, read_at')
+    .eq('app_id', id)
+    .is('read_at', null)
+    .order('created_at', { ascending: false })
+    .limit(3);
+
+  const trend: TrendPoint[] = (history ?? [])
+    .filter((row) => row.overall_score !== null)
+    .map((row) => ({
+      assessmentId: String(row.assessment_id),
+      score: Number(row.overall_score),
+      assessedAt: String(row.assessed_at),
+      delta: row.score_delta === null ? null : Number(row.score_delta),
+      materialRegression: Boolean(row.material_regression),
+    }));
 
   const current = authorisations?.[0] ?? null;
   const status = current?.status ?? 'none';
@@ -422,6 +460,137 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                   />
                 </ActionForm>
               </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {trend.length > 0 && (
+        <section aria-labelledby="trend" className="space-y-5">
+          <h2 id="trend" className="text-2xl font-bold tracking-tight">
+            Score over time
+          </h2>
+          <div className="rounded-xl border border-line p-5">
+            <ScoreTrend points={trend} />
+          </div>
+
+          {drift && (
+            <div className="rounded-xl border border-line p-5">
+              <h3 className="font-semibold">
+                Since the assessment before it, on{' '}
+                {new Date(drift.created_at as string).toISOString().slice(0, 10)}
+              </h3>
+              <p className="mt-2 text-sm text-muted">
+                {Number(drift.score_before).toFixed(1)} → {Number(drift.score_after).toFixed(1)} (
+                {Number(drift.score_delta) > 0 ? '+' : ''}
+                {Number(drift.score_delta).toFixed(1)}) · {String(drift.findings_new)} new,{' '}
+                {String(drift.findings_resolved)} resolved, {String(drift.findings_persisting)}{' '}
+                unchanged.
+              </p>
+              {(drift.new_finding_titles as string[] | null)?.length ? (
+                <div className="mt-4 text-sm">
+                  <p className="font-medium">New</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-muted">
+                    {(drift.new_finding_titles as string[]).map((title) => (
+                      <li key={title}>{title}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {(drift.resolved_finding_titles as string[] | null)?.length ? (
+                <div className="mt-4 text-sm">
+                  <p className="font-medium">Resolved</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-muted">
+                    {(drift.resolved_finding_titles as string[]).map((title) => (
+                      <li key={title}>{title}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {drift.material_regression ? (
+                <div className="mt-4 rounded-lg border border-line-strong p-4 text-sm">
+                  <p className="font-medium text-bad">
+                    This was a material change, so the badge was suspended.
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
+                    {(drift.regression_reasons as string[]).map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-muted">
+                    Fix the findings in the report and request a re-assessment. The badge is restored
+                    when a new assessment passes review.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </section>
+      )}
+
+      {status === 'verified' && (
+        <section aria-labelledby="monitoring" className="space-y-4">
+          <h2 id="monitoring" className="text-2xl font-bold tracking-tight">
+            Monitoring
+          </h2>
+          <div className="rounded-xl border border-line p-5 text-sm">
+            <p className="text-muted">
+              With monitoring on we re-assess this application on your plan’s cadence and check that
+              its certified origin is still answering. The check is a single GET request to that
+              origin and nothing else — the same scope you authorised.
+            </p>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-muted">Status</dt>
+                <dd className="font-medium">{app.monitoring_enabled ? 'On' : 'Off'}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Last seen answering</dt>
+                <dd className="font-medium">
+                  {app.last_seen_at
+                    ? new Date(app.last_seen_at as string).toUTCString()
+                    : 'Not checked yet'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Consecutive failed checks</dt>
+                <dd className="font-medium">{String(app.consecutive_liveness_failures ?? 0)}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Last re-assessment queued</dt>
+                <dd className="font-medium">
+                  {app.last_reassessed_at
+                    ? new Date(app.last_reassessed_at as string).toISOString().slice(0, 10)
+                    : 'Never'}
+                </dd>
+              </div>
+            </dl>
+            <div className="mt-5">
+              <ActionForm
+                action={setMonitoring}
+                submitLabel={app.monitoring_enabled ? 'Update monitoring' : 'Turn monitoring on'}
+              >
+                <input type="hidden" name="appId" value={id} />
+                <Checkbox
+                  name="enabled"
+                  label="Monitor this application"
+                  defaultChecked={Boolean(app.monitoring_enabled)}
+                />
+              </ActionForm>
+            </div>
+          </div>
+
+          {(appAlerts ?? []).length > 0 && (
+            <div className="rounded-xl border border-line-strong p-5 text-sm">
+              <h3 className="font-semibold">Unread alerts about this application</h3>
+              <ul className="mt-2 space-y-1 text-muted">
+                {(appAlerts ?? []).map((alert) => (
+                  <li key={alert.id as string}>{String(alert.title)}</li>
+                ))}
+              </ul>
+              <p className="mt-3">
+                <Link href="/console/alerts">Open your alerts</Link>
+              </p>
             </div>
           )}
         </section>

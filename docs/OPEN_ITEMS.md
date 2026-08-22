@@ -26,6 +26,19 @@ codebase must appear here. Nothing leaves this list silently.
 | Public directory                           | M7          | Cold-start: a directory of nothing helps nobody                                                    |
 | Marketing arm                              | M8          | Blocked on the independence policy being implemented and documented                                |
 
+## Known gaps in shipped code
+
+Things that work but are narrower than they will need to be. Each is here so it cannot be
+mistaken for finished.
+
+| Gap | Where | Why it is acceptable for now |
+| --- | --- | --- |
+| Alerts are never delivered outside the console | `alerts.delivered_at` and `delivery_channel` are written by nothing | There is no email sender yet. The columns exist so adding one later is a sweep, not a migration — and the console is the record either way. |
+| The liveness probe bypasses the scope guard | `apps/worker/src/monitoring.ts`, `httpLivenessProbe` | It is a single GET to the badge's own certified origin, which is narrower than any authorised scope. It should still go through the guarded dispatcher so there is one egress path, not two. |
+| Badge fidelity against the supplied artwork | `packages/badge/src/render.ts` | The marks are traced from 300dpi JPEG; vector originals would close the delta. |
+| The `verify.` subdomain is not deployed | Routing | The routes exist and work; host-based routing is blocked on the domain decision. |
+| Key-compromise re-signing is manual | `docs/RUNBOOK.md` | Planned rotation is covered by keeping retired keys published. A bulk re-signing script is not written. |
+
 ## Stubs in the codebase
 
 | Symbol       | File | Replaced by |

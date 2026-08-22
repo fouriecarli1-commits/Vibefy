@@ -77,7 +77,7 @@ export async function suspendBadge(
     .update({
       status: 'suspended',
       suspended_at: new Date().toISOString(),
-      revocation_reason: reason,
+      suspension_reason: reason,
     })
     .eq('id', badgeId);
   if (error) return { error: error.message };
@@ -98,7 +98,7 @@ export async function reinstateBadge(
   const badgeId = String(formData.get('badgeId') ?? '');
   const { error } = await context.supabase
     .from('badges')
-    .update({ status: 'active', suspended_at: null })
+    .update({ status: 'active', suspended_at: null, suspension_reason: null })
     .eq('id', badgeId);
   if (error) return { error: error.message };
 

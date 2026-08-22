@@ -14,9 +14,19 @@ import { NotAuthorisedError, runAssessmentJob } from './run-assessment.ts';
 import { claimNextRequest, completeRequest, failRequest } from './queue.ts';
 import { resolveReportStorage, sweepPendingReports } from './report.ts';
 import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
+import {
+  sweepBadgeExpiryWarnings,
+  sweepDriftDetection,
+  sweepLiveness,
+  sweepScheduledReassessments,
+} from './monitoring.ts';
 
 export const POLL_INTERVAL_MS = 5_000;
 export const REPORT_SWEEP_INTERVAL_MS = 30_000;
+// Monitoring answers slower questions — is anything due, has anything drifted,
+// is the site still up — so it runs on its own, longer beat. Running it at the
+// report cadence would mean pinging every customer's site every thirty seconds.
+export const MONITOR_SWEEP_INTERVAL_MS = 5 * 60_000;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -108,14 +118,39 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
   }, REPORT_SWEEP_INTERVAL_MS);
   sweep.unref();
 
+  // Continuous monitoring. Every one of these is idempotent — a drift report is
+  // unique per assessment, an alert is unique per dedupe key, a re-assessment
+  // stamps the app before it runs — so a sweep that runs twice, or that crashes
+  // halfway, costs nothing.
+  const monitor = setInterval(() => {
+    void sweepDriftDetection(pool, log).catch((error) =>
+      log('drift sweep failed', { error: String(error) }),
+    );
+    void sweepScheduledReassessments(pool, log).catch((error) =>
+      log('re-assessment sweep failed', { error: String(error) }),
+    );
+    void sweepLiveness(pool, undefined, log).catch((error) =>
+      log('liveness sweep failed', { error: String(error) }),
+    );
+    void sweepBadgeExpiryWarnings(pool, log).catch((error) =>
+      log('badge expiry sweep failed', { error: String(error) }),
+    );
+  }, MONITOR_SWEEP_INTERVAL_MS);
+  monitor.unref();
+
   void loop();
-  log('worker ready', { poll: POLL_INTERVAL_MS, reportSweep: REPORT_SWEEP_INTERVAL_MS });
+  log('worker ready', {
+    poll: POLL_INTERVAL_MS,
+    reportSweep: REPORT_SWEEP_INTERVAL_MS,
+    monitorSweep: MONITOR_SWEEP_INTERVAL_MS,
+  });
 
   return {
     pool,
     async stop() {
       running = false;
       clearInterval(sweep);
+      clearInterval(monitor);
       await pool.end();
     },
   };

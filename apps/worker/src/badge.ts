@@ -13,6 +13,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefy/badge';
+import { isMonitored, type MonitoredPlan } from '@vibefy/monitoring';
 import type { PoolClient } from 'pg';
 
 /** Twelve months is the outside limit; continuous plans get less. */
@@ -198,6 +199,15 @@ export async function issueBadgeFor(
     ],
   );
 
+  // A badge on a continuous plan is a maintained claim, so monitoring starts the
+  // moment it is issued rather than when someone remembers to switch it on. A
+  // one-off badge is a photograph and is not monitored — it expires instead.
+  if (isMonitored(candidate.plan as MonitoredPlan)) {
+    await client.query('update public.apps set monitoring_enabled = true where id = $1', [
+      candidate.appId,
+    ]);
+  }
+
   return { badgeId: rows[0]!.id, slug, publicId };
 }
 
@@ -264,7 +274,8 @@ export async function sweepBadgeLifecycle(
     // monitoring stops, and a badge whose monitoring has stopped is a stale stamp.
     const suspended = await client.query(
       `update public.badges b
-          set status = 'suspended', suspended_at = now()
+          set status = 'suspended', suspended_at = now(),
+              suspension_reason = 'The subscription that maintains this verification is no longer active, so monitoring has stopped.'
         where b.status = 'active'
           and exists (
             select 1 from public.subscriptions s

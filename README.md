@@ -12,11 +12,13 @@ Vibefy is not an app store, and a Vibefy badge is not a security guarantee. See
 
 ## Status
 
-Milestone **M3 — Badge system**. Intake, ownership verification, the authorisation gate, the
-six-stage pipeline, the reviewer queue, reports with PDF export, entitlements, Stripe billing,
-and the signed "Verified by Vibefy" badge with its public verification surface are built.
-Continuous monitoring (M4) is not. See `docs/MILESTONES.md` for what each milestone delivered
-and `docs/OPEN_ITEMS.md` for what is deferred and why.
+Milestone **M4 — Continuous monitoring**. Intake, ownership verification, the authorisation
+gate, the six-stage pipeline, the reviewer queue, reports with PDF export, entitlements, Stripe
+billing, the signed "Verified by Vibefy" badge with its public verification surface, and
+continuous monitoring — scheduled re-assessment, drift detection, liveness checks and automatic
+badge suspension on a material regression — are built. Agency and organisation surfaces (M5)
+are not. See `docs/MILESTONES.md` for what each milestone delivered and `docs/OPEN_ITEMS.md`
+for what is deferred and why.
 
 ## Getting started
 
@@ -52,10 +54,11 @@ Runs, in order:
 
 ```
 apps/web           Next.js App Router console, review queue and public pages
-apps/worker        The assessment runner: pg-boss consumer, pipeline, persistence
+apps/worker        The assessment runner: queue consumer, pipeline, persistence, monitoring sweeps
 packages/engine    The assessment engine — scope boundary, stages, evidence, cost
 packages/report    The report: assembly from stored rows, tier redaction, rendering
 packages/billing   Entitlements, the payment boundary, and webhook application
+packages/monitoring Drift between two assessments, and what makes a change material
 packages/badge     Ed25519 signing, the published key set, and the badge renderer
 packages/shared    Types, design tokens, and the guarantees shared by every surface
 packages/rubric    The rubric as versioned data, plus the scoring functions

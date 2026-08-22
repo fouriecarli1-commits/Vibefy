@@ -191,6 +191,64 @@ Because the image is served from our origin with a five-minute cache, a
 revocation stops every embedded instance reading as verified within minutes.
 There is no file anywhere that says otherwise.
 
+## Continuous monitoring
+
+Four sweeps run in the worker every five minutes (`MONITOR_SWEEP_INTERVAL_MS`).
+All four are idempotent, so running them twice, or crashing halfway, costs
+nothing.
+
+| Sweep | What it does |
+| --- | --- |
+| `sweepDriftDetection` | Compares each reviewed assessment against the one before it on the same application, writes an append-only `drift_reports` row, and suspends the badge if the change is material |
+| `sweepScheduledReassessments` | Queues a re-assessment for every monitored application whose plan cadence is up, re-checking the authorisation in the same query |
+| `sweepLiveness` | Sends one GET to each monitored badge's certified origin, suspends after a run of failures, restores when it answers again |
+| `sweepBadgeExpiryWarnings` | Raises one alert at 30 days and one at 7 days before expiry |
+
+### When a customer asks why their badge was suspended
+
+The answer is a row, not a reconstruction:
+
+```sql
+select created_at, score_before, score_after, score_delta,
+       material_regression, regression_reasons, certification_lost,
+       new_finding_titles
+  from public.drift_reports
+ where app_id = '<app id>'
+ order by created_at desc
+ limit 1;
+```
+
+`regression_reasons` is the exact wording the customer was shown, frozen at the
+moment the decision was made. The table refuses updates and deletes, including
+from the superuser, so what is there is what happened. If the suspension was a
+liveness one instead, `badges.suspension_reason` says so and names the number of
+consecutive failed checks.
+
+### Restoring a badge
+
+- **Suspended for unreachability** — restores itself on the next successful
+  probe. Nothing to do.
+- **Suspended for a material regression** — the customer fixes the findings and
+  requests a re-assessment. A new approved assessment issues a badge through the
+  normal three gates. Do not reinstate by hand: the suspension is a record of a
+  score that was true at the time.
+- **Suspended by a reviewer** — `/review/badges`, with a written reason for the
+  reinstatement. The liveness sweep will not touch it, because it only reverses
+  suspensions whose reason it wrote itself.
+
+### Turning monitoring off for one application
+
+The customer does it themselves on the application page. Off means we stop
+looking; the badge is then not renewed and runs to its expiry date.
+
+### Adjusting what counts as material
+
+`DEFAULT_MATERIALITY_POLICY` in `packages/monitoring/src/regression.ts`. The
+numbers there mirror rubric 1.0.0's certification floors but are restated
+deliberately, so that publishing a new rubric cannot silently change what
+suspends a live badge. Changing either is a decision to record in
+`DECISIONS.md`, and `pnpm test` will tell you which cases move.
+
 ## Changing a legal document
 
 1. Edit the file in `/legal`, bump its `**Version:**`.

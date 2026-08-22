@@ -156,6 +156,53 @@ deployment concern blocked on the domain decision. A **bulk re-signing script** 
 compromise path: planned rotation is covered by retired keys, and the runbook says plainly that
 the compromise path is not automated yet.
 
-## M4–M8 — not started
+## M4 — Continuous monitoring ✅
+
+| Gate | Status |
+| --- | --- |
+| 1. `pnpm verify` green | ✅ 417 tests, six gates |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Drift and regression are badge tests: 26 unit cases and 18 against the database |
+| 3. Every AI-written claim evidence-bound | ✅ Unchanged — monitoring adds no model calls |
+| 4. RLS verified | ✅ `drift_reports` and `alerts` are member-scoped; the only writable column for a customer is `alerts.read_at` |
+| 5. No secrets in the repo | ✅ Unchanged |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ Unchanged |
+| 7. Docs updated | ✅ 85 decisions recorded |
+| 8. Cost per run recorded and visible | ✅ A scheduled re-assessment carries the same per-run ceiling as a requested one |
+
+### What M4 built
+
+- **`packages/monitoring`** — the whole verdict, with no database access: what changed between two
+  assessments, and whether the change is bad enough to take a badge down. Every rule is data and
+  carries the sentence the customer is shown.
+- **The same commercial-data ban as scoring**, enforced at compile time. Suspension cannot see a
+  plan, a price or a marketing relationship, and a source-scan test keeps the cadence table out of
+  the verdict modules.
+- **`drift_reports`**, append-only, with a check constraint that makes "we suspended it and cannot
+  say why" unrepresentable.
+- **Four sweeps in the worker**: compare each finished assessment against its predecessor, queue
+  due re-assessments, ping certified origins, and warn before a badge expires. All idempotent —
+  a drift report is unique per assessment, an alert is unique per dedupe key, and a re-assessment
+  stamps the application before it runs.
+- **Automatic suspension on a material regression**, with the reasons written down at the moment
+  the decision was made, and a matching alert quoting them in full.
+- **Liveness with a run threshold and automatic restore**, so one timeout costs nothing and a
+  recovery needs no support ticket — while leaving a reviewer's suspension exactly where they put
+  it.
+- **A separate `suspension_reason`**, because a customer whose site was down for six hours should
+  not be told their badge was revoked.
+- **The console surfaces**: score over time, the last comparison in full — new, resolved and
+  unchanged findings — an alert inbox, and a monitoring switch on each application.
+
+### Outstanding from M4
+
+**Alert delivery outside the console.** `alerts.delivered_at` and `delivery_channel` exist and are
+never set: there is no email sender yet, so an alert is only seen by someone who logs in. The
+column is there so that adding a sender later is a sweep, not a migration.
+
+**The liveness probe does not go through the scope guard.** It is a single GET to the badge's own
+certified origin, which is narrower than any authorised scope, but it uses `fetch` directly rather
+than the guarded dispatcher. Registered in OPEN_ITEMS.md.
+
+## M5–M8 — not started
 
 See PART 2 of the build brief.

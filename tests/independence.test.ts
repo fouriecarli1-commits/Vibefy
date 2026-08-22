@@ -181,10 +181,51 @@ describe('the scoring module cannot see money', () => {
     for (const file of readdirSync(scoringDir).filter((name) => name.endsWith('.ts'))) {
       const source = readFileSync(join(scoringDir, file), 'utf8');
       expect(source, `${file} must not import billing`).not.toMatch(
-        /from ['"]@vibefy\/(billing|report)/,
+        /from ['"]@vibefy\/(billing|report|monitoring)/,
       );
       expect(source, `${file} must not read the price list`).not.toMatch(/config\/pricing/);
     }
+  });
+});
+
+describe('what suspends a badge cannot see money either', () => {
+  // Monitoring is the second place where a commercial fact could quietly change
+  // a verdict — "their subscription lapsed, call it a regression" — and the
+  // consequence there is worse, because it takes a live badge down. The same
+  // guard applies, with one deliberate exception: schedule.ts decides *cadence*,
+  // which is coverage, and is allowed to know what someone bought.
+  const monitoringDir = join(process.cwd(), 'packages/monitoring/src');
+  const forbidden = ['subscription', 'invoice', 'stripe', 'price', 'marketing', 'billing', 'seats'];
+  const verdictFiles = ['drift.ts', 'regression.ts', 'liveness.ts'];
+
+  it.each(verdictFiles)('%s contains no commercial concept', (file) => {
+    const source = readFileSync(join(monitoringDir, file), 'utf8');
+    const code = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/.*$/gm, '')
+      .toLowerCase();
+    for (const term of forbidden) {
+      expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
+    }
+    expect(source, `${file} must not import billing`).not.toMatch(/from ['"]@vibefy\/(billing)/);
+  });
+
+  it('does not let the schedule reach the verdict', () => {
+    for (const file of verdictFiles) {
+      const source = readFileSync(join(monitoringDir, file), 'utf8');
+      expect(source, `${file} must not import the cadence table`).not.toMatch(
+        /from ['"]\.\/schedule\.ts/,
+      );
+    }
+  });
+
+  it('keeps monitoring out of the scoring package entirely', () => {
+    const manifest = JSON.parse(
+      readFileSync(join(process.cwd(), 'packages/rubric/package.json'), 'utf8'),
+    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    expect(Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })).not.toContain(
+      '@vibefy/monitoring',
+    );
   });
 });
 

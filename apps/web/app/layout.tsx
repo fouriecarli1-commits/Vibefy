@@ -44,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/console">Console</Link>
               <Link href="/review">Review</Link>
               <Link href="/verify">Check a badge</Link>
+              <Link href="/console/alerts">Alerts</Link>
               <Link href="/console/billing">Billing</Link>
               <Link
                 href="/sign-in"

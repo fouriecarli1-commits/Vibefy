@@ -120,6 +120,9 @@ importers:
       '@vibefy/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@vibefy/monitoring':
+        specifier: workspace:*
+        version: link:../../packages/monitoring
       '@vibefy/report':
         specifier: workspace:*
         version: link:../../packages/report
@@ -201,6 +204,15 @@ importers:
       zod:
         specifier: 4.4.3
         version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/monitoring:
     devDependencies:
       '@types/node':
         specifier: 26.2.0
