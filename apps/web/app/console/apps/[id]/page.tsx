@@ -11,7 +11,8 @@ import {
   verifyAuthorisation,
 } from '../actions';
 import { setMonitoring } from '../../alerts/actions';
-import { ActionForm, Checkbox, Field } from '@/components/action-form';
+import { assignPolicyProfile } from '../../workspace/actions';
+import { ActionForm, Checkbox, Field, Select } from '@/components/action-form';
 import { ScoreTrend, type TrendPoint } from '@/components/score-trend';
 import { createClient } from '@/lib/supabase/server';
 
@@ -121,6 +122,11 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     .is('read_at', null)
     .order('created_at', { ascending: false })
     .limit(3);
+
+  const { data: policyProfiles } = await supabase
+    .from('policy_profiles')
+    .select('id, name')
+    .eq('organisation_id', app.organisation_id);
 
   const trend: TrendPoint[] = (history ?? [])
     .filter((row) => row.overall_score !== null)
@@ -593,6 +599,38 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
               </p>
             </div>
           )}
+        </section>
+      )}
+
+      {(policyProfiles ?? []).length > 0 && (
+        <section aria-labelledby="policy" className="space-y-4">
+          <h2 id="policy" className="text-xl font-semibold">
+            Policy profile
+          </h2>
+          <div className="rounded-xl border border-line p-5 text-sm">
+            <p className="text-muted">
+              Your organisation’s own bar for this application. It is applied over a score that was
+              computed without knowing the profile exists: it can fail an application the rubric
+              passed, and it never changes what anything scored.
+            </p>
+            <div className="mt-4">
+              <ActionForm action={assignPolicyProfile} submitLabel="Apply profile">
+                <input type="hidden" name="appId" value={id} />
+                <Select
+                  label="Profile"
+                  name="profileId"
+                  defaultValue={String(app.policy_profile_id ?? '')}
+                  options={[
+                    { value: '', label: 'No profile' },
+                    ...(policyProfiles ?? []).map((profile) => ({
+                      value: String(profile.id),
+                      label: String(profile.name),
+                    })),
+                  ]}
+                />
+              </ActionForm>
+            </div>
+          </div>
         </section>
       )}
 

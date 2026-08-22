@@ -52,6 +52,37 @@ export async function readAsUser<T>(
 }
 
 /**
+ * The same identity, but permitted to commit.
+ *
+ * Used by the one console path that has to write while reading — the audit
+ * export, which produces a file and records that it produced it. Still the
+ * caller's own row-level security: a workspace cannot export, or record an
+ * export against, an organisation it is not a member of.
+ */
+export async function writeAsUser<T>(
+  userId: string,
+  work: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query('begin');
+    await client.query('select set_config($1, $2, true)', [
+      'request.jwt.claims',
+      JSON.stringify({ sub: userId, role: 'authenticated' }),
+    ]);
+    await client.query('set local role authenticated');
+    const result = await work(client);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Reads made on behalf of nobody: the public verification surfaces. Runs as the
  * `anon` role, so a mistake here can only expose what is already published.
  */

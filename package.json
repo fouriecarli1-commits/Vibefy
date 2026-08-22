@@ -15,7 +15,7 @@
     "brand:build": "tsx tools/brand-build.mts",
     "check:copy": "node tools/copy-lint.mjs",
     "check:secrets": "node tools/secret-scan.mjs",
-    "check:contrast": "node tools/contrast-check.mjs",
+    "check:contrast": "tsx tools/contrast-check.mts",
     "check:brand": "node tools/brand-check.mjs",
     "verify": "pnpm check:secrets && pnpm check:copy && pnpm check:contrast && pnpm check:brand && pnpm check:stubs && pnpm legal:registry && pnpm typecheck && pnpm test",
     "db:start": "supabase start",

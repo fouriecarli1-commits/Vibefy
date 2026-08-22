@@ -280,3 +280,47 @@ describe('the document itself', () => {
     expect(scoreFingerprint(source)).toBe(scoreFingerprint({ ...source, findings: [] }));
   });
 });
+
+describe('white-label', () => {
+  const branded = (accent: string | null): ReportSource => ({
+    ...source,
+    branding: {
+      displayName: 'Acme Digital',
+      logoDataUri: null,
+      accentColour: accent,
+      contactLine: 'hello@acme.example',
+      footerNote: null,
+    },
+  });
+
+  it('puts the agency on the cover and still says who did the assessment', () => {
+    const html = renderReport(branded('#1F4FD8'), 'paid').html;
+    expect(html).toContain('Prepared for you by Acme Digital.');
+    expect(html).toContain('The assessment itself was carried out by Vibefy');
+    // The sentence that stops a handover report reading as the agency's own
+    // verification of its own work.
+    expect(html).toContain('did not score this application and cannot change what it scored');
+  });
+
+  it('uses an agency accent colour only when it is legible', () => {
+    // #FAFAFA on the report's near-white surface is about 1.05:1. We show a
+    // client's brand colour; we do not ship a document that fails the standard
+    // we score other people against.
+    const illegible = renderReport(branded('#FAFAFA'), 'paid').html;
+    expect(illegible).not.toContain('#FAFAFA');
+    const legible = renderReport(branded('#1F4FD8'), 'paid').html;
+    expect(legible).toContain('#1F4FD8');
+  });
+
+  it('does not change what the report scored', () => {
+    const fingerprint = (html: string) =>
+      /vibefy-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
+    expect(fingerprint(renderReport(branded('#1F4FD8'), 'paid').html)).toBe(
+      fingerprint(renderReport(source, 'paid').html),
+    );
+  });
+
+  it('renders without branding when there is none', () => {
+    expect(renderReport(source, 'paid').html).not.toContain('Prepared for you by');
+  });
+});

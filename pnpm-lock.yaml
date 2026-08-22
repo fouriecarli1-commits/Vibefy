@@ -59,6 +59,9 @@ importers:
       '@vibefy/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@vibefy/policy':
+        specifier: workspace:*
+        version: link:../../packages/policy
       '@vibefy/report':
         specifier: workspace:*
         version: link:../../packages/report
@@ -71,6 +74,9 @@ importers:
       '@vibefy/worker':
         specifier: workspace:*
         version: link:../worker
+      '@vibefy/workspace':
+        specifier: workspace:*
+        version: link:../../packages/workspace
       marked:
         specifier: ^16.4.2
         version: 16.4.2
@@ -221,8 +227,20 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  packages/policy:
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   packages/report:
     dependencies:
+      '@vibefy/policy':
+        specifier: workspace:*
+        version: link:../policy
       '@vibefy/rubric':
         specifier: workspace:*
         version: link:../rubric
@@ -252,6 +270,15 @@ importers:
       '@types/node':
         specifier: 26.2.0
         version: 26.2.0
+
+  packages/workspace:
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
 
 packages:
 

@@ -10,6 +10,7 @@
  * it with direct access — one assembly path, two trust levels.
  */
 import { getRubric } from '@vibefy/rubric';
+import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefy/policy';
 import type { ReportSource } from './types.ts';
 
 /** The smallest database surface this needs. `pg.PoolClient` satisfies it. */
@@ -24,6 +25,7 @@ interface AssessmentRow {
   app_name: string;
   primary_url: string | null;
   intended_for_app_store: boolean;
+  policy_profile_id: string | null;
   organisation_name: string;
   rubric_version: string;
   overall_score: string | number | null;
@@ -54,6 +56,25 @@ interface RunRow {
   stage: string;
   status: string;
   metadata: { notes?: string[] } | null;
+}
+
+interface BrandingRow {
+  display_name: string;
+  logo_data_uri: string | null;
+  accent_colour: string | null;
+  contact_line: string | null;
+  footer_note: string | null;
+}
+
+interface PolicyRow {
+  id: string;
+  name: string;
+  description: string | null;
+  min_overall_score: string | null;
+  dimension_floors: Record<string, number> | null;
+  max_open_severity: PolicyProfile['maxOpenSeverity'];
+  require_certification: boolean;
+  require_store_readiness: boolean;
 }
 
 export async function assembleReportSource(
@@ -97,6 +118,26 @@ export async function assembleReportSource(
     [assessmentId],
   );
 
+  // The agency's cover block, if this workspace has one. Read through the same
+  // identity as everything else, so a workspace cannot brand someone else's report.
+  const branding = await client.query<BrandingRow>(
+    `select display_name, logo_data_uri, accent_colour, contact_line, footer_note
+       from public.workspace_branding
+      where organisation_id = (select organisation_id from public.assessments where id = $1)`,
+    [assessmentId],
+  );
+
+  const policyProfile = row.policy_profile_id
+    ? (
+        await client.query<PolicyRow>(
+          `select id, name, description, min_overall_score, dimension_floors,
+                  max_open_severity, require_certification, require_store_readiness
+             from public.policy_profiles where id = $1`,
+          [row.policy_profile_id],
+        )
+      ).rows[0]
+    : undefined;
+
   const rubric = getRubric(row.rubric_version);
   const labelFor = (id: string) => rubric.dimensions.find((d) => d.id === id)?.label ?? id;
   const bandFor = (score: number) =>
@@ -104,6 +145,41 @@ export async function assembleReportSource(
 
   const dimensionScores = row.dimension_scores ?? [];
   const narrative = row.report_narrative ?? null;
+  const brandingRow = branding.rows[0];
+
+  // The policy is evaluated here, over the finished score, and never anywhere
+  // that could feed back into it.
+  const policyEvaluation = policyProfile
+    ? evaluatePolicy(
+        {
+          id: policyProfile.id,
+          name: policyProfile.name,
+          description: policyProfile.description,
+          minOverallScore:
+            policyProfile.min_overall_score === null ? null : Number(policyProfile.min_overall_score),
+          dimensionFloors: (policyProfile.dimension_floors ?? {}) as PolicyProfile['dimensionFloors'],
+          maxOpenSeverity: policyProfile.max_open_severity,
+          requireCertification: policyProfile.require_certification,
+          requireStoreReadiness: policyProfile.require_store_readiness,
+        },
+        {
+          assessmentId: row.id,
+          overallScore: Number(row.overall_score ?? 0),
+          certificationEligible: row.certification_eligible === true,
+          dimensions: dimensionScores.map((dimension) => ({
+            dimension: dimension.dimension as PolicySubject['dimensions'][number]['dimension'],
+            score: Number(dimension.score),
+          })),
+          openFindings: findings.rows.map((finding) => ({
+            ruleId: finding.rubric_rule_id,
+            dimension: finding.dimension as PolicySubject['openFindings'][number]['dimension'],
+            severity: finding.severity as PolicySubject['openFindings'][number]['severity'],
+            title: finding.title,
+          })),
+          intendedForAppStore: row.intended_for_app_store === true,
+        },
+      )
+    : null;
 
   return {
     assessmentId: row.id,
@@ -144,5 +220,22 @@ export async function assembleReportSource(
     scopeStatement: row.scope_statement ?? '',
     promptBundleSha256: row.prompt_bundle_sha256 ?? '',
     intendedForAppStore: row.intended_for_app_store === true,
+    branding: brandingRow
+      ? {
+          displayName: brandingRow.display_name,
+          logoDataUri: brandingRow.logo_data_uri,
+          accentColour: brandingRow.accent_colour,
+          contactLine: brandingRow.contact_line,
+          footerNote: brandingRow.footer_note,
+        }
+      : null,
+    policy: policyEvaluation
+      ? {
+          profileName: policyEvaluation.profileName,
+          meetsPolicy: policyEvaluation.meetsPolicy,
+          failures: policyEvaluation.failures.map((failure) => failure.explanation),
+          note: policyEvaluation.note,
+        }
+      : null,
   };
 }

@@ -63,6 +63,27 @@ export function AuthForm({
       });
     }
 
+    // Before a password is accepted, ask whether this address belongs to a
+    // domain that requires single sign-on. A workspace that has enforced SSO has
+    // done so precisely so that a password cannot be an alternative route in.
+    const { data: routing } = await supabase.rpc('sso_routing', { candidate_email: email });
+    const route = Array.isArray(routing) ? routing[0] : routing;
+    if (route?.email_domain) {
+      const { error: ssoError } = await supabase.auth.signInWithSSO({
+        domain: String(route.email_domain),
+      });
+      if (ssoError) {
+        return setStatus({
+          kind: 'error',
+          message: `${route.email_domain} signs in through your organisation’s identity provider, and password sign-in is refused for it. ${ssoError.message}`,
+        });
+      }
+      return setStatus({
+        kind: 'busy',
+        message: 'Redirecting you to your organisation’s identity provider…',
+      });
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return setStatus({ kind: 'error', message: error.message });
     router.push(next ?? '/console');

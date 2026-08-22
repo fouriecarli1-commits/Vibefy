@@ -10,7 +10,7 @@
  * renders from, not read from the current source files, so a later edit to the
  * standard wording can never change what a customer was actually told.
  */
-import { NON_RELIANCE_LEGEND, AI_DISCLOSURE, themes } from '@vibefy/shared';
+import { NON_RELIANCE_LEGEND, AI_DISCLOSURE, legibleOr, themes } from '@vibefy/shared';
 import { redactForTier, scoreFingerprint } from './redact.ts';
 import type { RenderedReport, ReportFinding, ReportSource, ReportTier } from './types.ts';
 
@@ -34,6 +34,14 @@ export function escapeHtml(value: string): string {
 function stylesheet(): string {
   const light = themes.light;
   return `
+    .whitelabel {
+      display: flex; gap: 16px; align-items: flex-start;
+      border-left: 4px solid var(--line-strong);
+      padding: 12px 0 12px 16px; margin-bottom: 28px;
+    }
+    .whitelabel-logo { max-height: 56px; max-width: 180px; }
+    .whitelabel-name { font-weight: 700; font-size: 18px; margin: 0; }
+    .whitelabel-line { margin: 0 0 4px; font-weight: 600; }
     :root {
       --surface: ${light.surface};
       --surface-muted: ${light.surfaceMuted};
@@ -144,6 +152,40 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
     )
     .join('\n');
 
+  const branding = source.branding ?? null;
+  // The agency's colour is used only if it is legible on the report surface. We
+  // will not ship a document that fails the standard we score other people
+  // against, however much someone likes their brand blue.
+  const accent = legibleOr(branding?.accentColour, themes.light.surface, themes.light.text);
+  const brandingHtml = branding
+    ? `<aside class="whitelabel" style="border-color:${escapeHtml(accent)}">
+        ${
+          branding.logoDataUri
+            ? `<img class="whitelabel-logo" src="${escapeHtml(branding.logoDataUri)}" alt="${escapeHtml(branding.displayName)}">`
+            : `<p class="whitelabel-name" style="color:${escapeHtml(accent)}">${escapeHtml(branding.displayName)}</p>`
+        }
+        <div>
+          <p class="whitelabel-line">Prepared for you by ${escapeHtml(branding.displayName)}.</p>
+          <p class="muted">The assessment itself was carried out by Vibefy against published rubric v${escapeHtml(source.rubricVersion)}. ${escapeHtml(branding.displayName)} did not score this application and cannot change what it scored.</p>
+          ${branding.contactLine ? `<p class="muted">${escapeHtml(branding.contactLine)}</p>` : ''}
+        </div>
+      </aside>`
+    : '';
+
+  const policy = source.policy ?? null;
+  const policyHtml = policy
+    ? `<section class="callout">
+        <h2 style="margin-top:0">Your organisation’s policy: ${escapeHtml(policy.profileName)}</h2>
+        <p><strong>${policy.meetsPolicy ? 'Meets your policy.' : 'Does not meet your policy.'}</strong></p>
+        ${
+          policy.failures.length > 0
+            ? `<ul class="plain">${policy.failures.map((failure) => `<li>${escapeHtml(failure)}</li>`).join('')}</ul>`
+            : ''
+        }
+        <p class="muted">${escapeHtml(policy.note)}</p>
+      </section>`
+    : '';
+
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -156,6 +198,7 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
 <body>
 <div class="page">
 
+${brandingHtml}
 <header class="cover">
   <p class="muted">Vibefy assessment · Rubric v${escapeHtml(source.rubricVersion)}</p>
   <h1>${escapeHtml(source.appName)}</h1>
@@ -175,6 +218,8 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
   <p>${escapeHtml(source.scopeStatement)}</p>
   <p class="muted">${escapeHtml(AI_DISCLOSURE)}</p>
 </section>
+
+${policyHtml}
 
 ${
   source.narrative

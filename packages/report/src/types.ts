@@ -75,6 +75,31 @@ export interface ReportSource {
   readonly scopeStatement: string;
   readonly promptBundleSha256: string;
   readonly intendedForAppStore: boolean;
+  /**
+   * The agency handing this report to a client, if there is one.
+   *
+   * White-label means *their* cover block, not their assessment. The document
+   * still says who performed the work, against which rubric, and every Vibefy
+   * mark in it is the supplied mark, unaltered.
+   */
+  readonly branding?: ReportBranding | null;
+  /** The organisation's own bar, and whether this assessment cleared it. */
+  readonly policy?: ReportPolicy | null;
+}
+
+export interface ReportBranding {
+  readonly displayName: string;
+  readonly logoDataUri: string | null;
+  readonly accentColour: string | null;
+  readonly contactLine: string | null;
+  readonly footerNote: string | null;
+}
+
+export interface ReportPolicy {
+  readonly profileName: string;
+  readonly meetsPolicy: boolean;
+  readonly failures: readonly string[];
+  readonly note: string;
 }
 
 export interface RenderedReport {

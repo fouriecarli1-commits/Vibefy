@@ -14,22 +14,10 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const tokens = JSON.parse(readFileSync(join(root, 'packages/shared/design/tokens.json'), 'utf8'));
 
-/** @param {string} hex */
-export function relativeLuminance(hex) {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) throw new Error(`Not a 6-digit hex colour: ${hex}`);
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255);
-  const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-/** @param {string} fg @param {string} bg */
-export function contrastRatio(fg, bg) {
-  const a = relativeLuminance(fg);
-  const b = relativeLuminance(bg);
-  const [hi, lo] = a > b ? [a, b] : [b, a];
-  return (hi + 0.05) / (lo + 0.05);
-}
+// The arithmetic lives in packages/shared so that this gate and the report
+// renderer cannot disagree about what "legible" means.
+export { contrastRatio, relativeLuminance } from '../packages/shared/src/contrast.ts';
+import { contrastRatio } from '../packages/shared/src/contrast.ts';
 
 /** Resolve a dotted token path such as "light.text" or "brand.teal". */
 export function resolveToken(path) {

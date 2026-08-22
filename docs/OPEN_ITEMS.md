@@ -20,8 +20,8 @@ codebase must appear here. Nothing leaves this list silently.
 | Assessment engine pipeline                 | M1          | M0 is foundations only                                                                             |
 | Stripe integration, invoices, tax          | M2          |                                                                                                    |
 | Badge issuance, signing, verification page | M3          | The Ed25519 key pair is not generated until M3 so it is never committed to a repo that predates it |
-| Continuous monitoring and drift detection  | M4          |                                                                                                    |
-| Agency and organisation surfaces, SSO      | M5          |                                                                                                    |
+| Continuous monitoring and drift detection  | M4          | Delivered — see MILESTONES.md                                                                      |
+| Agency and organisation surfaces, SSO      | M5          | Delivered — see MILESTONES.md                                                                      |
 | Expo mobile app                            | M6          |                                                                                                    |
 | Public directory                           | M7          | Cold-start: a directory of nothing helps nobody                                                    |
 | Marketing arm                              | M8          | Blocked on the independence policy being implemented and documented                                |
@@ -38,6 +38,10 @@ mistaken for finished.
 | Badge fidelity against the supplied artwork | `packages/badge/src/render.ts` | The marks are traced from 300dpi JPEG; vector originals would close the delta. |
 | The `verify.` subdomain is not deployed | Routing | The routes exist and work; host-based routing is blocked on the domain decision. |
 | Key-compromise re-signing is manual | `docs/RUNBOOK.md` | Planned rotation is covered by keeping retired keys published. A bulk re-signing script is not written. |
+| Identity-provider registration is an operator step | `/console/workspace/<id>/sso` | The domain claim, DNS verification, enforcement and sign-in routing are built. Registering the SAML/OIDC provider with the auth service is manual, and the console says so. |
+| Invitation emails are not sent | `/console/workspace/<id>/team` | The link is shown once to the inviter, who passes it on. Stated plainly rather than implied — same missing email sender as the alerts. |
+| The portfolio evaluates a policy without findings | `apps/web/app/console/portfolio/page.tsx` | The dashboard row carries the score and dimensions but not the findings, so a profile's severity ceiling is evaluated on the report instead. A row that carried every finding for every application would be a portfolio page that loads in seconds. |
+| Domain discovery on sign-in is unauthenticated | `public.sso_routing` | It confirms that one exact domain enforces single sign-on. Every enterprise sign-in performs the same step; it reveals no organisation name, size or unenforced connection. |
 
 ## Stubs in the codebase
 

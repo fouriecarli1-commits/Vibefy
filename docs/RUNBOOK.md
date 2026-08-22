@@ -249,6 +249,60 @@ deliberately, so that publishing a new rubric cannot silently change what
 suspends a live badge. Changing either is a decision to record in
 `DECISIONS.md`, and `pnpm test` will tell you which cases move.
 
+## Workspaces, seats and single sign-on
+
+### A customer says they cannot invite anyone
+
+The seat limit is a database trigger, not a form check, and it counts unaccepted
+invitations. Check both numbers:
+
+```sql
+select public.seats_for_organisation('<org id>') as seats,
+       public.seats_used('<org id>')             as used;
+```
+
+`used` above `seats` means either someone should be removed, an invitation
+withdrawn, or seats added on the subscription. Adding seats is a Stripe change;
+the trigger reads the live subscription, so it takes effect immediately.
+
+### A customer lost an invitation link
+
+It cannot be recovered — only the hash is stored, deliberately. Withdraw the
+invitation (which frees the seat) and issue a new one.
+
+### A customer is locked out by single sign-on
+
+`sso_connections.enforced` refuses password sign-in for every address at that
+domain. If their identity provider is misconfigured, the way back is to unenforce:
+
+```sql
+update public.sso_connections set enforced = false where email_domain = '<domain>';
+```
+
+Do this only on a request from an owner of that workspace, verified out of band.
+Whoever controls the domain controls who gets in, which is exactly why the domain
+is proved by DNS TXT before enforcement can be switched on at all.
+
+### Registering an identity provider
+
+Still manual. The console tells the customer so. The domain claim, its DNS
+verification and the sign-in routing are all built; the provider itself is
+registered with the auth service by an operator, and `sso_connections.auth_provider_id`
+is where its id belongs once it exists.
+
+### An auditor questions an export
+
+Every export is recorded in `audit_exports` with the SHA-256 of exactly what was
+handed over, in a table that refuses updates and deletes:
+
+```sql
+select created_at, kind, format, row_count, sha256, period_start, period_end
+  from public.audit_exports where organisation_id = '<org id>' order by created_at desc;
+```
+
+Hash the file they are holding and compare. Two things are never in one of those
+files by design: a full IP address, and anybody's email address.
+
 ## Changing a legal document
 
 1. Edit the file in `/legal`, bump its `**Version:**`.

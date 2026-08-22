@@ -23,7 +23,9 @@
     "next": "16.3.2",
     "pg": "8.23.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "@vibefy/workspace": "workspace:*",
+    "@vibefy/policy": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",

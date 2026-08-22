@@ -13,7 +13,7 @@ import {
   relativeLuminance,
   runContrastChecks,
   resolveToken,
-} from '../tools/contrast-check.mjs';
+} from '../tools/contrast-check.mts';
 
 describe('copy lint', () => {
   it.each(FORBIDDEN_PHRASES)('rejects "%s"', (phrase) => {

@@ -127,3 +127,45 @@ export function Checkbox({
     </div>
   );
 }
+
+export function Select({
+  label,
+  name,
+  options,
+  hint,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  options: readonly { value: string; label: string }[];
+  hint?: string;
+  defaultValue?: string;
+}) {
+  const id = `field-${name}`;
+  const hintId = hint ? `${id}-hint` : undefined;
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-sm font-medium">
+        {label}
+      </label>
+      <select
+        id={id}
+        name={name}
+        defaultValue={defaultValue}
+        aria-describedby={hintId}
+        className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {hint && (
+        <p id={hintId} className="text-sm text-muted">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}

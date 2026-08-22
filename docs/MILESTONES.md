@@ -203,6 +203,57 @@ column is there so that adding a sender later is a sweep, not a migration.
 certified origin, which is narrower than any authorised scope, but it uses `fetch` directly rather
 than the guarded dispatcher. Registered in OPEN_ITEMS.md.
 
-## M5–M8 — not started
+## M5 — Agency & organisation surfaces ✅
+
+| Gate | Status |
+| --- | --- |
+| 1. `pnpm verify` green | ✅ 456 tests, six gates |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Seats, invitation tokens, workspace isolation and what an audit export may not contain |
+| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
+| 4. RLS verified | ✅ Five new tables, all forced; invitations are admin-only, exports are admin-only, the portfolio is a `security_invoker` view |
+| 5. No secrets in the repo | ✅ Only invitation token *hashes* are stored, and no identity-provider certificate ever reaches us |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ Unchanged |
+| 7. Docs updated | ✅ 103 decisions recorded |
+| 8. Cost per run recorded and visible | ✅ Unchanged |
+
+### What M5 built
+
+- **Shared workspaces** — agency and organisation types alongside the personal one every
+  account gets. The creator is its owner from the moment it exists, and a trigger refuses to
+  leave one without an owner.
+- **Seats, enforced in the database** on both memberships and invitations, so no path — including
+  a future single-sign-on one — can walk past the limit. An unaccepted invitation holds a seat.
+- **Invitations as credentials**: CSPRNG token, only the hash stored, seven-day expiry,
+  constant-time comparison, and the signed-in address checked as well as the token.
+- **`packages/policy`** — an organisation's own bar, applied over a finished score. It can fail
+  an application the rubric passed; the evaluation type structurally cannot carry a score, and a
+  test asserts the report fingerprint is identical with and without a profile attached.
+- **White-label reports** — the agency's cover block, with the sentence that keeps a handover
+  report from reading as the agency's own verification of its own work. Their accent colour is
+  used only where it passes contrast.
+- **Audit export** — six exports, each scoped by the caller's own row-level security, each
+  recorded with the hash of exactly what was handed over in an append-only table. IPs truncated
+  to their network, no email address anywhere, and CSV formula injection defused.
+- **Single sign-on** — domain claimed, proved by DNS TXT, unique platform-wide, enforceable only
+  once verified. The sign-in page routes through one `security definer` function that answers
+  one question and reveals nothing else.
+- **The portfolio dashboard** — every application in every workspace you belong to, with its
+  score, badge state, monitoring state and policy verdict.
+
+### Outstanding from M5
+
+**Identity-provider registration is manual.** The domain claim, verification, enforcement and
+sign-in routing are all built; registering the SAML or OIDC provider itself with the auth service
+is an operator step, and the console says so rather than implying otherwise.
+
+**Invitation emails are not sent.** The link is shown once to the inviter to pass on, and the
+console states plainly that we do not send it. Same underlying gap as monitoring alerts: there is
+no email sender yet.
+
+**The portfolio evaluates a profile without findings.** A severity ceiling is checked on the
+report, which has the findings; the dashboard row does not carry them, so it evaluates the
+score-and-dimension rules only. Registered in OPEN_ITEMS.md.
+
+## M6–M8 — not started
 
 See PART 2 of the build brief.
