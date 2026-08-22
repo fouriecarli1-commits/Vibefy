@@ -12,10 +12,11 @@ Vibefy is not an app store, and a Vibefy badge is not a security guarantee. See
 
 ## Status
 
-Milestone **M2 — Reports & payments**. Intake, ownership verification, the authorisation gate,
-the six-stage pipeline, the reviewer queue, reports with PDF export, entitlements and Stripe
-billing are built. The badge system (M3) is not. See `docs/MILESTONES.md` for what each
-milestone delivered and `docs/OPEN_ITEMS.md` for what is deferred and why.
+Milestone **M3 — Badge system**. Intake, ownership verification, the authorisation gate, the
+six-stage pipeline, the reviewer queue, reports with PDF export, entitlements, Stripe billing,
+and the signed "Verified by Vibefy" badge with its public verification surface are built.
+Continuous monitoring (M4) is not. See `docs/MILESTONES.md` for what each milestone delivered
+and `docs/OPEN_ITEMS.md` for what is deferred and why.
 
 ## Getting started
 
@@ -55,6 +56,7 @@ apps/worker        The assessment runner: pg-boss consumer, pipeline, persistenc
 packages/engine    The assessment engine — scope boundary, stages, evidence, cost
 packages/report    The report: assembly from stored rows, tier redaction, rendering
 packages/billing   Entitlements, the payment boundary, and webhook application
+packages/badge     Ed25519 signing, the published key set, and the badge renderer
 packages/shared    Types, design tokens, and the guarantees shared by every surface
 packages/rubric    The rubric as versioned data, plus the scoring functions
 prompts/           Versioned prompts, hashed and recorded in every report
@@ -80,6 +82,10 @@ tools/             The CI gates listed above
 5. **The scope boundary is below the model, not in it.** Requests are checked against the
    resolved address, destructive methods never leave the process, and the browser's own
    requests go through the same guard. A model cannot widen what it is allowed to reach.
+6. **A badge signature attests a historical fact, not current standing.** That the assessment
+   happened stays true forever and can be checked offline against a published key. Whether the
+   badge is still live is a separate question, and only our origin answers it — which is why we
+   serve the image rather than handing out a file.
 
 ## What a Vibefy assessment is not
 

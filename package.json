@@ -12,7 +12,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "brand:build": "node tools/brand-build.mjs",
+    "brand:build": "tsx tools/brand-build.mts",
     "check:copy": "node tools/copy-lint.mjs",
     "check:secrets": "node tools/secret-scan.mjs",
     "check:contrast": "node tools/contrast-check.mjs",
@@ -26,11 +26,14 @@
     "tokens:build": "node tools/tokens-build.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "legal:registry": "node tools/legal-registry.mjs",
-    "dev:worker": "pnpm --filter @vibefy/worker start"
+    "dev:worker": "pnpm --filter @vibefy/worker start",
+    "badge:keygen": "tsx tools/generate-badge-key.mts"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
     "@types/pg": "8.23.1",
+    "@vibefy/badge": "workspace:*",
+    "@vibefy/shared": "workspace:*",
     "pg": "8.23.0",
     "playwright": "^1.62.1",
     "prettier": "3.6.2",

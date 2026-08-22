@@ -1,5 +1,6 @@
 /**
- * Vibefy mark geometry — the single source for every derived asset.
+ * Vibefy mark geometry — the single source for every derived asset, and for the
+ * badge rendered at request time.
  *
  * The founder's artwork in brand/source/ is the authority. These paths are a
  * clean vector reconstruction of it, not a redesign: same forms, same palette,
@@ -48,7 +49,7 @@ export const BADGE = {
  */
 export const FONT_STACK = "Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
 
-export const PALETTE = {
+export const PALETTE: Readonly<Record<string, string>> = {
   navy: '#16205A',
   blue: '#1F5FE0',
   azure: '#2E9BE0',

@@ -18,7 +18,8 @@
     "pg": "8.23.0",
     "@vibefy/report": "workspace:*",
     "playwright": "1.62.1",
-    "@vibefy/billing": "workspace:*"
+    "@vibefy/billing": "workspace:*",
+    "@vibefy/badge": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

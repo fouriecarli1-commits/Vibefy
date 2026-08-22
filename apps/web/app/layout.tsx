@@ -43,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/methodology">Methodology</Link>
               <Link href="/console">Console</Link>
               <Link href="/review">Review</Link>
+              <Link href="/verify">Check a badge</Link>
               <Link href="/console/billing">Billing</Link>
               <Link
                 href="/sign-in"
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/legal">Legal</Link>
               <Link href="/legal/rating-methodology-and-independence">Independence policy</Link>
               <Link href="/legal/responsible-disclosure">Responsible disclosure</Link>
+              <Link href="/verify">Check a badge</Link>
             </p>
             <p className="mt-4">© {new Date().getFullYear()} Vibefy</p>
           </div>

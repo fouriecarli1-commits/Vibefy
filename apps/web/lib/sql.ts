@@ -51,6 +51,22 @@ export async function readAsUser<T>(
   }
 }
 
+/**
+ * Reads made on behalf of nobody: the public verification surfaces. Runs as the
+ * `anon` role, so a mistake here can only expose what is already published.
+ */
+export async function readAsAnon<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query('begin read only');
+    await client.query('set local role anon');
+    return await work(client);
+  } finally {
+    await client.query('rollback').catch(() => undefined);
+    client.release();
+  }
+}
+
 /** Writes made by the webhook endpoint, which has no signed-in user at all. */
 export async function writeAsService<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect();

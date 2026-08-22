@@ -13,6 +13,7 @@ import { Pool } from 'pg';
 import { NotAuthorisedError, runAssessmentJob } from './run-assessment.ts';
 import { claimNextRequest, completeRequest, failRequest } from './queue.ts';
 import { resolveReportStorage, sweepPendingReports } from './report.ts';
+import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
 
 export const POLL_INTERVAL_MS = 5_000;
 export const REPORT_SWEEP_INTERVAL_MS = 30_000;
@@ -95,6 +96,14 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
   const sweep = setInterval(() => {
     void sweepPendingReports(pool, storage, log).catch((error) =>
       log('report sweep failed', { error: String(error) }),
+    );
+    // Badges: issued when the last of approval, the rubric gate and licence
+    // acceptance lands, and expired or suspended when the facts change.
+    void sweepBadgeIssuance(pool, log).catch((error) =>
+      log('badge issuance sweep failed', { error: String(error) }),
+    );
+    void sweepBadgeLifecycle(pool, log).catch((error) =>
+      log('badge lifecycle sweep failed', { error: String(error) }),
     );
   }, REPORT_SWEEP_INTERVAL_MS);
   sweep.unref();

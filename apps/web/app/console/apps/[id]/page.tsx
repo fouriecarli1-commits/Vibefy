@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { CHALLENGE_PATH, DNS_RECORD_PREFIX } from '@vibefy/engine/authorisation';
+import { badgeEmbedSnippet, BADGE_USAGE } from '@vibefy/shared';
 import {
+  acceptBadgeLicence,
   requestAssessment,
   revokeAuthorisation,
   startAuthorisation,
@@ -67,6 +69,25 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     .order('created_at', { ascending: false })
     .limit(10);
 
+  const { data: badge } = await supabase
+    .from('badges')
+    .select(
+      'id, public_id, slug, status, score, rubric_version, assessed_at, expires_at, certified_origin, revocation_reason',
+    )
+    .eq('app_id', id)
+    .order('issued_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: licence } = await supabase
+    .from('consents')
+    .select('document_version, occurred_at')
+    .eq('document_type', 'badge_licence')
+    .eq('action', 'accepted')
+    .order('occurred_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { data: authorisations } = await supabase
     .from('authorisations')
     .select('*')
@@ -77,6 +98,10 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
   const status = current?.status ?? 'none';
   const copy = STATUS_COPY[status] ?? STATUS_COPY.none!;
   const host = app.primary_url ? new URL(app.primary_url as string).hostname : '';
+  const verifyOrigin =
+    process.env.NEXT_PUBLIC_VERIFY_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    'https://verify.vibefy.example';
 
   return (
     <div className="max-w-3xl space-y-10">
@@ -309,6 +334,96 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                 Last refused request: {String(request.refusal_message)}
               </p>
             ))}
+        </section>
+      )}
+
+      {status === 'verified' && (
+        <section aria-labelledby="badge" className="space-y-5">
+          <h2 id="badge" className="text-2xl font-bold tracking-tight">
+            Your badge
+          </h2>
+
+          {badge ? (
+            <div className="space-y-5 rounded-xl border border-line p-6">
+              <div className="flex flex-wrap items-center gap-5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/badge/${badge.public_id}.svg`}
+                  alt={`Verified by Vibefy — ${app.name}, Rubric v${badge.rubric_version}, assessed ${new Date(badge.assessed_at as string).toISOString().slice(0, 10)}. Scope-limited assessment, not a security guarantee.`}
+                  width={128}
+                  height={128}
+                />
+                <div>
+                  <p className="font-medium capitalize">{String(badge.status)}</p>
+                  <p className="text-sm text-muted">
+                    {Number(badge.score).toFixed(1)} / 100 · rubric v{String(badge.rubric_version)}{' '}
+                    · expires {new Date(badge.expires_at as string).toISOString().slice(0, 10)}
+                  </p>
+                  <p className="mt-1 text-sm">
+                    <Link href={`/a/${badge.slug}`}>Its verification page</Link>
+                  </p>
+                  {badge.revocation_reason ? (
+                    <p className="mt-2 text-sm text-bad">{String(badge.revocation_reason)}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              {String(badge.status) === 'active' && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold">Embed it</h3>
+                  <p className="text-sm text-muted">
+                    Paste this where you want the badge to appear. It has to stay a link to the
+                    verification page — a badge that does not link is a claim without evidence, and
+                    the licence does not permit it. Minimum size {BADGE_USAGE.minimumSizePx}px, with
+                    clear space of {Math.round(BADGE_USAGE.clearSpaceRatio * 100)}% of the badge
+                    width on every side.
+                  </p>
+                  <pre className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs">
+                    {badgeEmbedSnippet({
+                      appName: app.name as string,
+                      rubricVersion: String(badge.rubric_version),
+                      assessedOn: new Date(badge.assessed_at as string).toISOString().slice(0, 10),
+                      verifyOrigin: verifyOrigin,
+                      publicId: String(badge.public_id),
+                      slug: String(badge.slug),
+                    })}
+                  </pre>
+                  <p className="text-sm text-muted">
+                    The image is served from Vibefy on every load, never copied to your server. That
+                    is what lets a suspension or a revocation take effect within minutes — and it is
+                    why there is no file to download.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : licence ? (
+            <p className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
+              The Badge Licence is accepted. A badge is issued once an assessment has been approved
+              by a reviewer and has met the certification threshold — those are separate gates, and
+              neither can be bought.
+            </p>
+          ) : (
+            <div className="rounded-xl border border-line p-6">
+              <h3 className="font-semibold">Accept the Badge Licence</h3>
+              <p className="mt-2 max-w-prose text-sm text-muted">
+                "Verified by Vibefy" is a trade mark. The licence lets you display it for this
+                application, on this domain, until it expires — and sets out what you may not do: no
+                recolouring, no cropping, no altering the wordmark, no displaying it after it
+                expires or is revoked, and never without the link to the verification page. Read it
+                in full: <Link href="/legal/badge-licence">Vibefy Badge Licence Agreement</Link>.
+              </p>
+              <div className="mt-5">
+                <ActionForm action={acceptBadgeLicence} submitLabel="Accept the licence">
+                  <input type="hidden" name="appId" value={id} />
+                  <Checkbox
+                    label="I accept the Vibefy Badge Licence Agreement for this application."
+                    name="accepted"
+                    hint="Recorded with the version, a hash of the exact wording, the time, your IP and your user agent — in a record that cannot be edited afterwards."
+                  />
+                </ActionForm>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

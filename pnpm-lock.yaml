@@ -14,6 +14,12 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
+      '@vibefy/badge':
+        specifier: workspace:*
+        version: link:packages/badge
+      '@vibefy/shared':
+        specifier: workspace:*
+        version: link:packages/shared
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -44,6 +50,9 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.112.3
         version: 2.112.3
+      '@vibefy/badge':
+        specifier: workspace:*
+        version: link:../../packages/badge
       '@vibefy/billing':
         specifier: workspace:*
         version: link:../../packages/billing
@@ -102,6 +111,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@vibefy/badge':
+        specifier: workspace:*
+        version: link:../../packages/badge
       '@vibefy/billing':
         specifier: workspace:*
         version: link:../../packages/billing
@@ -133,6 +145,19 @@ importers:
       tsx:
         specifier: 4.23.12
         version: 4.23.12
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/badge:
+    dependencies:
+      '@vibefy/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2

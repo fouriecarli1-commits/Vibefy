@@ -16,11 +16,13 @@ import { decideAssessmentRequest, resolvePlan } from '@vibefy/billing';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser } from '@/lib/sql';
 
-const WARRANTY_FILE = 'authorisation-to-test.md';
-
-function warrantyFingerprint(): { version: string; sha256: string } {
-  const path = join(process.cwd(), '..', '..', 'legal', WARRANTY_FILE);
-  const contents = readFileSync(path, 'utf8');
+/**
+ * The version and exact bytes of a legal document, at the moment it is accepted.
+ * The hash goes into the consent record so that "which words did they agree to"
+ * stays answerable years later, even if the file is edited.
+ */
+function documentFingerprint(file: string): { version: string; sha256: string } {
+  const contents = readFileSync(join(process.cwd(), '..', '..', 'legal', file), 'utf8');
   return {
     version: /\*\*Version:\*\*\s*([^\s·]+)/.exec(contents)?.[1] ?? '0.0.0',
     sha256: createHash('sha256').update(contents).digest('hex'),
@@ -166,7 +168,7 @@ export async function startAuthorisation(
 
   const host = new URL(app.primary_url as string).hostname;
   const challenge = createChallenge(host);
-  const warranty = warrantyFingerprint();
+  const warranty = documentFingerprint('authorisation-to-test.md');
   const { ip, userAgent } = await requestContext();
 
   const declared = String(formData.get('scopeDomains') ?? host)
@@ -459,5 +461,74 @@ export async function requestAssessment(
     notice: verdict.usesReTestCredit
       ? `Queued as a ${verdict.depth} assessment, using one of your free re-tests.`
       : `Queued as a ${verdict.depth} assessment. ${plan.because}`,
+  };
+}
+
+/**
+ * Accepting the Badge Licence.
+ *
+ * The last of the three things that must be true before a badge exists: a human
+ * approved the assessment, the rubric gate passed, and the owner accepted the
+ * trademark licence. Acceptance is recorded append-only with the version, a hash
+ * of the exact wording, the time, the IP and the user agent — the same evidence
+ * standard as the authorisation warranty, because the same kind of dispute is
+ * possible.
+ *
+ * Nothing here issues a badge. The worker does that, because it holds the
+ * signing key and the console deliberately does not.
+ */
+export async function acceptBadgeLicence(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'You are signed out.' };
+
+  const appId = String(formData.get('appId') ?? '');
+  if (formData.get('accepted') !== 'on') {
+    return { error: 'The Badge Licence has to be accepted before a badge can be issued.' };
+  }
+
+  const { data: app } = await supabase
+    .from('apps')
+    .select('id, organisation_id')
+    .eq('id', appId)
+    .single();
+  if (!app) return { error: 'Application not found.' };
+
+  const membership = await supabase
+    .from('memberships')
+    .select('role')
+    .eq('organisation_id', app.organisation_id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!membership.data || !['owner', 'admin'].includes(String(membership.data.role))) {
+    return {
+      error: 'Only an owner or an admin can accept a trademark licence for this workspace.',
+    };
+  }
+
+  const licence = documentFingerprint('badge-licence.md');
+  const { ip, userAgent } = await requestContext();
+
+  const { error } = await supabase.from('consents').insert({
+    user_id: user.id,
+    organisation_id: app.organisation_id,
+    document_type: 'badge_licence',
+    document_version: licence.version,
+    document_sha256: licence.sha256,
+    action: 'accepted',
+    ip,
+    user_agent: userAgent,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/console/apps/${appId}`);
+  return {
+    notice:
+      'Licence accepted. Your badge is issued shortly — the process that signs badges runs separately from the console, which is deliberate: it holds the signing key and the console never does.',
   };
 }

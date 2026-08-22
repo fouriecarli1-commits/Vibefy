@@ -1,5 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Not currently verified by Vibefy — Revoked">
-  <title>Not currently verified by Vibefy — Revoked</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img"
+     aria-label="Not currently verified by Vibefy — revoked." width="512" height="512">
+  <title>Not currently verified by Vibefy — revoked.</title>
+  <desc>A Vibefy assessment is point-in-time and scope-limited. It is not a penetration test, a security audit, or a guarantee.</desc>
   <g fill="none" stroke="#B3261E">
     <circle cx="256" cy="256" r="243" stroke-width="17"/>
     <circle cx="256" cy="256" r="219" stroke-width="11"/>
@@ -10,8 +12,7 @@
     <path d="M150 272 L262 272" fill="none" stroke="#FFFFFF"
           stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <g fill="#7A1912" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
-     text-anchor="middle" lengthAdjust="spacingAndGlyphs">
+  <g fill="#7A1912" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle" lengthAdjust="spacingAndGlyphs">
     <text x="256" y="308" font-size="46" font-weight="700" textLength="190">Revoked</text>
     <text x="256" y="358" font-size="31" font-weight="500" textLength="176">Not currently</text>
     <text x="256" y="396" font-size="31" font-weight="500" textLength="266">verified by Vibefy</text>

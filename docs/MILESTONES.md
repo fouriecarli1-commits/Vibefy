@@ -112,6 +112,50 @@ A **Stripe account with four price ids** and a registered webhook endpoint. The 
 built and tested; it has never spoken to Stripe, because there is nothing to speak to yet.
 **Object storage** for rendered reports is still local disk, which is a deployment decision.
 
-## M3–M8 — not started
+## M3 — Badge system · complete
+
+| Definition of Done | Status |
+|---|---|
+| 1. Works end-to-end locally with one command | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview, and the `verify.` subdomain is a deployment concern |
+| 2. Tests pass, including the four mandatory areas | ✅ 368 tests. Badge integrity now has 43 of its own, covering forgery, tampering, rotation and every lifecycle transition |
+| 3. The independence test passes | ✅ Unchanged |
+| 4. RLS verified | ✅ The public verification surface is a view granted to `anon`; the `badges` table itself stays closed |
+| 5. No secrets in the repo | ✅ The signing key is generated to stdout and never to a file |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ The Badge Licence is accepted in-product, append-only, with version, hash, IP and user agent |
+| 7. Docs updated | ✅ 68 decisions recorded |
+| 8. Cost per run recorded and visible | ✅ Unchanged |
+
+### What M3 built
+
+- **Ed25519 signing** over a fixed, published canonicalisation. A third party verifies a badge
+  offline with any JOSE library, against a JWKS at `/.well-known/vibefy-badge-key`.
+- **The distinction the scheme rests on**, written into the payload, the API response and the
+  checker page: the signature attests that the assessment happened and scored what it says —
+  a fact that survives revocation — and says nothing about whether the badge is live.
+- **The badge image, rendered on every request** from our origin, cached five minutes. There is
+  no file to copy, which is what makes revocation take effect within minutes.
+- **Four states that are never a broken image.** Suspended, expired and revoked all render as a
+  legible "not currently verified" mark, visually distinct from the certification mark.
+- **The verification page**, with the scope-and-limitations block above the fold — before the
+  score — and the marketing-client disclosure where one applies.
+- **A public checker** at `/verify` that answers the two questions separately, because
+  conflating them is the whole failure mode.
+- **Issuance behind three gates**: a human approved it, the rubric gate passed, and the owner
+  accepted the trademark licence at its current version. None can be bought.
+- **Lifecycle sweeps** that expire and suspend, plus a database function that reports an expired
+  badge as expired whatever the stored column says.
+- **Origin telemetry** capped at one event per badge, per origin, per hour, surfaced to reviewers
+  as mismatches — a badge requested from a domain it is not licensed for.
+- **One renderer** for the runtime badge and the brand masters, so the mark on a customer's site
+  and the mark in our header cannot drift apart.
+
+### Outstanding from M3
+
+The **`verify.` subdomain** in production — the routes exist and work; host-based routing is a
+deployment concern blocked on the domain decision. A **bulk re-signing script** for the
+compromise path: planned rotation is covered by retired keys, and the runbook says plainly that
+the compromise path is not automated yet.
+
+## M4–M8 — not started
 
 See PART 2 of the build brief.

@@ -144,6 +144,53 @@ scores are never recomputed against a different version.
 3. Update `CURRENT_RUBRIC_VERSION`.
 4. Announce the change with notice before it takes effect, per the Independence Policy.
 
+## The badge signing key
+
+```bash
+pnpm badge:keygen                 # a dated key id
+pnpm badge:keygen my-key-id       # a chosen one
+```
+
+It writes to stdout and never to a file. Copy the two variables into the
+platform secret store, then clear your shell history. **Only the worker needs
+them** — the console never signs anything, deliberately.
+
+### Rotating
+
+1. `pnpm badge:keygen` with a new id.
+2. Add the _previous_ public JWK to `VIBEFY_BADGE_RETIRED_KEYS` (it is printed as
+   a comment by the generator; you can also read it from
+   `/.well-known/vibefy-badge-key` before you switch).
+3. Point `VIBEFY_BADGE_KEY_ID` and `VIBEFY_BADGE_SIGNING_KEY_B64` at the new key.
+4. Restart the worker.
+
+Existing badges keep verifying, because they record which key signed them and the
+retired public key stays published. **Never remove a retired key**: a verifier
+that suddenly fails cannot tell "this badge is forged" from "Vibefy tidied up".
+
+### If the key is suspected compromised
+
+This is the one incident that ends the business if handled slowly.
+
+1. Generate a new key and switch to it immediately.
+2. Remove the compromised key from the published set — this is the _only_
+   circumstance in which a key is unpublished, and it deliberately invalidates
+   every badge it signed.
+3. Re-sign every active badge with the new key.
+4. Publish what happened. A quiet rotation after a compromise is a worse
+   position than the compromise.
+
+## Taking a badge down
+
+`/review/badges` lists every issued badge and surfaces origin mismatches — a
+badge requested from a domain it is not licensed for. Suspension and revocation
+both need a written reason; the database refuses a revocation without one, and
+the transition is written to an append-only event log by trigger.
+
+Because the image is served from our origin with a five-minute cache, a
+revocation stops every embedded instance reading as verified within minutes.
+There is no file anywhere that says otherwise.
+
 ## Changing a legal document
 
 1. Edit the file in `/legal`, bump its `**Version:**`.
