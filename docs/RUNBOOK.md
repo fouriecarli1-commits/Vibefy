@@ -7,7 +7,7 @@ How to run, verify, debug and deploy Vibefy. Written for one person with no team
 | Command               | What it does                                                                                              |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
 | `pnpm dev`            | Checks prerequisites, starts Supabase, applies migrations, builds brand assets, runs the console on :3000 |
-| `pnpm verify`         | Everything CI runs: five gates, the legal registry, typecheck and the full test suite                                 |
+| `pnpm verify`         | Everything CI runs: five gates, the legal registry, typecheck and the full test suite                     |
 | `pnpm test`           | Tests only (boots a throwaway Postgres automatically)                                                     |
 | `pnpm brand:build`    | Regenerates every SVG master, PNG export and app icon                                                     |
 | `pnpm tokens:build`   | Regenerates the console's CSS custom properties from `tokens.json`                                        |

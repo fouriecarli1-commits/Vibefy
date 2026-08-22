@@ -56,8 +56,28 @@ fi
 
 dsn() { echo "postgresql:///$DB_NAME?host=$SOCKET_DIR"; }
 
+# pg_isready against the socket is the honest test: pg_ctl status reports on the
+# data directory, which can disagree with whether anything is actually accepting
+# connections after an unclean shutdown or a re-exec under a different user.
 is_running() {
-  "$PG_BIN/pg_ctl" -D "$DATA_DIR" status >/dev/null 2>&1
+  "$PG_BIN/pg_isready" -h "$SOCKET_DIR" -U postgres >/dev/null 2>&1
+}
+
+ensure_running() {
+  mkdir -p "$SOCKET_DIR"
+  if [ ! -s "$DATA_DIR/PG_VERSION" ]; then
+    mkdir -p "$DATA_DIR"
+    "$PG_BIN/initdb" -D "$DATA_DIR" -U postgres --auth=trust --no-sync >/dev/null
+  fi
+  if ! is_running; then
+    "$PG_BIN/pg_ctl" -D "$DATA_DIR" -l "$LOG_FILE" \
+      -o "-c listen_addresses='' -k $SOCKET_DIR -c fsync=off -c synchronous_commit=off -c full_page_writes=off" \
+      -w start >/dev/null 2>&1 || true
+  fi
+  if ! is_running; then
+    echo "Postgres did not start. See $LOG_FILE" >&2
+    exit 1
+  fi
 }
 
 start() {
@@ -94,13 +114,10 @@ stop() {
 }
 
 reset() {
-  if is_running; then
-    "$PG_BIN/dropdb" -h "$SOCKET_DIR" -U postgres --if-exists "$DB_NAME"
-    "$PG_BIN/createdb" -h "$SOCKET_DIR" -U postgres "$DB_NAME"
-    apply
-  else
-    start
-  fi
+  ensure_running
+  "$PG_BIN/dropdb" -h "$SOCKET_DIR" -U postgres --if-exists "$DB_NAME"
+  "$PG_BIN/createdb" -h "$SOCKET_DIR" -U postgres "$DB_NAME"
+  apply
 }
 
 case "${1:-start}" in

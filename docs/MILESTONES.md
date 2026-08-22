@@ -5,16 +5,16 @@ PART 10 passes. **Do not start M1 until the founder confirms M0.**
 
 ## M0 — Foundations · complete, with two items honestly outstanding
 
-| Definition of Done | Status |
-|---|---|
-| 1. Works end-to-end locally with one command | ✅ `pnpm dev`. ⚠️ No deployed preview yet — blocked on the domain and hosting accounts (see `OPEN_ITEMS.md`) |
-| 2. Tests pass, including payments, badge integrity, authorisation-to-test and personal data | ✅ 159 tests, all four areas covered |
-| 3. The independence test passes | ✅ Identical apps, opposite wallets, byte-identical scores |
-| 4. RLS verified — user A cannot read user B's app, assessment, report or badge | ✅ Asserted per table against a real Postgres |
-| 5. No secrets in the repo; scanner clean | ✅ Also runs as a pre-commit hook, and covers untracked files |
-| 6. Legal artefacts drafted, versioned, surfaced in-product, acceptance recorded | ✅ 14 drafts, hashed, published at `/legal`, acceptance written to the append-only `consents` table |
-| 7. `DECISIONS.md`, `OPEN_ITEMS.md` and the runbook updated | ✅ 26 decisions recorded |
-| 8. Cost per run recorded and visible on the internal dashboard | ⚠️ `cost_records`, the generated total and the `daily_spend` / `assessment_cost` views exist. The dashboard that reads them lands in M1, alongside the first run that has a cost |
+| Definition of Done                                                                          | Status                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Works end-to-end locally with one command                                                | ✅ `pnpm dev`. ⚠️ No deployed preview yet — blocked on the domain and hosting accounts (see `OPEN_ITEMS.md`)                                                                     |
+| 2. Tests pass, including payments, badge integrity, authorisation-to-test and personal data | ✅ 159 tests, all four areas covered                                                                                                                                             |
+| 3. The independence test passes                                                             | ✅ Identical apps, opposite wallets, byte-identical scores                                                                                                                       |
+| 4. RLS verified — user A cannot read user B's app, assessment, report or badge              | ✅ Asserted per table against a real Postgres                                                                                                                                    |
+| 5. No secrets in the repo; scanner clean                                                    | ✅ Also runs as a pre-commit hook, and covers untracked files                                                                                                                    |
+| 6. Legal artefacts drafted, versioned, surfaced in-product, acceptance recorded             | ✅ 14 drafts, hashed, published at `/legal`, acceptance written to the append-only `consents` table                                                                              |
+| 7. `DECISIONS.md`, `OPEN_ITEMS.md` and the runbook updated                                  | ✅ 26 decisions recorded                                                                                                                                                         |
+| 8. Cost per run recorded and visible on the internal dashboard                              | ⚠️ `cost_records`, the generated total and the `daily_spend` / `assessment_cost` views exist. The dashboard that reads them lands in M1, alongside the first run that has a cost |
 
 ### What M0 built
 
