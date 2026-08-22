@@ -168,4 +168,56 @@ describe('the scoring module cannot see money', () => {
   it('takes exactly one argument, so no context parameter can be added quietly', () => {
     expect(scoreAssessment.length).toBe(1);
   });
+
+  it('does not depend on the billing package, at any depth', () => {
+    const manifest = JSON.parse(
+      readFileSync(join(process.cwd(), 'packages/rubric/package.json'), 'utf8'),
+    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
+    expect(declared).not.toContain('@vibefy/billing');
+    expect(declared).not.toContain('@vibefy/report');
+    expect(declared).not.toContain('stripe');
+
+    for (const file of readdirSync(scoringDir).filter((name) => name.endsWith('.ts'))) {
+      const source = readFileSync(join(scoringDir, file), 'utf8');
+      expect(source, `${file} must not import billing`).not.toMatch(
+        /from ['"]@vibefy\/(billing|report)/,
+      );
+      expect(source, `${file} must not read the price list`).not.toMatch(/config\/pricing/);
+    }
+  });
+});
+
+describe('what a report shows never changes what it scored', () => {
+  it('renders the same score at both tiers', async () => {
+    const { renderReport } = await import('../packages/report/src/index.ts');
+    const { entitlementFor } = await import('../packages/billing/src/index.ts');
+
+    const source = {
+      assessmentId: 'a',
+      appName: 'Kettle',
+      appUrl: 'https://kettle.example',
+      organisationName: 'Kettle Ltd',
+      rubricVersion: '1.0.0',
+      assessedOn: '2026-08-22',
+      reviewedOn: null,
+      overallScore: 63.5,
+      band: 'Adequate',
+      certificationEligible: false,
+      certificationBlockers: [],
+      dimensions: [],
+      findings: [],
+      narrative: null,
+      stages: [],
+      scopeStatement: 'x'.repeat(120),
+      promptBundleSha256: 'c'.repeat(64),
+      intendedForAppStore: false,
+    } as const;
+
+    const free = renderReport(source, entitlementFor('free').reportTier);
+    const paid = renderReport(source, entitlementFor('one_off').reportTier);
+    const fingerprint = (html: string) =>
+      /vibefy-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
+    expect(fingerprint(free.html)).toBe(fingerprint(paid.html));
+  });
 });

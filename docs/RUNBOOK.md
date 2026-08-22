@@ -113,6 +113,27 @@ and the pipeline stops rather than retrying. That is deliberate: retrying a ceil
 money to break the same rule twice. Everything assessed before that point still stands, and the
 report says what came after was not assessed.
 
+## Testing payments without Stripe
+
+The billing suite runs against `FakePaymentProvider`, which signs webhooks with a real HMAC in
+Stripe's format. To exercise the endpoint by hand:
+
+```bash
+node -e '
+  const { FakePaymentProvider } = await import("./packages/billing/src/index.ts");
+  const p = new FakePaymentProvider();
+  const body = JSON.stringify({ id: "evt_1", type: "checkout.session.completed", created: Math.floor(Date.now()/1000),
+    data: { object: { id: "cs_1", mode: "payment", invoice: "in_1", amount_total: 7900, currency: "usd",
+      metadata: { organisationId: "<your org id>", plan: "one_off" } } } });
+  console.log(body); console.log(p.sign(body));
+'
+```
+
+POST the body to `/api/stripe/webhook` with that value as the `stripe-signature` header. A
+tampered body, an unsigned body, or one older than five minutes is refused — those are tested.
+
+With real keys set, the fake is never constructed, and production refuses to start without them.
+
 ## Changing the rubric
 
 Rubric versions are immutable once published — the database refuses to edit one, and issued

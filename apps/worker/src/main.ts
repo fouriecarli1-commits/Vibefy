@@ -1,19 +1,21 @@
 /**
  * The worker process.
  *
- * Assessments are long-running, so they never run in a request handler. pg-boss
- * gives us a durable queue in the database we already have — one fewer vendor,
- * one fewer dashboard, and the jobs live where the data lives.
+ * Assessments are long-running, so they never run in a request handler. The
+ * queue is `public.assessment_requests`, claimed with FOR UPDATE SKIP LOCKED —
+ * a table the customer can watch rather than a broker they cannot.
  *
  * In production this process runs inside the ephemeral, network-restricted
  * container described in the runbook. The scope guard is the in-process half of
  * that boundary; the container's egress allowlist is the outer half.
  */
-import { PgBoss, type Job } from 'pg-boss';
 import { Pool } from 'pg';
-import { runAssessmentJob, type AssessmentJob } from './run-assessment.ts';
+import { NotAuthorisedError, runAssessmentJob } from './run-assessment.ts';
+import { claimNextRequest, completeRequest, failRequest } from './queue.ts';
+import { resolveReportStorage, sweepPendingReports } from './report.ts';
 
-export const ASSESSMENT_QUEUE = 'assessment.run';
+export const POLL_INTERVAL_MS = 5_000;
+export const REPORT_SWEEP_INTERVAL_MS = 30_000;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -26,47 +28,95 @@ function log(message: string, detail: Record<string, unknown> = {}): void {
   console.log(JSON.stringify({ at: new Date().toISOString(), message, ...detail }));
 }
 
-export async function start(): Promise<{ boss: PgBoss; pool: Pool }> {
-  const connectionString = requireEnv('SUPABASE_DB_URL');
-  const pool = new Pool({ connectionString, max: 4 });
-  const boss = new PgBoss({ connectionString, schema: 'pgboss' });
+/** Runs one queued request, if there is one. Returns whether it did any work. */
+export async function processNextRequest(pool: Pool, logger: typeof log = log): Promise<boolean> {
+  const claimClient = await pool.connect();
+  let claimed;
+  try {
+    claimed = await claimNextRequest(claimClient);
+  } finally {
+    claimClient.release();
+  }
+  if (!claimed) return false;
 
-  boss.on('error', (error: unknown) => log('queue error', { error: String(error) }));
+  logger('request claimed', { requestId: claimed.id, appId: claimed.appId, depth: claimed.depth });
 
-  await boss.start();
-  await boss.createQueue(ASSESSMENT_QUEUE);
+  try {
+    const result = await runAssessmentJob(
+      { appId: claimed.appId, depth: claimed.depth, requestedBy: claimed.requestedBy },
+      { pool, log: logger },
+    );
+    const client = await pool.connect();
+    try {
+      await completeRequest(client, claimed.id, result.assessmentId);
+    } finally {
+      client.release();
+    }
+    logger('request completed', { requestId: claimed.id, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // An unauthorised target does not become authorised by trying again, and
+    // retrying it would mean attempting to test something we may not test, twice.
+    const retryable = !(error instanceof NotAuthorisedError);
+    const client = await pool.connect();
+    try {
+      const outcome = await failRequest(client, claimed.id, message, { retryable });
+      logger('request failed', { requestId: claimed.id, outcome, error: message });
+    } finally {
+      client.release();
+    }
+  }
 
-  await boss.work<AssessmentJob>(
-    ASSESSMENT_QUEUE,
-    // One at a time per worker. Assessments are heavy, and a queue that runs
-    // eight of them at once is a queue that hits the daily spend cap by lunchtime.
-    { batchSize: 1, pollingIntervalSeconds: 5 },
-    async ([job]: Job<AssessmentJob>[]) => {
-      if (!job) return;
-      log('job received', { jobId: job.id, appId: job.data.appId });
+  return true;
+}
+
+export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }> {
+  const pool = new Pool({ connectionString: requireEnv('SUPABASE_DB_URL'), max: 4 });
+  const storage = resolveReportStorage();
+  let running = true;
+
+  const loop = async () => {
+    while (running) {
       try {
-        const result = await runAssessmentJob(job.data, { pool, log });
-        log('job completed', { jobId: job.id, ...result });
+        // One at a time per worker. Assessments are heavy, and a worker that runs
+        // eight at once is a worker that hits the daily spend cap by lunchtime.
+        const did = await processNextRequest(pool, log);
+        if (!did) await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       } catch (error) {
-        log('job failed', {
-          jobId: job.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw error;
+        log('worker loop error', { error: String(error) });
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       }
-    },
-  );
+    }
+  };
 
-  log('worker ready', { queue: ASSESSMENT_QUEUE });
-  return { boss, pool };
+  // Reports are generated by a sweep rather than by a message from the console:
+  // an approval whose enqueue failed would otherwise leave a customer with a
+  // report that never appears and no trace of why.
+  const sweep = setInterval(() => {
+    void sweepPendingReports(pool, storage, log).catch((error) =>
+      log('report sweep failed', { error: String(error) }),
+    );
+  }, REPORT_SWEEP_INTERVAL_MS);
+  sweep.unref();
+
+  void loop();
+  log('worker ready', { poll: POLL_INTERVAL_MS, reportSweep: REPORT_SWEEP_INTERVAL_MS });
+
+  return {
+    pool,
+    async stop() {
+      running = false;
+      clearInterval(sweep);
+      await pool.end();
+    },
+  };
 }
 
 if (process.argv[1]?.endsWith('main.ts')) {
-  const { boss, pool } = await start();
+  const { stop } = await start();
   const shutdown = async () => {
     log('shutting down');
-    await boss.stop({ graceful: true });
-    await pool.end();
+    await stop();
     process.exit(0);
   };
   process.on('SIGINT', shutdown);

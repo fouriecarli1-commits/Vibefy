@@ -12,7 +12,9 @@ import {
   screenIntake,
   verifyOwnership,
 } from '@vibefy/engine/authorisation';
+import { decideAssessmentRequest, resolvePlan } from '@vibefy/billing';
 import { createClient } from '@/lib/supabase/server';
+import { readAsUser } from '@/lib/sql';
 
 const WARRANTY_FILE = 'authorisation-to-test.md';
 
@@ -322,4 +324,140 @@ export async function revokeAuthorisation(
 
   revalidatePath(`/console/apps/${appId}`);
   return { notice: 'Authorisation withdrawn. Any run in flight stops, and no new run will start.' };
+}
+
+/**
+ * Requesting an assessment.
+ *
+ * The entitlement decision is made here, recorded on the request row, and then
+ * acted on — rather than recomputed later from a plan that may since have
+ * changed. A refusal is stored with its reason so the customer can be told
+ * exactly why, and so we can answer the same question in six months.
+ *
+ * Nothing here starts an assessment. It puts a row in a queue the customer can
+ * watch; the worker does the rest, and re-checks the authorisation gate before
+ * it does anything at all.
+ */
+export async function requestAssessment(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'You are signed out.' };
+
+  const appId = String(formData.get('appId') ?? '');
+
+  const decision = await readAsUser(user.id, async (client) => {
+    const app = await client.query<{
+      organisation_id: string;
+      screening_status: string;
+      authorised: boolean;
+    }>(
+      `select a.organisation_id, a.screening_status,
+              public.app_is_authorised_for_testing(a.id) as authorised
+         from public.apps a where a.id = $1`,
+      [appId],
+    );
+    const row = app.rows[0];
+    if (!row) return null;
+
+    const plan = await resolvePlan(client, { organisationId: row.organisation_id, appId });
+
+    const history = await client.query<{ completed_at: string; paid: boolean }>(
+      `select a.completed_at,
+              exists (
+                select 1 from public.invoices i
+                 where i.app_id = $1 and i.status = 'paid'
+                   and i.paid_at <= a.completed_at
+              ) as paid
+         from public.assessments a
+        where a.app_id = $1 and a.completed_at is not null
+        order by a.completed_at desc
+        limit 10`,
+      [appId],
+    );
+
+    const appCount = await client.query<{ n: number }>(
+      `select count(*)::int as n from public.apps
+        where organisation_id = $1 and archived_at is null`,
+      [row.organisation_id],
+    );
+
+    const subscription = await client.query<{ status: string }>(
+      `select status from public.subscriptions where organisation_id = $1
+        order by case status when 'active' then 0 else 1 end limit 1`,
+      [row.organisation_id],
+    );
+
+    return {
+      organisationId: row.organisation_id,
+      screening: row.screening_status,
+      plan,
+      verdict: decideAssessmentRequest({
+        plan: plan.plan,
+        subscriptionStatus: (subscription.rows[0]?.status ?? null) as never,
+        appsInWorkspace: appCount.rows[0]?.n ?? 1,
+        previousAssessments: history.rows.map((entry) => ({
+          completedAt: new Date(entry.completed_at),
+          paid: entry.paid,
+        })),
+        appIsAuthorised: row.authorised === true,
+      }),
+    };
+  });
+
+  if (!decision) return { error: 'Application not found.' };
+  if (decision.screening === 'refused') {
+    return {
+      error:
+        'This application was refused under the Acceptable Use Policy. Appeal it rather than re-submitting.',
+    };
+  }
+
+  const { verdict, plan } = decision;
+
+  if (!verdict.allowed) {
+    // The refusal is recorded, not just returned: a customer who asks why in six
+    // months deserves the same answer they were given today.
+    await supabase.from('assessment_requests').insert({
+      app_id: appId,
+      organisation_id: decision.organisationId,
+      requested_by: user.id,
+      depth: verdict.depth,
+      status: 'refused',
+      plan_at_request: plan.plan,
+      max_run_cost_usd: verdict.maxRunCostUsd,
+      refusal_code: verdict.refusal?.code,
+      refusal_message: verdict.refusal?.message,
+    });
+    return { error: verdict.refusal?.message ?? 'This assessment cannot run right now.' };
+  }
+
+  const { error } = await supabase.from('assessment_requests').insert({
+    app_id: appId,
+    organisation_id: decision.organisationId,
+    requested_by: user.id,
+    depth: verdict.depth,
+    plan_at_request: plan.plan,
+    uses_retest_credit: verdict.usesReTestCredit,
+    max_run_cost_usd: verdict.maxRunCostUsd,
+  });
+
+  if (error) {
+    return {
+      error: error.message.includes('one_live_per_app')
+        ? 'An assessment of this application is already queued or running.'
+        : error.message,
+    };
+  }
+
+  revalidatePath(`/console/apps/${appId}`);
+  return {
+    notice: verdict.usesReTestCredit
+      ? `Queued as a ${verdict.depth} assessment, using one of your free re-tests.`
+      : `Queued as a ${verdict.depth} assessment. ${plan.because}`,
+  };
 }

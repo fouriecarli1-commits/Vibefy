@@ -12,11 +12,15 @@
   "dependencies": {
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",
+    "@vibefy/billing": "workspace:*",
     "@vibefy/engine": "workspace:*",
+    "@vibefy/report": "workspace:*",
     "@vibefy/rubric": "workspace:*",
     "@vibefy/shared": "workspace:*",
+    "@vibefy/worker": "workspace:*",
     "marked": "^16.4.2",
     "next": "16.3.2",
+    "pg": "8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -26,6 +30,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "tailwindcss": "4.3.3",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "@types/pg": "8.23.1"
   }
 }

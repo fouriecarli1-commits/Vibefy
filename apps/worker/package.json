@@ -16,7 +16,9 @@
     "@vibefy/rubric": "workspace:*",
     "@vibefy/shared": "workspace:*",
     "pg": "8.23.0",
-    "pg-boss": "12.27.0"
+    "@vibefy/report": "workspace:*",
+    "playwright": "1.62.1",
+    "@vibefy/billing": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

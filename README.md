@@ -12,10 +12,10 @@ Vibefy is not an app store, and a Vibefy badge is not a security guarantee. See
 
 ## Status
 
-Milestone **M1 — Assessment engine**. Intake, ownership verification, the authorisation gate,
-the six-stage pipeline, the reviewer queue and the cost dashboard are built. Payments (M2) and
-the badge system (M3) are not. See `docs/MILESTONES.md` for what each milestone delivered and
-`docs/OPEN_ITEMS.md` for what is deferred and why.
+Milestone **M2 — Reports & payments**. Intake, ownership verification, the authorisation gate,
+the six-stage pipeline, the reviewer queue, reports with PDF export, entitlements and Stripe
+billing are built. The badge system (M3) is not. See `docs/MILESTONES.md` for what each
+milestone delivered and `docs/OPEN_ITEMS.md` for what is deferred and why.
 
 ## Getting started
 
@@ -53,6 +53,8 @@ Runs, in order:
 apps/web           Next.js App Router console, review queue and public pages
 apps/worker        The assessment runner: pg-boss consumer, pipeline, persistence
 packages/engine    The assessment engine — scope boundary, stages, evidence, cost
+packages/report    The report: assembly from stored rows, tier redaction, rendering
+packages/billing   Entitlements, the payment boundary, and webhook application
 packages/shared    Types, design tokens, and the guarantees shared by every surface
 packages/rubric    The rubric as versioned data, plus the scoring functions
 prompts/           Versioned prompts, hashed and recorded in every report

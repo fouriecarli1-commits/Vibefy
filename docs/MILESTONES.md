@@ -74,6 +74,44 @@ The **sandbox container image** — an ephemeral machine with a default-deny egr
 deployment artefact and is blocked on the hosting decision. The in-process guard is built and
 tested; it is the inner half of that boundary, not a replacement for it.
 
-## M2–M8 — not started
+## M2 — Reports & payments · complete, blocked only on a Stripe account
+
+| Definition of Done                                   | Status                                                                                                                                              |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview                                                                                  |
+| 2. Tests pass, including the four mandatory areas    | ✅ 325 tests. Payments now have their own suite, run against a fake that signs with a real HMAC                                                     |
+| 3. The independence test passes                      | ✅ Extended: `packages/rubric` may not depend on `@vibefy/billing`, `@vibefy/report` or `stripe`, and a report renders the same score at both tiers |
+| 4. RLS verified                                      | ✅ Extended to `assessment_requests` and `billing_events`                                                                                           |
+| 5. No secrets in the repo                            | ✅                                                                                                                                                  |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ The refund policy is summarised on the billing page and linked in full                                                                           |
+| 7. Docs updated                                      | ✅ 55 decisions recorded                                                                                                                            |
+| 8. Cost per run recorded and visible                 | ✅ Unchanged, and the per-run ceiling now comes from the customer's entitlement                                                                     |
+
+### What M2 built
+
+- **The report**, as a self-contained HTML document that is also what gets printed to PDF.
+  Score, dimension breakdown, findings with evidence hashes, a prioritised remediation order,
+  and — at every tier — the scope statement and what was not assessed.
+- **Tier redaction that cannot leak.** A free report shows the same score and the same dimension
+  breakdown; evidence and remediation are stripped from the objects, not hidden by the template.
+- **Entitlements** deciding depth, report tier, PDF, badge eligibility, the free tier's 90-day
+  cooling-off period and re-test credits — and nothing else. An unauthorised target is refused on
+  every plan.
+- **Stripe** via hosted Checkout, Billing and Tax, behind a provider interface with a signing
+  fake. No card field exists anywhere in this repository.
+- **Webhooks** that verify the raw body, record before acting, and are idempotent by database
+  constraint.
+- **A visible queue.** `assessment_requests` is claimed with `FOR UPDATE SKIP LOCKED`; the
+  customer can watch their own request and cancel it, and the refusal reason is stored.
+- **A self-healing report sweep** that also regenerates the full report when a customer upgrades
+  after reading the free one — same findings, same evidence, same score.
+
+### Outstanding from M2
+
+A **Stripe account with four price ids** and a registered webhook endpoint. The integration is
+built and tested; it has never spoken to Stripe, because there is nothing to speak to yet.
+**Object storage** for rendered reports is still local disk, which is a deployment decision.
+
+## M3–M8 — not started
 
 See PART 2 of the build brief.

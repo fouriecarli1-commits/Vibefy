@@ -2,7 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { CHALLENGE_PATH, DNS_RECORD_PREFIX } from '@vibefy/engine/authorisation';
-import { revokeAuthorisation, startAuthorisation, verifyAuthorisation } from '../actions';
+import {
+  requestAssessment,
+  revokeAuthorisation,
+  startAuthorisation,
+  verifyAuthorisation,
+} from '../actions';
 import { ActionForm, Checkbox, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 
@@ -47,6 +52,20 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
 
   const { data: app } = await supabase.from('apps').select('*').eq('id', id).single();
   if (!app) notFound();
+
+  const { data: requests } = await supabase
+    .from('assessment_requests')
+    .select('id, status, depth, uses_retest_credit, refusal_message, created_at, assessment_id')
+    .eq('app_id', id)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  const { data: assessments } = await supabase
+    .from('assessments')
+    .select('id, status, overall_score, rubric_version, reviewed_at, created_at')
+    .eq('app_id', id)
+    .order('created_at', { ascending: false })
+    .limit(10);
 
   const { data: authorisations } = await supabase
     .from('authorisations')
@@ -227,6 +246,71 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           </div>
         )}
       </section>
+
+      {status === 'verified' && (
+        <section aria-labelledby="assess" className="space-y-4">
+          <h2 id="assess" className="text-2xl font-bold tracking-tight">
+            Assessments
+          </h2>
+
+          {(requests ?? []).some((request) =>
+            ['queued', 'claimed'].includes(String(request.status)),
+          ) ? (
+            <p role="status" className="rounded-xl border border-line bg-surface-muted p-5 text-sm">
+              An assessment is queued. The worker claims it, re-checks that the authorisation is
+              still live, and runs it. You will see the report here once a human reviewer has
+              approved it — nothing is published before that.
+            </p>
+          ) : (
+            <div className="rounded-xl border border-line p-5">
+              <p className="mb-4 text-sm text-muted">
+                What runs depends on your plan: how deep the assessment goes and how much of the
+                report you see. It never depends on what you paid for the score itself.
+              </p>
+              <ActionForm action={requestAssessment} submitLabel="Request an assessment">
+                <input type="hidden" name="appId" value={id} />
+              </ActionForm>
+            </div>
+          )}
+
+          {(assessments ?? []).length > 0 && (
+            <ul className="space-y-3">
+              {(assessments ?? []).map((assessment) => (
+                <li key={assessment.id as string} className="rounded-xl border border-line p-5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    <span className="font-medium">
+                      {assessment.overall_score !== null
+                        ? `${Number(assessment.overall_score).toFixed(1)} / 100`
+                        : 'Not scored yet'}
+                    </span>
+                    <span className="text-sm text-muted">
+                      {String(assessment.status).replace(/_/g, ' ')} · rubric v
+                      {String(assessment.rubric_version)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    {new Date(assessment.created_at as string).toUTCString()}
+                  </p>
+                  {['approved', 'published'].includes(String(assessment.status)) && (
+                    <p className="mt-3 text-sm">
+                      <Link href={`/console/reports/${assessment.id}`}>Read the report</Link>
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {(requests ?? [])
+            .filter((request) => String(request.status) === 'refused')
+            .slice(0, 1)
+            .map((request) => (
+              <p key={request.id as string} className="text-sm text-muted">
+                Last refused request: {String(request.refusal_message)}
+              </p>
+            ))}
+        </section>
+      )}
 
       <section aria-labelledby="history" className="space-y-4">
         <h2 id="history" className="text-xl font-semibold">
