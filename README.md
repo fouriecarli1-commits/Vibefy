@@ -18,7 +18,12 @@ billing, the signed "Verified by Vibefy" badge with its public verification surf
 continuous monitoring, and the agency and organisation surfaces — shared workspaces, seats and
 roles, policy profiles, white-label reports, audit export, single sign-on and the portfolio
 dashboard — the Expo mobile app with push notifications, and the public directory are built. The marketing
-arm (M8) is deliberately not — see `docs/MILESTONES.md`. See `docs/MILESTONES.md` for what each milestone delivered and `docs/OPEN_ITEMS.md`
+arm (M8) is deliberately not — its own precondition, a live directory, is not met. See
+`docs/MILESTONES.md`.
+
+The spend ceilings, retention deletion, data-subject-rights flows and the appeals route are also
+built: the schema had recorded the intent of all four since M1 and nothing had carried any of
+them out. See `docs/MILESTONES.md` for what each milestone delivered and `docs/OPEN_ITEMS.md`
 for what is deferred and why.
 
 ## Getting started
@@ -65,6 +70,7 @@ packages/policy    An organisation's own bar, applied over a score and never to 
 packages/workspace Invitation tokens, seat arithmetic and the audit export
 packages/api       One typed client the console and the phone both use — there is no mobile API
 packages/directory Public listing: search, rubric-only ordering, and the disclosures
+packages/governance Spend ceilings, the retention schedule, and data-subject rights
 packages/badge     Ed25519 signing, the published key set, and the badge renderer
 packages/shared    Types, design tokens, and the guarantees shared by every surface
 packages/rubric    The rubric as versioned data, plus the scoring functions

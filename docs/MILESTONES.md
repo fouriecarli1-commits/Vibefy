@@ -334,10 +334,45 @@ and it is why M7 comes seventh rather than second. No code change makes it go aw
 advertising, visually and in words, and kept out of the organic ordering — the Badge Licence and
 the ordering note both say so, and the type system would need changing to allow it.
 
+## Governance operations — closing what the schema only promised ✅
+
+Not a numbered milestone. Four things the brief specifies that earlier milestones recorded the
+*intent* of and nothing carried out. They are listed here because a promise with no mechanism
+behind it is the thing this whole product exists to find in other people's software — and two of
+them were being claimed, in writing, in the published privacy notice.
+
+| Gate | Status |
+| --- | --- |
+| 1. `pnpm verify` green | ✅ 525 tests, six gates |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Personal data is the whole of this: retention deletion, data-subject rights, and the privacy of both |
+| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
+| 4. RLS verified | ✅ A spend pause is platform-only; a deletion record is visible to the workspace it belongs to; a data-subject request is private to the person who made it |
+| 5. No secrets in the repo | ✅ Unchanged |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ No document changed — what changed is that two of their claims became true |
+| 7. Docs updated | ✅ 142 decisions recorded |
+| 8. Cost per run recorded and visible | ✅ The dashboard now shows the ceilings and whether one has stopped anything |
+
+### What it built
+
+- **The global daily spend cap** (PART 9). The per-run ceiling existed; a runaway loop across a
+  thousand cheap runs hit nothing. The pause is a row, so restarting the worker does not lift it;
+  a partial unique index means two workers crossing the line produce one pause; the lift is manual
+  and needs a written reason; and a paused platform defers queued work rather than failing it.
+- **Retention deletion** (PART 8.2). Every evidence artefact has carried a `retention_until` since
+  M1 and nothing had ever acted on one. The record of the deletion is written before the deletion,
+  keeps the hash and not the artefact, and is append-only.
+- **Data-subject rights, in product** (PART 8.2) — access, correction, deletion, portability,
+  objection, each with what it actually gets you in the words we will be held to. The deadline
+  comes from a database trigger, a completed request is terminal, and a refusal must name its
+  lawful basis in both the action and a check constraint.
+- **The appeals route** (PART 3), with a fourteen-day deadline, a reviewer queue, and written
+  reasons required for every outcome including a rejection.
+
 ## M8 — not started
 
 Blocked, per PART 2, on M7 being live and on the independence policy in PART 8 being implemented
 and documented. The policy is implemented (`docs/INDEPENDENCE_POLICY.md`, enforced by
 `tests/independence.test.ts`, `tests/directory.test.ts` and the compile-time boundaries in
 `packages/rubric`, `packages/monitoring`, `packages/policy` and `packages/directory`). What
-remains before M8 is a live directory, which needs paying customers, not code.
+remains is a live directory, which needs paying customers rather than code — and the cold-start
+argument in PART 11 is exactly the reason not to build a marketing arm against an empty one.

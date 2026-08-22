@@ -21,6 +21,12 @@ import {
   sweepScheduledReassessments,
 } from './monitoring.ts';
 import { sweepAlertPush } from './push.ts';
+import {
+  spendingIsPaused,
+  sweepGovernanceDeadlines,
+  sweepRetention,
+  sweepSpendCap,
+} from './governance.ts';
 
 export const POLL_INTERVAL_MS = 5_000;
 export const REPORT_SWEEP_INTERVAL_MS = 30_000;
@@ -45,6 +51,15 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
   const claimClient = await pool.connect();
   let claimed;
   try {
+    // The global spend ceiling is checked here, before anything is claimed,
+    // because the failure it guards against is not one expensive run — it is a
+    // thousand cheap ones started by a loop nobody is watching at three in the
+    // morning. A pause is a row in the database, not state in this process, so
+    // restarting the worker does not lift it.
+    if (await spendingIsPaused(claimClient)) {
+      logger('spending paused — not claiming work');
+      return false;
+    }
     claimed = await claimNextRequest(claimClient);
   } finally {
     claimClient.release();
@@ -140,6 +155,17 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
     // a copy of it, and one that fails is retried rather than lost.
     void sweepAlertPush(pool, undefined, log).catch((error) =>
       log('alert push sweep failed', { error: String(error) }),
+    );
+    // Governance: the ceiling, the retention deadline and the response deadline.
+    // All three were recorded in the schema from M1 and acted on by nothing.
+    void sweepSpendCap(pool, log).catch((error) =>
+      log('spend sweep failed', { error: String(error) }),
+    );
+    void sweepRetention(pool, log).catch((error) =>
+      log('retention sweep failed', { error: String(error) }),
+    );
+    void sweepGovernanceDeadlines(pool, log).catch((error) =>
+      log('governance deadline sweep failed', { error: String(error) }),
     );
   }, MONITOR_SWEEP_INTERVAL_MS);
   monitor.unref();

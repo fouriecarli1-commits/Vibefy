@@ -21,7 +21,8 @@
     "@vibefy/billing": "workspace:*",
     "@vibefy/badge": "workspace:*",
     "@vibefy/monitoring": "workspace:*",
-    "@vibefy/api": "workspace:*"
+    "@vibefy/api": "workspace:*",
+    "@vibefy/governance": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

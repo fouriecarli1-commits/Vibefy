@@ -57,6 +57,12 @@ export default async function ReviewQueuePage() {
         </p>
       </header>
 
+      <nav aria-label="Review queues" className="flex flex-wrap gap-5 text-sm">
+        <Link href="/review/badges">Badges</Link>
+        <Link href="/review/appeals">Appeals</Link>
+        <Link href="/review/requests">Data requests</Link>
+      </nav>
+
       {queue && queue.length > 0 ? (
         <ol className="space-y-3">
           {queue.map((assessment) => {

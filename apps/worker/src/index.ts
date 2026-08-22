@@ -5,4 +5,5 @@ export * from './run-assessment.ts';
 export * from './queue.ts';
 export * from './monitoring.ts';
 export * from './push.ts';
+export * from './governance.ts';
 export { processNextRequest, POLL_INTERVAL_MS } from './main.ts';

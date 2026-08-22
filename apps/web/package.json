@@ -26,7 +26,8 @@
     "react-dom": "19.2.8",
     "@vibefy/workspace": "workspace:*",
     "@vibefy/policy": "workspace:*",
-    "@vibefy/directory": "workspace:*"
+    "@vibefy/directory": "workspace:*",
+    "@vibefy/governance": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",

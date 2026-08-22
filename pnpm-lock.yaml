@@ -120,6 +120,9 @@ importers:
       '@vibefy/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@vibefy/governance':
+        specifier: workspace:*
+        version: link:../../packages/governance
       '@vibefy/policy':
         specifier: workspace:*
         version: link:../../packages/policy
@@ -190,6 +193,9 @@ importers:
       '@vibefy/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@vibefy/governance':
+        specifier: workspace:*
+        version: link:../../packages/governance
       '@vibefy/monitoring':
         specifier: workspace:*
         version: link:../../packages/monitoring
@@ -300,6 +306,15 @@ importers:
       zod:
         specifier: 4.4.3
         version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/governance:
     devDependencies:
       '@types/node':
         specifier: 26.2.0

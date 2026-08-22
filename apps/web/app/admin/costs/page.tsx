@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { CEILINGS } from '@vibefy/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { createClient } from '@/lib/supabase/server';
 
@@ -43,6 +44,14 @@ export default async function CostsPage() {
     .select('*')
     .order('day', { ascending: false })
     .limit(14);
+  // The ceiling, and whether it has stopped anything. A cap nobody can see the
+  // state of is a cap nobody trusts.
+  const { data: pauses } = await supabase
+    .from('spend_pauses')
+    .select('id, reason, observed_usd, ceiling_usd, paused_at, lifted_at, lift_reason')
+    .order('paused_at', { ascending: false })
+    .limit(5);
+
   const { data: perAssessment } = await supabase
     .from('assessment_cost')
     .select('*')
@@ -72,6 +81,69 @@ export default async function CostsPage() {
           config/pricing.json; nothing on the scoring path can read either.
         </p>
       </header>
+
+      <section aria-labelledby="ceilings" className="space-y-4">
+        <h2 id="ceilings" className="text-xl font-semibold">
+          Ceilings
+        </h2>
+        <dl className="grid gap-4 sm:grid-cols-3">
+          {[
+            { label: 'Global daily spend', value: `$${CEILINGS.globalDailyUsd.toFixed(2)}` },
+            {
+              label: 'Free-tier weekly budget',
+              value: `$${CEILINGS.freeTierWeeklyAlertUsd.toFixed(2)}`,
+            },
+            {
+              label: 'Free tier, per account per month',
+              value: `$${CEILINGS.freeTierPerAccountMonthlyUsd.toFixed(2)}`,
+            },
+          ].map((item) => (
+            <div key={item.label} className="rounded-xl border border-line p-5">
+              <dt className="text-sm text-muted">{item.label}</dt>
+              <dd className="mt-1 text-2xl font-bold tracking-tight">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+        {(pauses ?? []).some((pause) => !pause.lifted_at) ? (
+          <div role="alert" className="rounded-xl border border-line-strong p-5">
+            <h3 className="font-semibold text-bad">Assessment work is paused</h3>
+            <p className="mt-2 text-sm">
+              {String((pauses ?? []).find((pause) => !pause.lifted_at)?.reason)}
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              The worker claims nothing while a pause is live. Lifting one is deliberate and needs a
+              written reason — see the runbook. The pause is a row, not process state, so restarting
+              the worker does not clear it.
+            </p>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
+            No pause is live. Work stops automatically at the daily ceiling and is only restarted by
+            a person, because a cap that lifts itself is not a cap.
+          </p>
+        )}
+        {(pauses ?? []).length > 0 && (
+          <ul className="space-y-2 text-sm">
+            {(pauses ?? []).map((pause) => (
+              <li key={pause.id as string} className="rounded-lg border border-line p-4">
+                <div className="flex flex-wrap justify-between gap-3">
+                  <span className="font-medium">
+                    ${Number(pause.observed_usd).toFixed(2)} against $
+                    {Number(pause.ceiling_usd).toFixed(2)}
+                  </span>
+                  <span className="text-muted">
+                    {new Date(pause.paused_at as string).toUTCString()}
+                    {pause.lifted_at ? ' · lifted' : ' · live'}
+                  </span>
+                </div>
+                {pause.lift_reason && (
+                  <p className="mt-1 text-muted">Lifted: {String(pause.lift_reason)}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section aria-labelledby="margin" className="space-y-4">
         <h2 id="margin" className="text-xl font-semibold">

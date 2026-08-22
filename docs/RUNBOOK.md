@@ -385,6 +385,71 @@ placement is ever introduced it must be labelled as advertising, visually and in
 words, and kept out of the organic ordering; that is in the Badge Licence and in
 the note under every page of results.
 
+## Spend ceilings
+
+The per-run cap is enforced inside the engine before every model call. The
+global daily cap is a sweep, and its pause is a row:
+
+```sql
+select public.spend_since(date_trunc('day', now()))       as today,
+       public.free_tier_spend_since(now() - interval '7 days') as free_this_week,
+       public.spending_is_paused()                        as paused;
+```
+
+### The platform has paused itself
+
+That is the ceiling working. `/admin/costs` shows why, with the observed number
+against the ceiling. The worker claims nothing while a pause is live; queued
+requests stay queued and are not failed.
+
+Before lifting one, find out what spent the money — `/admin/costs` lists the most
+expensive assessments. Then:
+
+```sql
+update public.spend_pauses
+   set lifted_at = now(), lifted_by = '<your user id>',
+       lift_reason = 'Cause identified: <what it was>. Raised the ceiling / fixed the loop.'
+ where lifted_at is null;
+```
+
+The reason is required by a check constraint, and the pause is kept. A cap that
+lifts itself is not a cap, which is why this is a manual step with a sentence
+attached.
+
+To change the ceiling itself, edit `config/pricing.json`. It is config, not code,
+so it does not need a deploy.
+
+## Retention and data-subject rights
+
+### Proving a deletion happened
+
+```sql
+select data_class, entity_id, sha256, retention_until, deleted_at
+  from public.retention_deletions
+ where organisation_id = '<org id>' order by deleted_at desc;
+```
+
+The hash is kept and the artefact is not, so this answers "did you actually
+delete it" rather than asserting it. The table refuses updates and deletes.
+
+### A data-subject request
+
+Customers raise them at `/console/privacy`; the queue is `/review/requests`. Both
+sides show the deadline, which is set by a database trigger at thirty days and
+cannot be created without one.
+
+- **Answering one** needs a sentence saying what was done. It is shown to them.
+- **Refusing one** needs the lawful basis, in a sentence. A check constraint
+  refuses a refusal without it — name the basis, do not assert that one exists.
+- **A completed or refused request is terminal.** If they come back, that is a
+  new request with a new deadline, which is the honest way round.
+
+### An appeal
+
+`/review/appeals`, fourteen days, answered by someone who did not work on the
+assessment. Every outcome needs written reasons — a rejection especially, since
+that is the one the published policy exists for.
+
 ## Changing a legal document
 
 1. Edit the file in `/legal`, bump its `**Version:**`.
