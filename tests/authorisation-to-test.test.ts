@@ -127,7 +127,9 @@ describe('the authorisation record is evidence, so it is immutable', () => {
     const appId = await seedApp(db, account);
     const id = await seedAuthorisation(db, account, appId);
     await db.query('begin');
-    const message = await expectRefusal(db, `delete from public.authorisations where id = $1`, [id]);
+    const message = await expectRefusal(db, `delete from public.authorisations where id = $1`, [
+      id,
+    ]);
     expect(message).toMatch(/append-only/i);
     await db.query('rollback');
   });

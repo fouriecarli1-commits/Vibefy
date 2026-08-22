@@ -105,7 +105,8 @@ function gateTriggers(
   return findings.some((finding) => {
     if (gate.triggerSeverity && finding.severity !== gate.triggerSeverity) return false;
     if (gate.appliesToRules && !gate.appliesToRules.includes(finding.ruleId)) return false;
-    if (gate.appliesToDimensions && !gate.appliesToDimensions.includes(finding.dimension)) return false;
+    if (gate.appliesToDimensions && !gate.appliesToDimensions.includes(finding.dimension))
+      return false;
     return Boolean(gate.appliesToRules ?? gate.appliesToDimensions);
   });
 }

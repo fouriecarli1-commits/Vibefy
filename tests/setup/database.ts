@@ -11,7 +11,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const script = join(root, 'scripts', 'test-db.sh');
 
 export default function setup(): void {
-  const dsn = execFileSync('bash', [script, 'reset'], { encoding: 'utf8' }).trim().split('\n').pop();
+  const dsn = execFileSync('bash', [script, 'reset'], { encoding: 'utf8' })
+    .trim()
+    .split('\n')
+    .pop();
   if (!dsn) throw new Error('test-db.sh did not return a connection string');
   process.env.VIBEFY_TEST_DSN = dsn;
 }

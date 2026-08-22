@@ -142,7 +142,13 @@ export async function seedFinding(
     await client.query(
       `insert into public.evidence (finding_id, assessment_id, organisation_id, kind, storage_path, sha256)
        values ($1, $2, $3, 'header_scan', $4, $5)`,
-      [findingId, assessmentId, account.organisationId, `evidence/${findingId}.json`, sha256(findingId)],
+      [
+        findingId,
+        assessmentId,
+        account.organisationId,
+        `evidence/${findingId}.json`,
+        sha256(findingId),
+      ],
     );
   }
   return findingId;
@@ -162,7 +168,12 @@ export async function approveAssessment(
   await client.query(
     `insert into public.reviews (assessment_id, organisation_id, reviewer_id, action, reason)
      values ($1, $2, $3, 'approved', $4)`,
-    [assessmentId, account.organisationId, reviewerId, 'Findings and evidence checked against the rubric.'],
+    [
+      assessmentId,
+      account.organisationId,
+      reviewerId,
+      'Findings and evidence checked against the rubric.',
+    ],
   );
   await client.query(
     `update public.assessments
@@ -175,10 +186,7 @@ export async function approveAssessment(
   );
 }
 
-export async function acceptBadgeLicence(
-  client: Client,
-  account: SeededAccount,
-): Promise<string> {
+export async function acceptBadgeLicence(client: Client, account: SeededAccount): Promise<string> {
   const { rows } = await client.query<{ id: string }>(
     `insert into public.consents (user_id, organisation_id, document_type, document_version, document_sha256, action)
      values ($1, $2, 'badge_licence', '1.0.0', $3, 'accepted') returning id`,

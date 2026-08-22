@@ -30,8 +30,10 @@ describe('the rubric itself', () => {
   it('requires evidence for every criterion', () => {
     for (const dimension of getRubric().dimensions) {
       for (const criterion of dimension.criteria) {
-        expect(criterion.requiredEvidence.length, `${criterion.id} has no evidence requirement`)
-          .toBeGreaterThan(0);
+        expect(
+          criterion.requiredEvidence.length,
+          `${criterion.id} has no evidence requirement`,
+        ).toBeGreaterThan(0);
       }
     }
   });
@@ -42,7 +44,9 @@ describe('the rubric itself', () => {
   });
 
   it('refuses to score against a version it does not have', () => {
-    expect(() => scoreAssessment({ ...clean, rubricVersion: '9.9.9' })).toThrow(/unknown rubric version/i);
+    expect(() => scoreAssessment({ ...clean, rubricVersion: '9.9.9' })).toThrow(
+      /unknown rubric version/i,
+    );
   });
 });
 
@@ -57,13 +61,16 @@ describe('arithmetic', () => {
   it('subtracts the severity penalty, scaled by confidence', () => {
     const high = scoreAssessment(withFindings(finding({ severity: 'high', confidence: 'high' })));
     const low = scoreAssessment(withFindings(finding({ severity: 'high', confidence: 'low' })));
-    const security = (r: typeof high) => r.dimensions.find((d) => d.dimension === 'security_posture')!;
+    const security = (r: typeof high) =>
+      r.dimensions.find((d) => d.dimension === 'security_posture')!;
     expect(security(high).score).toBe(78); // 100 − 22 × 1.0
     expect(security(low).score).toBe(91.2); // 100 − 22 × 0.4
   });
 
   it('ignores findings that were withheld for lack of evidence', () => {
-    const withheld = scoreAssessment(withFindings(finding({ severity: 'critical', isPublished: false })));
+    const withheld = scoreAssessment(
+      withFindings(finding({ severity: 'critical', isPublished: false })),
+    );
     expect(withheld.overallScore).toBe(100);
   });
 
@@ -71,7 +78,11 @@ describe('arithmetic', () => {
     const battered = scoreAssessment(
       withFindings(
         ...Array.from({ length: 8 }, (_, index) =>
-          finding({ severity: 'critical', ruleId: `SEC-0${index % 9}`, dimension: 'practicality_ux' }),
+          finding({
+            severity: 'critical',
+            ruleId: `SEC-0${index % 9}`,
+            dimension: 'practicality_ux',
+          }),
         ),
       ),
     );
@@ -81,7 +92,9 @@ describe('arithmetic', () => {
 
 describe('gates', () => {
   it('caps the overall score when a critical security finding stands, whatever the rest scores', () => {
-    const result = scoreAssessment(withFindings(finding({ severity: 'critical', ruleId: 'SEC-05' })));
+    const result = scoreAssessment(
+      withFindings(finding({ severity: 'critical', ruleId: 'SEC-05' })),
+    );
     expect(result.overallScore).toBeLessThanOrEqual(49);
     expect(result.certificationEligible).toBe(false);
     expect(result.gatesApplied.map((g) => g.id)).toContain('GATE-CRITICAL-SECURITY');
@@ -89,14 +102,18 @@ describe('gates', () => {
 
   it('applies the same cap to a critical privacy finding', () => {
     const result = scoreAssessment(
-      withFindings(finding({ severity: 'critical', dimension: 'data_privacy_practice', ruleId: 'PRI-02' })),
+      withFindings(
+        finding({ severity: 'critical', dimension: 'data_privacy_practice', ruleId: 'PRI-02' }),
+      ),
     );
     expect(result.certificationEligible).toBe(false);
     expect(result.gatesApplied.map((g) => g.id)).toContain('GATE-CRITICAL-SECURITY');
   });
 
   it('caps harder still on an exposed live credential', () => {
-    const result = scoreAssessment(withFindings(finding({ severity: 'critical', ruleId: 'SEC-04' })));
+    const result = scoreAssessment(
+      withFindings(finding({ severity: 'critical', ruleId: 'SEC-04' })),
+    );
     expect(result.overallScore).toBeLessThanOrEqual(39);
     expect(result.gatesApplied.map((g) => g.id)).toContain('GATE-EXPOSED-SECRET');
   });
@@ -118,14 +135,20 @@ describe('gates', () => {
       ),
     );
     expect(result.overallScore).toBeGreaterThanOrEqual(70);
-    expect(result.dimensions.find((d) => d.dimension === 'security_posture')!.score).toBeLessThan(65);
+    expect(result.dimensions.find((d) => d.dimension === 'security_posture')!.score).toBeLessThan(
+      65,
+    );
     expect(result.certificationEligible).toBe(false);
     expect(result.certificationBlockers.join(' ')).toMatch(/security_posture/);
   });
 
   it('never lets a gate raise a score', () => {
-    const gated = scoreAssessment(withFindings(finding({ severity: 'critical', ruleId: 'SEC-05' })));
-    const ungated = scoreAssessment(withFindings(finding({ severity: 'critical', ruleId: 'SEC-05', isPublished: false })));
+    const gated = scoreAssessment(
+      withFindings(finding({ severity: 'critical', ruleId: 'SEC-05' })),
+    );
+    const ungated = scoreAssessment(
+      withFindings(finding({ severity: 'critical', ruleId: 'SEC-05', isPublished: false })),
+    );
     expect(gated.overallScore).toBeLessThan(ungated.overallScore);
   });
 });

@@ -54,7 +54,9 @@ export function badgeEmbedSnippet(options: BadgeEmbedOptions): string {
 
   const origin = options.verifyOrigin.replace(/\/+$/, '');
   if (!/^https:\/\//.test(origin)) {
-    throw new BadgeUsageError('The badge is served over HTTPS from the Vibefy verification origin only.');
+    throw new BadgeUsageError(
+      'The badge is served over HTTPS from the Vibefy verification origin only.',
+    );
   }
 
   const alt = badgeAltText(options);

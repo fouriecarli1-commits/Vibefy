@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Runs before every commit. Two checks only, both fast, both about things that
+# are painful to undo once they are in history: a leaked credential, and copy
+# that claims more than we assess.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+node tools/secret-scan.mjs --staged
+node tools/copy-lint.mjs

@@ -13,8 +13,7 @@ export const VIEWBOX = 512;
 
 /** The swoosh check, its inner chevron, and the three signal arcs. */
 export const MARK = {
-  swoosh:
-    'M88 176 C112 306 162 378 212 398 C266 418 306 360 334 302 C368 230 404 164 434 122',
+  swoosh: 'M88 176 C112 306 162 378 212 398 C266 418 306 360 334 302 C368 230 404 164 434 122',
   swooshWidth: 60,
   chevron: 'M196 272 L250 328 L332 218',
   chevronWidth: 32,
@@ -47,8 +46,7 @@ export const BADGE = {
  * until then every text element pins its width with textLength so substitution
  * changes the letterforms but never the lockup.
  */
-export const FONT_STACK =
-  "Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+export const FONT_STACK = "Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
 
 export const PALETTE = {
   navy: '#16205A',

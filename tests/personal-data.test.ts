@@ -9,7 +9,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
 import { connect, expectRefusal } from './setup/client.ts';
-import { seedAccount, seedAssessment, seedFinding, sha256, type SeededAccount } from './setup/seed.ts';
+import {
+  seedAccount,
+  seedAssessment,
+  seedFinding,
+  sha256,
+  type SeededAccount,
+} from './setup/seed.ts';
 
 let db: Client;
 let account: SeededAccount;
@@ -136,9 +142,9 @@ describe('the audit trail', () => {
         rows[0]!.id,
       ]),
     ).toMatch(/append-only/i);
-    expect(await expectRefusal(db, `delete from public.audit_log where id = $1`, [rows[0]!.id])).toMatch(
-      /append-only/i,
-    );
+    expect(
+      await expectRefusal(db, `delete from public.audit_log where id = $1`, [rows[0]!.id]),
+    ).toMatch(/append-only/i);
     await db.query('rollback');
   });
 });

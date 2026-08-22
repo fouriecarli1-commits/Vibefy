@@ -25,12 +25,24 @@ export const SECRET_PATTERNS = [
   { name: 'Stripe test secret key', pattern: /\b[rs]k_test_[A-Za-z0-9]{16,}\b/ },
   { name: 'Stripe webhook signing secret', pattern: /\bwhsec_[A-Za-z0-9]{16,}\b/ },
   { name: 'AWS access key id', pattern: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/ },
-  { name: 'GitHub token', pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})\b/ },
+  {
+    name: 'GitHub token',
+    pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})\b/,
+  },
   { name: 'Google API key', pattern: /\bAIza[0-9A-Za-z_-]{35}\b/ },
   { name: 'Slack token', pattern: /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/ },
-  { name: 'Private key block', pattern: /-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----/ },
-  { name: 'JSON Web Token (Supabase service role keys look like this)', pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/ },
-  { name: 'Postgres connection string with a password', pattern: /postgres(?:ql)?:\/\/[^\s:@/]+:(?!postgres@|password@)[^\s:@/]{6,}@/ },
+  {
+    name: 'Private key block',
+    pattern: /-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----/,
+  },
+  {
+    name: 'JSON Web Token (Supabase service role keys look like this)',
+    pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/,
+  },
+  {
+    name: 'Postgres connection string with a password',
+    pattern: /postgres(?:ql)?:\/\/[^\s:@/]+:(?!postgres@|password@)[^\s:@/]{6,}@/,
+  },
   {
     name: 'Assignment of a long opaque value to a secret-looking name',
     pattern:
@@ -38,19 +50,46 @@ export const SECRET_PATTERNS = [
   },
 ];
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.pnpm-store']);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.next',
+  'dist',
+  'build',
+  'coverage',
+  '.pnpm-store',
+]);
 const BINARY_EXTENSIONS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.pdf', '.zip', '.gz', '.woff', '.woff2', '.ttf', '.otf', '.mp4',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.ico',
+  '.pdf',
+  '.zip',
+  '.gz',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.mp4',
 ]);
 /** This file necessarily contains the shapes it is looking for. */
 const SKIP_FILES = new Set(['tools/secret-scan.mjs', 'tools/secret-scan.test.ts']);
 const MAX_BYTES = 2_000_000;
 
 /** Placeholders that exist so a human knows what to paste. They are not secrets. */
-const PLACEHOLDER = /^(?:|x{3,}|\.{3,}|<[^>]+>|\$\{[^}]+\}|your[-_].*|replace[-_]me|changeme|example|placeholder|dummy|test)$/i;
+const PLACEHOLDER =
+  /^(?:|x{3,}|\.{3,}|<[^>]+>|\$\{[^}]+\}|your[-_].*|replace[-_]me|changeme|example|placeholder|dummy|test)$/i;
 
 function gitFiles(staged) {
-  const args = staged ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR'] : ['ls-files'];
+  // Untracked-but-not-ignored files are included deliberately: a credential in a
+  // brand-new file is exactly the case where scanning only tracked files would
+  // wave it through until the moment it is committed.
+  const args = staged
+    ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR']
+    : ['ls-files', '--cached', '--others', '--exclude-standard'];
   const out = execFileSync('git', args, { cwd: root, encoding: 'utf8' });
   return out.split('\n').filter(Boolean);
 }
@@ -102,8 +141,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (findings.length > 0) {
     console.error(`\n✗ Secret scan failed — ${findings.length} potential credential(s):\n`);
     for (const f of findings) console.error(`  ${f.path}:${f.line}  [${f.rule}]  ${f.preview}`);
-    console.error('\nRotate the credential first, then remove it. A deleted commit is not a rotated key.');
-    console.error('If this is a false positive, append a `secret-scan-allow` comment on that line.\n');
+    console.error(
+      '\nRotate the credential first, then remove it. A deleted commit is not a rotated key.',
+    );
+    console.error(
+      'If this is a false positive, append a `secret-scan-allow` comment on that line.\n',
+    );
     process.exit(1);
   }
   console.log(`✓ Secret scan passed — ${scanned} files, no credentials found.`);

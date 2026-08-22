@@ -10,7 +10,7 @@
  *   node tools/brand-build.mjs            build SVG masters and raster exports
  *   node tools/brand-build.mjs --svg-only skip rasterisation (no sharp needed)
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { BADGE, FONT_STACK, MARK, PALETTE, VIEWBOX } from '../brand/geometry.mjs';
@@ -20,6 +20,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const svgDir = join(root, 'brand/svg');
 const pngDir = join(root, 'brand/png');
 const iconDir = join(root, 'brand/icons');
+// The web app serves the marks from its own public directory. It is populated
+// by this pipeline rather than by a manual copy, so the header, the PDF and the
+// badge can never end up showing three different vintages of the same logo.
+const webPublicDir = join(root, 'apps/web/public/brand');
 
 const gradientStops = tokens.gradient.primaryStops
   .map((stop) => `      <stop offset="${stop.offset}" stop-color="${stop.color}"/>`)
@@ -65,9 +69,7 @@ function badgeSvg(status = 'active') {
   if (!colours) throw new Error(`Unknown badge status: ${status}`);
   const active = status === 'active';
 
-  const ring = active
-    ? 'url(#vibefy-badge-ring)'
-    : colours.ring;
+  const ring = active ? 'url(#vibefy-badge-ring)' : colours.ring;
   const shieldFill = active ? 'url(#vibefy-badge-shield)' : colours.accent;
   const markFill = active ? 'url(#vibefy-badge-check)' : '#FFFFFF';
 
@@ -91,7 +93,9 @@ ${gradientStops}
   // different colour. It says, in words, that the application is not currently
   // verified, and names the state. The layout is centred rather than the active
   // lockup, so the two are distinguishable at a glance and at thumbnail size.
-  const label = active ? 'Verified by Vibefy' : `Not currently verified by Vibefy — ${colours.label}`;
+  const label = active
+    ? 'Verified by Vibefy'
+    : `Not currently verified by Vibefy — ${colours.label}`;
 
   const activeLines = `  <g fill="${PALETTE.navy}" font-family="${FONT_STACK}" font-weight="700" lengthAdjust="spacingAndGlyphs">
     <text x="280" y="238" textLength="182" font-size="58">Verified</text>
@@ -201,7 +205,9 @@ async function main() {
   try {
     ({ default: sharp } = await import('sharp'));
   } catch {
-    console.log('· sharp is not installed — skipping raster exports. Run with --svg-only to silence this.');
+    console.log(
+      '· sharp is not installed — skipping raster exports. Run with --svg-only to silence this.',
+    );
     return;
   }
 
@@ -241,6 +247,12 @@ async function main() {
     await pipeline.png({ compressionLevel: 9 }).toFile(join(iconDir, icon.name));
   }
   console.log(`✓ ${ICON_TARGETS.length} app icons written to brand/icons/`);
+
+  mkdirSync(webPublicDir, { recursive: true });
+  for (const [name] of SVG_TARGETS) copyFileSync(join(svgDir, name), join(webPublicDir, name));
+  for (const icon of ICON_TARGETS)
+    copyFileSync(join(iconDir, icon.name), join(webPublicDir, icon.name));
+  console.log('✓ Web public assets refreshed in apps/web/public/brand/');
 }
 
 await main();

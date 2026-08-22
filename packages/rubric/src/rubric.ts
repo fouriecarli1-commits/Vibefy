@@ -88,7 +88,9 @@ export function getRubric(version: string = CURRENT_RUBRIC_VERSION): RubricDefin
  * which the database also refuses.
  */
 export function rubricChecksum(version: string = CURRENT_RUBRIC_VERSION): string {
-  return createHash('sha256').update(canonicalise(getRubric(version))).digest('hex');
+  return createHash('sha256')
+    .update(canonicalise(getRubric(version)))
+    .digest('hex');
 }
 
 /** Stable stringification: key order must not change a checksum. */

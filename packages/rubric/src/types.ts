@@ -118,7 +118,4 @@ const _dimensionScoreIsClean: FreeOfCommercialInfluence<DimensionScore> = true;
 const _scoringResultIsClean: FreeOfCommercialInfluence<ScoringResult> = true;
 
 export const SCORING_BOUNDARY_ASSERTED =
-  _scoringInputIsClean &&
-  _scoringFindingIsClean &&
-  _dimensionScoreIsClean &&
-  _scoringResultIsClean;
+  _scoringInputIsClean && _scoringFindingIsClean && _dimensionScoreIsClean && _scoringResultIsClean;

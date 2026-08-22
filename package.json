@@ -17,16 +17,20 @@
     "check:secrets": "node tools/secret-scan.mjs",
     "check:contrast": "node tools/contrast-check.mjs",
     "check:brand": "node tools/brand-check.mjs",
-    "verify": "pnpm check:secrets && pnpm check:copy && pnpm check:contrast && pnpm check:brand && pnpm typecheck && pnpm test",
+    "verify": "pnpm check:secrets && pnpm check:copy && pnpm check:contrast && pnpm check:brand && pnpm check:stubs && pnpm typecheck && pnpm test",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "check:stubs": "node tools/stub-check.mjs",
+    "tokens:build": "node tools/tokens-build.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
     "@types/pg": "8.23.1",
     "pg": "8.23.0",
+    "playwright": "^1.62.1",
     "prettier": "3.6.2",
     "sharp": "0.35.3",
     "tsx": "4.23.12",

@@ -18,7 +18,11 @@ export interface ScopeStatementFacts {
   readonly assessedOn: string;
 }
 
-export function scopeStatement({ appName, rubricVersion, assessedOn }: ScopeStatementFacts): string {
+export function scopeStatement({
+  appName,
+  rubricVersion,
+  assessedOn,
+}: ScopeStatementFacts): string {
   return [
     `This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation of ${appName}, conducted by Vibefy against published Vibefy Rubric version ${rubricVersion} on ${assessedOn}.`,
     `"Verified by Vibefy" means only that the application was assessed against that rubric and met the published threshold on that date.`,

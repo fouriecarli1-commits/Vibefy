@@ -194,7 +194,10 @@ describe('a reviewer', () => {
       expect(assessments.rows).toHaveLength(1);
 
       const costs = await client.query(`select * from public.cost_records`);
-      expect(costs.rows, 'a reviewer with a cost signal in front of them is not independent').toHaveLength(0);
+      expect(
+        costs.rows,
+        'a reviewer with a cost signal in front of them is not independent',
+      ).toHaveLength(0);
     });
   });
 });

@@ -25,8 +25,29 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** Surfaces whose words reach a customer, a regulator or a court. */
 const SCAN_DIRS = ['apps', 'packages', 'legal', 'brand', 'supabase'];
 const SCAN_FILES = ['README.md'];
-const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.md', '.mdx', '.sql', '.html', '.txt']);
-const SKIP_DIRS = new Set(['node_modules', '.next', 'dist', 'build', 'coverage', '.git', 'source', 'png', 'icons']);
+const SCAN_EXTENSIONS = new Set([
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.md',
+  '.mdx',
+  '.sql',
+  '.html',
+  '.txt',
+]);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.next',
+  'dist',
+  'build',
+  'coverage',
+  '.git',
+  'source',
+  'png',
+  'icons',
+]);
 /** This file necessarily contains every forbidden phrase, and the tests assert on them. */
 const SKIP_FILES = new Set(['tools/copy-lint.mjs', 'tools/copy-lint.test.ts']);
 
@@ -79,7 +100,7 @@ const QUALIFIERS = [
   'cannot',
   "isn't",
   "doesn't",
-  "does not",
+  'does not',
   'without',
   'rather than',
   'instead of',
@@ -210,7 +231,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { violations, fileCount } = runCopyLint();
   if (violations.length > 0) {
     console.error(`\n✗ Copy lint failed — ${violations.length} violation(s):\n`);
-    for (const v of violations) console.error(`  ${v.path}:${v.line}  [${v.rule}]\n      ${v.detail}`);
+    for (const v of violations)
+      console.error(`  ${v.path}:${v.line}  [${v.rule}]\n      ${v.detail}`);
     console.error('\nIf the wording is genuinely unavoidable, add on the line above:');
     console.error('  vibefy-copy-lint-allow: <why this wording is correct>\n');
     process.exit(1);

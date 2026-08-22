@@ -33,7 +33,8 @@ function allowedColours() {
   const values = new Set(['#FFFFFF', 'currentColor', 'none']);
   const collect = (node) => {
     for (const value of Object.values(node)) {
-      if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) values.add(value.toUpperCase());
+      if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value))
+        values.add(value.toUpperCase());
       else if (value && typeof value === 'object') collect(value);
     }
   };
@@ -56,15 +57,20 @@ export function runBrandCheck() {
     }
     const svg = readFileSync(path, 'utf8');
 
-    if (!/<title>/.test(svg)) failures.push(`${master} has no <title>; screen readers would announce nothing.`);
+    if (!/<title>/.test(svg))
+      failures.push(`${master} has no <title>; screen readers would announce nothing.`);
     if (!/aria-label=/.test(svg)) failures.push(`${master} has no aria-label.`);
     if (/<image\b/.test(svg)) {
-      failures.push(`${master} embeds a raster. The badge is served as SVG at runtime and must stay vector.`);
+      failures.push(
+        `${master} embeds a raster. The badge is served as SVG at runtime and must stay vector.`,
+      );
     }
 
     for (const colour of svg.match(/#[0-9a-fA-F]{6}/g) ?? []) {
       if (!permitted.has(colour.toUpperCase())) {
-        failures.push(`${master} uses ${colour}, which is not in the palette. The marks are not recoloured.`);
+        failures.push(
+          `${master} uses ${colour}, which is not in the palette. The marks are not recoloured.`,
+        );
       }
     }
   }
@@ -97,7 +103,9 @@ export function runBrandCheck() {
 
   const unexpected = readdirSync(svgDir).filter((file) => !REQUIRED_MASTERS.includes(file));
   for (const file of unexpected) {
-    failures.push(`${file} is in brand/svg/ but is not a generated master. Derivatives come from tools/brand-build.mjs.`);
+    failures.push(
+      `${file} is in brand/svg/ but is not a generated master. Derivatives come from tools/brand-build.mjs.`,
+    );
   }
 
   return failures;
@@ -111,5 +119,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error('');
     process.exit(1);
   }
-  console.log(`✓ Brand check passed — ${REQUIRED_MASTERS.length} masters, palette and wordmark intact.`);
+  console.log(
+    `✓ Brand check passed — ${REQUIRED_MASTERS.length} masters, palette and wordmark intact.`,
+  );
 }

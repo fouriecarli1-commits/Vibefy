@@ -124,9 +124,11 @@ describe('AI never certifies alone', () => {
       [assessmentId, owner.organisationId, reviewer.userId],
     );
     await db.query('begin');
-    const message = await expectRefusal(db, `update public.reviews set reason = 'Changed' where id = $1`, [
-      rows[0]!.id,
-    ]);
+    const message = await expectRefusal(
+      db,
+      `update public.reviews set reason = 'Changed' where id = $1`,
+      [rows[0]!.id],
+    );
     expect(message).toMatch(/append-only/i);
     await db.query('rollback');
   });

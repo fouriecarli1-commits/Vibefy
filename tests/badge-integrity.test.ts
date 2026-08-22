@@ -154,9 +154,11 @@ describe('badge history is evidence', () => {
     const badgeId = await issueBadge(db, owner, { appId, assessmentId, consentId });
 
     await db.query('begin');
-    const message = await expectRefusal(db, `update public.badges set status = 'revoked' where id = $1`, [
-      badgeId,
-    ]);
+    const message = await expectRefusal(
+      db,
+      `update public.badges set status = 'revoked' where id = $1`,
+      [badgeId],
+    );
     expect(message).toMatch(/revoked_needs_reason/i);
     await db.query('rollback');
   });

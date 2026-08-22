@@ -8,7 +8,12 @@
 import { describe, expect, it } from 'vitest';
 import { lintText, FORBIDDEN_PHRASES } from '../tools/copy-lint.mjs';
 import { scanText } from '../tools/secret-scan.mjs';
-import { contrastRatio, relativeLuminance, runContrastChecks, resolveToken } from '../tools/contrast-check.mjs';
+import {
+  contrastRatio,
+  relativeLuminance,
+  runContrastChecks,
+  resolveToken,
+} from '../tools/contrast-check.mjs';
 
 describe('copy lint', () => {
   it.each(FORBIDDEN_PHRASES)('rejects "%s"', (phrase) => {
@@ -19,13 +24,19 @@ describe('copy lint', () => {
   it('rejects extensions of the certification mark', () => {
     for (const claim of ['Vibefy Certified', 'Vibefy Trusted', 'Approved by Vibefy']) {
       const violations = lintText(claim);
-      expect(violations.some((v) => v.rule === 'mark-extension' || v.rule === 'forbidden-phrase'), claim)
-        .toBe(true);
+      expect(
+        violations.some((v) => v.rule === 'mark-extension' || v.rule === 'forbidden-phrase'),
+        claim,
+      ).toBe(true);
     }
   });
 
   it('accepts the permitted forms of the mark', () => {
-    for (const permitted of ['Verified by Vibefy', 'Vibefy-assessed', 'Vibefy Rubric v1.0.0 — score 82/100']) {
+    for (const permitted of [
+      'Verified by Vibefy',
+      'Vibefy-assessed',
+      'Vibefy Rubric v1.0.0 — score 82/100',
+    ]) {
       expect(lintText(permitted), permitted).toHaveLength(0);
     }
   });
@@ -36,7 +47,10 @@ describe('copy lint', () => {
   });
 
   it('reads wrapped prose as one sentence, so a negation on the line above still counts', () => {
-    const wrapped = ['This is not a penetration test, a code audit, or a', 'guarantee of any kind.'].join('\n');
+    const wrapped = [
+      'This is not a penetration test, a code audit, or a',
+      'guarantee of any kind.',
+    ].join('\n');
     expect(lintText(wrapped)).toHaveLength(0);
   });
 
@@ -56,18 +70,21 @@ describe('copy lint', () => {
 
 describe('secret scan', () => {
   it.each([
-    ['Anthropic key', 'const key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";'],
-    ['AWS access key', 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE'],
-    ['Stripe live key', 'STRIPE_SECRET_KEY=sk_live_51H8xQ2KlMnOpQrStUvWx'],
-    ['GitHub token', 'token: ghp_abcdefghijklmnopqrstuvwxyz0123456789'],
-    ['private key block', '-----BEGIN OPENSSH PRIVATE KEY-----'],
-    ['JWT', 'SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZSJ9.c2lnbmF0dXJlaGVyZQ'],
+    ['Anthropic key', 'const key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";'], // secret-scan-allow: fixture proving the scanner fires
+    ['AWS access key', 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE'], // secret-scan-allow: fixture proving the scanner fires
+    ['Stripe live key', 'STRIPE_SECRET_KEY=sk_live_51H8xQ2KlMnOpQrStUvWx'], // secret-scan-allow: fixture proving the scanner fires
+    ['GitHub token', 'token: ghp_abcdefghijklmnopqrstuvwxyz0123456789'], // secret-scan-allow: fixture proving the scanner fires
+    ['private key block', '-----BEGIN OPENSSH PRIVATE KEY-----'], // secret-scan-allow: fixture proving the scanner fires
+    [
+      'JWT',
+      'SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZSJ9.c2lnbmF0dXJlaGVyZQ', // secret-scan-allow: fixture proving the scanner fires
+    ],
   ])('catches a %s', (_label, line) => {
     expect(scanText(line)).not.toHaveLength(0);
   });
 
   it('never echoes the full credential into the log', () => {
-    const [finding] = scanText('const key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";');
+    const [finding] = scanText('const key = "sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";'); // secret-scan-allow: fixture proving the scanner fires
     expect(finding!.preview).not.toContain('AbCdEfGhIjKlMnOpQrStUvWxYz0123456789');
     expect(finding!.preview).toMatch(/…/);
   });

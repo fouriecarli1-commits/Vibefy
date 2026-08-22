@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Gates, types and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The secret scanner reads the working tree; history is not needed,
+          # but a shallow clone still lets `git ls-files` enumerate it.
+          fetch-depth: 1
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Postgres 16 client and server
+        # The row-level-security suite runs against a real Postgres rather than a
+        # mock: these policies are the difference between a product and a breach.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y postgresql-16
+
+      - run: pnpm install --frozen-lockfile
+
+      # Ordered cheapest-and-most-important first, so a leaked credential or an
+      # over-claiming string fails in seconds rather than after the test suite.
+      - name: Secret scan
+        run: pnpm check:secrets
+
+      - name: Copy lint — no over-claiming language
+        run: pnpm check:copy
+
+      - name: Colour contrast — WCAG 2.2 AA
+        run: pnpm check:contrast
+
+      - name: Brand assets are current
+        run: |
+          pnpm brand:build --svg-only
+          git diff --exit-code -- brand/svg || {
+            echo "::error::brand/svg is out of date. Run 'pnpm brand:build' and commit the result."
+            exit 1
+          }
+          pnpm check:brand
+
+      - name: Formatting
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Fail if any STUB_ is undocumented
+        run: node tools/stub-check.mjs

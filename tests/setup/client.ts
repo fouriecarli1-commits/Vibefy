@@ -47,7 +47,11 @@ export async function actingAs<T>(
  * Runs a query that is expected to be refused, inside a savepoint, so that one
  * refusal does not abort the surrounding transaction and mask the next check.
  */
-export async function expectRefusal(client: Client, sql: string, params: unknown[] = []): Promise<string> {
+export async function expectRefusal(
+  client: Client,
+  sql: string,
+  params: unknown[] = [],
+): Promise<string> {
   await client.query('savepoint probe');
   try {
     await client.query(sql, params);

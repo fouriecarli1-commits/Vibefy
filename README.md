@@ -35,14 +35,14 @@ pnpm verify
 
 Runs, in order:
 
-| Check | What it protects |
-|---|---|
-| `check:secrets` | No credential ever reaches the repository |
-| `check:copy` | No output over-claims — see the forbidden-phrase list in `tools/copy-lint.mjs` |
+| Check            | What it protects                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| `check:secrets`  | No credential ever reaches the repository                                                                     |
+| `check:copy`     | No output over-claims — see the forbidden-phrase list in `tools/copy-lint.mjs`                                |
 | `check:contrast` | Every brand colour pair meets WCAG 2.2 AA; we cannot sell an accessibility score from an inaccessible product |
-| `check:brand` | The badge and wordmark are used only in their permitted forms |
-| `typecheck` | |
-| `test` | Including the RLS isolation tests and the rating-independence test |
+| `check:brand`    | The badge and wordmark are used only in their permitted forms                                                 |
+| `typecheck`      |                                                                                                               |
+| `test`           | Including the RLS isolation tests and the rating-independence test                                            |
 
 ## Repository layout
 

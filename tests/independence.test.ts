@@ -15,7 +15,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
-import { scoreAssessment, type ScoringFinding, type ScoringInput } from '../packages/rubric/src/index.ts';
+import {
+  scoreAssessment,
+  type ScoringFinding,
+  type ScoringInput,
+} from '../packages/rubric/src/index.ts';
 import { connect } from './setup/client.ts';
 import {
   makeReviewer,
@@ -148,23 +152,18 @@ describe('the scoring module cannot see money', () => {
     (file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'types.ts',
   );
 
-  it.each(scoringFiles)(
-    '%s contains no commercial concept',
-    (file) => {
-      const source = readFileSync(join(scoringDir, file), 'utf8');
-      // Strip comments: the guarantee is about what the code does, and the
-      // comments necessarily discuss what it must not do.
-      const code = source
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/(^|\s)\/\/.*$/gm, '')
-        .toLowerCase();
-      for (const term of forbidden) {
-        expect(code, `${file} must not reference "${term}"`).not.toMatch(
-          new RegExp(`\\b${term}\\b`),
-        );
-      }
-    },
-  );
+  it.each(scoringFiles)('%s contains no commercial concept', (file) => {
+    const source = readFileSync(join(scoringDir, file), 'utf8');
+    // Strip comments: the guarantee is about what the code does, and the
+    // comments necessarily discuss what it must not do.
+    const code = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/.*$/gm, '')
+      .toLowerCase();
+    for (const term of forbidden) {
+      expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
+    }
+  });
 
   it('takes exactly one argument, so no context parameter can be added quietly', () => {
     expect(scoreAssessment.length).toBe(1);

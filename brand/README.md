@@ -18,11 +18,11 @@ badly at the 96px minimum. Everything else in `brand/` is generated from it by
 
 ## What is generated
 
-| Path | Contents | Committed |
-|---|---|---|
-| `brand/svg/` | Nine SVG masters: mark, mono light/dark, horizontal lockup light/dark, and the four badge states | yes |
-| `brand/png/` | 1x / 2x / 3x raster exports of the mark, badge and lockup | no — generated |
-| `brand/icons/` | Favicons, Apple touch icon, Android Chrome icons, maskable icon | no — generated |
+| Path           | Contents                                                                                         | Committed      |
+| -------------- | ------------------------------------------------------------------------------------------------ | -------------- |
+| `brand/svg/`   | Nine SVG masters: mark, mono light/dark, horizontal lockup light/dark, and the four badge states | yes            |
+| `brand/png/`   | 1x / 2x / 3x raster exports of the mark, badge and lockup                                        | no — generated |
+| `brand/icons/` | Favicons, Apple touch icon, Android Chrome icons, maskable icon                                  | no — generated |
 
 ```bash
 pnpm brand:build          # regenerate everything
@@ -33,12 +33,12 @@ pnpm check:brand          # assert the masters still obey the usage rules
 
 A badge is never a broken image. Every state renders as a legible mark:
 
-| State | Renders as |
-|---|---|
-| `active` | The certification mark: shield, check, "Verified by Vibefy" |
+| State       | Renders as                                                                |
+| ----------- | ------------------------------------------------------------------------- |
+| `active`    | The certification mark: shield, check, "Verified by Vibefy"               |
 | `suspended` | Amber ring, barred shield, "Suspended — Not currently verified by Vibefy" |
-| `expired` | Grey ring, barred shield, "Expired — Not currently verified by Vibefy" |
-| `revoked` | Red ring, barred shield, "Revoked — Not currently verified by Vibefy" |
+| `expired`   | Grey ring, barred shield, "Expired — Not currently verified by Vibefy"    |
+| `revoked`   | Red ring, barred shield, "Revoked — Not currently verified by Vibefy"     |
 
 The centred layout of the three inactive states is deliberately different from the active
 lockup, so the two are distinguishable at a glance and at thumbnail size.

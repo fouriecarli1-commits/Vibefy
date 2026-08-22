@@ -30,3 +30,4 @@ brand/icons/
 .vscode/*
 !.vscode/extensions.json
 .tmp/
+apps/web/public/brand/
