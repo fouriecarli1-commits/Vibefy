@@ -69,6 +69,9 @@ jobs:
       - name: Tests
         run: pnpm test
 
+      - name: Schema file matches the migrations
+        run: pnpm check:schema
+
       - name: Fail if any STUB_ is undocumented
         run: node tools/stub-check.mjs
 

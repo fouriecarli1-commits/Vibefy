@@ -640,14 +640,58 @@ for re-acceptance. If you did not intend that, you did not want a version bump.
 
 ## Deploying
 
-Not yet wired — the domain and hosting accounts are open items. When they are:
+### Standing rules
 
-- **Web:** Vercel, EU region, environment variables from the platform secret store.
-- **Database:** Supabase, EU region (Frankfurt or Ireland).
-- **Secrets:** never in the repo. `.env.local` locally, platform secret store in production.
-- **Badge signing key (M3):** generated at M3, stored only in the platform secret store. If it
-  leaks, every badge becomes forgeable — rotation means reissuing every badge, so treat it as
-  the most sensitive value in the system.
+- **Web:** Vercel, EU region. `vercel.json` pins `fra1`, the build command and the output
+  directory, so an import needs no dashboard configuration and two deployments cannot differ
+  because someone typed something different into a form.
+- **Database:** Supabase, EU region (Frankfurt or Ireland). The region is not a preference: the
+  privacy notice says data is held in the EU, and this is the setting that makes that true.
+- **Secrets:** never in the repo. `.env.local` locally, the platform secret store in production.
+- **Badge signing key:** stored only in the platform secret store, and only the worker needs it.
+  If it leaks, every badge becomes forgeable — rotation means reissuing every badge, so treat it
+  as the most sensitive value in the system.
+
+### First deployment, from a browser
+
+Written for someone with no local toolchain. Nothing here needs a terminal.
+
+1. **Create the Supabase project.** EU region. Save the database password at the moment it is
+   shown; it is shown once.
+2. **Apply the schema.** Supabase dashboard → SQL Editor → paste the whole of
+   `supabase/schema.sql` → Run. That file is generated from `supabase/migrations` by
+   `pnpm schema:build`, and `pnpm check:schema` fails the build if it has drifted — so what gets
+   pasted is what the tests ran against.
+3. **Import the repository into Vercel.** Root directory: the repository root, not `apps/web`.
+   `vercel.json` supplies the rest.
+4. **Set the environment variables** before the first deployment (Vercel → Settings →
+   Environment Variables), for all three environments:
+
+   | Variable                        | Where it comes from                                          |
+   | ------------------------------- | ------------------------------------------------------------ |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | Supabase → Settings → API → Project URL                      |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public                      |
+   | `SUPABASE_SERVICE_ROLE_KEY`     | Supabase → Settings → API → service_role                     |
+   | `SUPABASE_DB_URL`               | Supabase → Settings → Database → Connection string → URI     |
+   | `ANTHROPIC_API_KEY`             | console.anthropic.com → API Keys                             |
+   | `NEXT_PUBLIC_SITE_URL`          | The deployment's own URL — known only after the first deploy |
+   | `NEXT_PUBLIC_SUPPORT_EMAIL`     | Whatever address answers support today                       |
+
+   Everything else in `.env.example` may stay empty. A missing setting disables the feature it
+   belongs to and says so; it does not break the build.
+
+5. **Deploy**, then set `NEXT_PUBLIC_SITE_URL` to the URL Vercel gave you and deploy again.
+
+### What this deployment cannot do
+
+The assessment engine drives a real browser, and Vercel's functions cannot hold one open for the
+minutes a run takes. So on Vercel alone: an assessment can be requested and appears in
+`assessment_requests` as `queued`, and nothing claims it. Everything else works — accounts,
+workspaces, authorisation, reports on existing data, badges, verification, the directory.
+
+Running the worker means a machine that can hold a process and launch Chromium: a laptop with
+`pnpm dev:worker`, or a small always-on container. It needs `SUPABASE_DB_URL` and
+`ANTHROPIC_API_KEY`, and nothing else.
 
 ## If something goes wrong in production
 

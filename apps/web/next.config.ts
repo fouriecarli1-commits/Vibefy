@@ -30,7 +30,26 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: ['@vibefycode/shared', '@vibefycode/rubric'],
+  // Every workspace package, not a hand-kept subset. They ship TypeScript
+  // source rather than compiled output, so one that is imported and not listed
+  // here fails at build time — and the list drifting behind the imports is a
+  // build that breaks on the day a new package is used, not on the day it is
+  // added.
+  transpilePackages: [
+    '@vibefycode/api',
+    '@vibefycode/badge',
+    '@vibefycode/billing',
+    '@vibefycode/directory',
+    '@vibefycode/engine',
+    '@vibefycode/governance',
+    '@vibefycode/monitoring',
+    '@vibefycode/notify',
+    '@vibefycode/policy',
+    '@vibefycode/report',
+    '@vibefycode/rubric',
+    '@vibefycode/shared',
+    '@vibefycode/workspace',
+  ],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
