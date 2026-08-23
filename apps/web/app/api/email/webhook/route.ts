@@ -5,6 +5,7 @@ import {
   verifyEmailWebhook,
 } from '@vibefycode/notify';
 import { writeAsService } from '@/lib/sql';
+import { readWebhookBody } from '@/lib/webhook-body';
 
 /**
  * The email provider's webhook — bounces and complaints.
@@ -25,12 +26,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Not configured.' }, { status: 404 });
   }
 
-  const rawBody = await request.text();
+  const body = await readWebhookBody(request);
+  if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
 
   let event;
   try {
     event = verifyEmailWebhook(
-      rawBody,
+      body.raw,
       {
         id: request.headers.get('svix-id'),
         timestamp: request.headers.get('svix-timestamp'),
@@ -47,7 +49,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const applied = await writeAsService((client) => applyEmailEvent(client, event));
-    return NextResponse.json({ received: true, kind: applied.kind, note: applied.note });
+    // The count, not the addresses. The provider already knows who it told us
+    // about, and an endpoint that echoes an address back is one more place an
+    // address can leak from.
+    return NextResponse.json({
+      received: true,
+      kind: applied.kind,
+      suppressed: applied.suppressed.length,
+    });
   } catch (error) {
     // A 500 asks the provider to redeliver, which is what we want when our own
     // database was briefly unavailable. Suppression is idempotent, so a

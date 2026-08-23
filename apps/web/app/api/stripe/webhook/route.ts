@@ -7,6 +7,7 @@ import {
   type PaymentProvider,
 } from '@vibefycode/billing';
 import { writeAsService } from '@/lib/sql';
+import { readWebhookBody } from '@/lib/webhook-body';
 
 /**
  * The payment provider's webhook.
@@ -54,11 +55,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing signature.' }, { status: 400 });
   }
 
-  const rawBody = await request.text();
+  const body = await readWebhookBody(request);
+  if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
 
   let event;
   try {
-    event = provider().verifyWebhook(rawBody, signature);
+    event = provider().verifyWebhook(body.raw, signature);
   } catch (error) {
     if (error instanceof WebhookVerificationError) {
       return NextResponse.json({ error: 'Signature did not verify.' }, { status: 400 });

@@ -258,13 +258,38 @@ describe('the endpoint', () => {
   it('verifies the raw body, not a re-serialised object', () => {
     // `request.json()` here would verify our own serialiser rather than the
     // provider's bytes, and every signature would fail — or worse, pass.
-    expect(route).toContain('await request.text()');
+    const shared = readFileSync(join(process.cwd(), 'apps/web/lib/webhook-body.ts'), 'utf8');
+    expect(shared).toContain('await request.text()');
+    expect(route).toContain('body.raw');
     expect(route).not.toContain('request.json()');
+    expect(shared).not.toContain('request.json()');
   });
 
   it('refuses rather than accepting anything when the secret is missing', () => {
     expect(route).toContain('RESEND_WEBHOOK_SECRET');
     expect(route).toMatch(/status:\s*404/);
+  });
+
+  it('refuses a body too large to be an event before reading it', () => {
+    // The window this closes: the body has to be read before a signature can be
+    // checked, so until then anyone on the internet can make us buffer whatever
+    // they send. A signed event from either provider is a few kilobytes.
+    expect(route).toContain('readWebhookBody');
+    const shared = readFileSync(join(process.cwd(), 'apps/web/lib/webhook-body.ts'), 'utf8');
+    expect(shared).toMatch(/content-length/);
+    // And again after reading, because content-length is a claim and a chunked
+    // request does not make one at all.
+    expect(shared).toContain('Buffer.byteLength');
+    // The payment webhook is public in exactly the same way.
+    const stripe = readFileSync(
+      join(process.cwd(), 'apps/web/app/api/stripe/webhook/route.ts'),
+      'utf8',
+    );
+    expect(stripe).toContain('readWebhookBody');
+  });
+
+  it('answers with a count, not with anybody’s address', () => {
+    expect(route).toContain('suppressed: applied.suppressed.length');
   });
 
   it('turns a failed verification into a 400 and nothing else', () => {
