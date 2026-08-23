@@ -7,6 +7,8 @@
  * authorising testing of a domain they merely named.
  */
 import { createServer, type Server } from 'node:http';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   CHALLENGE_PATH,
@@ -58,6 +60,24 @@ describe('well-known file verification', () => {
     expect(outcome.verified).toBe(false);
     expect(outcome.detail).toMatch(/non-public address|does not resolve/i);
   }, 20_000);
+
+  it('checks the address at connect time as well as before', async () => {
+    // Resolving the host and connecting to it are two separate resolutions. A
+    // record that answers publicly for the first can answer 127.0.0.1 for the
+    // second — DNS rebinding, and not exotic. The pre-check cannot see that;
+    // only the dispatcher can, so the request carries one.
+    const source = readFileSync(
+      join(process.cwd(), 'packages/engine/src/authorisation/ownership.ts'),
+      'utf8',
+    );
+    expect(source).toContain('dispatcher: createScopedDispatcher(');
+    // And the pre-check stays: it is what turns a refusal into a sentence the
+    // customer can act on rather than a bare "fetch failed".
+    expect(source).toContain('isPrivateAddress');
+    expect(source.indexOf('isPrivateAddress(entry.address)')).toBeLessThan(
+      source.indexOf('dispatcher: createScopedDispatcher('),
+    );
+  });
 });
 
 describe('the scope a verification permits', () => {

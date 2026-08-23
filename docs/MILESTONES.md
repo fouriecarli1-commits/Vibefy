@@ -368,6 +368,37 @@ them were being claimed, in writing, in the published privacy notice.
 - **The appeals route** (PART 3), with a fourteen-day deadline, a reviewer queue, and written
   reasons required for every outcome including a rejection.
 
+## Hardening — the egress path, the bounce path, and one test that walks the whole thing
+
+Not a numbered milestone. Three defects and one gap, found by asking what happens in the seams
+between milestones rather than inside any one of them.
+
+| Gate                                                             | Status                                                                                                                                  |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. `pnpm verify` green                                           | ✅ 612 tests, nine gates — `format:check` is now one of them                                                                            |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ The journey test covers three of the four in one run; the fourth is unchanged                                                        |
+| 3. Every AI-written claim evidence-bound                         | ✅ Unchanged, and now asserted end-to-end: every published finding in the journey run carries evidence                                  |
+| 4. RLS verified                                                  | ✅ Unchanged. The webhook writes as the service role to one table nobody else can write                                                 |
+| 5. No secrets in the repo                                        | ✅ The test signing secrets are assembled at runtime rather than written down, because a scanner cannot tell a fake one from a real one |
+| 6. Legal artefacts surfaced with acceptance recorded             | ✅ No document changed                                                                                                                  |
+| 7. Docs updated                                                  | ✅ 202 decisions recorded                                                                                                               |
+| 8. Cost per run recorded and visible                             | ✅ Unchanged                                                                                                                            |
+
+### What it built
+
+- **The address check, actually switched on.** `ScopeGuard.check` reads a URL. The half of scope
+  enforcement a URL cannot answer — what the host resolves to — lived only in an undici dispatcher
+  installed by a method nothing ever called. An authorised host whose A-record points at
+  `169.254.169.254` passed every check made against its URL. The engine's HTTP client, the liveness
+  probe and the ownership check now each carry a scoped dispatcher on the request itself.
+- **Bounce and complaint ingestion.** `POST /api/email/webhook`, verified before parsing, a 400 for
+  anything unproven, a 404 when unconfigured, and idempotent by primary key. Only a permanent bounce
+  or a complaint suppresses.
+- **`tests/journey.test.ts`.** One application from a signature on a warranty to a suspended badge,
+  in order, through the tables a customer would touch. It states where it is not the real code.
+- **Invitation email**, sent at the point of invitation, because the link exists in memory for one
+  request and nowhere else.
+
 ## M8 — not started
 
 Blocked, per PART 2, on M7 being live and on the independence policy in PART 8 being implemented

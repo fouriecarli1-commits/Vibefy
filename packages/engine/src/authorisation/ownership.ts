@@ -14,11 +14,20 @@
  * authorisation exists, so it is deliberately the narrowest request we ever
  * make: one GET, to one fixed path, over HTTPS, to a public address, with no
  * redirects followed.
+ *
+ * The address is checked twice, and it has to be. Resolving the host and then
+ * fetching it are two separate resolutions: a record that answered publicly the
+ * first time can answer `127.0.0.1` the second, which is DNS rebinding and is
+ * not exotic. So the pre-check refuses early and gives a readable reason, and
+ * the request itself goes out through a dispatcher that checks the address the
+ * connection actually resolved to.
  */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { resolveTxt } from 'node:dns/promises';
 import { lookup } from 'node:dns/promises';
+import { fetch } from 'undici';
 import { isPrivateAddress } from '../runtime/addresses.ts';
+import { ScopeGuard, ScopeViolationError, createScopedDispatcher } from '../runtime/scope.ts';
 
 export const CHALLENGE_PATH = '/.well-known/vibefycode-challenge.txt';
 export const DNS_RECORD_PREFIX = 'vibefycode-site-verification=';
@@ -151,6 +160,10 @@ export async function verifyWellKnownFile(
       redirect: 'manual', // a redirect could carry us to a host nobody authorised
       signal: controller.signal,
       headers: { 'user-agent': 'VibefyCodeOwnershipCheck/1.0', accept: 'text/plain' },
+      // Closes the window between the lookup above and this connection. The
+      // pre-check reads whatever the resolver said a moment ago; this reads the
+      // address the socket is actually about to open.
+      dispatcher: createScopedDispatcher(new ScopeGuard(ownershipPolicy(host))),
     });
 
     if (response.status !== 200) {
@@ -182,12 +195,45 @@ export async function verifyWellKnownFile(
       method: 'well_known_file',
       host,
       checkedAt,
-      detail: `${url} could not be reached: ${error instanceof Error ? error.message : String(error)}`,
+      detail: `${url} could not be reached: ${describe(error)}`,
       observed: [],
     };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * The narrowest policy in the codebase: one host, one GET, ten seconds.
+ *
+ * It is not built from an authorisation record because at this point there is
+ * no authorisation — proving control of the host is what earns one.
+ */
+function ownershipPolicy(host: string) {
+  return {
+    allowedHosts: [host],
+    exclusions: [],
+    ceiling: {
+      nonDestructiveOnly: true,
+      maxRequestsPerMinute: 2,
+      maxTotalRequests: 1,
+      maxDurationSeconds: 10,
+      allowDataModification: false,
+      allowDataExport: false,
+      allowAccountCreation: false,
+      syntheticAccountsOnly: true,
+    },
+  };
+}
+
+/** undici reports whatever the connector threw as a bare `fetch failed`. */
+function describe(error: unknown): string {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (current instanceof ScopeViolationError) return current.message;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
