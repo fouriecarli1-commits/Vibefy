@@ -60,7 +60,18 @@ describe('the schema file', () => {
 });
 
 describe('the hosting configuration', () => {
-  const vercel = JSON.parse(read('vercel.json')) as Record<string, unknown>;
+  // In `apps/web`, not at the repository root. Vercel detects the Next.js app
+  // there and makes it the root directory, and it reads `vercel.json` from the
+  // root directory — so a file at the repository root is silently ignored, and
+  // whatever was left in the dashboard keeps applying. That is how the first
+  // three deployments failed with the same error after the file was "fixed".
+  const vercel = JSON.parse(read('apps/web/vercel.json')) as Record<string, unknown>;
+
+  it('sits where Vercel actually looks for it', () => {
+    expect(() => read('apps/web/vercel.json')).not.toThrow();
+    // At the repository root it is read by nothing and quietly does nothing.
+    expect(() => read('vercel.json')).toThrow();
+  });
 
   it('pins an EU region, because the privacy notice says so', () => {
     // The notice is not a description of an intention; it is a statement about
