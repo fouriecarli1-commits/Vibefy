@@ -16,7 +16,7 @@ import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { renderBadgeSvg, renderMarkSvg, type BadgeStatus } from '@vibefycode/badge';
-import { FONT_STACK, PALETTE, WORDMARK, badgeStatusColours } from '@vibefycode/shared';
+import { FONT_STACK, PALETTE, badgeStatusColours, wordmarkSvg } from '@vibefycode/shared';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const svgDir = join(root, 'brand/svg');
@@ -43,8 +43,10 @@ function horizontalLockupSvg({ onDark = false } = {}): string {
   <title>VibefyCode — vibe app rating system</title>
   <g transform="translate(36 18) scale(0.74)">
 ${markSvg}  </g>
-  <g font-family="${FONT_STACK}" fill="${wordmarkColour}" letter-spacing="6">
-    <text x="446" y="250" font-size="132" textLength="880" lengthAdjust="spacingAndGlyphs"><tspan font-weight="700">${WORDMARK.strong}</tspan><tspan font-weight="400">${WORDMARK.light}</tspan></text>
+${wordmarkSvg({ x: 886, y: 250, width: 880, fill: wordmarkColour })}
+  <g font-family="${FONT_STACK}" fill="${wordmarkColour}">
+    <!-- The tagline stays live text. It describes the product; it is not the mark,
+         and a substituted font changes nothing anyone could be misled by. -->
     <text x="450" y="322" font-size="48" font-weight="500" textLength="560" lengthAdjust="spacingAndGlyphs">vibe app rating system</text>
   </g>
 </svg>

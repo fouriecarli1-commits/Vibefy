@@ -484,10 +484,25 @@ PNG masters. The seal's arc legends are placed one glyph at a time
 the browser will look fine and the PNG masters will come out with no wordmark
 on them. A test asserts no badge SVG contains it.
 
-**The badge embeds no font file.** Every text element pins its width with
-`textLength`, so a machine without Poppins gets different letterforms and the
-same lockup. Drop the pin and the wordmark will clip on some machines and not
-others — the first build of the new lockup clipped to "VIBEFYCO".
+**The wordmark is outlines, not text**, and the brand gate refuses a master that
+sets it as text. It is the trade mark and it goes onto other people's websites,
+where a machine without Poppins would otherwise draw a different logo. To
+regenerate it after a font or spacing change:
+
+```bash
+curl -sS "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7V1s.ttf" -o /tmp/Poppins-Bold.ttf
+curl -sS "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrFJA.ttf"     -o /tmp/Poppins-Regular.ttf
+node tools/build-wordmark.mjs /tmp/Poppins-Bold.ttf /tmp/Poppins-Regular.ttf
+pnpm brand:build
+```
+
+Poppins is SIL Open Font License 1.1. No font file ships — only the ten glyphs
+of the wordmark, as paths.
+
+**The remaining text still pins its width with `textLength`.** The legends and
+the tagline are descriptive rather than the mark, so a substituted font there is
+cosmetic — but drop the pin and they will clip on some machines and not others.
+The first build of the new lockup clipped to "VIBEFYCO".
 
 ### The artwork in `brand/source/` is the authority
 

@@ -14,6 +14,8 @@
  * gets held to.
  */
 
+import { WORDMARK_OUTLINE } from './wordmark.generated.ts';
+
 export const VIEWBOX = 512;
 
 /**
@@ -124,7 +126,8 @@ export const SEAL = {
   ],
   banner: 'M120 392 Q256 344 392 392 L392 452 Q256 404 120 452 Z',
   bannerRule: 'M120 402 Q256 354 392 402',
-  bannerText: { y: 414, size: 32 },
+  /** Fitted to the span between the two stars, not to a font size. */
+  bannerText: { y: 420, width: 206 },
   bannerStars: [
     { cx: 136, cy: 406, size: 10 },
     { cx: 376, cy: 406, size: 10 },
@@ -168,7 +171,7 @@ export const SEAL_COMPACT = {
   legend: { y: 338, size: 40, text: 'VERIFIED BY' },
   /** Wider than the disc and clipped to it, so it ends on the edge rather than in the band. */
   banner: 'M20 356 L492 356 L492 424 L20 424 Z',
-  bannerText: { y: 406, size: 48 },
+  bannerText: { y: 410, width: 316 },
   inactiveMark: { x: 256, y: 168, scale: 0.46 },
   inactiveLegend: { y: 292, size: 36 },
   statusNote: { y: 332, size: 26 },
@@ -311,4 +314,30 @@ export function fanPaths(fan: {
       `${(fan.x + fan.radius * Math.cos(angle)).toFixed(2)} ${(fan.y + fan.radius * Math.sin(angle)).toFixed(2)}`;
     return `M${fan.x} ${fan.y} L${point(from)} L${point(to)} Z`;
   });
+}
+
+/**
+ * The wordmark, as SVG markup.
+ *
+ * Outlines, not text. A logo set in live type changes shape with whatever fonts
+ * the viewer happens to have, and this one is served onto other people's
+ * websites where it is the trade mark. `textLength` pinned the width and never
+ * the letterforms, which was only ever half a fix.
+ *
+ * Scaled to a width rather than a font size, because what a layout constrains is
+ * the space the wordmark has to sit in — and a logo that overflows its banner is
+ * worse than one set slightly small.
+ */
+export function wordmarkSvg(options: {
+  x: number;
+  y: number;
+  width: number;
+  fill: string;
+}): string {
+  const { x, y, width, fill } = options;
+  const scale = width / WORDMARK_OUTLINE.width;
+  return `  <g fill="${fill}" transform="translate(${(x - width / 2).toFixed(2)} ${y}) scale(${scale.toFixed(6)})">
+    <path d="${WORDMARK_OUTLINE.strong}"/>
+    <path d="${WORDMARK_OUTLINE.light}"/>
+  </g>`;
 }

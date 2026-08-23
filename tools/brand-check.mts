@@ -8,7 +8,7 @@
  * nothing has been recoloured off-palette, the marks are vector rather than a
  * wrapped raster, and the certification badge carries the wordmark unextended.
  */
-import { SEAL, SEAL_COMPACT, WORDMARK } from '@vibefycode/shared';
+import { SEAL, SEAL_COMPACT, WORDMARK, WORDMARK_OUTLINE } from '@vibefycode/shared';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -99,6 +99,30 @@ export function runBrandCheck() {
     failures.push(
       `The compact badge's legend reads "${SEAL_COMPACT.legend.text}", not "VERIFIED BY".`,
     );
+  }
+
+  // The wordmark is drawn, not typed. Set as text it would be a different
+  // drawing on every machine without Poppins — and it is the trade mark, served
+  // onto other people's websites.
+  for (const master of [
+    'vibefycode-badge-verified.svg',
+    'vibefycode-badge-verified-compact.svg',
+    'vibefycode-logo-horizontal.svg',
+    'vibefycode-logo-horizontal-dark.svg',
+  ]) {
+    const path = join(svgDir, master);
+    if (!existsSync(path)) continue;
+    const svg = readFileSync(path, 'utf8');
+    if (!svg.includes(WORDMARK_OUTLINE.strong) || !svg.includes(WORDMARK_OUTLINE.light)) {
+      failures.push(`${master} does not carry the outlined wordmark. Run \`pnpm brand:build\`.`);
+    }
+    for (const element of svg.match(/<text[^>]*>[^<]*<\/text>/g) ?? []) {
+      if (element.toUpperCase().includes('VIBEFY')) {
+        failures.push(
+          `${master} sets the wordmark as live text. It must be outlines, or it is a different drawing on every machine without Poppins.`,
+        );
+      }
+    }
   }
 
   for (const master of ['vibefycode-badge-verified.svg', 'vibefycode-badge-verified-compact.svg']) {

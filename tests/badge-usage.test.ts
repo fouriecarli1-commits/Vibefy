@@ -9,6 +9,7 @@ import {
   BadgeUsageError,
   SEAL,
   WORDMARK,
+  WORDMARK_OUTLINE,
   arcTextPlacements,
   badgeAltText,
   badgeAssetFor,
@@ -157,18 +158,38 @@ describe('the seal', () => {
     // What must survive at every size: whose mark it is, and what it claims.
     for (const svg of [seal, compact]) {
       expect(svg).toContain('Verified by VibefyCode');
-      expect(svg).toContain(WORDMARK.strong);
-      expect(svg).toContain(WORDMARK.light);
+      expect(svg).toContain(WORDMARK_OUTLINE.strong);
+      expect(svg).toContain(WORDMARK_OUTLINE.light);
     }
   });
 
-  it('says the wordmark in one word, in two weights', () => {
+  it('draws the wordmark as outlines, never as live text', () => {
+    // The wordmark is the trade mark, and it is served onto other people's
+    // websites. Set as text it would be a different drawing on every machine
+    // that happens to lack Poppins; `textLength` pinned the width and never the
+    // letterforms, which was only ever half a fix.
     expect(`${WORDMARK.strong}${WORDMARK.light}`).toBe('VIBEFYCODE');
-    const svg = renderBadgeSvg({ status: 'active' });
-    // One <text>, two <tspan>s — never two words with a gap between them.
-    expect(svg).toMatch(
-      new RegExp(`<tspan font-weight="700">${WORDMARK.strong}</tspan><tspan font-weight="400">${WORDMARK.light}</tspan>`),
-    );
+
+    for (const sizePx of [96, 512]) {
+      const svg = renderBadgeSvg({ status: 'active', sizePx });
+      expect(svg).toContain(WORDMARK_OUTLINE.strong);
+      expect(svg).toContain(WORDMARK_OUTLINE.light);
+      // No <text> element anywhere carries the letters of the wordmark.
+      for (const element of svg.match(/<text[^>]*>[^<]*<\/text>/g) ?? []) {
+        expect(element.toUpperCase()).not.toContain('VIBEFY');
+      }
+    }
+  });
+
+  it('scales the wordmark to its container rather than to a font size', () => {
+    // A logo that overflows its banner is worse than one set slightly small.
+    const seal = renderBadgeSvg({ status: 'active' });
+    // The transform on the group that actually holds the wordmark, not the one
+    // on the mark above it.
+    const before = seal.slice(0, seal.indexOf(WORDMARK_OUTLINE.strong));
+    const scales = before.match(/scale\(([\d.]+)\)/g) ?? [];
+    const scale = Number(/([\d.]+)/.exec(scales[scales.length - 1] ?? '')?.[1]);
+    expect(scale * WORDMARK_OUTLINE.width).toBeCloseTo(SEAL.bannerText.width, 1);
   });
 
   it('never reads as a verification in any state that is not one', () => {

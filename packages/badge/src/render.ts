@@ -24,7 +24,7 @@ import {
   VIEWBOX,
   annulusPath,
   starPath,
-  WORDMARK,
+  wordmarkSvg,
   badgeAltText,
   badgeStatusColours,
 } from '@vibefycode/shared';
@@ -122,24 +122,6 @@ ${GRADIENT_STOPS.map((stop) => `      <stop offset="${stop.offset}" stop-color="
     <linearGradient id="${idPrefix}-arrow" x1="0" y1="1" x2="1" y2="0">
 ${ARROW_STOPS.map((stop) => `      <stop offset="${stop.offset}" stop-color="${stop.color}"/>`).join('\n')}
     </linearGradient>`;
-}
-
-/**
- * The wordmark, set as one word in two weights. Never two words.
- *
- * Width is pinned with `textLength`, because the badge embeds no font file: on a
- * machine without Poppins the letterforms change, and without the pin the
- * lockup would change with them.
- */
-function wordmarkText(options: {
-  x: number;
-  y: number;
-  size: number;
-  fill: string;
-  anchor?: string;
-}): string {
-  const { x, y, size, fill, anchor = 'middle' } = options;
-  return `  <text x="${x}" y="${y}" text-anchor="${anchor}" font-family="${FONT_STACK}" font-size="${size}" fill="${fill}" textLength="${(size * 6.6).toFixed(0)}" lengthAdjust="spacingAndGlyphs"><tspan font-weight="700">${WORDMARK.strong}</tspan><tspan font-weight="400">${WORDMARK.light}</tspan></text>`;
 }
 
 /**
@@ -265,14 +247,14 @@ ${[-SEAL.topStars.angle, SEAL.topStars.angle]
     ? `  <g aria-hidden="true" clip-path="url(#seal-disc)">
     <path d="${SEAL_COMPACT.banner}" fill="${ink}"/>
   </g>
-${wordmarkText({ x: 256, y: SEAL_COMPACT.bannerText.y, size: SEAL_COMPACT.bannerText.size, fill: onInk })}`
+${wordmarkSvg({ x: 256, y: SEAL_COMPACT.bannerText.y, width: SEAL_COMPACT.bannerText.width, fill: onInk })}`
     : `  <g aria-hidden="true">
 ${SEAL.bannerFolds.map((fold) => `    <path d="${fold}" fill="${active ? PALETTE.ink : colours.ring}"/>`).join('\n')}
     <path d="${SEAL.banner}" fill="${ink}"/>
     <path d="${SEAL.bannerRule}" fill="none" stroke="${onInk}" stroke-width="1.5" opacity="0.4"/>
 ${SEAL.bannerStars.map((s) => star(s.cx, s.cy, s.size, onInk)).join('\n')}
   </g>
-${wordmarkText({ x: 256, y: SEAL.bannerText.y, size: SEAL.bannerText.size, fill: onInk })}`;
+${wordmarkSvg({ x: 256, y: SEAL.bannerText.y, width: SEAL.bannerText.width, fill: onInk })}`;
 
   // Non-active states say so in words, under the banner, where the eye lands
   // after the wordmark. Never inside the mark, which is never altered.
