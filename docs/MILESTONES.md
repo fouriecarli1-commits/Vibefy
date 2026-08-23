@@ -368,20 +368,20 @@ them were being claimed, in writing, in the published privacy notice.
 - **The appeals route** (PART 3), with a fourteen-day deadline, a reviewer queue, and written
   reasons required for every outcome including a rejection.
 
-## Hardening — the egress path, the bounce path, and one test that walks the whole thing
+## Hardening — the egress path, the bounce path, two dashboards that answered wrongly, and one test that walks the whole thing
 
 Not a numbered milestone. Three defects and one gap, found by asking what happens in the seams
 between milestones rather than inside any one of them.
 
 | Gate                                                             | Status                                                                                                                                  |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. `pnpm verify` green                                           | ✅ 612 tests, nine gates — `format:check` is now one of them                                                                            |
+| 1. `pnpm verify` green                                           | ✅ 636 tests, nine gates — `format:check` is now one of them                                                                            |
 | 2. Tests for money, badges, authorisation-to-test, personal data | ✅ The journey test covers three of the four in one run; the fourth is unchanged                                                        |
 | 3. Every AI-written claim evidence-bound                         | ✅ Unchanged, and now asserted end-to-end: every published finding in the journey run carries evidence                                  |
 | 4. RLS verified                                                  | ✅ Unchanged. The webhook writes as the service role to one table nobody else can write                                                 |
 | 5. No secrets in the repo                                        | ✅ The test signing secrets are assembled at runtime rather than written down, because a scanner cannot tell a fake one from a real one |
 | 6. Legal artefacts surfaced with acceptance recorded             | ✅ No document changed                                                                                                                  |
-| 7. Docs updated                                                  | ✅ 202 decisions recorded                                                                                                               |
+| 7. Docs updated                                                  | ✅ 212 decisions recorded                                                                                                               |
 | 8. Cost per run recorded and visible                             | ✅ Unchanged                                                                                                                            |
 
 ### What it built
@@ -398,6 +398,15 @@ between milestones rather than inside any one of them.
   in order, through the tables a customer would touch. It states where it is not the real code.
 - **Invitation email**, sent at the point of invitation, because the link exists in memory for one
   request and nowhere else.
+- **The portfolio's two unanswerable rules.** `max_open_severity` was evaluated against an empty
+  finding list, so a profile forbidding an open critical reported a pass on an application with
+  three; and `require_store_readiness` read a hard-coded `false`, so a store-bound application
+  failed with an explanation stating the opposite of the truth. Both facts now come from the view.
+- **A subject access request, answered by a mechanism** (PART 8.2). The published promise —
+  account, memberships, consents with the hash of what was agreed to, applications submitted —
+  had been kept by a person running queries. It names what it leaves out and why, takes the
+  subject from the stored request rather than the URL, records the disclosure in the same
+  transaction as the disclosure, and refuses a caller who could only produce a partial answer.
 
 ## M8 — not started
 
