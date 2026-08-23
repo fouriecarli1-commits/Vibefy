@@ -1,0 +1,77 @@
+{
+  "$comment": "Offline advisory set. This is a deliberately small, high-confidence list of advisories severe enough that shipping the affected range is a finding on its own. It is NOT a substitute for a full vulnerability feed: the production source is OSV.dev, resolved by the orchestrator rather than inside the sandbox, because the runner's egress is limited to the customer's declared scope. Coverage is stated in every finding this data produces.",
+  "source": "https://osv.dev",
+  "updated": "2026-08-22",
+  "advisories": [
+    {
+      "package": "lodash",
+      "vulnerable": "<4.17.21",
+      "severity": "high",
+      "id": "GHSA-35jh-r3h4-6jhm",
+      "summary": "Command injection via template"
+    },
+    {
+      "package": "minimist",
+      "vulnerable": "<1.2.6",
+      "severity": "critical",
+      "id": "GHSA-xvch-5gv4-984h",
+      "summary": "Prototype pollution"
+    },
+    {
+      "package": "node-fetch",
+      "vulnerable": "<2.6.7",
+      "severity": "high",
+      "id": "GHSA-r683-j2x4-v87g",
+      "summary": "Exposure of sensitive information to an unauthorised actor"
+    },
+    {
+      "package": "axios",
+      "vulnerable": "<1.6.0",
+      "severity": "high",
+      "id": "GHSA-wf5p-g6vw-rhxx",
+      "summary": "Cross-site request forgery"
+    },
+    {
+      "package": "next",
+      "vulnerable": "<13.5.7",
+      "severity": "high",
+      "id": "GHSA-fq54-2j52-jc42",
+      "summary": "Server-side request forgery in Server Actions"
+    },
+    {
+      "package": "semver",
+      "vulnerable": "<7.5.2",
+      "severity": "high",
+      "id": "GHSA-c2qf-rxjj-qqgw",
+      "summary": "Regular expression denial of service"
+    },
+    {
+      "package": "json5",
+      "vulnerable": "<2.2.2",
+      "severity": "high",
+      "id": "GHSA-9c47-m6qq-7p4h",
+      "summary": "Prototype pollution"
+    },
+    {
+      "package": "jsonwebtoken",
+      "vulnerable": "<9.0.0",
+      "severity": "high",
+      "id": "GHSA-27h2-hvpr-p74q",
+      "summary": "Improper signature verification"
+    },
+    {
+      "package": "express",
+      "vulnerable": "<4.19.2",
+      "severity": "medium",
+      "id": "GHSA-rv95-896h-c2vc",
+      "summary": "Open redirect in response.location"
+    },
+    {
+      "package": "vite",
+      "vulnerable": "<4.5.3",
+      "severity": "high",
+      "id": "GHSA-6chw-6frg-f759",
+      "summary": "Server option allows reading files outside the project root"
+    }
+  ]
+}

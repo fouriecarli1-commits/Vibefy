@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+@theme inline {
+  --color-surface: var(--vibefycode-surface);
+  --color-surface-muted: var(--vibefycode-surface-muted);
+  --color-ink: var(--vibefycode-text);
+  --color-muted: var(--vibefycode-text-muted);
+  --color-accent: var(--vibefycode-accent);
+  --color-line: var(--vibefycode-border);
+  --color-line-strong: var(--vibefycode-border-interactive);
+  --color-ok: var(--vibefycode-success);
+  --color-warn: var(--vibefycode-warning);
+  --color-bad: var(--vibefycode-danger);
+  --font-sans:
+    'Poppins', 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html {
+  background: var(--vibefycode-surface);
+  color: var(--vibefycode-text);
+}
+
+body {
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+/* WCAG 2.2 asks for a focus indicator that is actually visible. The default
+   browser ring disappears against our surfaces, so it is replaced rather than
+   removed — never `outline: none`. */
+:focus-visible {
+  outline: 3px solid var(--vibefycode-focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.vibefycode-gradient-text {
+  background: var(--vibefycode-gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

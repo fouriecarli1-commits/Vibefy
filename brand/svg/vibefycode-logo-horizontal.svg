@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 420" role="img" aria-label="VibefyCode — vibe app rating system">
+  <title>VibefyCode — vibe app rating system</title>
+  <g transform="translate(36 18) scale(0.74)">
+  <defs>
+    <linearGradient id="mark-ribbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2FD3C4"/>
+      <stop offset="48%" stop-color="#2E9BE0"/>
+      <stop offset="100%" stop-color="#1F5FE0"/>
+    </linearGradient>
+    <linearGradient id="mark-arrow" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2E9BE0"/>
+      <stop offset="62%" stop-color="#E8730C"/>
+      <stop offset="100%" stop-color="#F9A03F"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#C7D0DE" stroke-width="6" fill="none" opacity="1">
+      <path d="M96 300 L138 300 L160 278"/>
+      <path d="M110 366 L152 366 L172 346"/>
+      <path d="M150 232 L120 232 L104 216"/>
+      <path d="M118 424 L166 424"/>
+      <path d="M404 300 L440 300 L456 284"/>
+      <path d="M398 232 L432 232"/>
+    </g>
+    <g fill="#C7D0DE" opacity="1">
+      <circle cx="92" cy="300" r="8"/>
+      <circle cx="106" cy="366" r="8"/>
+      <circle cx="100" cy="212" r="8"/>
+      <circle cx="114" cy="424" r="8"/>
+      <circle cx="460" cy="280" r="8"/>
+      <circle cx="436" cy="232" r="8"/>
+      <rect x="388" y="400" width="15" height="26" rx="3"/>
+      <rect x="411" y="384" width="15" height="42" rx="3"/>
+      <rect x="434" y="362" width="15" height="64" rx="3"/>
+    </g>
+    <path d="M268 402 C312 360 356 320 398 276" stroke="url(#mark-arrow)" stroke-width="26"/>
+    <path d="M452 232 L414 302 L374 256 Z" fill="#E8730C" stroke="none"/>
+    <path d="M132 118 C160 214 200 306 244 372" stroke="url(#mark-ribbon)" stroke-width="44"/>
+    <path d="M244 372 C238 404 208 416 186 400 C164 384 168 350 194 342 C220 334 240 352 240 374" stroke="url(#mark-ribbon)" stroke-width="22"/>
+    <circle cx="200" cy="372" r="13" fill="#FFFFFF" stroke="none"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="#FFFFFF" stroke-width="62"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="url(#mark-ribbon)" stroke-width="44"/>
+  </g>
+  </g>
+  <g fill="#16205A" transform="translate(446.00 250) scale(0.134825)">
+    <path d="M721 -702 472 0H258L9 -702H191L365 -172L540 -702ZM997 -702V0H826V-702ZM1715 -191Q1715 -103 1653.5 -51.5Q1592 0 1482 0H1155V-702H1471Q1578 -702 1638.5 -653.0Q1699 -604 1699 -520Q1699 -458 1666.5 -417.0Q1634 -376 1580 -360Q1641 -347 1678.0 -299.5Q1715 -252 1715 -191ZM1326 -418H1438Q1480 -418 1502.5 -436.5Q1525 -455 1525 -491Q1525 -527 1502.5 -546.0Q1480 -565 1438 -565H1326ZM1542 -214Q1542 -251 1517.5 -272.0Q1493 -293 1450 -293H1326V-138H1452Q1495 -138 1518.5 -157.5Q1542 -177 1542 -214ZM2019 -565V-423H2248V-291H2019V-137H2278V0H1848V-702H2278V-565ZM2880 -702V-565H2594V-417H2808V-284H2594V0H2423V-702ZM3606 -702 3363 -232V0H3192V-232L2949 -702H3143L3279 -408L3414 -702Z"/>
+    <path d="M4038 -706Q4152 -706 4237.0 -651.0Q4322 -596 4361 -495H4252Q4223 -558 4168.5 -592.0Q4114 -626 4038 -626Q3965 -626 3907.0 -592.0Q3849 -558 3816.0 -495.5Q3783 -433 3783 -349Q3783 -266 3816.0 -203.5Q3849 -141 3907.0 -107.0Q3965 -73 4038 -73Q4114 -73 4168.5 -106.5Q4223 -140 4252 -203H4361Q4322 -103 4237.0 -48.5Q4152 6 4038 6Q3941 6 3861.5 -39.5Q3782 -85 3736.0 -166.0Q3690 -247 3690 -349Q3690 -451 3736.0 -532.5Q3782 -614 3861.5 -660.0Q3941 -706 4038 -706ZM4496 -349Q4496 -451 4542.5 -532.5Q4589 -614 4669.0 -659.5Q4749 -705 4846 -705Q4944 -705 5024.0 -659.5Q5104 -614 5150.0 -533.0Q5196 -452 5196 -349Q5196 -246 5150.0 -165.0Q5104 -84 5024.0 -38.5Q4944 7 4846 7Q4749 7 4669.0 -38.5Q4589 -84 4542.5 -165.5Q4496 -247 4496 -349ZM5103 -349Q5103 -433 5069.5 -495.5Q5036 -558 4978.0 -592.0Q4920 -626 4846 -626Q4772 -626 4714.0 -592.0Q4656 -558 4622.5 -495.5Q4589 -433 4589 -349Q4589 -266 4622.5 -203.0Q4656 -140 4714.5 -106.0Q4773 -72 4846 -72Q4919 -72 4977.5 -106.0Q5036 -140 5069.5 -203.0Q5103 -266 5103 -349ZM5937 -347Q5937 -240 5892.5 -161.5Q5848 -83 5764.5 -41.5Q5681 0 5567 0H5350V-697H5567Q5681 -697 5764.5 -654.5Q5848 -612 5892.5 -533.0Q5937 -454 5937 -347ZM5844 -347Q5844 -477 5772.5 -550.0Q5701 -623 5567 -623H5441V-75H5567Q5702 -75 5773.0 -146.5Q5844 -218 5844 -347ZM6182 -623V-390H6436V-315H6182V-75H6466V0H6091V-698H6466V-623Z"/>
+  </g>
+  <g font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" fill="#16205A">
+    <!-- The tagline stays live text. It describes the product; it is not the mark,
+         and a substituted font changes nothing anyone could be misled by. -->
+    <text x="450" y="322" font-size="48" font-weight="500" textLength="560" lengthAdjust="spacingAndGlyphs">vibe app rating system</text>
+  </g>
+</svg>

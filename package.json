@@ -1,0 +1,58 @@
+{
+  "name": "vibefycode",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "build": "pnpm --filter @vibefycode/web build",
+    "typecheck": "pnpm -r typecheck && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "brand:build": "tsx tools/brand-build.mts",
+    "check:copy": "node tools/copy-lint.mjs",
+    "check:secrets": "node tools/secret-scan.mjs",
+    "check:contrast": "tsx tools/contrast-check.mts",
+    "check:brand": "tsx tools/brand-check.mts",
+    "verify": "pnpm format:check && pnpm check:secrets && pnpm check:copy && pnpm check:contrast && pnpm check:brand && pnpm check:stubs && pnpm check:schema && pnpm legal:registry && pnpm typecheck && pnpm test",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:stubs": "node tools/stub-check.mjs",
+    "schema:build": "node tools/build-schema.mjs",
+    "check:schema": "node tools/build-schema.mjs --check",
+    "tokens:build": "node tools/tokens-build.mjs",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "legal:registry": "node tools/legal-registry.mjs",
+    "dev:worker": "pnpm --filter @vibefycode/worker start",
+    "badge:keygen": "tsx tools/generate-badge-key.mts",
+    "dev:mobile": "pnpm -F @vibefycode/mobile start",
+    "check:a11y": "tsx tools/a11y-scan.mts",
+    "verify:all": "pnpm verify && pnpm check:a11y"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@types/node": "26.2.0",
+    "@types/pg": "8.23.1",
+    "@vibefycode/badge": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
+    "axe-core": "4.13.0",
+    "pg": "8.23.0",
+    "playwright": "^1.62.1",
+    "prettier": "3.6.2",
+    "sharp": "0.35.3",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "type": "module"
+}

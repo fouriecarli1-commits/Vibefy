@@ -1,0 +1,35 @@
+{
+  "name": "@vibefycode/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vibefycode/api": "workspace:*",
+    "@vibefycode/badge": "workspace:*",
+    "@vibefycode/billing": "workspace:*",
+    "@vibefycode/engine": "workspace:*",
+    "@vibefycode/governance": "workspace:*",
+    "@vibefycode/monitoring": "workspace:*",
+    "@vibefycode/notify": "workspace:*",
+    "@vibefycode/report": "workspace:*",
+    "@vibefycode/rubric": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
+    "pg": "8.23.0",
+    "playwright": "1.62.1",
+    "undici": "8.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2"
+  }
+}

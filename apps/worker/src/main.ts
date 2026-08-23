@@ -1,0 +1,213 @@
+/**
+ * The worker process.
+ *
+ * Assessments are long-running, so they never run in a request handler. The
+ * queue is `public.assessment_requests`, claimed with FOR UPDATE SKIP LOCKED —
+ * a table the customer can watch rather than a broker they cannot.
+ *
+ * In production this process runs inside the ephemeral, network-restricted
+ * container described in the runbook. The scope guard is the in-process half of
+ * that boundary; the container's egress allowlist is the outer half.
+ */
+import { Pool } from 'pg';
+import { resendFromEnvironment } from '@vibefycode/notify';
+import { NotAuthorisedError, runAssessmentJob } from './run-assessment.ts';
+import { claimNextRequest, completeRequest, failRequest } from './queue.ts';
+import { resolveReportStorage, sweepPendingReports } from './report.ts';
+import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
+import {
+  sweepBadgeExpiryWarnings,
+  sweepDriftDetection,
+  sweepLiveness,
+  sweepScheduledReassessments,
+} from './monitoring.ts';
+import { sweepAlertPush } from './push.ts';
+import { sweepAlertEmail } from './email.ts';
+import {
+  spendingIsPaused,
+  sweepGovernanceDeadlines,
+  sweepRetention,
+  sweepSpendCap,
+} from './governance.ts';
+
+export const POLL_INTERVAL_MS = 5_000;
+export const REPORT_SWEEP_INTERVAL_MS = 30_000;
+// Monitoring answers slower questions — is anything due, has anything drifted,
+// is the site still up — so it runs on its own, longer beat. Running it at the
+// report cadence would mean pinging every customer's site every thirty seconds.
+export const MONITOR_SWEEP_INTERVAL_MS = 5 * 60_000;
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set. The worker needs a direct database connection.`);
+  return value;
+}
+
+function log(message: string, detail: Record<string, unknown> = {}): void {
+  // Structured, because the person debugging this at 2am is the person who wrote it.
+  console.log(JSON.stringify({ at: new Date().toISOString(), message, ...detail }));
+}
+
+/** Runs one queued request, if there is one. Returns whether it did any work. */
+export async function processNextRequest(pool: Pool, logger: typeof log = log): Promise<boolean> {
+  const claimClient = await pool.connect();
+  let claimed;
+  try {
+    // The global spend ceiling is checked here, before anything is claimed,
+    // because the failure it guards against is not one expensive run — it is a
+    // thousand cheap ones started by a loop nobody is watching at three in the
+    // morning. A pause is a row in the database, not state in this process, so
+    // restarting the worker does not lift it.
+    if (await spendingIsPaused(claimClient)) {
+      logger('spending paused — not claiming work');
+      return false;
+    }
+    claimed = await claimNextRequest(claimClient);
+  } finally {
+    claimClient.release();
+  }
+  if (!claimed) return false;
+
+  logger('request claimed', { requestId: claimed.id, appId: claimed.appId, depth: claimed.depth });
+
+  try {
+    const result = await runAssessmentJob(
+      { appId: claimed.appId, depth: claimed.depth, requestedBy: claimed.requestedBy },
+      { pool, log: logger },
+    );
+    const client = await pool.connect();
+    try {
+      await completeRequest(client, claimed.id, result.assessmentId);
+    } finally {
+      client.release();
+    }
+    logger('request completed', { requestId: claimed.id, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // An unauthorised target does not become authorised by trying again, and
+    // retrying it would mean attempting to test something we may not test, twice.
+    const retryable = !(error instanceof NotAuthorisedError);
+    const client = await pool.connect();
+    try {
+      const outcome = await failRequest(client, claimed.id, message, { retryable });
+      logger('request failed', { requestId: claimed.id, outcome, error: message });
+    } finally {
+      client.release();
+    }
+  }
+
+  return true;
+}
+
+export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }> {
+  const pool = new Pool({ connectionString: requireEnv('SUPABASE_DB_URL'), max: 4 });
+  const storage = resolveReportStorage();
+  const emailProvider = resendFromEnvironment();
+  if (!emailProvider) {
+    log('email not configured — alerts will reach the console and phones only', {
+      needs: 'RESEND_API_KEY and ALERT_EMAIL_FROM',
+    });
+  }
+  let running = true;
+
+  const loop = async () => {
+    while (running) {
+      try {
+        // One at a time per worker. Assessments are heavy, and a worker that runs
+        // eight at once is a worker that hits the daily spend cap by lunchtime.
+        const did = await processNextRequest(pool, log);
+        if (!did) await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      } catch (error) {
+        log('worker loop error', { error: String(error) });
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+    }
+  };
+
+  // Reports are generated by a sweep rather than by a message from the console:
+  // an approval whose enqueue failed would otherwise leave a customer with a
+  // report that never appears and no trace of why.
+  const sweep = setInterval(() => {
+    void sweepPendingReports(pool, storage, log).catch((error) =>
+      log('report sweep failed', { error: String(error) }),
+    );
+    // Badges: issued when the last of approval, the rubric gate and licence
+    // acceptance lands, and expired or suspended when the facts change.
+    void sweepBadgeIssuance(pool, log).catch((error) =>
+      log('badge issuance sweep failed', { error: String(error) }),
+    );
+    void sweepBadgeLifecycle(pool, log).catch((error) =>
+      log('badge lifecycle sweep failed', { error: String(error) }),
+    );
+  }, REPORT_SWEEP_INTERVAL_MS);
+  sweep.unref();
+
+  // Continuous monitoring. Every one of these is idempotent — a drift report is
+  // unique per assessment, an alert is unique per dedupe key, a re-assessment
+  // stamps the app before it runs — so a sweep that runs twice, or that crashes
+  // halfway, costs nothing.
+  const monitor = setInterval(() => {
+    void sweepDriftDetection(pool, log).catch((error) =>
+      log('drift sweep failed', { error: String(error) }),
+    );
+    void sweepScheduledReassessments(pool, log).catch((error) =>
+      log('re-assessment sweep failed', { error: String(error) }),
+    );
+    void sweepLiveness(pool, undefined, log).catch((error) =>
+      log('liveness sweep failed', { error: String(error) }),
+    );
+    void sweepBadgeExpiryWarnings(pool, log).catch((error) =>
+      log('badge expiry sweep failed', { error: String(error) }),
+    );
+    // Alerts reach phones from here. The console is still the record; a push is
+    // a copy of it, and one that fails is retried rather than lost.
+    void sweepAlertPush(pool, undefined, log).catch((error) =>
+      log('alert push sweep failed', { error: String(error) }),
+    );
+    // The other half of the same promise: an alert has to reach someone who did
+    // not install the app.
+    void sweepAlertEmail(pool, emailProvider, log).catch((error) =>
+      log('alert email sweep failed', { error: String(error) }),
+    );
+    // Governance: the ceiling, the retention deadline and the response deadline.
+    // All three were recorded in the schema from M1 and acted on by nothing.
+    void sweepSpendCap(pool, log).catch((error) =>
+      log('spend sweep failed', { error: String(error) }),
+    );
+    void sweepRetention(pool, log).catch((error) =>
+      log('retention sweep failed', { error: String(error) }),
+    );
+    void sweepGovernanceDeadlines(pool, log).catch((error) =>
+      log('governance deadline sweep failed', { error: String(error) }),
+    );
+  }, MONITOR_SWEEP_INTERVAL_MS);
+  monitor.unref();
+
+  void loop();
+  log('worker ready', {
+    poll: POLL_INTERVAL_MS,
+    reportSweep: REPORT_SWEEP_INTERVAL_MS,
+    monitorSweep: MONITOR_SWEEP_INTERVAL_MS,
+  });
+
+  return {
+    pool,
+    async stop() {
+      running = false;
+      clearInterval(sweep);
+      clearInterval(monitor);
+      await pool.end();
+    },
+  };
+}
+
+if (process.argv[1]?.endsWith('main.ts')) {
+  const { stop } = await start();
+  const shutdown = async () => {
+    log('shutting down');
+    await stop();
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}

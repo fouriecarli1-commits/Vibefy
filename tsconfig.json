@@ -1,0 +1,17 @@
+{
+  "$comment": "The tests and the tooling. Every workspace package typechecks itself; these two directories sit outside all of them and were, until this file existed, never typechecked at all — so a test could assert against a shape that no longer exists and keep passing.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "lib": ["ES2023", "DOM"],
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    // The gates are .mjs and the tests import them. allowJs lets TypeScript read
+    // their real exports instead of treating each one as `any`; checkJs stays off
+    // because they are plain scripts, not typed modules.
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["tests/**/*.ts", "tools/**/*.mts", "tools/**/*.ts", "vitest.config.mts"]
+}

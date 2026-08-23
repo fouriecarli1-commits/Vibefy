@@ -1,0 +1,21 @@
+{
+  "name": "@vibefycode/report",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vibefycode/rubric": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
+    "@vibefycode/policy": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@vibefycode/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./authorisation": "./src/authorisation/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.120.0",
+    "@axe-core/playwright": "4.13.0",
+    "@vibefycode/rubric": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
+    "axe-core": "4.13.0",
+    "playwright": "1.62.1",
+    "undici": "8.10.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img"
+     aria-label="Not currently verified by VibefyCode — expired." width="512" height="512">
+  <title>Not currently verified by VibefyCode — expired.</title>
+  <desc>A VibefyCode assessment is point-in-time and scope-limited. It is not a penetration test, a security audit, or a guarantee.</desc>
+  <defs>
+    <linearGradient id="seal-ribbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2FD3C4"/>
+      <stop offset="48%" stop-color="#2E9BE0"/>
+      <stop offset="100%" stop-color="#1F5FE0"/>
+    </linearGradient>
+    <linearGradient id="seal-arrow" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2E9BE0"/>
+      <stop offset="62%" stop-color="#E8730C"/>
+      <stop offset="100%" stop-color="#F9A03F"/>
+    </linearGradient>
+    <clipPath id="seal-disc"><circle cx="256" cy="256" r="248"/></clipPath>
+  </defs>
+  <path d="M 8 256 A 248 248 0 1 0 504 256 A 248 248 0 1 0 8 256 Z M 59 256 A 197 197 0 1 0 453 256 A 197 197 0 1 0 59 256 Z" fill="#9CA3AF" fill-rule="evenodd"/>
+  <circle cx="256" cy="256" r="197" fill="#FFFFFF"/>
+  <circle cx="256" cy="256" r="239" fill="none" stroke="#F4F7FC" stroke-width="1.5" opacity="0.45"/>
+  <circle cx="256" cy="256" r="188" fill="none" stroke="#9CA3AF" stroke-width="1.5" opacity="0.28"/>
+  <g aria-hidden="true">
+    <text x="0" y="0" transform="translate(170.75 53.19) rotate(-22.80)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">E</text>
+    <text x="0" y="0" transform="translate(198.32 43.70) rotate(-15.20)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">X</text>
+    <text x="0" y="0" transform="translate(226.90 37.93) rotate(-7.60)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">P</text>
+    <text x="0" y="0" transform="translate(256.00 36.00) rotate(0.00)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">I</text>
+    <text x="0" y="0" transform="translate(285.10 37.93) rotate(7.60)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">R</text>
+    <text x="0" y="0" transform="translate(313.68 43.70) rotate(15.20)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">E</text>
+    <text x="0" y="0" transform="translate(341.25 53.19) rotate(22.80)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">D</text>
+    <path d="M0.00 -13.00 L3.21 -4.42 L12.36 -4.02 L5.19 1.69 L7.64 10.52 L0.00 5.46 L-7.64 10.52 L-5.19 1.69 L-12.36 -4.02 L-3.21 -4.42 Z" transform="translate(73.61173403789081 132.9775612364357)" fill="#F4F7FC"/>
+    <path d="M0.00 -13.00 L3.21 -4.42 L12.36 -4.02 L5.19 1.69 L7.64 10.52 L0.00 5.46 L-7.64 10.52 L-5.19 1.69 L-12.36 -4.02 L-3.21 -4.42 Z" transform="translate(438.3882659621092 132.9775612364357)" fill="#F4F7FC"/>
+  </g>
+  <g transform="translate(256 190) scale(0.5) translate(-256 -256)" opacity="0.45">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M268 402 C312 360 356 320 398 276" stroke="currentColor" stroke-width="26"/>
+    <path d="M452 232 L414 302 L374 256 Z" fill="currentColor" stroke="none"/>
+    <path d="M132 118 C160 214 200 306 244 372" stroke="currentColor" stroke-width="44"/>
+    <path d="M244 372 C238 404 208 416 186 400 C164 384 168 350 194 342 C220 334 240 352 240 374" stroke="currentColor" stroke-width="22"/>
+    <circle cx="200" cy="372" r="13" fill="#FFFFFF" stroke="none"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="#FFFFFF" stroke-width="62"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="currentColor" stroke-width="44"/>
+  </g>
+  </g>
+  <g aria-hidden="true" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle" fill="#9CA3AF">
+    <text x="256" y="336" font-size="27" font-weight="600">Not currently verified</text>
+  </g>
+  <g aria-hidden="true">
+    <path d="M100 378 L140 392 L140 450 L100 436 Z" fill="#6B7280"/>
+    <path d="M412 378 L372 392 L372 450 L412 436 Z" fill="#6B7280"/>
+    <path d="M120 392 Q256 344 392 392 L392 452 Q256 404 120 452 Z" fill="#9CA3AF"/>
+    <path d="M120 402 Q256 354 392 402" fill="none" stroke="#F4F7FC" stroke-width="1.5" opacity="0.4"/>
+    <path d="M0.00 -10.00 L2.47 -3.40 L9.51 -3.09 L3.99 1.30 L5.88 8.09 L0.00 4.20 L-5.88 8.09 L-3.99 1.30 L-9.51 -3.09 L-2.47 -3.40 Z" transform="translate(136 406)" fill="#F4F7FC"/>
+    <path d="M0.00 -10.00 L2.47 -3.40 L9.51 -3.09 L3.99 1.30 L5.88 8.09 L0.00 4.20 L-5.88 8.09 L-3.99 1.30 L-9.51 -3.09 L-2.47 -3.40 Z" transform="translate(376 406)" fill="#F4F7FC"/>
+  </g>
+  <g fill="#F4F7FC" transform="translate(153.00 420) scale(0.031561)">
+    <path d="M721 -702 472 0H258L9 -702H191L365 -172L540 -702ZM997 -702V0H826V-702ZM1715 -191Q1715 -103 1653.5 -51.5Q1592 0 1482 0H1155V-702H1471Q1578 -702 1638.5 -653.0Q1699 -604 1699 -520Q1699 -458 1666.5 -417.0Q1634 -376 1580 -360Q1641 -347 1678.0 -299.5Q1715 -252 1715 -191ZM1326 -418H1438Q1480 -418 1502.5 -436.5Q1525 -455 1525 -491Q1525 -527 1502.5 -546.0Q1480 -565 1438 -565H1326ZM1542 -214Q1542 -251 1517.5 -272.0Q1493 -293 1450 -293H1326V-138H1452Q1495 -138 1518.5 -157.5Q1542 -177 1542 -214ZM2019 -565V-423H2248V-291H2019V-137H2278V0H1848V-702H2278V-565ZM2880 -702V-565H2594V-417H2808V-284H2594V0H2423V-702ZM3606 -702 3363 -232V0H3192V-232L2949 -702H3143L3279 -408L3414 -702Z"/>
+    <path d="M4038 -706Q4152 -706 4237.0 -651.0Q4322 -596 4361 -495H4252Q4223 -558 4168.5 -592.0Q4114 -626 4038 -626Q3965 -626 3907.0 -592.0Q3849 -558 3816.0 -495.5Q3783 -433 3783 -349Q3783 -266 3816.0 -203.5Q3849 -141 3907.0 -107.0Q3965 -73 4038 -73Q4114 -73 4168.5 -106.5Q4223 -140 4252 -203H4361Q4322 -103 4237.0 -48.5Q4152 6 4038 6Q3941 6 3861.5 -39.5Q3782 -85 3736.0 -166.0Q3690 -247 3690 -349Q3690 -451 3736.0 -532.5Q3782 -614 3861.5 -660.0Q3941 -706 4038 -706ZM4496 -349Q4496 -451 4542.5 -532.5Q4589 -614 4669.0 -659.5Q4749 -705 4846 -705Q4944 -705 5024.0 -659.5Q5104 -614 5150.0 -533.0Q5196 -452 5196 -349Q5196 -246 5150.0 -165.0Q5104 -84 5024.0 -38.5Q4944 7 4846 7Q4749 7 4669.0 -38.5Q4589 -84 4542.5 -165.5Q4496 -247 4496 -349ZM5103 -349Q5103 -433 5069.5 -495.5Q5036 -558 4978.0 -592.0Q4920 -626 4846 -626Q4772 -626 4714.0 -592.0Q4656 -558 4622.5 -495.5Q4589 -433 4589 -349Q4589 -266 4622.5 -203.0Q4656 -140 4714.5 -106.0Q4773 -72 4846 -72Q4919 -72 4977.5 -106.0Q5036 -140 5069.5 -203.0Q5103 -266 5103 -349ZM5937 -347Q5937 -240 5892.5 -161.5Q5848 -83 5764.5 -41.5Q5681 0 5567 0H5350V-697H5567Q5681 -697 5764.5 -654.5Q5848 -612 5892.5 -533.0Q5937 -454 5937 -347ZM5844 -347Q5844 -477 5772.5 -550.0Q5701 -623 5567 -623H5441V-75H5567Q5702 -75 5773.0 -146.5Q5844 -218 5844 -347ZM6182 -623V-390H6436V-315H6182V-75H6466V0H6091V-698H6466V-623Z"/>
+  </g>
+</svg>

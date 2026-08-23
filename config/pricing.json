@@ -1,0 +1,52 @@
+{
+  "$comment": "Pricing scaffold. Values live in config rather than code so they can change without a deploy, and so nothing on the scoring path can import them — packages/rubric has no dependency on this file and would fail to compile if it did.",
+  "currency": "USD",
+  "tiers": [
+    {
+      "id": "free",
+      "label": "Free",
+      "priceUsd": 0,
+      "billing": "none",
+      "depth": "limited",
+      "contents": "One limited report per app per 90 days. Headline score and top three findings. No evidence artefacts, no badge."
+    },
+    {
+      "id": "one_off",
+      "label": "One-off deep report",
+      "priceUsd": 79,
+      "billing": "once",
+      "depth": "full",
+      "contents": "Full findings with evidence, remediation guide, improvement suggestions, store-readiness checklist, PDF export, one free re-test within 30 days."
+    },
+    {
+      "id": "certified",
+      "label": "Certified",
+      "priceUsd": 49,
+      "billing": "monthly",
+      "depth": "continuous",
+      "contents": "Badge, monthly re-assessment, drift alerts, trend history."
+    },
+    {
+      "id": "agency",
+      "label": "Agency",
+      "priceUsd": 299,
+      "billing": "monthly",
+      "depth": "continuous",
+      "contents": "Multi-app workspace, seats, white-label PDF export."
+    },
+    {
+      "id": "organisation",
+      "label": "Organisation",
+      "priceUsd": null,
+      "billing": "quote",
+      "depth": "continuous",
+      "contents": "SSO, policy profiles, portfolio dashboard, audit export."
+    }
+  ],
+  "ceilings": {
+    "perRunCostUsd": { "limited": 0.5, "full": 4, "continuous": 2 },
+    "freeTierPerAccountMonthlyUsd": 2,
+    "globalDailySpendUsd": 200,
+    "freeTierWeeklyBudgetAlertUsd": 100
+  }
+}

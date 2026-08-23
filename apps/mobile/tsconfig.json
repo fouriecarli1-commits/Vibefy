@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM"],
+    "types": ["react"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": { "@/*": ["./*"] }
+  },
+  "include": ["app/**/*.ts", "app/**/*.tsx", "lib/**/*.ts", "lib/**/*.tsx", "*.ts"]
+}
