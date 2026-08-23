@@ -76,6 +76,21 @@ export default async function ReviewRequestsPage() {
                 </p>
                 {request.details && <p className="mt-3 text-sm">{String(request.details)}</p>}
 
+                {['access', 'portability'].includes(String(request.request_type)) && (
+                  <p className="mt-4 text-sm">
+                    <a
+                      href={`/review/requests/${request.id as string}/export`}
+                      className="font-medium underline"
+                    >
+                      Assemble their data export
+                    </a>{' '}
+                    <span className="text-muted">
+                      — account, memberships, consents with the hash of what was agreed to, and the
+                      applications they submitted. Downloading it is recorded in the audit log.
+                    </span>
+                  </p>
+                )}
+
                 <div className="mt-5">
                   <ActionForm action={resolveDataRequest} submitLabel="Record">
                     <input type="hidden" name="requestId" value={request.id as string} />
