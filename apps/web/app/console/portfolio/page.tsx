@@ -13,11 +13,13 @@ interface PortfolioRow {
   primary_url: string | null;
   screening_status: string;
   monitoring_enabled: boolean;
+  intended_for_app_store: boolean;
   policy_profile_id: string | null;
   assessment_id: string | null;
   overall_score: string | null;
   certification_eligible: boolean | null;
   dimension_scores: { dimension: string; score: number }[] | null;
+  open_findings: PolicySubject['openFindings'];
   assessed_at: string | null;
   badge_status: string | null;
   badge_expires_at: string | null;
@@ -142,10 +144,8 @@ export default async function PortfolioPage() {
                           entry.dimension as PolicySubject['dimensions'][number]['dimension'],
                         score: Number(entry.score),
                       })),
-                      // The portfolio row does not carry findings; the policy's
-                      // severity ceiling is evaluated on the report, which does.
-                      openFindings: [],
-                      intendedForAppStore: false,
+                      openFindings: row.open_findings ?? [],
+                      intendedForAppStore: row.intended_for_app_store === true,
                     })
                   : null;
 
