@@ -1,38 +1,46 @@
 # Supplied artwork
 
-**These files are the authority.** Everything in `brand/svg/`, `brand/png/`, `brand/icons/` and
-`apps/web/public/brand/` is derived from them by `pnpm brand:build`, and nothing derived may be
-"improved" — see PART 0.5 and PART 11 of the build brief.
+**`vibefycode-logo-horizontal.jpg` is the authority.** Everything in `brand/svg/`, `brand/png/`,
+`brand/icons/`, `apps/mobile/assets/` and `apps/web/public/brand/` is derived from it by
+`pnpm brand:build`, and nothing derived may be "improved" — see PART 0.5 and PART 11 of the build
+brief.
 
-## What is missing
+The vector masters are a clean reconstruction of it: same forms, same palette, same proportions,
+rebuilt as editable geometry in `packages/shared/src/brand.ts`. That is deliberate rather than a
+shortcut — the badge is served as SVG on every request, and an auto-trace of a gradient raster
+produces thousands of noisy paths that render badly at the 96px minimum embed size.
 
-The VibefyCode logo and stamp were supplied as images in conversation rather than as files, so
-they are not here yet. The vector masters in `brand/svg/` are reconstructions from those images:
-same forms, same palette, same proportions, rebuilt as clean geometry.
+## `reference/` — composition only, never derived from
 
-**Drop the real files in here** — vector originals if they exist, otherwise the highest-resolution
-raster you have — named:
+Three seal designs, kept because the badge's **composition** follows them: the arc legend above,
+the banner ribbon carrying the wordmark below, the stars, the fan base.
 
-| File | What it is |
-| --- | --- |
-| `vibefycode-logo-horizontal.*` | The V mark with the rising arrow, circuit traces and the VIBEFYCODE wordmark |
-| `vibefycode-badge-verified.*` | The round "Verified by VibefyCode" stamp |
+They are not artwork sources, for three reasons, and none of them is fixable by editing:
 
-Then re-derive the masters against them and check the reconstruction. This is registered in
-`docs/OPEN_ITEMS.md` and will not disappear from that list on its own.
+1. **Each has "Made with AI" burned into the pixels**, top right. A trust mark cannot carry a
+   third-party watermark.
+2. **The badge is generated as SVG on every request.** That is the whole revocation mechanism —
+   no file exists for a customer to cache, so a suspended badge stops reading as verified within
+   minutes. Chrome bevels, lens flares, bokeh and photographic circuit texture do not survive
+   vectorisation.
+3. **They would not survive the size they are licensed at.** The Badge Licence permits embedding
+   from 96px. At 96px these read as a grey smudge; the flat vector seal reads as a seal.
 
-## One thing to fix in the supplied stamp
+They also draw a different V from the logo. The mark in `brand/svg/` follows the **logo**, because
+a badge and a website that disagree about the same mark is precisely what PART 0.5 exists to
+prevent.
 
-The outer arc of the supplied stamp image reads **"VERIFIED BY VIBFCODE"** — the E is missing from
-VIBEFYCODE — and a second, ghosted "VERIFIED BY" overlaps it at a different angle. The
-reconstruction here spells the wordmark correctly and carries the arc once, because a trust mark
-with a typo in its own name is worse than no trust mark. If the supplied file is regenerated,
-check that arc before anything is derived from it.
+## If you replace the logo
 
-## Superseded
+Drop the new file in as `vibefycode-logo-horizontal.*`, update the paths in
+`packages/shared/src/brand.ts` to match, then:
 
-<!-- vibefycode-copy-lint-allow-block: naming the previous brand is the whole point of this line -->
+```bash
+pnpm brand:build     # regenerates every derivative from that one source
+pnpm check:brand     # masters present, palette clean, wordmark intact
+pnpm verify          # everything else
+```
 
-`superseded/` holds the previous Vibefy artwork, kept for reference. Nothing derives from it.
-
-<!-- vibefycode-copy-lint-allow-block-end -->
+Then look at the result — the gate checks correctness, not whether it looks right. Render the seal
+at 512px and the compact badge at 96px; they are different artwork for a reason. `docs/RUNBOOK.md`
+has the one-liner.
