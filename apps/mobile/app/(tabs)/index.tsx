@@ -1,7 +1,13 @@
 import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
-import { listAlerts, listApps, markAlertRead, type AlertSummary, type AppSummary } from '@vibefycode/api';
+import {
+  listAlerts,
+  listApps,
+  markAlertRead,
+  type AlertSummary,
+  type AppSummary,
+} from '@vibefycode/api';
 import { supabase } from '@/lib/supabase.ts';
 import { palette, scoreColour, spacing } from '@/lib/theme.ts';
 import { Button, Empty, Loading, styles } from '@/lib/ui.tsx';
@@ -33,7 +39,9 @@ export default function ApplicationsScreen() {
       // Surfaced on the screen they open, not left in a tab they have no reason
       // to visit. A push notification only reaches someone who allowed them.
       const alerts = await listAlerts(supabase, 20).catch(() => []);
-      setUrgent(alerts.filter((alert) => alert.severity === 'critical' && !alert.readAt).slice(0, 3));
+      setUrgent(
+        alerts.filter((alert) => alert.severity === 'critical' && !alert.readAt).slice(0, 3),
+      );
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));

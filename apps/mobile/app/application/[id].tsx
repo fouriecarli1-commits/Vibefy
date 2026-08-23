@@ -105,9 +105,7 @@ export default function ApplicationScreen() {
         )}
         <Text style={styles.muted}>
           {app.monitoring_enabled ? 'Monitored' : 'Not monitored'}
-          {app.last_seen_at
-            ? ` · last answered ${new Date(app.last_seen_at).toDateString()}`
-            : ''}
+          {app.last_seen_at ? ` · last answered ${new Date(app.last_seen_at).toDateString()}` : ''}
         </Text>
       </View>
 
@@ -115,8 +113,8 @@ export default function ApplicationScreen() {
         <Text style={styles.h2}>Re-assessment</Text>
         {live ? (
           <Text style={styles.muted}>
-            An assessment is {live.status}. A human reviews the result before you see it — nothing is
-            published before that.
+            An assessment is {live.status}. A human reviews the result before you see it — nothing
+            is published before that.
           </Text>
         ) : (
           <>
@@ -146,7 +144,9 @@ export default function ApplicationScreen() {
                   onPress={() => router.push(`/report/${assessment.assessmentId}`)}
                   style={{ color: palette.link, fontSize: 16 }}
                 >
-                  {assessment.score === null ? 'Not scored' : `${assessment.score.toFixed(1)} / 100`}
+                  {assessment.score === null
+                    ? 'Not scored'
+                    : `${assessment.score.toFixed(1)} / 100`}
                 </Text>
                 <Text style={styles.muted}>{assessment.assessedOn}</Text>
               </View>

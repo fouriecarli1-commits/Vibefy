@@ -24,8 +24,7 @@ export function resolveToken(path: string): string {
   const parts = path.split('.');
   const source: unknown = parts[0] === 'brand' ? tokens : tokens.semantic;
   const value = parts.reduce<unknown>(
-    (node, key) =>
-      node == null ? node : (node as Record<string, unknown>)[key],
+    (node, key) => (node == null ? node : (node as Record<string, unknown>)[key]),
     source,
   );
   if (typeof value !== 'string') throw new Error(`Unknown token path: ${path}`);

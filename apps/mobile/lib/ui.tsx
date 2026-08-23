@@ -24,7 +24,12 @@ export const styles = StyleSheet.create({
   body: { fontSize: 15, color: palette.text, lineHeight: 22 },
   muted: { fontSize: 14, color: palette.textMuted, lineHeight: 20 },
   score: { fontSize: 30, fontWeight: '700' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: spacing.sm },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+  },
   button: {
     backgroundColor: palette.accent,
     borderRadius: radii.sm,

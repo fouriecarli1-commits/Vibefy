@@ -168,10 +168,10 @@ export default async function PortfolioPage() {
                       : ''}
                   </p>
                   <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-                    <span>
-                      Authorisation: {row.authorisation_status ?? 'none'}
-                    </span>
-                    {row.badge_status && <span>{BADGE_LABEL[row.badge_status] ?? row.badge_status}</span>}
+                    <span>Authorisation: {row.authorisation_status ?? 'none'}</span>
+                    {row.badge_status && (
+                      <span>{BADGE_LABEL[row.badge_status] ?? row.badge_status}</span>
+                    )}
                     <span>{row.monitoring_enabled ? 'Monitored' : 'Not monitored'}</span>
                     {row.unread_alerts > 0 && (
                       <span className="text-warn">{row.unread_alerts} unread alerts</span>

@@ -8,7 +8,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { evaluatePolicy, POLICY_NOTE, type PolicyProfile, type PolicySubject } from '../packages/policy/src/index.ts';
+import {
+  evaluatePolicy,
+  POLICY_NOTE,
+  type PolicyProfile,
+  type PolicySubject,
+} from '../packages/policy/src/index.ts';
 
 const STRICT: PolicyProfile = {
   id: 'p1',
@@ -87,7 +92,12 @@ describe('a profile measures, it does not score', () => {
             severity: 'high',
             title: 'Session cookie readable by script',
           },
-          { ruleId: 'UX-01', dimension: 'practicality_ux', severity: 'low', title: 'Small tap target' },
+          {
+            ruleId: 'UX-01',
+            dimension: 'practicality_ux',
+            severity: 'low',
+            title: 'Small tap target',
+          },
         ],
       }),
     );

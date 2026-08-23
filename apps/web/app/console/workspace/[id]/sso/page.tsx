@@ -38,7 +38,10 @@ export default async function SsoPage({ params }: { params: Promise<{ id: string
       </section>
 
       {(connections ?? []).map((connection) => (
-        <section key={connection.id as string} className="space-y-4 rounded-xl border border-line p-5">
+        <section
+          key={connection.id as string}
+          className="space-y-4 rounded-xl border border-line p-5"
+        >
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 className="font-semibold">{String(connection.email_domain)}</h2>
             <span className="text-sm text-muted">

@@ -48,7 +48,10 @@ export default async function WorkspaceLayout({
         <p className="text-muted">{String(organisation.account_type)} workspace</p>
       </header>
 
-      <nav aria-label="Workspace settings" className="flex flex-wrap gap-5 border-b border-line pb-3 text-sm">
+      <nav
+        aria-label="Workspace settings"
+        className="flex flex-wrap gap-5 border-b border-line pb-3 text-sm"
+      >
         {TABS.map((tab) => (
           <Link key={tab.href} href={`/console/workspace/${id}/${tab.href}`}>
             {tab.label}

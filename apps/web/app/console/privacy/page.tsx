@@ -40,7 +40,9 @@ export default async function PrivacyPage() {
 
   const { data: requests } = await supabase
     .from('data_requests')
-    .select('id, request_type, status, details, response, refusal_basis, due_at, created_at, completed_at')
+    .select(
+      'id, request_type, status, details, response, refusal_basis, due_at, created_at, completed_at',
+    )
     .order('created_at', { ascending: false });
 
   const { data: me } = await supabase
@@ -115,7 +117,10 @@ export default async function PrivacyPage() {
               const due = new Date(request.due_at as string);
               const overdue = isOverdue(due, status);
               return (
-                <li key={request.id as string} className="rounded-xl border border-line p-5 text-sm">
+                <li
+                  key={request.id as string}
+                  className="rounded-xl border border-line p-5 text-sm"
+                >
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <span className="font-medium">
                       {String(request.request_type).replace(/_/g, ' ')}

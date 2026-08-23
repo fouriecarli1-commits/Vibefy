@@ -21,10 +21,7 @@ import {
   type ComparableFinding,
 } from '../packages/monitoring/src/index.ts';
 
-function snapshot(
-  id: string,
-  overrides: Partial<AssessmentSnapshot> = {},
-): AssessmentSnapshot {
+function snapshot(id: string, overrides: Partial<AssessmentSnapshot> = {}): AssessmentSnapshot {
   return {
     assessmentId: id,
     assessedAt: new Date('2026-08-01T00:00:00Z'),
@@ -152,7 +149,9 @@ describe('when a change costs a badge', () => {
   it('suspends on a new serious security finding even when the score barely moves', () => {
     const after = snapshot('b', {
       overallScore: 81,
-      findings: [finding({ ruleId: 'SEC-04', severity: 'critical', title: 'API key in client bundle' })],
+      findings: [
+        finding({ ruleId: 'SEC-04', severity: 'critical', title: 'API key in client bundle' }),
+      ],
     });
     const verdict = assessMateriality(computeDrift(snapshot('a'), after));
     expect(verdict.reasons.map((r) => r.rule)).toContain('serious_new_security_finding');
@@ -314,8 +313,20 @@ describe('cadence', () => {
   it('schedules the next run a plan-defined number of days after the last one', () => {
     const due = nextReassessmentDue('certified', new Date('2026-08-01T00:00:00Z'));
     expect(due?.toISOString()).toBe('2026-08-31T00:00:00.000Z');
-    expect(isReassessmentDue('certified', new Date('2026-08-01T00:00:00Z'), new Date('2026-08-30T00:00:00Z'))).toBe(false);
-    expect(isReassessmentDue('certified', new Date('2026-08-01T00:00:00Z'), new Date('2026-09-01T00:00:00Z'))).toBe(true);
+    expect(
+      isReassessmentDue(
+        'certified',
+        new Date('2026-08-01T00:00:00Z'),
+        new Date('2026-08-30T00:00:00Z'),
+      ),
+    ).toBe(false);
+    expect(
+      isReassessmentDue(
+        'certified',
+        new Date('2026-08-01T00:00:00Z'),
+        new Date('2026-09-01T00:00:00Z'),
+      ),
+    ).toBe(true);
   });
 
   it('never calls a never-assessed application overdue', () => {

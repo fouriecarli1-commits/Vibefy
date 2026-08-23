@@ -174,7 +174,9 @@ describe('what a send result means', () => {
     });
     await provider.send({ to: 'a@b.test', subject: 's', text: 't', html: 'h' });
     expect(String(seen?.body)).not.toContain('rs_secret_value');
-    expect(String((seen?.headers as Record<string, string>).authorization)).toContain('rs_secret_value');
+    expect(String((seen?.headers as Record<string, string>).authorization)).toContain(
+      'rs_secret_value',
+    );
   });
 });
 
@@ -346,7 +348,10 @@ describe('the console surfaces what needs action, without being asked', () => {
     const layout = readFileSync(join(process.cwd(), 'apps/web/app/console/layout.tsx'), 'utf8');
     expect(layout).toContain('AlertBanner');
 
-    const banner = readFileSync(join(process.cwd(), 'apps/web/components/alert-banner.tsx'), 'utf8');
+    const banner = readFileSync(
+      join(process.cwd(), 'apps/web/components/alert-banner.tsx'),
+      'utf8',
+    );
     // Only critical. A banner that shows on every visit is one people learn to
     // scroll past, and the one that mattered goes with it.
     expect(banner).toMatch(/\.eq\('severity', 'critical'\)/);

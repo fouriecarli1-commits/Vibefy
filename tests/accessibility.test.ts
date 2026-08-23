@@ -91,12 +91,15 @@ const source: ReportSource = {
 };
 
 describe('the report a customer hands to someone else', () => {
-  it.each(['free', 'paid'] as const)('has no WCAG 2.2 AA violations at the %s tier', async (tier) => {
-    const { violations, passes } = await auditHtml(renderReport(source, tier).html);
-    expect(violations, `\n${explain(violations)}\n`).toEqual([]);
-    // "Zero violations" and "the scan never ran" look identical otherwise.
-    expect(passes).toBeGreaterThan(10);
-  });
+  it.each(['free', 'paid'] as const)(
+    'has no WCAG 2.2 AA violations at the %s tier',
+    async (tier) => {
+      const { violations, passes } = await auditHtml(renderReport(source, tier).html);
+      expect(violations, `\n${explain(violations)}\n`).toEqual([]);
+      // "Zero violations" and "the scan never ran" look identical otherwise.
+      expect(passes).toBeGreaterThan(10);
+    },
+  );
 });
 
 describe('the badge, where it actually lives', () => {

@@ -156,8 +156,11 @@ export async function assembleReportSource(
           name: policyProfile.name,
           description: policyProfile.description,
           minOverallScore:
-            policyProfile.min_overall_score === null ? null : Number(policyProfile.min_overall_score),
-          dimensionFloors: (policyProfile.dimension_floors ?? {}) as PolicyProfile['dimensionFloors'],
+            policyProfile.min_overall_score === null
+              ? null
+              : Number(policyProfile.min_overall_score),
+          dimensionFloors: (policyProfile.dimension_floors ??
+            {}) as PolicyProfile['dimensionFloors'],
           maxOpenSeverity: policyProfile.max_open_severity,
           requireCertification: policyProfile.require_certification,
           requireStoreReadiness: policyProfile.require_store_readiness,

@@ -19,7 +19,11 @@ export interface MonitoringCadence {
 }
 
 export const CADENCE: Readonly<Record<MonitoredPlan, MonitoringCadence>> = {
-  free: { reassessEveryDays: null, livenessEveryMinutes: null, livenessFailuresBeforeSuspension: 0 },
+  free: {
+    reassessEveryDays: null,
+    livenessEveryMinutes: null,
+    livenessFailuresBeforeSuspension: 0,
+  },
   // A one-off report is a photograph, not a subscription. It is not monitored,
   // and the badge it earns expires rather than being maintained.
   one_off: {
@@ -62,10 +66,7 @@ function addDays(from: Date, days: number): Date {
  * An application that has never been assessed is not "overdue" — it is
  * un-started, and the customer asks for the first run themselves.
  */
-export function nextReassessmentDue(
-  plan: MonitoredPlan,
-  lastAssessedAt: Date | null,
-): Date | null {
+export function nextReassessmentDue(plan: MonitoredPlan, lastAssessedAt: Date | null): Date | null {
   const { reassessEveryDays } = cadenceFor(plan);
   if (reassessEveryDays === null || !lastAssessedAt) return null;
   return addDays(lastAssessedAt, reassessEveryDays);

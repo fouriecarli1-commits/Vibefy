@@ -447,9 +447,9 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                     })}
                   </pre>
                   <p className="text-sm text-muted">
-                    The image is served from VibefyCode on every load, never copied to your server. That
-                    is what lets a suspension or a revocation take effect within minutes — and it is
-                    why there is no file to download.
+                    The image is served from VibefyCode on every load, never copied to your server.
+                    That is what lets a suspension or a revocation take effect within minutes — and
+                    it is why there is no file to download.
                   </p>
                 </div>
               )}
@@ -457,8 +457,8 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           ) : licenceIsCurrent ? (
             <p className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
               The Badge Licence is accepted at version {badgeLicenceVersion}. A badge is issued once
-              an assessment has been approved by a reviewer and has met the certification threshold —
-              those are separate gates, and neither can be bought.
+              an assessment has been approved by a reviewer and has met the certification threshold
+              — those are separate gates, and neither can be bought.
             </p>
           ) : (
             <div className="rounded-xl border border-line p-6">
@@ -478,7 +478,8 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                 application, on this domain, until it expires — and sets out what you may not do: no
                 recolouring, no cropping, no altering the wordmark, no displaying it after it
                 expires or is revoked, and never without the link to the verification page. Read it
-                in full: <Link href="/legal/badge-licence">VibefyCode Badge Licence Agreement</Link>.
+                in full: <Link href="/legal/badge-licence">VibefyCode Badge Licence Agreement</Link>
+                .
               </p>
               <div className="mt-5">
                 <ActionForm action={acceptBadgeLicence} submitLabel="Accept the licence">
@@ -548,8 +549,8 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                     ))}
                   </ul>
                   <p className="mt-3 text-muted">
-                    Fix the findings in the report and request a re-assessment. The badge is restored
-                    when a new assessment passes review.
+                    Fix the findings in the report and request a re-assessment. The badge is
+                    restored when a new assessment passes review.
                   </p>
                 </div>
               ) : null}

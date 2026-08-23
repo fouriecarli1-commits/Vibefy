@@ -61,31 +61,34 @@ async function analyse(page: Page): Promise<AxeViolation[]> {
 
 async function analyseFull(page: Page): Promise<AxeRun> {
   await page.addScriptTag({ content: AXE_SOURCE });
-  return page.evaluate(async (tags) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const results = await (window as any).axe.run(document, {
-      runOnly: { type: 'tag', values: tags },
-    });
-    const violations = results.violations.map(
-      (violation: {
-        id: string;
-        impact: string | null;
-        help: string;
-        helpUrl: string;
-        nodes: { target: string[]; failureSummary?: string }[];
-      }) => ({
-        id: violation.id,
-        impact: violation.impact,
-        help: violation.help,
-        helpUrl: violation.helpUrl,
-        nodes: violation.nodes.slice(0, 4).map((node) => ({
-          target: node.target,
-          summary: (node.failureSummary ?? '').split('\n').slice(0, 3).join(' '),
-        })),
-      }),
-    );
-    return { violations, passes: results.passes.length };
-  }, AXE_TAGS as unknown as string[]);
+  return page.evaluate(
+    async (tags) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const results = await (window as any).axe.run(document, {
+        runOnly: { type: 'tag', values: tags },
+      });
+      const violations = results.violations.map(
+        (violation: {
+          id: string;
+          impact: string | null;
+          help: string;
+          helpUrl: string;
+          nodes: { target: string[]; failureSummary?: string }[];
+        }) => ({
+          id: violation.id,
+          impact: violation.impact,
+          help: violation.help,
+          helpUrl: violation.helpUrl,
+          nodes: violation.nodes.slice(0, 4).map((node) => ({
+            target: node.target,
+            summary: (node.failureSummary ?? '').split('\n').slice(0, 3).join(' '),
+          })),
+        }),
+      );
+      return { violations, passes: results.passes.length };
+    },
+    AXE_TAGS as unknown as string[],
+  );
 }
 
 /**
@@ -125,7 +128,9 @@ export function describe(violations: readonly AxeViolation[]): string {
     .map(
       (violation) =>
         `${violation.id} (${violation.impact ?? 'unknown'}): ${violation.help}\n` +
-        violation.nodes.map((node) => `    at ${node.target.join(' ')} — ${node.summary}`).join('\n') +
+        violation.nodes
+          .map((node) => `    at ${node.target.join(' ')} — ${node.summary}`)
+          .join('\n') +
         `\n    ${violation.helpUrl}`,
     )
     .join('\n\n');

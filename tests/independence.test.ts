@@ -207,7 +207,9 @@ describe('what suspends a badge cannot see money either', () => {
     for (const term of forbidden) {
       expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
     }
-    expect(source, `${file} must not import billing`).not.toMatch(/from ['"]@vibefycode\/(billing)/);
+    expect(source, `${file} must not import billing`).not.toMatch(
+      /from ['"]@vibefycode\/(billing)/,
+    );
   });
 
   it('does not let the schedule reach the verdict', () => {

@@ -76,16 +76,16 @@ tested; it is the inner half of that boundary, not a replacement for it.
 
 ## M2 — Reports & payments · complete, blocked only on a Stripe account
 
-| Definition of Done                                   | Status                                                                                                                                              |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview                                                                                  |
-| 2. Tests pass, including the four mandatory areas    | ✅ 325 tests. Payments now have their own suite, run against a fake that signs with a real HMAC                                                     |
+| Definition of Done                                   | Status                                                                                                                                                      |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview                                                                                          |
+| 2. Tests pass, including the four mandatory areas    | ✅ 325 tests. Payments now have their own suite, run against a fake that signs with a real HMAC                                                             |
 | 3. The independence test passes                      | ✅ Extended: `packages/rubric` may not depend on `@vibefycode/billing`, `@vibefycode/report` or `stripe`, and a report renders the same score at both tiers |
-| 4. RLS verified                                      | ✅ Extended to `assessment_requests` and `billing_events`                                                                                           |
-| 5. No secrets in the repo                            | ✅                                                                                                                                                  |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ The refund policy is summarised on the billing page and linked in full                                                                           |
-| 7. Docs updated                                      | ✅ 55 decisions recorded                                                                                                                            |
-| 8. Cost per run recorded and visible                 | ✅ Unchanged, and the per-run ceiling now comes from the customer's entitlement                                                                     |
+| 4. RLS verified                                      | ✅ Extended to `assessment_requests` and `billing_events`                                                                                                   |
+| 5. No secrets in the repo                            | ✅                                                                                                                                                          |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ The refund policy is summarised on the billing page and linked in full                                                                                   |
+| 7. Docs updated                                      | ✅ 55 decisions recorded                                                                                                                                    |
+| 8. Cost per run recorded and visible                 | ✅ Unchanged, and the per-run ceiling now comes from the customer's entitlement                                                                             |
 
 ### What M2 built
 
@@ -114,16 +114,16 @@ built and tested; it has never spoken to Stripe, because there is nothing to spe
 
 ## M3 — Badge system · complete
 
-| Definition of Done | Status |
-|---|---|
-| 1. Works end-to-end locally with one command | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview, and the `verify.` subdomain is a deployment concern |
-| 2. Tests pass, including the four mandatory areas | ✅ 368 tests. Badge integrity now has 43 of its own, covering forgery, tampering, rotation and every lifecycle transition |
-| 3. The independence test passes | ✅ Unchanged |
-| 4. RLS verified | ✅ The public verification surface is a view granted to `anon`; the `badges` table itself stays closed |
-| 5. No secrets in the repo | ✅ The signing key is generated to stdout and never to a file |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ The Badge Licence is accepted in-product, append-only, with version, hash, IP and user agent |
-| 7. Docs updated | ✅ 68 decisions recorded |
-| 8. Cost per run recorded and visible | ✅ Unchanged |
+| Definition of Done                                   | Status                                                                                                                    |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview, and the `verify.` subdomain is a deployment concern   |
+| 2. Tests pass, including the four mandatory areas    | ✅ 368 tests. Badge integrity now has 43 of its own, covering forgery, tampering, rotation and every lifecycle transition |
+| 3. The independence test passes                      | ✅ Unchanged                                                                                                              |
+| 4. RLS verified                                      | ✅ The public verification surface is a view granted to `anon`; the `badges` table itself stays closed                    |
+| 5. No secrets in the repo                            | ✅ The signing key is generated to stdout and never to a file                                                             |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ The Badge Licence is accepted in-product, append-only, with version, hash, IP and user agent                           |
+| 7. Docs updated                                      | ✅ 68 decisions recorded                                                                                                  |
+| 8. Cost per run recorded and visible                 | ✅ Unchanged                                                                                                              |
 
 ### What M3 built
 
@@ -158,16 +158,16 @@ the compromise path is not automated yet.
 
 ## M4 — Continuous monitoring ✅
 
-| Gate | Status |
-| --- | --- |
-| 1. `pnpm verify` green | ✅ 417 tests, six gates |
-| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Drift and regression are badge tests: 26 unit cases and 18 against the database |
-| 3. Every AI-written claim evidence-bound | ✅ Unchanged — monitoring adds no model calls |
-| 4. RLS verified | ✅ `drift_reports` and `alerts` are member-scoped; the only writable column for a customer is `alerts.read_at` |
-| 5. No secrets in the repo | ✅ Unchanged |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ Unchanged |
-| 7. Docs updated | ✅ 85 decisions recorded |
-| 8. Cost per run recorded and visible | ✅ A scheduled re-assessment carries the same per-run ceiling as a requested one |
+| Gate                                                             | Status                                                                                                         |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1. `pnpm verify` green                                           | ✅ 417 tests, six gates                                                                                        |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Drift and regression are badge tests: 26 unit cases and 18 against the database                             |
+| 3. Every AI-written claim evidence-bound                         | ✅ Unchanged — monitoring adds no model calls                                                                  |
+| 4. RLS verified                                                  | ✅ `drift_reports` and `alerts` are member-scoped; the only writable column for a customer is `alerts.read_at` |
+| 5. No secrets in the repo                                        | ✅ Unchanged                                                                                                   |
+| 6. Legal artefacts surfaced with acceptance recorded             | ✅ Unchanged                                                                                                   |
+| 7. Docs updated                                                  | ✅ 85 decisions recorded                                                                                       |
+| 8. Cost per run recorded and visible                             | ✅ A scheduled re-assessment carries the same per-run ceiling as a requested one                               |
 
 ### What M4 built
 
@@ -205,16 +205,16 @@ than the guarded dispatcher. Registered in OPEN_ITEMS.md.
 
 ## M5 — Agency & organisation surfaces ✅
 
-| Gate | Status |
-| --- | --- |
-| 1. `pnpm verify` green | ✅ 456 tests, six gates |
-| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Seats, invitation tokens, workspace isolation and what an audit export may not contain |
-| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
-| 4. RLS verified | ✅ Five new tables, all forced; invitations are admin-only, exports are admin-only, the portfolio is a `security_invoker` view |
-| 5. No secrets in the repo | ✅ Only invitation token *hashes* are stored, and no identity-provider certificate ever reaches us |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ Unchanged |
-| 7. Docs updated | ✅ 103 decisions recorded |
-| 8. Cost per run recorded and visible | ✅ Unchanged |
+| Gate                                                             | Status                                                                                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1. `pnpm verify` green                                           | ✅ 456 tests, six gates                                                                                                        |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Seats, invitation tokens, workspace isolation and what an audit export may not contain                                      |
+| 3. Every AI-written claim evidence-bound                         | ✅ Unchanged                                                                                                                   |
+| 4. RLS verified                                                  | ✅ Five new tables, all forced; invitations are admin-only, exports are admin-only, the portfolio is a `security_invoker` view |
+| 5. No secrets in the repo                                        | ✅ Only invitation token _hashes_ are stored, and no identity-provider certificate ever reaches us                             |
+| 6. Legal artefacts surfaced with acceptance recorded             | ✅ Unchanged                                                                                                                   |
+| 7. Docs updated                                                  | ✅ 103 decisions recorded                                                                                                      |
+| 8. Cost per run recorded and visible                             | ✅ Unchanged                                                                                                                   |
 
 ### What M5 built
 
@@ -256,16 +256,16 @@ score-and-dimension rules only. Registered in OPEN_ITEMS.md.
 
 ## M6 — Native mobile app ✅
 
-| Gate | Status |
-| --- | --- |
-| 1. `pnpm verify` green | ✅ 472 tests, six gates, ten workspace projects typechecked |
+| Gate                                                             | Status                                                                                                                                            |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. `pnpm verify` green                                           | ✅ 472 tests, six gates, ten workspace projects typechecked                                                                                       |
 | 2. Tests for money, badges, authorisation-to-test, personal data | ✅ The one write that spends money checks the authorisation gate before it queues; push delivery is tested for scope, duplication and dead tokens |
-| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
-| 4. RLS verified | ✅ A device token belongs to one person and only that person; delivery records are platform-only and append-only |
-| 5. No secrets in the repo | ✅ The app ships the anon key and nothing else — no service-role key ever reaches a phone |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ There is no mobile sign-up, precisely so consent is recorded where the wording is shown in full |
-| 7. Docs updated | ✅ 118 decisions recorded |
-| 8. Cost per run recorded and visible | ✅ A re-test requested from a phone carries the same per-run ceiling as one requested in the console |
+| 3. Every AI-written claim evidence-bound                         | ✅ Unchanged                                                                                                                                      |
+| 4. RLS verified                                                  | ✅ A device token belongs to one person and only that person; delivery records are platform-only and append-only                                  |
+| 5. No secrets in the repo                                        | ✅ The app ships the anon key and nothing else — no service-role key ever reaches a phone                                                         |
+| 6. Legal artefacts surfaced with acceptance recorded             | ✅ There is no mobile sign-up, precisely so consent is recorded where the wording is shown in full                                                |
+| 7. Docs updated                                                  | ✅ 118 decisions recorded                                                                                                                         |
+| 8. Cost per run recorded and visible                             | ✅ A re-test requested from a phone carries the same per-run ceiling as one requested in the console                                              |
 
 ### What M6 built
 
@@ -294,16 +294,16 @@ that needs the bundle identifier and the Apple/Google accounts, which follow the
 
 ## M7 — Public directory ✅
 
-| Gate | Status |
-| --- | --- |
-| 1. `pnpm verify` green | ✅ 495 tests, six gates |
-| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Ordering is asserted identical with and without a paid relationship; the public view is asserted to expose nothing beyond the verification page |
-| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
-| 4. RLS verified | ✅ The listing table is member-only; the directory view is the one thing `anon` may read, and it exposes only published columns |
-| 5. No secrets in the repo | ✅ Unchanged |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ The Badge Licence gained a directory clause and bumped to 1.1.0-draft; the console now asks for re-acceptance rather than carrying the old one forward |
-| 7. Docs updated | ✅ 129 decisions recorded |
-| 8. Cost per run recorded and visible | ✅ Unchanged |
+| Gate                                                             | Status                                                                                                                                                    |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. `pnpm verify` green                                           | ✅ 495 tests, six gates                                                                                                                                   |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Ordering is asserted identical with and without a paid relationship; the public view is asserted to expose nothing beyond the verification page        |
+| 3. Every AI-written claim evidence-bound                         | ✅ Unchanged                                                                                                                                              |
+| 4. RLS verified                                                  | ✅ The listing table is member-only; the directory view is the one thing `anon` may read, and it exposes only published columns                           |
+| 5. No secrets in the repo                                        | ✅ Unchanged                                                                                                                                              |
+| 6. Legal artefacts surfaced with acceptance recorded             | ✅ The Badge Licence gained a directory clause and bumped to 1.1.0-draft; the console now asks for re-acceptance rather than carrying the old one forward |
+| 7. Docs updated                                                  | ✅ 129 decisions recorded                                                                                                                                 |
+| 8. Cost per run recorded and visible                             | ✅ Unchanged                                                                                                                                              |
 
 ### What M7 built
 
@@ -337,20 +337,20 @@ the ordering note both say so, and the type system would need changing to allow 
 ## Governance operations — closing what the schema only promised ✅
 
 Not a numbered milestone. Four things the brief specifies that earlier milestones recorded the
-*intent* of and nothing carried out. They are listed here because a promise with no mechanism
+_intent_ of and nothing carried out. They are listed here because a promise with no mechanism
 behind it is the thing this whole product exists to find in other people's software — and two of
 them were being claimed, in writing, in the published privacy notice.
 
-| Gate | Status |
-| --- | --- |
-| 1. `pnpm verify` green | ✅ 525 tests, six gates |
-| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Personal data is the whole of this: retention deletion, data-subject rights, and the privacy of both |
-| 3. Every AI-written claim evidence-bound | ✅ Unchanged |
-| 4. RLS verified | ✅ A spend pause is platform-only; a deletion record is visible to the workspace it belongs to; a data-subject request is private to the person who made it |
-| 5. No secrets in the repo | ✅ Unchanged |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ No document changed — what changed is that two of their claims became true |
-| 7. Docs updated | ✅ 142 decisions recorded |
-| 8. Cost per run recorded and visible | ✅ The dashboard now shows the ceilings and whether one has stopped anything |
+| Gate                                                             | Status                                                                                                                                                      |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. `pnpm verify` green                                           | ✅ 525 tests, six gates                                                                                                                                     |
+| 2. Tests for money, badges, authorisation-to-test, personal data | ✅ Personal data is the whole of this: retention deletion, data-subject rights, and the privacy of both                                                     |
+| 3. Every AI-written claim evidence-bound                         | ✅ Unchanged                                                                                                                                                |
+| 4. RLS verified                                                  | ✅ A spend pause is platform-only; a deletion record is visible to the workspace it belongs to; a data-subject request is private to the person who made it |
+| 5. No secrets in the repo                                        | ✅ Unchanged                                                                                                                                                |
+| 6. Legal artefacts surfaced with acceptance recorded             | ✅ No document changed — what changed is that two of their claims became true                                                                               |
+| 7. Docs updated                                                  | ✅ 142 decisions recorded                                                                                                                                   |
+| 8. Cost per run recorded and visible                             | ✅ The dashboard now shows the ceilings and whether one has stopped anything                                                                                |
 
 ### What it built
 

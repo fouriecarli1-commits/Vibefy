@@ -32,8 +32,8 @@ export default async function ReviewQueuePage() {
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Review queue</h1>
         <p className="text-muted">
-          This queue is for VibefyCode reviewers. Row-level security means you would see nothing here in
-          any case — this message just explains why.
+          This queue is for VibefyCode reviewers. Row-level security means you would see nothing
+          here in any case — this message just explains why.
         </p>
       </div>
     );

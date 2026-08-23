@@ -33,7 +33,9 @@ const DIMENSIONS: readonly DirectoryDimension[] = [
 ];
 
 export function isSortKey(value: string): value is SortKey {
-  return value === 'score' || value === 'recent' || (DIMENSIONS as readonly string[]).includes(value);
+  return (
+    value === 'score' || value === 'recent' || (DIMENSIONS as readonly string[]).includes(value)
+  );
 }
 
 function dimensionScore(entry: RankableFields, dimension: DirectoryDimension): number {
@@ -53,11 +55,7 @@ function comparatorFor(sort: SortKey): (a: RankableFields, b: RankableFields) =>
 }
 
 function normalise(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim();
+  return text.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').trim();
 }
 
 /**

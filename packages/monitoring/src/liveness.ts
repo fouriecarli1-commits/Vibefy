@@ -63,7 +63,8 @@ export function applyProbe(
       suspendBadge: false,
       // Only a suspension we caused is ours to reverse. A badge suspended for a
       // regression, a lapsed subscription or a licence breach stays down.
-      restoreBadge: state.badgeStatus === 'suspended' && state.consecutiveFailures >= failuresBeforeSuspension,
+      restoreBadge:
+        state.badgeStatus === 'suspended' && state.consecutiveFailures >= failuresBeforeSuspension,
       reason: null,
     };
   }

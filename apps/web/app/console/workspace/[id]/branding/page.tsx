@@ -27,9 +27,9 @@ export default async function BrandingPage({ params }: { params: Promise<{ id: s
         <p className="mt-2 text-muted">
           Your cover block goes on reports you hand to your clients: your name, your logo, your
           contact line. What it does not do is change who performed the assessment. Every report
-          still states that VibefyCode carried out the work against the published rubric, and that you
-          did not score the application and cannot change what it scored. The VibefyCode marks in the
-          document are the supplied marks, unaltered.
+          still states that VibefyCode carried out the work against the published rubric, and that
+          you did not score the application and cannot change what it scored. The VibefyCode marks
+          in the document are the supplied marks, unaltered.
         </p>
         <p className="mt-2 text-muted">
           Your accent colour is used only where it is legible on the report’s background. If it is

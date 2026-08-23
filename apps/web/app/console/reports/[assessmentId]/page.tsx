@@ -135,7 +135,9 @@ export default async function ReportPage({
                     due {new Date(appeal.due_at as string).toISOString().slice(0, 10)}
                   </span>
                 </div>
-                {appeal.resolution && <p className="mt-2 text-muted">{String(appeal.resolution)}</p>}
+                {appeal.resolution && (
+                  <p className="mt-2 text-muted">{String(appeal.resolution)}</p>
+                )}
               </li>
             ))}
           </ul>

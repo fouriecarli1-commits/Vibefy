@@ -86,7 +86,9 @@ export async function listAssessments(
 ): Promise<AssessmentSummary[]> {
   const { data, error } = await client
     .from('assessment_history')
-    .select('assessment_id, status, overall_score, rubric_version, assessed_at, score_delta, material_regression')
+    .select(
+      'assessment_id, status, overall_score, rubric_version, assessed_at, score_delta, material_regression',
+    )
     .eq('app_id', appId)
     .limit(20);
   if (error) throw new Error(error.message);
@@ -169,12 +171,18 @@ export interface ReTestRefusal {
  */
 export async function requestReTest(
   client: SupabaseClient,
-  input: { appId: string; organisationId: string; userId: string; depth: string; plan: string; maxRunCostUsd: number },
+  input: {
+    appId: string;
+    organisationId: string;
+    userId: string;
+    depth: string;
+    plan: string;
+    maxRunCostUsd: number;
+  },
 ): Promise<{ requestId: string } | ReTestRefusal> {
-  const { data: authorised, error: authError } = await client.rpc(
-    'app_is_authorised_for_testing',
-    { target_app: input.appId },
-  );
+  const { data: authorised, error: authError } = await client.rpc('app_is_authorised_for_testing', {
+    target_app: input.appId,
+  });
   if (authError) return { refused: true, reason: authError.message };
   if (authorised !== true) {
     return {

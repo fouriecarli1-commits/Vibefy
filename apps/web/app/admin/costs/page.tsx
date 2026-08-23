@@ -32,8 +32,8 @@ export default async function CostsPage() {
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Unit economics</h1>
         <p className="text-muted">
-          This dashboard is for VibefyCode administrators. Row-level security means the underlying rows
-          are unreadable to anyone else in any case.
+          This dashboard is for VibefyCode administrators. Row-level security means the underlying
+          rows are unreadable to anyone else in any case.
         </p>
       </div>
     );

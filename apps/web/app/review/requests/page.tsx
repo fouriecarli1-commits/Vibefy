@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { daysRemaining, isOverdue, RESPONSE_DAYS, type RequestStatus } from '@vibefycode/governance';
+import {
+  daysRemaining,
+  isOverdue,
+  RESPONSE_DAYS,
+  type RequestStatus,
+} from '@vibefycode/governance';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { resolveDataRequest } from '@/app/console/privacy/actions';
@@ -23,7 +28,9 @@ export default async function ReviewRequestsPage() {
 
   const { data: requests } = await supabase
     .from('data_requests')
-    .select('id, user_id, request_type, status, details, response, refusal_basis, due_at, created_at')
+    .select(
+      'id, user_id, request_type, status, details, response, refusal_basis, due_at, created_at',
+    )
     .order('due_at');
 
   const open = (requests ?? []).filter(

@@ -80,7 +80,9 @@ export interface Drift {
   readonly resolvedFindings: readonly FindingChange[];
   readonly persistingFindings: readonly FindingChange[];
   /** Severity raised on a finding that was already there. */
-  readonly escalatedFindings: readonly (FindingChange & { readonly wasSeverity: MonitoredSeverity })[];
+  readonly escalatedFindings: readonly (FindingChange & {
+    readonly wasSeverity: MonitoredSeverity;
+  })[];
   readonly certificationBefore: boolean;
   readonly certificationAfter: boolean;
   readonly certificationLost: boolean;
@@ -123,5 +125,4 @@ const _snapshotIsClean: FreeOfCommercialInfluence<AssessmentSnapshot> = true;
 const _findingIsClean: FreeOfCommercialInfluence<ComparableFinding> = true;
 const _driftIsClean: FreeOfCommercialInfluence<Drift> = true;
 
-export const MONITORING_BOUNDARY_ASSERTED =
-  _snapshotIsClean && _findingIsClean && _driftIsClean;
+export const MONITORING_BOUNDARY_ASSERTED = _snapshotIsClean && _findingIsClean && _driftIsClean;

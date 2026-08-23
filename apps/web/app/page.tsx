@@ -14,9 +14,9 @@ export default function HomePage() {
           The trust layer for <span className="vibefycode-gradient-text">AI-built apps</span>
         </h1>
         <p className="max-w-2xl text-lg text-muted">
-          You built it fast. VibefyCode tells you — with evidence — what a first real user, an app store
-          reviewer, or someone poking at your API would find. Every finding carries a screenshot, a
-          trace or an HTTP exchange. Nothing we cannot evidence gets published.
+          You built it fast. VibefyCode tells you — with evidence — what a first real user, an app
+          store reviewer, or someone poking at your API would find. Every finding carries a
+          screenshot, a trace or an HTTP exchange. Nothing we cannot evidence gets published.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
           <Link href="/sign-up" className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white">

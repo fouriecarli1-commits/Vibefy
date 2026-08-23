@@ -65,8 +65,8 @@ export async function AlertBanner() {
         })}
       </ul>
       <p className="text-sm text-muted">
-        <Link href="/console/alerts">All alerts</Link> · we email these too, so there is a record
-        of the notice.
+        <Link href="/console/alerts">All alerts</Link> · we email these too, so there is a record of
+        the notice.
       </p>
     </section>
   );

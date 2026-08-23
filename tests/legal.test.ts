@@ -36,10 +36,7 @@ describe('the drafted set', () => {
   });
 
   it('marks every document as a draft pending counsel', () => {
-    for (const [file, entry] of Object.entries(registry.documents) as [
-      string,
-      RegistryEntry,
-    ][]) {
+    for (const [file, entry] of Object.entries(registry.documents) as [string, RegistryEntry][]) {
       expect(entry.isDraft, `${file} lost its DRAFT header`).toBe(true);
       expect(entry.version, `${file} has no version`).toBeTruthy();
     }

@@ -9,11 +9,11 @@
 
 ## What we set
 
-| Cookie            | Purpose                            | Type                             | Lifetime           |
-| ----------------- | ---------------------------------- | -------------------------------- | ------------------ |
-| `sb-*-auth-token` | Keeps you signed in                | Strictly necessary               | Session, refreshed |
-| `vibefycode-consent`  | Remembers your cookie choice       | Strictly necessary               | 12 months          |
-| Analytics cookies | Understanding which pages are used | **Optional — only with consent** | 14 months          |
+| Cookie               | Purpose                            | Type                             | Lifetime           |
+| -------------------- | ---------------------------------- | -------------------------------- | ------------------ |
+| `sb-*-auth-token`    | Keeps you signed in                | Strictly necessary               | Session, refreshed |
+| `vibefycode-consent` | Remembers your cookie choice       | Strictly necessary               | 12 months          |
+| Analytics cookies    | Understanding which pages are used | **Optional — only with consent** | 14 months          |
 
 We do not set advertising cookies, and we do not share data with advertising networks.
 

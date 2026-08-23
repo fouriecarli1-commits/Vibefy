@@ -41,12 +41,21 @@ export function ScoreTrend({ points }: { points: readonly TrendPoint[] }) {
           aria-hidden="true"
           preserveAspectRatio="none"
         >
-          <path d={path} fill="none" stroke="currentColor" strokeWidth="2" className="text-accent" />
+          <path
+            d={path}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="text-accent"
+          />
         </svg>
       )}
       <ol className="space-y-2 text-sm">
         {points.map((point) => (
-          <li key={point.assessmentId} className="flex flex-wrap items-baseline justify-between gap-3">
+          <li
+            key={point.assessmentId}
+            className="flex flex-wrap items-baseline justify-between gap-3"
+          >
             <span className="font-medium">{point.score.toFixed(1)} / 100</span>
             <span className="text-muted">
               {new Date(point.assessedAt).toISOString().slice(0, 10)}

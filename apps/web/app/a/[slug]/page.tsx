@@ -141,8 +141,8 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
                 the disclosure wherever a rating is displayed, and two wordings is how
                 the softer one ends up where people actually look. */}
             {MARKETING_CLIENT_DISCLOSURE} Scoring receives a data structure with no field for it,
-            and a test in our build pipeline asserts a maximally-paying customer and a free one
-            with identical applications score identically. See the{' '}
+            and a test in our build pipeline asserts a maximally-paying customer and a free one with
+            identical applications score identically. See the{' '}
             <Link href="/legal/rating-methodology-and-independence">independence policy</Link>.
           </p>
         </section>
@@ -180,8 +180,9 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
         </h2>
         <p className="max-w-prose text-muted">
           You do not have to take our word for it. The payload below is signed with Ed25519, and the
-          public key is published at <code>{`${verifyOrigin}/.well-known/vibefycode-badge-key`}</code>.
-          Any JOSE library can verify it without contacting us.
+          public key is published at{' '}
+          <code>{`${verifyOrigin}/.well-known/vibefycode-badge-key`}</code>. Any JOSE library can
+          verify it without contacting us.
         </p>
         <p className="max-w-prose text-sm text-muted">
           One thing that signature does <strong>not</strong> tell you: whether the badge is still
@@ -206,8 +207,8 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
       <footer className="border-t border-line pt-6 text-sm text-muted">
         <p>
           Reports are prepared for the customer. No third party — including investors, acquirers or
-          end users — may rely on a VibefyCode assessment. If you believe this badge is being displayed
-          improperly, <Link href="/legal/ip-takedown">tell us</Link>.
+          end users — may rely on a VibefyCode assessment. If you believe this badge is being
+          displayed improperly, <Link href="/legal/ip-takedown">tell us</Link>.
         </p>
       </footer>
     </article>

@@ -42,16 +42,20 @@ export default function SubmitScreen() {
     if (!organisationId) return setError('No workspace found for your account.');
     if (name.trim().length < 2) return setError('Give the application a name.');
     if (!/^https:\/\//i.test(url.trim())) {
-      return setError('The URL must start with https://. We do not assess applications over plain HTTP.');
+      return setError(
+        'The URL must start with https://. We do not assess applications over plain HTTP.',
+      );
     }
 
     setBusy(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const slug = `${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
+    const slug = `${name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .slice(0, 40)}-${Math.random().toString(36).slice(2, 8)}`;
 
     const { data, error: cause } = await supabase
       .from('apps')
@@ -76,15 +80,13 @@ export default function SubmitScreen() {
       <View style={styles.card}>
         <Text style={styles.h2}>Before anything runs</Text>
         <Text style={styles.muted}>
-          Adding an application here records it. Nothing is tested until you prove, in the console on
-          a computer, that you control the host and are entitled to authorise testing of it. That
+          Adding an application here records it. Nothing is tested until you prove, in the console
+          on a computer, that you control the host and are entitled to authorise testing of it. That
           step is a warranty, and it is not one to give from a phone.
         </Text>
       </View>
 
-      {workspaceName && (
-        <Text style={styles.muted}>Adding to {workspaceName}.</Text>
-      )}
+      {workspaceName && <Text style={styles.muted}>Adding to {workspaceName}.</Text>}
 
       <View style={{ gap: 6 }}>
         <Text style={styles.muted}>Name</Text>

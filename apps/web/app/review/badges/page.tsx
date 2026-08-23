@@ -33,8 +33,8 @@ export default async function BadgeRegisterPage() {
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Issued badges</h1>
         <p className="text-muted">
-          This register is for VibefyCode reviewers. Row-level security means you would see nothing here
-          in any case.
+          This register is for VibefyCode reviewers. Row-level security means you would see nothing
+          here in any case.
         </p>
       </div>
     );

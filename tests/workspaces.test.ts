@@ -103,11 +103,18 @@ describe('invitation tokens', () => {
   });
 
   it('refuses a used, withdrawn, expired or unknown invitation', () => {
-    const base = { email: 'a@example.test', acceptedAt: null, revokedAt: null, expiresAt: new Date('2030-01-01') };
+    const base = {
+      email: 'a@example.test',
+      acceptedAt: null,
+      revokedAt: null,
+      expiresAt: new Date('2030-01-01'),
+    };
     expect(canAccept(null, 'a@example.test').ok).toBe(false);
     expect(canAccept({ ...base, acceptedAt: new Date() }, 'a@example.test').ok).toBe(false);
     expect(canAccept({ ...base, revokedAt: new Date() }, 'a@example.test').ok).toBe(false);
-    expect(canAccept({ ...base, expiresAt: new Date('2020-01-01') }, 'a@example.test').ok).toBe(false);
+    expect(canAccept({ ...base, expiresAt: new Date('2020-01-01') }, 'a@example.test').ok).toBe(
+      false,
+    );
   });
 });
 
@@ -185,17 +192,19 @@ describe('who may manage a workspace', () => {
     );
 
     const asOwner = await actingAs(db, { userId: owner.userId }, async (client) => {
-      const { rows } = await client.query('select id from public.invitations where organisation_id = $1', [
-        workspaceId,
-      ]);
+      const { rows } = await client.query(
+        'select id from public.invitations where organisation_id = $1',
+        [workspaceId],
+      );
       return rows.length;
     });
     expect(asOwner).toBeGreaterThan(0);
 
     const asMember = await actingAs(db, { userId: colleague.userId }, async (client) => {
-      const { rows } = await client.query('select id from public.invitations where organisation_id = $1', [
-        workspaceId,
-      ]);
+      const { rows } = await client.query(
+        'select id from public.invitations where organisation_id = $1',
+        [workspaceId],
+      );
       return rows.length;
     });
     // A member cannot see who else was invited — that is an administrative fact.

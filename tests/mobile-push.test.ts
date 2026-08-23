@@ -114,9 +114,9 @@ describe('what is worth interrupting someone for', () => {
   });
 
   it('batches at Expo’s limit', () => {
-    expect(batch(Array.from({ length: 250 }, (_, index) => index)).map((part) => part.length)).toEqual([
-      100, 100, 50,
-    ]);
+    expect(
+      batch(Array.from({ length: 250 }, (_, index) => index)).map((part) => part.length),
+    ).toEqual([100, 100, 50]);
     expect(batch([])).toEqual([]);
   });
 });
@@ -192,10 +192,10 @@ describe('the delivery sweep', () => {
 
     await sweepAlertPush(pool, async (messages) => messages.map(() => ({ status: 'ok' as const })));
 
-    const { rows } = await db.query<{ delivered_at: string | null; delivery_channel: string | null }>(
-      'select delivered_at, delivery_channel from public.alerts where id = $1',
-      [alertId],
-    );
+    const { rows } = await db.query<{
+      delivered_at: string | null;
+      delivery_channel: string | null;
+    }>('select delivered_at, delivery_channel from public.alerts where id = $1', [alertId]);
     expect(rows[0]!.delivered_at).not.toBeNull();
     expect(rows[0]!.delivery_channel).toBe('push');
   });
@@ -254,7 +254,9 @@ describe('the delivery sweep', () => {
       [alertId, deviceId],
     );
     await expect(
-      db.query(`update public.alert_deliveries set status = 'failed' where alert_id = $1`, [alertId]),
+      db.query(`update public.alert_deliveries set status = 'failed' where alert_id = $1`, [
+        alertId,
+      ]),
     ).rejects.toThrow(/append-only/i);
   });
 

@@ -10,10 +10,13 @@
 ## 1. What is licensed
 
 <!-- vibefycode-copy-lint-allow-block: a licence that renames its own mark has to name the old one, or the customer cannot tell what changed -->
+
 > **This version renames the Mark.** Until version 1.1.0-draft the licensed mark read "Verified by
 > Vibefy". It now reads **"Verified by VibefyCode"**, and the badge device has been redrawn from new
 > supplied artwork.
+
 <!-- vibefycode-copy-lint-allow-block-end --> That is a change to the thing being licensed, not a clarification, so an
+
 > acceptance of an earlier version does not carry forward: no badge issues or renews until this
 > version is accepted.
 

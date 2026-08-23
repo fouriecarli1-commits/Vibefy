@@ -56,8 +56,8 @@ export default async function VerifyPage({
         <h1 className="text-3xl font-bold tracking-tight">Check a badge</h1>
         <p className="text-muted">
           Paste the badge identifier from a "Verified by VibefyCode" mark — it is the part before{' '}
-          <code>.svg</code> in the image URL — and this will tell you what VibefyCode actually attested,
-          and whether it still stands.
+          <code>.svg</code> in the image URL — and this will tell you what VibefyCode actually
+          attested, and whether it still stands.
         </p>
       </header>
 
@@ -135,8 +135,8 @@ export default async function VerifyPage({
               <code>{record.certified_origin}</code>
             </p>
             <p className="mt-2 text-sm text-muted">
-              A VibefyCode badge on any other website is being displayed outside its licence, whatever
-              its signature says.
+              A VibefyCode badge on any other website is being displayed outside its licence,
+              whatever its signature says.
             </p>
           </section>
         </div>
@@ -145,9 +145,9 @@ export default async function VerifyPage({
       <section className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
         <h2 className="font-semibold text-ink">Checking it without us</h2>
         <p className="mt-2">
-          The signing keys are published at <code>/.well-known/vibefycode-badge-key</code> as a JWKS,
-          and each badge's signed payload is at <code>/api/badge/&lt;identifier&gt;</code>. Any
-          Ed25519 implementation can verify it offline. The response documents the exact
+          The signing keys are published at <code>/.well-known/vibefycode-badge-key</code> as a
+          JWKS, and each badge's signed payload is at <code>/api/badge/&lt;identifier&gt;</code>.
+          Any Ed25519 implementation can verify it offline. The response documents the exact
           canonicalisation, because two implementations must produce identical bytes or the
           signature check is meaningless.
         </p>

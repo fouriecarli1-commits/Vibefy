@@ -72,9 +72,13 @@ export function evaluatePolicy(profile: PolicyProfile, subject: PolicySubject): 
 
   if (profile.maxOpenSeverity !== null) {
     const ceiling = SEVERITY_RANK[profile.maxOpenSeverity];
-    const over = subject.openFindings.filter((finding) => SEVERITY_RANK[finding.severity] > ceiling);
+    const over = subject.openFindings.filter(
+      (finding) => SEVERITY_RANK[finding.severity] > ceiling,
+    );
     if (over.length > 0) {
-      const worst = over.reduce((a, b) => (SEVERITY_RANK[b.severity] > SEVERITY_RANK[a.severity] ? b : a));
+      const worst = over.reduce((a, b) =>
+        SEVERITY_RANK[b.severity] > SEVERITY_RANK[a.severity] ? b : a,
+      );
       failures.push({
         rule: 'max_open_severity',
         explanation: `${over.length} open finding${over.length === 1 ? '' : 's'} above the permitted ${profile.maxOpenSeverity} ceiling, the worst being a ${worst.severity}: ${worst.title}.`,

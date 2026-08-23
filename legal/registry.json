@@ -40,7 +40,7 @@
       "requiresConsent": true,
       "consentDocumentType": "badge_licence",
       "isDraft": true,
-      "sha256": "1cb77b32ecd445be2d7b08b674d500cd298670ae53b36d6612490193b69207f2"
+      "sha256": "de9d3a48bf62e4df684f755b3448561885a6b30519c9d1df98472b5cdcc5bfb0"
     },
     "cookie-notice.md": {
       "version": "1.0.0-draft",
@@ -48,7 +48,7 @@
       "requiresConsent": true,
       "consentDocumentType": "cookie_notice",
       "isDraft": true,
-      "sha256": "98cbf24c2f1fab6e758a07d13265a3fe45a8dc773c9afd27730db7740bf01706"
+      "sha256": "dfa8fa170a460c05ee37f09c8e30bed1dccf3b71f91116e544dc3fbbf257c2b4"
     },
     "data-processing-agreement.md": {
       "version": "1.0.0-draft",

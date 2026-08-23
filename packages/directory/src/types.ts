@@ -29,7 +29,10 @@ export interface DirectoryEntry {
   readonly score: number;
   readonly rubricVersion: string;
   readonly assessedOn: string;
-  readonly dimensions: readonly { readonly dimension: DirectoryDimension; readonly score: number }[];
+  readonly dimensions: readonly {
+    readonly dimension: DirectoryDimension;
+    readonly score: number;
+  }[];
   readonly tagline: string | null;
   readonly category: string | null;
   /** Carried to be disclosed, never to be ranked on. */

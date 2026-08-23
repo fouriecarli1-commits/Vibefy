@@ -51,10 +51,7 @@ interface PendingRow {
  * to know about this", and the whole point of one client and one schema is that
  * there is only ever one.
  */
-export async function findPendingPushes(
-  client: PoolClient,
-  limit = 200,
-): Promise<PendingRow[]> {
+export async function findPendingPushes(client: PoolClient, limit = 200): Promise<PendingRow[]> {
   const { rows } = await client.query<PendingRow>(
     `select al.id as alert_id, al.app_id, al.severity::text as severity, al.title, al.body,
             dt.id as device_token_id, dt.token
@@ -127,7 +124,12 @@ export async function sweepAlertPush(
           `insert into public.alert_deliveries (alert_id, channel, target_id, status, detail)
            values ($1, 'push', $2, $3, $4)
            on conflict (alert_id, channel, target_id) do nothing`,
-          [row.alert_id, row.device_token_id, outcome.delivered ? 'sent' : 'failed', outcome.detail],
+          [
+            row.alert_id,
+            row.device_token_id,
+            outcome.delivered ? 'sent' : 'failed',
+            outcome.detail,
+          ],
         );
 
         if (outcome.disableToken) {

@@ -100,9 +100,9 @@ export default async function DirectoryPage({
       <header className="max-w-2xl space-y-3">
         <h1 className="text-3xl font-bold tracking-tight">Directory</h1>
         <p className="text-muted">
-          Applications with a live &ldquo;Verified by VibefyCode&rdquo; badge. A listing appears only
-          while the badge is live: if one is suspended, expires or is revoked, its listing goes with
-          it in the same instant.
+          Applications with a live &ldquo;Verified by VibefyCode&rdquo; badge. A listing appears
+          only while the badge is live: if one is suspended, expires or is revoked, its listing goes
+          with it in the same instant.
         </p>
         <p className="text-sm text-muted">{DIRECTORY_SCOPE}</p>
       </header>

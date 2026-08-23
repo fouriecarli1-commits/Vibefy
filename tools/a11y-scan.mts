@@ -64,7 +64,9 @@ function run(command: string, args: string[], cwd: string): Promise<void> {
       stdio: 'inherit',
       env: { ...process.env, ...ENVIRONMENT },
     });
-    child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${command} exited ${code}`))));
+    child.on('exit', (code) =>
+      code === 0 ? resolve() : reject(new Error(`${command} exited ${code}`)),
+    );
   });
 }
 

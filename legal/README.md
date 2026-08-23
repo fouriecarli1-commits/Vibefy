@@ -15,22 +15,22 @@ entity and governing law are not yet decided; every placeholder reading `[JURISD
 
 ## The documents
 
-| File                                     | What it governs                                         |
-| ---------------------------------------- | ------------------------------------------------------- |
+| File                                     | What it governs                                             |
+| ---------------------------------------- | ----------------------------------------------------------- |
 | `terms-of-service.md`                    | Use of the VibefyCode platform                              |
-| `assessment-services-agreement.md`       | What an assessment is, and what it is not               |
-| `authorisation-to-test.md`               | The customer's warranty that we may test the target     |
+| `assessment-services-agreement.md`       | What an assessment is, and what it is not                   |
+| `authorisation-to-test.md`               | The customer's warranty that we may test the target         |
 | `badge-licence.md`                       | The trademark licence for the "Verified by VibefyCode" mark |
-| `acceptable-use-policy.md`               | What we will not assess or certify                      |
-| `privacy-policy.md`                      | What we collect, why, and for how long                  |
-| `data-processing-agreement.md`           | Controller/processor terms and the sub-processor list   |
-| `cookie-notice.md`                       | Cookies and the consent mechanism                       |
-| `rating-methodology-and-independence.md` | How scores are reached and why payment cannot move them |
-| `appeals-and-corrections.md`             | How to challenge a finding or a score                   |
-| `responsible-disclosure.md`              | What we do when we find a live exposure                 |
-| `refund-and-cancellation.md`             | Refunds, cancellation and what happens to a badge       |
-| `ip-takedown.md`                         | Copyright and trademark takedown, and counter-notice    |
-| `marketing-services-agreement.md`        | The firewalled marketing arm (M8)                       |
+| `acceptable-use-policy.md`               | What we will not assess or certify                          |
+| `privacy-policy.md`                      | What we collect, why, and for how long                      |
+| `data-processing-agreement.md`           | Controller/processor terms and the sub-processor list       |
+| `cookie-notice.md`                       | Cookies and the consent mechanism                           |
+| `rating-methodology-and-independence.md` | How scores are reached and why payment cannot move them     |
+| `appeals-and-corrections.md`             | How to challenge a finding or a score                       |
+| `responsible-disclosure.md`              | What we do when we find a live exposure                     |
+| `refund-and-cancellation.md`             | Refunds, cancellation and what happens to a badge           |
+| `ip-takedown.md`                         | Copyright and trademark takedown, and counter-notice        |
+| `marketing-services-agreement.md`        | The firewalled marketing arm (M8)                           |
 
 ## How versions and acceptance work
 

@@ -20,11 +20,11 @@ mark on a customer's site and the mark in our own header cannot drift apart.
 
 ## What is generated
 
-| Path           | Contents                                                                                         | Committed      |
-| -------------- | ------------------------------------------------------------------------------------------------ | -------------- |
+| Path           | Contents                                                                                                          | Committed      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- | -------------- |
 | `brand/svg/`   | Ten SVG masters: mark, mono light/dark, horizontal lockup light/dark, the four badge states and the compact badge | yes            |
-| `brand/png/`   | 1x / 2x / 3x raster exports of the mark, badge and lockup                                        | no — generated |
-| `brand/icons/` | Favicons, Apple touch icon, Android Chrome icons, maskable icon                                  | no — generated |
+| `brand/png/`   | 1x / 2x / 3x raster exports of the mark, badge and lockup                                                         | no — generated |
+| `brand/icons/` | Favicons, Apple touch icon, Android Chrome icons, maskable icon                                                   | no — generated |
 
 ```bash
 pnpm brand:build          # regenerate everything
@@ -35,8 +35,8 @@ pnpm check:brand          # assert the masters still obey the usage rules
 
 A badge is never a broken image. Every state renders as a legible mark:
 
-| State       | Renders as                                                                |
-| ----------- | ------------------------------------------------------------------------- |
+| State       | Renders as                                                                    |
+| ----------- | ----------------------------------------------------------------------------- |
 | `active`    | The certification mark: shield, check, "Verified by VibefyCode"               |
 | `suspended` | Amber ring, barred shield, "Suspended — Not currently verified by VibefyCode" |
 | `expired`   | Grey ring, barred shield, "Expired — Not currently verified by VibefyCode"    |

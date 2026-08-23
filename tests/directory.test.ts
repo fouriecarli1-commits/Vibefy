@@ -118,7 +118,9 @@ describe('ordering cannot be bought', () => {
       .replace(/(^|\s)\/\/.*$/gm, '')
       .toLowerCase();
     for (const term of ['marketing', 'plan', 'price', 'sponsor', 'promoted', 'boost', 'featured']) {
-      expect(source, `rank.ts must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
+      expect(source, `rank.ts must not reference "${term}"`).not.toMatch(
+        new RegExp(`\\b${term}\\b`),
+      );
     }
   });
 
@@ -151,9 +153,9 @@ describe('search', () => {
   });
 
   it('lists the categories actually in use, case-folded once', () => {
-    expect(categoriesOf([entry({ category: 'Home' }), entry({ slug: 'b', category: 'home' })])).toEqual(
-      ['Home'],
-    );
+    expect(
+      categoriesOf([entry({ category: 'Home' }), entry({ slug: 'b', category: 'home' })]),
+    ).toEqual(['Home']);
   });
 });
 
@@ -295,16 +297,19 @@ describe('only certified applications, and only while they are', () => {
     );
     expect(rows.map((row) => row.state)).toEqual(['listed', 'opted_out', 'listed']);
     await expect(
-      db.query('update public.listing_events set state = %s where app_id = $1'.replace('%s', "'listed'"), [
-        appId,
-      ]),
+      db.query(
+        'update public.listing_events set state = %s where app_id = $1'.replace('%s', "'listed'"),
+        [appId],
+      ),
     ).rejects.toThrow(/append-only/i);
   });
 
   it('refuses an opt-out that is not stamped', async () => {
     const { appId } = await certifiedApp('directory-unstamped');
     await expect(
-      db.query(`update public.directory_listings set state = 'opted_out' where app_id = $1`, [appId]),
+      db.query(`update public.directory_listings set state = 'opted_out' where app_id = $1`, [
+        appId,
+      ]),
     ).rejects.toThrow(/listing_opt_out_is_stamped/);
   });
 

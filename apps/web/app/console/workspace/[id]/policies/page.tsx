@@ -49,7 +49,9 @@ export default async function PoliciesPage({ params }: { params: Promise<{ id: s
                   <span className="font-medium">{String(profile.name)}</span>
                   <span className="text-muted">{profile.is_default ? 'default' : ''}</span>
                 </div>
-                {profile.description && <p className="mt-1 text-muted">{String(profile.description)}</p>}
+                {profile.description && (
+                  <p className="mt-1 text-muted">{String(profile.description)}</p>
+                )}
                 <ul className="mt-3 list-disc space-y-1 pl-5 text-muted">
                   {profile.min_overall_score !== null && (
                     <li>Minimum overall score {Number(profile.min_overall_score).toFixed(1)}</li>
@@ -64,8 +66,12 @@ export default async function PoliciesPage({ params }: { params: Promise<{ id: s
                   {profile.max_open_severity && (
                     <li>No open finding worse than {String(profile.max_open_severity)}</li>
                   )}
-                  {profile.require_certification && <li>Must meet the rubric’s certification requirements</li>}
-                  {profile.require_store_readiness && <li>Must be assessed for store distribution</li>}
+                  {profile.require_certification && (
+                    <li>Must meet the rubric’s certification requirements</li>
+                  )}
+                  {profile.require_store_readiness && (
+                    <li>Must be assessed for store distribution</li>
+                  )}
                 </ul>
                 <div className="mt-4">
                   <ActionForm action={deletePolicyProfile} submitLabel="Delete profile" destructive>

@@ -57,7 +57,9 @@ describe('copy lint', () => {
   });
 
   it('rejects a suppression that gives no reason', () => {
-    const violations = lintText(['// vibefycode-copy-lint-allow:', 'const label = "safe";'].join('\n'));
+    const violations = lintText(
+      ['// vibefycode-copy-lint-allow:', 'const label = "safe";'].join('\n'),
+    );
     expect(violations.some((v) => v.rule === 'suppression-without-reason')).toBe(true);
   });
 

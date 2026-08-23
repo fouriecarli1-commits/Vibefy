@@ -72,7 +72,9 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             return (
               <li key={membership.id as string} className="rounded-xl border border-line p-5">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <span className="font-medium">{person?.full_name ?? person?.email ?? 'Member'}</span>
+                  <span className="font-medium">
+                    {person?.full_name ?? person?.email ?? 'Member'}
+                  </span>
                   <span className="text-sm text-muted">{String(membership.role)}</span>
                 </div>
                 <p className="mt-1 text-sm text-muted">{person?.email}</p>
@@ -86,7 +88,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                       options={[
                         { value: 'member', label: 'Member — reads and requests assessments' },
                         { value: 'admin', label: 'Admin — also manages people and policies' },
-                        { value: 'owner', label: 'Owner — also manages billing and single sign-on' },
+                        {
+                          value: 'owner',
+                          label: 'Owner — also manages billing and single sign-on',
+                        },
                       ]}
                     />
                   </ActionForm>
@@ -131,7 +136,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         {(invitations ?? []).length > 0 && (
           <ul className="space-y-3">
             {(invitations ?? []).map((invitation) => (
-              <li key={invitation.id as string} className="rounded-xl border border-line p-5 text-sm">
+              <li
+                key={invitation.id as string}
+                className="rounded-xl border border-line p-5 text-sm"
+              >
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <span className="font-medium">{String(invitation.email)}</span>
                   <span className="text-muted">

@@ -120,10 +120,7 @@ export const SEAL = {
    * when the banner is a shaded metal object and reads as two stray rectangles
    * when it is a flat shape.
    */
-  bannerFolds: [
-    'M100 378 L140 392 L140 450 L100 436 Z',
-    'M412 378 L372 392 L372 450 L412 436 Z',
-  ],
+  bannerFolds: ['M100 378 L140 392 L140 450 L100 436 Z', 'M412 378 L372 392 L372 450 L412 436 Z'],
   banner: 'M120 392 Q256 344 392 392 L392 452 Q256 404 120 452 Z',
   bannerRule: 'M120 402 Q256 354 392 402',
   /** Fitted to the span between the two stars, not to a font size. */

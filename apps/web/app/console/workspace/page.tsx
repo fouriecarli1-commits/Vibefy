@@ -81,10 +81,14 @@ export default async function WorkspacesPage() {
               name="accountType"
               defaultValue="agency"
               options={[
-                { value: 'agency', label: 'Agency — you assess applications you built for clients' },
+                {
+                  value: 'agency',
+                  label: 'Agency — you assess applications you built for clients',
+                },
                 {
                   value: 'organisation',
-                  label: 'Organisation — you oversee applications built inside your own institution',
+                  label:
+                    'Organisation — you oversee applications built inside your own institution',
                 },
               ]}
               hint="This decides which surfaces appear, not what anything scores."
