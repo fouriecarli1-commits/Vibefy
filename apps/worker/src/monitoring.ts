@@ -37,6 +37,10 @@ import {
   type MonitoredPlan,
 } from '@vibefycode/monitoring';
 import { entitlementFor } from '@vibefycode/billing';
+// `fetch` from undici, not the global one: Node bundles its own copy of undici
+// for the global, and it does not recognise a dispatcher built by this one.
+import { fetch } from 'undici';
+import { createScopedDispatcher, ScopeGuard, type ScopePolicy } from '@vibefycode/engine';
 import type { PoolClient } from 'pg';
 
 type Logger = (message: string, detail?: Record<string, unknown>) => void;
@@ -53,17 +57,82 @@ export type LivenessProbeFn = (
 
 export const LIVENESS_TIMEOUT_MS = 10_000;
 
+/**
+ * The scope policy for one liveness check.
+ *
+ * A ping is narrower than any assessment: one host, one GET, one request, and
+ * nothing that changes state. It goes through the same guard as everything else
+ * anyway, because the guard is not really about the ceiling — it is about the
+ * *resolved* address. A certified origin whose DNS is later pointed at
+ * 169.254.169.254 would otherwise have us fetching cloud metadata on a schedule,
+ * every hour, for as long as the badge lives.
+ */
+export function livenessPolicy(origin: string): ScopePolicy {
+  return {
+    allowedHosts: [new URL(origin).hostname],
+    exclusions: [],
+    ceiling: {
+      nonDestructiveOnly: true,
+      maxRequestsPerMinute: 4,
+      // One request, plus the redirects it is allowed to follow.
+      maxTotalRequests: 1 + LIVENESS_MAX_REDIRECTS,
+      maxDurationSeconds: 30,
+      allowDataModification: false,
+      allowDataExport: false,
+      allowAccountCreation: false,
+      syntheticAccountsOnly: true,
+    },
+  };
+}
+
+/**
+ * Redirects are followed by hand, for the same reason the engine follows them by
+ * hand: an automatic redirect is a request the guard never saw, and a target
+ * that redirects us somewhere the customer never authorised is exactly what the
+ * guard exists to refuse.
+ */
+export const LIVENESS_MAX_REDIRECTS = 3;
+
 export const httpLivenessProbe: LivenessProbeFn = async (url) => {
+  let guard: ScopeGuard;
+  try {
+    guard = new ScopeGuard(livenessPolicy(url));
+  } catch (error) {
+    return { status: null, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  const dispatcher = createScopedDispatcher(guard);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LIVENESS_TIMEOUT_MS);
+  let current = url;
+
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: { 'user-agent': 'VibefyCodeMonitor/1.0 (+https://vibefycode.app/methodology)' },
-    });
-    return { status: response.status };
+    for (let hop = 0; hop <= LIVENESS_MAX_REDIRECTS; hop += 1) {
+      const decision = guard.check(current, 'GET');
+      if (!decision.allowed) {
+        // Refused, not failed. The application may be perfectly healthy; we are
+        // simply not permitted to look where it is pointing us.
+        return { status: null, error: `Refused by the scope guard: ${decision.reason}` };
+      }
+
+      const response = await fetch(current, {
+        method: 'GET',
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: { 'user-agent': 'VibefyCodeMonitor/1.0 (+https://vibefycode.app/methodology)' },
+        // The dispatcher checks the address the host actually resolves to, which
+        // is the half of this that a URL allowlist cannot do.
+        dispatcher,
+      });
+
+      const location = response.headers.get('location');
+      if (response.status >= 300 && response.status < 400 && location) {
+        current = new URL(location, current).toString();
+        continue;
+      }
+      return { status: response.status };
+    }
+    return { status: null, error: `More than ${LIVENESS_MAX_REDIRECTS} redirects.` };
   } catch (error) {
     return { status: null, error: error instanceof Error ? error.message : String(error) };
   } finally {
@@ -645,7 +714,11 @@ export async function sweepLiveness(
           );
           if ((restored.rowCount ?? 0) > 0) {
             result.restored += 1;
-            await raiseAlert(client, row.organisation_id, recoveredAlert(row.name, row.app_id, now));
+            await raiseAlert(
+              client,
+              row.organisation_id,
+              recoveredAlert(row.name, row.app_id, now),
+            );
           }
         }
 

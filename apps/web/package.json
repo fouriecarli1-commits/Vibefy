@@ -27,7 +27,8 @@
     "@vibefycode/workspace": "workspace:*",
     "@vibefycode/policy": "workspace:*",
     "@vibefycode/directory": "workspace:*",
-    "@vibefycode/governance": "workspace:*"
+    "@vibefycode/governance": "workspace:*",
+    "@vibefycode/notify": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",

@@ -66,15 +66,15 @@ If it refuses to start as root, it drops to the `postgres` account automatically
 
 ## Common failures
 
-| Symptom                                      | Cause                                           | Fix                                                                     |
-| -------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL is not set`        | `.env.local` missing or unfilled                | `cp .env.example .env.local`, paste the values `supabase start` printed |
-| Tests fail with `VIBEFYCODE_TEST_DSN is not set` | Global setup did not run                        | Run `pnpm test`, not `vitest` directly                                  |
-| `initdb: cannot be run as root`              | No unprivileged account                         | `VIBEFYCODE_TEST_PGUSER=<user> pnpm test`                                   |
-| Migration fails with `append-only`           | A migration tried to UPDATE an evidence table   | That is the trigger doing its job. Insert a superseding row instead     |
-| `no verified, unexpired authorisation`       | An assessment was created without authorisation | That is the gate doing its job. Complete verification first             |
-| CI fails on "brand/svg is out of date"       | `packages/shared/src/brand.ts` changed without regenerating | `pnpm brand:build` and commit                               |
-| Copy lint fires on legal text                | Absolute word in a sentence with no negation    | Reword, or use a reasoned suppression                                   |
+| Symptom                                          | Cause                                                       | Fix                                                                     |
+| ------------------------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL is not set`            | `.env.local` missing or unfilled                            | `cp .env.example .env.local`, paste the values `supabase start` printed |
+| Tests fail with `VIBEFYCODE_TEST_DSN is not set` | Global setup did not run                                    | Run `pnpm test`, not `vitest` directly                                  |
+| `initdb: cannot be run as root`                  | No unprivileged account                                     | `VIBEFYCODE_TEST_PGUSER=<user> pnpm test`                               |
+| Migration fails with `append-only`               | A migration tried to UPDATE an evidence table               | That is the trigger doing its job. Insert a superseding row instead     |
+| `no verified, unexpired authorisation`           | An assessment was created without authorisation             | That is the gate doing its job. Complete verification first             |
+| CI fails on "brand/svg is out of date"           | `packages/shared/src/brand.ts` changed without regenerating | `pnpm brand:build` and commit                                           |
+| Copy lint fires on legal text                    | Absolute word in a sentence with no negation                | Reword, or use a reasoned suppression                                   |
 
 ## Adding a migration
 
@@ -197,12 +197,12 @@ Four sweeps run in the worker every five minutes (`MONITOR_SWEEP_INTERVAL_MS`).
 All four are idempotent, so running them twice, or crashing halfway, costs
 nothing.
 
-| Sweep | What it does |
-| --- | --- |
-| `sweepDriftDetection` | Compares each reviewed assessment against the one before it on the same application, writes an append-only `drift_reports` row, and suspends the badge if the change is material |
-| `sweepScheduledReassessments` | Queues a re-assessment for every monitored application whose plan cadence is up, re-checking the authorisation in the same query |
-| `sweepLiveness` | Sends one GET to each monitored badge's certified origin, suspends after a run of failures, restores when it answers again |
-| `sweepBadgeExpiryWarnings` | Raises one alert at 30 days and one at 7 days before expiry |
+| Sweep                         | What it does                                                                                                                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sweepDriftDetection`         | Compares each reviewed assessment against the one before it on the same application, writes an append-only `drift_reports` row, and suspends the badge if the change is material |
+| `sweepScheduledReassessments` | Queues a re-assessment for every monitored application whose plan cadence is up, re-checking the authorisation in the same query                                                 |
+| `sweepLiveness`               | Sends one GET to each monitored badge's certified origin, suspends after a run of failures, restores when it answers again                                                       |
+| `sweepBadgeExpiryWarnings`    | Raises one alert at 30 days and one at 7 days before expiry                                                                                                                      |
 
 ### When a customer asks why their badge was suspended
 
@@ -339,7 +339,7 @@ Three channels, in the order that matters:
    page the customer opens, and at the top of the mobile home screen. This is the
    one that gets read.
 2. **Push**, to phones with the app installed and notifications allowed.
-3. **Email**, which is the channel of *record* — a badge suspension is a notice
+3. **Email**, which is the channel of _record_ — a badge suspension is a notice
    we are obliged to give, and there has to be evidence it was sent.
 
 `alert_deliveries` is the ledger for all of it:
@@ -382,6 +382,38 @@ and sends nothing. That is a legitimate deployment, not a fault.
 **SPF, DKIM and DMARC on the sending domain are not optional.** Without them
 these land in spam, and a notice in spam is not a notice. It is on the open-items
 list, blocked on the domain decision.
+
+### Bounces and complaints reported after the fact
+
+Most bounces are not reported while we hold the connection. The provider accepts
+the message, tries for a while, and tells us hours later — by webhook.
+
+```
+RESEND_WEBHOOK_SECRET=whsec_...            # from the Resend dashboard
+```
+
+Point Resend at `POST https://<domain>/api/email/webhook` and subscribe it to
+`email.bounced` and `email.complained`. Without the secret the endpoint answers
+404 to everything: an endpoint that silently accepts anything because a secret is
+missing looks like it is working, which is worse than one that is not there.
+
+What it does, and only this:
+
+| Event                                    | Effect                                              |
+| ---------------------------------------- | --------------------------------------------------- |
+| `email.bounced`, bounce type `Permanent` | The address is suppressed.                          |
+| `email.bounced`, any other bounce type   | Nothing. A full mailbox is not a dead address.      |
+| `email.complained`                       | The address is suppressed, whether or not we agree. |
+| Anything else                            | Recorded in the response, written nowhere.          |
+
+A redelivery of an event already applied is a no-op — `email` is the primary key
+of `email_suppressions` — and the _first_ reason recorded for an address is the
+one kept. To check what a webhook did:
+
+```sql
+select email, kind, reason, suppressed_at
+  from public.email_suppressions order by suppressed_at desc limit 20;
+```
 
 ## The mobile app
 

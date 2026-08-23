@@ -12,18 +12,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@vibefycode/api": "workspace:*",
+    "@vibefycode/badge": "workspace:*",
+    "@vibefycode/billing": "workspace:*",
     "@vibefycode/engine": "workspace:*",
+    "@vibefycode/governance": "workspace:*",
+    "@vibefycode/monitoring": "workspace:*",
+    "@vibefycode/notify": "workspace:*",
+    "@vibefycode/report": "workspace:*",
     "@vibefycode/rubric": "workspace:*",
     "@vibefycode/shared": "workspace:*",
     "pg": "8.23.0",
-    "@vibefycode/report": "workspace:*",
     "playwright": "1.62.1",
-    "@vibefycode/billing": "workspace:*",
-    "@vibefycode/badge": "workspace:*",
-    "@vibefycode/monitoring": "workspace:*",
-    "@vibefycode/api": "workspace:*",
-    "@vibefycode/governance": "workspace:*",
-    "@vibefycode/notify": "workspace:*"
+    "undici": "8.10.0"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

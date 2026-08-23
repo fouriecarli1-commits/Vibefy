@@ -9,8 +9,20 @@
  * Redirects are followed manually because an automatic redirect is a request the
  * guard never saw — a target could redirect us to a host the customer never
  * authorised, or to a link-local address.
+ *
+ * Every request also goes out through the guard's own dispatcher. `guard.check`
+ * reads the URL, which is not enough on its own: an authorised host whose
+ * A-record points at 169.254.169.254 passes a host allowlist and reaches the
+ * metadata service. Only the dispatcher sees the address the name actually
+ * resolved to, so it is attached per request rather than left to a global
+ * install that a caller has to remember.
  */
-import { setGlobalDispatcher } from 'undici';
+// `fetch` comes from undici rather than the global, because the dispatcher does
+// too. Node bundles its own copy of undici for the global `fetch`, and handing
+// that copy a dispatcher built by the npm one fails at the handler interface —
+// two implementations of the same library that do not recognise each other.
+import { fetch, setGlobalDispatcher } from 'undici';
+import type { Dispatcher, RequestInit, Response } from 'undici';
 import { createScopedDispatcher, ScopeGuard, ScopeViolationError } from './scope.ts';
 import type { EvidenceStore } from './evidence.ts';
 
@@ -38,18 +50,25 @@ export interface ScopedRequestOptions {
 }
 
 export class ScopedHttp {
+  private readonly dispatcher: Dispatcher;
+
   constructor(
     private readonly guard: ScopeGuard,
     private readonly evidence: EvidenceStore,
-  ) {}
+  ) {
+    this.dispatcher = createScopedDispatcher(guard);
+  }
 
   /**
-   * Installs the guard as the process-wide dispatcher. Anything in this process
-   * that calls `fetch` — including code inside a dependency that never heard of
-   * the scope guard — is bounded by the customer's authorisation from here on.
+   * Additionally installs the guard as the process-wide dispatcher.
+   *
+   * Not required for anything this class does — its own requests are already
+   * dispatched through the guard. This is for the rest of the process: a call
+   * to `fetch` inside a dependency that never heard of the scope guard is
+   * bounded by the customer's authorisation once this has run.
    */
   installGlobalDispatcher(): void {
-    setGlobalDispatcher(createScopedDispatcher(this.guard));
+    setGlobalDispatcher(this.dispatcher);
   }
 
   async request(rawUrl: string, options: ScopedRequestOptions = {}): Promise<ScopedResponse> {
@@ -69,6 +88,9 @@ export class ScopedHttp {
           method,
           redirect: 'manual',
           signal: controller.signal,
+          // The guard checked the URL above; the dispatcher checks the address
+          // that URL's host resolves to. A host allowlist cannot do the second.
+          dispatcher: this.dispatcher,
           headers: {
             // We identify ourselves. An assessment service that arrives
             // disguised is indistinguishable from an attacker in a customer's
@@ -79,6 +101,11 @@ export class ScopedHttp {
           },
           ...(options.body ? { body: options.body } : {}),
         });
+      } catch (error) {
+        // undici wraps whatever the connector threw in a bare `fetch failed`.
+        // A scope refusal that reaches a log as "fetch failed" is a refusal
+        // nobody can act on, so the real reason is put back in front.
+        throw unwrapScopeViolation(error);
       } finally {
         clearTimeout(timer);
       }
@@ -138,6 +165,16 @@ export class ScopedHttp {
       return null;
     }
   }
+}
+
+/** Digs a ScopeViolationError out of a wrapped fetch failure, if that is what it was. */
+function unwrapScopeViolation(error: unknown): unknown {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (current instanceof ScopeViolationError) return current;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return error;
 }
 
 async function readCapped(response: Response): Promise<{ body: string; truncated: boolean }> {

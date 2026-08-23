@@ -125,3 +125,62 @@ export function renderAlertEmail(input: AlertEmailInput): EmailMessage {
     },
   };
 }
+
+export interface InvitationEmailInput {
+  readonly workspaceName: string;
+  readonly invitedByName: string | null;
+  readonly role: string;
+  readonly acceptUrl: string;
+  readonly expiresOn: string;
+  readonly recipientEmail: string;
+}
+
+/**
+ * The invitation.
+ *
+ * The link is the credential, so this is the only place it ever exists outside
+ * the sender's screen — we store its hash and nothing else. It says who invited
+ * them and to what, because an unexplained link asking someone to sign in is
+ * indistinguishable from a phishing attempt, and this one has to be believed.
+ */
+export function renderInvitationEmail(input: InvitationEmailInput): EmailMessage {
+  const by = input.invitedByName
+    ? `${input.invitedByName} has`
+    : 'Someone at your organisation has';
+  const heading = `${by} invited you to ${input.workspaceName} on VibefyCode`;
+
+  const text = [
+    heading,
+    '',
+    `You have been invited as a ${input.role}. The invitation is valid until ${input.expiresOn}.`,
+    '',
+    `Accept it: ${input.acceptUrl}`,
+    '',
+    'The link works only for this address, and only once. If you were not expecting it, ignore it — nothing happens until you accept, and it expires on its own.',
+    '',
+    '—',
+    'VibefyCode assesses applications against a published rubric. Joining a workspace lets you see the assessments of the applications in it.',
+  ].join('\n');
+
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>${escapeHtml(heading)}</title></head>
+<body style="margin:0;padding:24px;background:${SURFACE};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${INK}">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#FFFFFF;border:1px solid ${LINE};border-radius:12px">
+    <tr><td style="padding:28px 28px 8px">
+      <h1 style="margin:0;font-size:21px;line-height:1.35">${escapeHtml(heading)}</h1>
+    </td></tr>
+    <tr><td style="padding:12px 28px 0">
+      <p style="margin:0;font-size:15px;line-height:1.6">You have been invited as a ${escapeHtml(input.role)}. The invitation is valid until ${escapeHtml(input.expiresOn)}.</p>
+    </td></tr>
+    <tr><td style="padding:24px 28px 4px">
+      <a href="${escapeHtml(input.acceptUrl)}" style="display:inline-block;background:${INK};color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:15px">Accept the invitation</a>
+    </td></tr>
+    <tr><td style="padding:24px 28px 28px">
+      <p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};border-top:1px solid ${LINE};padding-top:16px">The link works only for this address, and only once. If you were not expecting it, ignore it — nothing happens until you accept, and it expires on its own.</p>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  return { to: input.recipientEmail, subject: heading, text, html };
+}

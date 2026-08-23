@@ -15,6 +15,8 @@ import {
   sweepDriftDetection,
   sweepLiveness,
   sweepScheduledReassessments,
+  httpLivenessProbe,
+  livenessPolicy,
 } from '../apps/worker/src/monitoring.ts';
 import { connect } from './setup/client.ts';
 import {
@@ -121,7 +123,9 @@ async function isolate(space: Workspace): Promise<void> {
   await db.query('update public.apps set monitoring_enabled = (id = $1)', [space.appId]);
 }
 
-async function alertsFor(space: Workspace): Promise<{ kind: string; title: string; body: string }[]> {
+async function alertsFor(
+  space: Workspace,
+): Promise<{ kind: string; title: string; body: string }[]> {
   const { rows } = await db.query<{ kind: string; title: string; body: string }>(
     'select kind::text as kind, title, body from public.alerts where organisation_id = $1 order by created_at',
     [space.owner.organisationId],
@@ -301,9 +305,10 @@ describe('drift, recorded', () => {
     const second = await assess(space, { score: 60 });
     await sweepDriftDetection(pool);
     await expect(
-      db.query('update public.drift_reports set material_regression = false where assessment_id = $1', [
-        second,
-      ]),
+      db.query(
+        'update public.drift_reports set material_regression = false where assessment_id = $1',
+        [second],
+      ),
     ).rejects.toThrow();
   });
 });
@@ -538,5 +543,46 @@ describe('liveness', () => {
       [space.appId],
     );
     expect(seen).toEqual([origin.rows[0]!.certified_origin]);
+  });
+});
+
+describe('the liveness probe is inside the scope boundary', () => {
+  it('refuses an origin that resolves to a private address', async () => {
+    // The certified origin is a public name today. If its DNS is later pointed
+    // at link-local, an unguarded probe would fetch cloud metadata on a
+    // schedule, every hour, for as long as the badge lives.
+    const probe = await httpLivenessProbe('http://127.0.0.1:1/');
+    expect(probe.status).toBeNull();
+    expect(probe.error ?? '').toMatch(/scope guard|private|refused/i);
+  });
+
+  it('refuses a redirect that leaves the certified origin', async () => {
+    const { createServer } = await import('node:http');
+    const server = createServer((_request, response) => {
+      // A target that redirects the monitor somewhere else is exactly what the
+      // guard exists to refuse — and following it automatically would be a
+      // request the guard never saw.
+      response.writeHead(302, { location: 'https://example.invalid/elsewhere' });
+      response.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as { port: number }).port;
+    try {
+      const probe = await httpLivenessProbe(`http://127.0.0.1:${port}/`);
+      expect(probe.status).toBeNull();
+      expect(probe.error ?? '').toMatch(/scope guard|refused|private/i);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('permits exactly one host and nothing that changes state', () => {
+    const policy = livenessPolicy('https://kettle.example');
+    expect(policy.allowedHosts).toEqual(['kettle.example']);
+    expect(policy.ceiling.nonDestructiveOnly).toBe(true);
+    expect(policy.ceiling.allowDataModification).toBe(false);
+    expect(policy.ceiling.allowAccountCreation).toBe(false);
+    // A ping is one request, plus the redirects it may follow. Not a crawl.
+    expect(policy.ceiling.maxTotalRequests).toBeLessThanOrEqual(4);
   });
 });

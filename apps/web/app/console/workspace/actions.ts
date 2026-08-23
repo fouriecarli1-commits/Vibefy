@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { verifyDnsTxt, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisation';
 import { canAccept, createInvitationToken, hashInvitationToken } from '@vibefycode/workspace';
+import { renderInvitationEmail, resendFromEnvironment } from '@vibefycode/notify';
 import { createClient } from '@/lib/supabase/server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -112,11 +113,45 @@ export async function inviteMember(
   if (error) return { error: error.message };
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  const acceptUrl = `${origin}/invite/${token}`;
+  const expiresOn = expiresAt.toISOString().slice(0, 10);
+
+  const { data: workspace } = await supabase
+    .from('organisations')
+    .select('name')
+    .eq('id', organisationId)
+    .maybeSingle();
+  const { data: inviter } = await supabase
+    .from('users')
+    .select('full_name')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  // Sent from the console rather than by a sweep: the link exists in memory here
+  // and nowhere else — only its hash is stored — so a sweep would have nothing
+  // to send. If the send fails the invitation still stands, and the link is
+  // shown to the inviter so it is never lost.
+  const provider = resendFromEnvironment();
+  let delivered = false;
+  if (provider) {
+    const outcome = await provider.send(
+      renderInvitationEmail({
+        workspaceName: String(workspace?.name ?? 'a VibefyCode workspace'),
+        invitedByName: (inviter?.full_name as string | null) ?? null,
+        role,
+        acceptUrl,
+        expiresOn,
+        recipientEmail: email,
+      }),
+    );
+    delivered = outcome.sent;
+  }
+
   revalidatePath(`/console/workspace/${organisationId}/team`);
   return {
-    notice:
-      `Invitation created for ${email}, valid until ${expiresAt.toISOString().slice(0, 10)}. ` +
-      `We do not send the email yet, so send them this link yourself — it is shown once and we cannot show it again: ${origin}/invite/${token}`,
+    notice: delivered
+      ? `Invitation emailed to ${email}, valid until ${expiresOn}. If it does not arrive, send them this link — it is shown once and we cannot show it again: ${acceptUrl}`
+      : `Invitation created for ${email}, valid until ${expiresOn}. We could not email it, so send them this link yourself — it is shown once and we cannot show it again: ${acceptUrl}`,
   };
 }
 
@@ -214,10 +249,7 @@ export async function changeRole(_previous: ActionState, formData: FormData): Pr
   // legitimately. Say what happened rather than showing a raw database error.
   if (error) {
     return {
-      error:
-        role === 'owner'
-          ? 'Only an owner can make someone else an owner.'
-          : error.message,
+      error: role === 'owner' ? 'Only an owner can make someone else an owner.' : error.message,
     };
   }
   if (!data) return { error: 'You are not permitted to change that membership.' };
@@ -342,7 +374,9 @@ export async function deletePolicyProfile(
   if (error) return { error: error.message };
 
   revalidatePath(`/console/workspace/${organisationId}/policies`);
-  return { notice: 'Deleted. Applications that used it are no longer measured against any profile.' };
+  return {
+    notice: 'Deleted. Applications that used it are no longer measured against any profile.',
+  };
 }
 
 export async function assignPolicyProfile(

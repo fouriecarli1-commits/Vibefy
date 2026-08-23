@@ -5,11 +5,15 @@
  * authorised to test is a criminal offence, and the guard is what stands between
  * a model's suggestion and a request actually leaving the machine.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   CeilingExceededError,
   DEFAULT_CEILING,
+  EvidenceStore,
   ScopeGuard,
+  ScopedHttp,
   ScopeViolationError,
   isPrivateAddress,
   policyFromAuthorisation,
@@ -164,6 +168,43 @@ describe('SSRF and rebinding defence', () => {
     ['::ffff:127.0.0.1', true],
   ])('classifies %s as private=%s', (address, expected) => {
     expect(isPrivateAddress(address)).toBe(expected);
+  });
+});
+
+describe('the client enforces the address, not only the URL', () => {
+  // The gap this closes: `check` reads the URL. An authorised host whose
+  // A-record points at 169.254.169.254 passes every check made against a URL,
+  // and only the dispatcher — which sees what the name resolved to — stops it.
+  // That dispatcher used to be reachable only through a global install that no
+  // production code path performed.
+  it('refuses a host in scope that resolves to a private address', async () => {
+    const guard = new ScopeGuard({
+      allowedHosts: ['localhost'],
+      exclusions: [],
+      ceiling: DEFAULT_CEILING,
+    });
+
+    // The URL-level check is content with it: the host is exactly what the
+    // customer authorised.
+    expect(guard.check('https://localhost/', 'GET').allowed).toBe(true);
+
+    // The request is not. Nothing is listening on that port either, so what
+    // matters is *which* failure comes back.
+    const http = new ScopedHttp(guard, new EvidenceStore('scope-fixture'));
+    await expect(http.request('https://localhost:9443/')).rejects.toThrow(/non-public address/);
+  });
+
+  it('needs no global install to do it', () => {
+    // A defence that only works once someone remembers to call a setup method
+    // is a defence that is off in the deployment where it matters.
+    const source = readFileSync(join(process.cwd(), 'packages/engine/src/runtime/http.ts'), 'utf8');
+    expect(source).toContain('createScopedDispatcher(guard)');
+    expect(source).toContain('dispatcher: this.dispatcher');
+    // Nothing in the engine or the worker calls the global installer, so it
+    // cannot be what the address check depends on.
+    expect(source.indexOf('this.dispatcher = createScopedDispatcher')).toBeLessThan(
+      source.indexOf('installGlobalDispatcher()'),
+    );
   });
 });
 

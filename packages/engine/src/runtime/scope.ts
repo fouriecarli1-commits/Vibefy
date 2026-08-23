@@ -143,8 +143,20 @@ export class ScopeGuard {
    * The single decision point. Every request the engine makes passes through
    * here before it reaches the network, and the undici dispatcher below calls it
    * again for anything that tries to bypass the engine.
+   *
+   * `countThisRequest` exists because those two callers see the same request.
+   * The rules — scheme, method, host, exclusions — are worth checking twice; the
+   * *budget* is not, because counting a request twice halves the ceiling the
+   * customer authorised. The caller that owns the run does the counting and the
+   * dispatcher checks the rules only.
    */
-  check(rawUrl: string, method = 'GET', now: number = Date.now()): ScopeDecision {
+  check(
+    rawUrl: string,
+    method = 'GET',
+    now: number = Date.now(),
+    options: { countThisRequest?: boolean } = {},
+  ): ScopeDecision {
+    const counting = options.countThisRequest !== false;
     let url: URL;
     try {
       url = new URL(rawUrl);
@@ -175,6 +187,8 @@ export class ScopeGuard {
     // against host would refuse every non-default port the customer declared.
     if (!this.hostInScope(url.hostname)) return this.refuse(rawUrl, 'host_out_of_scope');
     if (this.excluded(url)) return this.refuse(rawUrl, 'explicitly_excluded');
+
+    if (!counting) return { allowed: true, reason: 'in_scope' };
 
     const elapsedSeconds = (now - this.startedAt) / 1000;
     if (elapsedSeconds > this.policy.ceiling.maxDurationSeconds) {
@@ -230,10 +244,16 @@ export class ScopeGuard {
 /**
  * An undici dispatcher that refuses anything the guard would refuse.
  *
- * This exists so that a future call site which forgets to ask the guard is still
- * stopped. Install it with `setGlobalDispatcher` in the runner and every `fetch`
- * in the process — including one inside a dependency — is bounded by the
- * customer's authorisation.
+ * Two jobs, and only the first is unique to it. The `lookup` hook refuses a
+ * connection to a private address *after* resolution, which is the half of scope
+ * enforcement a URL allowlist cannot do: an authorised host whose A-record
+ * points at 169.254.169.254 passes every check made against the URL. The compose
+ * below re-checks the rules, so a call site that forgets to ask the guard is
+ * still stopped.
+ *
+ * It does not count requests against the run's ceiling. The caller that made the
+ * request already did, and counting the same request twice would halve the
+ * budget the customer authorised.
  */
 export function createScopedDispatcher(guard: ScopeGuard): Dispatcher {
   const allowPrivate = guard.policy.allowPrivateNetworkForTesting === true;
@@ -262,7 +282,9 @@ export function createScopedDispatcher(guard: ScopeGuard): Dispatcher {
   }).compose((dispatch) => (options, handler) => {
     const origin = typeof options.origin === 'string' ? options.origin : options.origin?.origin;
     const url = `${origin ?? ''}${options.path ?? ''}`;
-    const decision = guard.check(url, options.method ?? 'GET');
+    const decision = guard.check(url, options.method ?? 'GET', Date.now(), {
+      countThisRequest: false,
+    });
     if (!decision.allowed) {
       throw new ScopeViolationError(`Blocked by scope policy: ${decision.reason}`, {
         url,

@@ -129,6 +129,9 @@ importers:
       '@vibefycode/governance':
         specifier: workspace:*
         version: link:../../packages/governance
+      '@vibefycode/notify':
+        specifier: workspace:*
+        version: link:../../packages/notify
       '@vibefycode/policy':
         specifier: workspace:*
         version: link:../../packages/policy
@@ -223,6 +226,9 @@ importers:
       playwright:
         specifier: 1.62.1
         version: 1.62.1
+      undici:
+        specifier: 8.10.0
+        version: 8.10.0
     devDependencies:
       '@types/node':
         specifier: 26.2.0
