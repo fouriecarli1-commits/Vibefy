@@ -41,7 +41,7 @@ let pool: Pool;
 let owner: SeededAccount;
 let reviewer: SeededAccount;
 
-const generated = generateSigningKey('vibefy-badge-test');
+const generated = generateSigningKey('vibefycode-badge-test');
 const privateKey = privateKeyFromBase64(generated.privateKeyB64);
 const key = {
   kid: generated.kid,
@@ -72,7 +72,7 @@ async function approvedAssessment(
 
 beforeAll(async () => {
   db = await connect();
-  const dsn = new URL(process.env.VIBEFY_TEST_DSN!);
+  const dsn = new URL(process.env.VIBEFYCODE_TEST_DSN!);
   pool = new Pool({
     host: dsn.searchParams.get('host')!,
     database: dsn.pathname.slice(1),
@@ -396,7 +396,7 @@ describe('the rendered badge', () => {
     appName: 'Kettle',
     rubricVersion: '1.0.0',
     assessedOn: '2026-08-22',
-    verificationUrl: 'https://verify.vibefy.example/a/kettle-a1b2',
+    verificationUrl: 'https://verify.vibefycode.example/a/kettle-a1b2',
   };
 
   it('carries the rubric version and the assessment date in its accessible name', () => {
@@ -410,7 +410,7 @@ describe('the rendered badge', () => {
     for (const status of ['suspended', 'expired', 'revoked'] as const) {
       const svg = renderBadgeSvg({ ...facts, status });
       expect(svg, status).toContain('Not currently');
-      expect(svg, status).not.toMatch(/aria-label="Verified by Vibefy/);
+      expect(svg, status).not.toMatch(/aria-label="Verified by VibefyCode/);
     }
   });
 
@@ -434,7 +434,7 @@ describe('the rendered badge', () => {
 
   it('renders a generic master with no application named, for print', () => {
     const svg = renderBadgeSvg({ status: 'active' });
-    expect(svg).toContain('Verified by Vibefy');
+    expect(svg).toContain('Verified by VibefyCode');
     expect(svg).not.toContain('assessed ');
   });
 });

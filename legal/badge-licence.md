@@ -1,15 +1,23 @@
-# Vibefy Badge Licence Agreement
+# VibefyCode Badge Licence Agreement
 
 > **DRAFT — REQUIRES REVIEW BY QUALIFIED COUNSEL IN [JURISDICTION] BEFORE USE.**
 > Not legal advice. Not a substitute for a lawyer.
 
-**Version:** 1.1.0-draft · **Status:** not in force · **Baseline:** GDPR-grade
+**Version:** 2.0.0-draft · **Status:** not in force · **Baseline:** GDPR-grade
 
 ---
 
 ## 1. What is licensed
 
-"Verified by Vibefy" and the Vibefy badge device (together, the **Mark**) are trade marks of
+<!-- vibefycode-copy-lint-allow-block: a licence that renames its own mark has to name the old one, or the customer cannot tell what changed -->
+> **This version renames the Mark.** Until version 1.1.0-draft the licensed mark read "Verified by
+> Vibefy". It now reads **"Verified by VibefyCode"**, and the badge device has been redrawn from new
+> supplied artwork.
+<!-- vibefycode-copy-lint-allow-block-end --> That is a change to the thing being licensed, not a clarification, so an
+> acceptance of an earlier version does not carry forward: no badge issues or renews until this
+> version is accepted.
+
+"Verified by VibefyCode" and the VibefyCode badge device (together, the **Mark**) are trade marks of
 [LEGAL_ENTITY]. Where your application has been assessed, met the published threshold, and been
 approved by a human reviewer, we grant you a **limited, non-exclusive, non-transferable,
 revocable licence** to display the Mark for that application, for the period stated on the
@@ -37,16 +45,16 @@ company generally, your marketing claims about security, or any successor applic
 
 ## 3. What you may say, and what you may not
 
-**Permitted:** "Verified by Vibefy", "Vibefy-assessed", "Vibefy Rubric v1.0.0 — score 82/100".
+**Permitted:** "Verified by VibefyCode", "VibefyCode-assessed", "VibefyCode Rubric v1.0.0 — score 82/100".
 
-<!-- vibefy-copy-lint-allow-block: the Licence has to name the phrases it prohibits; this is the one place those words are permitted to appear -->
+<!-- vibefycode-copy-lint-allow-block: the Licence has to name the phrases it prohibits; this is the one place those words are permitted to appear -->
 
-**Not permitted**, because they claim more than we assessed: "Vibefy Verified Secure", "Vibefy
-Certified Safe", "Vibefy Approved", "Guaranteed by Vibefy", "Vibefy Compliant", or any
-formulation implying that Vibefy has certified your application as free of defects, lawful, or
+**Not permitted**, because they claim more than we assessed: "VibefyCode Verified Secure", "VibefyCode
+Certified Safe", "VibefyCode Approved", "Guaranteed by VibefyCode", "VibefyCode Compliant", or any
+formulation implying that VibefyCode has certified your application as free of defects, lawful, or
 fit for a purpose.
 
-<!-- vibefy-copy-lint-allow-block-end --> You may not present a Vibefy assessment as a penetration test, a security
+<!-- vibefycode-copy-lint-allow-block-end --> You may not present a VibefyCode assessment as a penetration test, a security
 
 audit or a compliance certification.
 
@@ -83,7 +91,7 @@ suspension that is not caused by an immediate safety concern.
 
 ## 8. The public directory
 
-While a badge is live, the application is listed in the public Vibefy directory. The listing
+While a badge is live, the application is listed in the public VibefyCode directory. The listing
 shows the application's name, the origin the badge certifies, the overall score, the score by
 dimension, the rubric version and the date of assessment. It shows nothing that is not already
 on the verification page that badge links to.

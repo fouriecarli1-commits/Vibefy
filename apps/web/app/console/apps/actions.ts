@@ -11,8 +11,8 @@ import {
   permittedScopeFor,
   screenIntake,
   verifyOwnership,
-} from '@vibefy/engine/authorisation';
-import { decideAssessmentRequest, resolvePlan } from '@vibefy/billing';
+} from '@vibefycode/engine/authorisation';
+import { decideAssessmentRequest, resolvePlan } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser } from '@/lib/sql';
 

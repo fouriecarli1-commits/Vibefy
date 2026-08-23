@@ -1,7 +1,7 @@
 /**
  * Badge integrity — the signing layer.
  *
- * Vibefy's asset is the credibility of the mark. These tests are about the one
+ * VibefyCode's asset is the credibility of the mark. These tests are about the one
  * thing that could destroy it outright: a badge somebody else could produce.
  * They also pin down the distinction the whole scheme rests on — that a
  * signature attests a historical fact, not current standing.
@@ -28,7 +28,7 @@ function keyFrom(kid: string) {
   return { kid, privateKey, jwk: toJwk(createPublicKey(privateKey), kid) };
 }
 
-const key = keyFrom('vibefy-badge-2026-08');
+const key = keyFrom('vibefycode-badge-2026-08');
 const otherKey = keyFrom('someone-elses-key');
 const keySet = buildKeySet(key);
 
@@ -110,7 +110,7 @@ describe('a badge somebody else made', () => {
     const result = verifyBadge(tampered, keySet);
     expect(result.signatureValid).toBe(false);
     expect(result.failures).toContain('bad_signature');
-    expect(result.explanation).toMatch(/altered, or Vibefy did not issue it/);
+    expect(result.explanation).toMatch(/altered, or VibefyCode did not issue it/);
   });
 
   it.each([
@@ -128,12 +128,12 @@ describe('a badge somebody else made', () => {
     expect(result.signatureValid).toBe(false);
   });
 
-  it('does not verify when signed with a key Vibefy does not publish', () => {
+  it('does not verify when signed with a key VibefyCode does not publish', () => {
     const forged = signBadge(payload({ kid: otherKey.kid }), otherKey);
     const result = verifyBadge(forged, keySet);
     expect(result.signatureValid).toBe(false);
     expect(result.failures).toContain('unknown_key');
-    expect(result.explanation).toMatch(/Vibefy did not issue it/);
+    expect(result.explanation).toMatch(/VibefyCode did not issue it/);
   });
 
   it('does not verify when the signature is swapped in from another badge', () => {

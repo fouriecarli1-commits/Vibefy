@@ -1,6 +1,6 @@
 # Local Supabase configuration. Production settings live in the Supabase
 # dashboard and the platform secret store, never here.
-project_id = "vibefy"
+project_id = "vibefycode"
 
 [api]
 enabled = true
@@ -41,7 +41,7 @@ enable_signup = true
 enable_signup = true
 enable_confirmations = true
 double_confirm_changes = true
-# Vibefy is a security product. A six-character password would be embarrassing.
+# VibefyCode is a security product. A six-character password would be embarrassing.
 [auth.email.template]
 
 [analytics]

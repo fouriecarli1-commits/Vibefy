@@ -22,7 +22,7 @@ import {
   type PushSender,
   type PushableAlert,
   type PushRecipient,
-} from '@vibefy/api';
+} from '@vibefycode/api';
 import type { PoolClient } from 'pg';
 
 type Logger = (message: string, detail?: Record<string, unknown>) => void;

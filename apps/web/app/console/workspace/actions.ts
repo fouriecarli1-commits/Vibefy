@@ -2,8 +2,8 @@
 
 import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
-import { verifyDnsTxt, DNS_RECORD_PREFIX } from '@vibefy/engine/authorisation';
-import { canAccept, createInvitationToken, hashInvitationToken } from '@vibefy/workspace';
+import { verifyDnsTxt, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisation';
+import { canAccept, createInvitationToken, hashInvitationToken } from '@vibefycode/workspace';
 import { createClient } from '@/lib/supabase/server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -280,7 +280,7 @@ function optionalScore(value: FormDataEntryValue | null): number | null {
  *
  * Every field here is a floor the organisation requires. There is deliberately
  * no field that raises anything: a profile can fail an application the rubric
- * passed, and the type in `@vibefy/policy` structurally cannot express the
+ * passed, and the type in `@vibefycode/policy` structurally cannot express the
  * reverse.
  */
 export async function savePolicyProfile(
@@ -376,7 +376,7 @@ const MAX_LOGO_BYTES = 128 * 1024;
  * Two guardrails are enforced here rather than trusted: the logo is small enough
  * to embed in a PDF that must render with no network, and the accent colour is
  * only used by the renderer if it is legible on the report surface. Neither the
- * badge nor the Vibefy wordmark is touched by any of this — the report always
+ * badge nor the VibefyCode wordmark is touched by any of this — the report always
  * says who performed the assessment.
  */
 export async function saveBranding(
@@ -424,7 +424,7 @@ export async function saveBranding(
   revalidatePath(`/console/workspace/${organisationId}/branding`);
   return {
     notice:
-      'Saved. Reports for this workspace now carry your cover block, and still state that Vibefy carried out the assessment against the published rubric.',
+      'Saved. Reports for this workspace now carry your cover block, and still state that VibefyCode carried out the assessment against the published rubric.',
   };
 }
 

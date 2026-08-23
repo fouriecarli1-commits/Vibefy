@@ -2,7 +2,7 @@
 /**
  * Secret scanner.
  *
- * Vibefy's rubric penalises apps for hardcoded credentials. Leaking our own would end the
+ * VibefyCode's rubric penalises apps for hardcoded credentials. Leaking our own would end the
  * business's credibility before its first customer, so this runs in CI and as a pre-commit
  * hook. It is deliberately dependency-free: a scanner that stops working when an install
  * fails is not a scanner.

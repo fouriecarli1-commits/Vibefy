@@ -5,7 +5,7 @@ import {
   WebhookVerificationError,
   applyBillingEvent,
   type PaymentProvider,
-} from '@vibefy/billing';
+} from '@vibefycode/billing';
 import { writeAsService } from '@/lib/sql';
 
 /**

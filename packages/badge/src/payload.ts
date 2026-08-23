@@ -5,7 +5,7 @@
  * the whole business rests on people trusting it and on us never claiming more
  * than it says.
  *
- * **The signature attests a historical fact:** that Vibefy assessed this
+ * **The signature attests a historical fact:** that VibefyCode assessed this
  * application, against this rubric version, on this date, and it scored this.
  * That fact does not stop being true when a badge is revoked, so the signature
  * keeps verifying. A third party can check it offline, forever, without asking

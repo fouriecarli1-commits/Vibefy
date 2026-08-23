@@ -350,7 +350,7 @@ function cookieChecks(response: ScopedResponse): RawFinding[] {
 
   const problems: string[] = [];
   const lower = raw.toLowerCase();
-  // vibefy-copy-lint-allow: "Secure" here is the cookie attribute name, not a claim about the application
+  // vibefycode-copy-lint-allow: "Secure" here is the cookie attribute name, not a claim about the application
   if (!lower.includes('secure')) problems.push('Secure');
   if (!lower.includes('httponly')) problems.push('HttpOnly');
   if (!lower.includes('samesite')) problems.push('SameSite');

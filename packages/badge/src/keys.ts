@@ -90,8 +90,8 @@ export interface SigningKey {
  * sign say so by using `requireSigningKey`.
  */
 export function loadSigningKey(env: NodeJS.ProcessEnv = process.env): SigningKey | null {
-  const base64 = env.VIBEFY_BADGE_SIGNING_KEY_B64;
-  const kid = env.VIBEFY_BADGE_KEY_ID;
+  const base64 = env.VIBEFYCODE_BADGE_SIGNING_KEY_B64;
+  const kid = env.VIBEFYCODE_BADGE_KEY_ID;
   if (!base64 || !kid) return null;
 
   const privateKey = privateKeyFromBase64(base64);
@@ -102,7 +102,7 @@ export function requireSigningKey(env: NodeJS.ProcessEnv = process.env): Signing
   const key = loadSigningKey(env);
   if (!key) {
     throw new KeyError(
-      'No badge signing key is configured. Set VIBEFY_BADGE_SIGNING_KEY_B64 and VIBEFY_BADGE_KEY_ID in the platform secret store — never in the repository.',
+      'No badge signing key is configured. Set VIBEFYCODE_BADGE_SIGNING_KEY_B64 and VIBEFYCODE_BADGE_KEY_ID in the platform secret store — never in the repository.',
     );
   }
   return key;
@@ -113,7 +113,7 @@ export function requireSigningKey(env: NodeJS.ProcessEnv = process.env): Signing
  *
  * Retired keys stay published forever. Removing one would silently break every
  * badge it ever signed, and a verifier that suddenly fails has no way to tell
- * "this badge is forged" from "Vibefy tidied up its keys".
+ * "this badge is forged" from "VibefyCode tidied up its keys".
  */
 export function buildKeySet(active: SigningKey | null, retired: readonly PublicJwk[] = []): KeySet {
   const keys: PublicJwk[] = [...retired];
@@ -123,14 +123,14 @@ export function buildKeySet(active: SigningKey | null, retired: readonly PublicJ
 
 /** Retired public keys, published alongside the active one. */
 export function loadRetiredKeys(env: NodeJS.ProcessEnv = process.env): PublicJwk[] {
-  const raw = env.VIBEFY_BADGE_RETIRED_KEYS;
+  const raw = env.VIBEFYCODE_BADGE_RETIRED_KEYS;
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as PublicJwk[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     throw new KeyError(
-      'VIBEFY_BADGE_RETIRED_KEYS is not valid JSON. Refusing to publish an incomplete key set.',
+      'VIBEFYCODE_BADGE_RETIRED_KEYS is not valid JSON. Refusing to publish an incomplete key set.',
     );
   }
 }

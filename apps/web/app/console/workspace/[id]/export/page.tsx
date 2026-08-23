@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { AUDIT_EXPORT_KINDS } from '@vibefy/workspace';
+import { AUDIT_EXPORT_KINDS } from '@vibefycode/workspace';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Audit export' };

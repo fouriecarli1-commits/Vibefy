@@ -1,4 +1,4 @@
-# Vibefy mobile
+# VibefyCode mobile
 
 Expo (React Native) app. Read-and-monitor first, per PART 2 of the build brief: submit an
 application, track it, read a report, receive alerts, approve a re-test. It is deliberately not
@@ -14,7 +14,7 @@ Account tab rather than letting somebody discover it halfway through.
 
 ```bash
 cp .env.example .env.local          # at the repo root
-EXPO_PUBLIC_SUPABASE_URL=... EXPO_PUBLIC_SUPABASE_ANON_KEY=... pnpm -F @vibefy/mobile start
+EXPO_PUBLIC_SUPABASE_URL=... EXPO_PUBLIC_SUPABASE_ANON_KEY=... pnpm -F @vibefycode/mobile start
 ```
 
 Both values are public by design — the anon key is meant to be shipped, because row-level

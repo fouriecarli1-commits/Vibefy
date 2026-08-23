@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getRubric } from '@vibefy/rubric';
+import { getRubric } from '@vibefycode/rubric';
 
 export default function HomePage() {
   const rubric = getRubric();
@@ -11,10 +11,10 @@ export default function HomePage() {
           The vibe app rating system
         </p>
         <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
-          The trust layer for <span className="vibefy-gradient-text">AI-built apps</span>
+          The trust layer for <span className="vibefycode-gradient-text">AI-built apps</span>
         </h1>
         <p className="max-w-2xl text-lg text-muted">
-          You built it fast. Vibefy tells you — with evidence — what a first real user, an app store
+          You built it fast. VibefyCode tells you — with evidence — what a first real user, an app store
           reviewer, or someone poking at your API would find. Every finding carries a screenshot, a
           trace or an HTTP exchange. Nothing we cannot evidence gets published.
         </p>
@@ -57,7 +57,7 @@ export default function HomePage() {
         className="rounded-xl border border-line bg-surface-muted p-6"
       >
         <h2 id="scope-heading" className="text-lg font-semibold">
-          What a Vibefy assessment is not
+          What a VibefyCode assessment is not
         </h2>
         <p className="mt-3 max-w-3xl text-sm text-muted">
           It is not a penetration test, a security audit, a code audit, a legal or regulatory

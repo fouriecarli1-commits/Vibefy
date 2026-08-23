@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { seatVerdict } from '@vibefy/workspace';
+import { seatVerdict } from '@vibefycode/workspace';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { changeRole, inviteMember, removeMember, revokeInvitation } from '../../actions';

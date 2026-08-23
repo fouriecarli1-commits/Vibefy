@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { createVibefyClient } from '@vibefy/api';
+import { createVibefyCodeClient } from '@vibefycode/api';
 
 /**
  * The phone's client.
@@ -20,8 +20,8 @@ const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? extra.supabaseAnonK
 if (!url || !anonKey) {
   // Loud, on first import, rather than a confusing empty screen later.
   console.warn(
-    'Vibefy: EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are not set. See apps/mobile/README.md.',
+    'VibefyCode: EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are not set. See apps/mobile/README.md.',
   );
 }
 
-export const supabase = createVibefyClient({ url, anonKey, storage: AsyncStorage });
+export const supabase = createVibefyCodeClient({ url, anonKey, storage: AsyncStorage });

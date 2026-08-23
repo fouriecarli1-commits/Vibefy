@@ -32,7 +32,7 @@ async function queueRequest(
 
 beforeAll(async () => {
   db = await connect();
-  const dsn = new URL(process.env.VIBEFY_TEST_DSN!);
+  const dsn = new URL(process.env.VIBEFYCODE_TEST_DSN!);
   pool = new Pool({
     host: dsn.searchParams.get('host')!,
     database: dsn.pathname.slice(1),

@@ -10,13 +10,13 @@ import {
   MARKETING_CLIENT_DISCLOSURE,
   type DirectoryEntry,
   type SortKey,
-} from '@vibefy/directory';
+} from '@vibefycode/directory';
 import { readAsAnon } from '@/lib/sql';
 
 export const metadata: Metadata = {
   title: 'Directory',
   description:
-    'Applications with a live Verified by Vibefy badge, ordered by the published rubric. Placement is not for sale.',
+    'Applications with a live Verified by VibefyCode badge, ordered by the published rubric. Placement is not for sale.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -100,7 +100,7 @@ export default async function DirectoryPage({
       <header className="max-w-2xl space-y-3">
         <h1 className="text-3xl font-bold tracking-tight">Directory</h1>
         <p className="text-muted">
-          Applications with a live &ldquo;Verified by Vibefy&rdquo; badge. A listing appears only
+          Applications with a live &ldquo;Verified by VibefyCode&rdquo; badge. A listing appears only
           while the badge is live: if one is suspended, expires or is revoked, its listing goes with
           it in the same instant.
         </p>

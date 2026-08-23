@@ -187,7 +187,7 @@ create trigger workspace_branding_set_updated_at
   for each row execute function public.set_updated_at();
 
 comment on table public.workspace_branding is
-  'An agency''s own cover block on a report it hands to a client. It never touches the Vibefy marks, and the report always states who performed the assessment.';
+  'An agency''s own cover block on a report it hands to a client. It never touches the VibefyCode marks, and the report always states who performed the assessment.';
 
 -- -----------------------------------------------------------------------------
 -- Single sign-on

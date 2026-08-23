@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Reporting infringing material on Vibefy
+## 1. Reporting infringing material on VibefyCode
 
 Send to [CONTACT_EMAIL] with the subject `IP NOTICE`:
 
@@ -35,9 +35,9 @@ proceedings.
 
 Accounts that are the subject of repeated valid notices are terminated.
 
-## 4. Misuse of the Vibefy mark
+## 4. Misuse of the VibefyCode mark
 
-This is the reverse case: someone displaying "Verified by Vibefy" without a current licence.
+This is the reverse case: someone displaying "Verified by VibefyCode" without a current licence.
 Report it to [CONTACT_EMAIL] with the URL. We verify against our badge register — which is
 authoritative, because we serve every legitimate badge ourselves — and where the display is
 unlicensed we will contact the operator, publish the revocation where one applies, and pursue

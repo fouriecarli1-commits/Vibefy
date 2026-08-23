@@ -151,7 +151,7 @@ describe('the evaluation cannot carry a score back', () => {
       readFileSync(join(process.cwd(), 'packages/rubric/package.json'), 'utf8'),
     ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     expect(Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })).not.toContain(
-      '@vibefy/policy',
+      '@vibefycode/policy',
     );
   });
 
@@ -181,7 +181,7 @@ describe('the evaluation cannot carry a score back', () => {
     } as const;
 
     const fingerprint = (html: string) =>
-      /vibefy-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
+      /vibefycode-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
 
     const plain = renderReport(base, 'paid');
     const withPolicy = renderReport(

@@ -1,12 +1,12 @@
 /**
  * The disclosures a listing carries.
  *
- * The paid-relationship sentence itself lives in `@vibefy/shared` and is
+ * The paid-relationship sentence itself lives in `@vibefycode/shared` and is
  * re-exported here, because PART 8.1 requires it wherever a rating is displayed
  * and two surfaces wording it differently is how the softer wording ends up in
  * the place people actually look.
  */
-import { MARKETING_CLIENT_DISCLOSURE } from '@vibefy/shared';
+import { MARKETING_CLIENT_DISCLOSURE } from '@vibefycode/shared';
 
 export { MARKETING_CLIENT_DISCLOSURE };
 

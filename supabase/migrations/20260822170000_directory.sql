@@ -11,7 +11,7 @@
 --
 --   2. There is no column here through which money could affect placement. Not
 --      a rank, not a weight, not a boost. The ordering the directory uses is
---      computed in `@vibefy/directory` from a type that structurally cannot
+--      computed in `@vibefycode/directory` from a type that structurally cannot
 --      carry a commercial field, and the marketing-client flag is carried only
 --      so that it can be *disclosed*.
 -- =============================================================================

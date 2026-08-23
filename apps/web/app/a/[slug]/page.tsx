@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { scopeStatement, AI_DISCLOSURE, MARKETING_CLIENT_DISCLOSURE } from '@vibefy/shared';
+import { scopeStatement, AI_DISCLOSURE, MARKETING_CLIENT_DISCLOSURE } from '@vibefycode/shared';
 import { readAsAnon } from '@/lib/sql';
 
 /**
  * The verification page.
  *
- * "Verified by Vibefy" is defensible only because this page defines precisely
+ * "Verified by VibefyCode" is defensible only because this page defines precisely
  * what was verified. The mark is a pointer; this is the substance — so the
  * scope-and-limitations block sits above the fold, before the score, not in a
  * footer where nobody reads it.
@@ -52,8 +52,8 @@ export async function generateMetadata({
   const badge = await loadBadge(slug).catch(() => null);
   if (!badge) return { title: 'Badge not found' };
   return {
-    title: `${badge.app_name} — Verified by Vibefy`,
-    description: `${badge.app_name} was assessed against Vibefy Rubric v${badge.rubric_version} on ${new Date(badge.assessed_at).toISOString().slice(0, 10)}. Scope-limited assessment, not a security guarantee.`,
+    title: `${badge.app_name} — Verified by VibefyCode`,
+    description: `${badge.app_name} was assessed against VibefyCode Rubric v${badge.rubric_version} on ${new Date(badge.assessed_at).toISOString().slice(0, 10)}. Scope-limited assessment, not a security guarantee.`,
     robots: { index: badge.status === 'active', follow: true },
   };
 }
@@ -82,7 +82,7 @@ const STATUS_COPY: Record<BadgeRecord['status'], { label: string; tone: string; 
       label: 'Revoked',
       tone: 'text-bad',
       meaning:
-        'Vibefy withdrew this badge. It must not be displayed anywhere, and displaying it is a breach of the Badge Licence.',
+        'VibefyCode withdrew this badge. It must not be displayed anywhere, and displaying it is a breach of the Badge Licence.',
     },
   };
 
@@ -102,7 +102,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/badge/${badge.public_id}.svg`}
-            alt={`Verified by Vibefy — ${badge.app_name}, Rubric v${badge.rubric_version}, assessed ${assessedOn}. Scope-limited assessment, not a security guarantee.`}
+            alt={`Verified by VibefyCode — ${badge.app_name}, Rubric v${badge.rubric_version}, assessed ${assessedOn}. Scope-limited assessment, not a security guarantee.`}
             width={128}
             height={128}
           />
@@ -180,7 +180,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
         </h2>
         <p className="max-w-prose text-muted">
           You do not have to take our word for it. The payload below is signed with Ed25519, and the
-          public key is published at <code>{`${verifyOrigin}/.well-known/vibefy-badge-key`}</code>.
+          public key is published at <code>{`${verifyOrigin}/.well-known/vibefycode-badge-key`}</code>.
           Any JOSE library can verify it without contacting us.
         </p>
         <p className="max-w-prose text-sm text-muted">
@@ -206,7 +206,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
       <footer className="border-t border-line pt-6 text-sm text-muted">
         <p>
           Reports are prepared for the customer. No third party — including investors, acquirers or
-          end users — may rely on a Vibefy assessment. If you believe this badge is being displayed
+          end users — may rely on a VibefyCode assessment. If you believe this badge is being displayed
           improperly, <Link href="/legal/ip-takedown">tell us</Link>.
         </p>
       </footer>

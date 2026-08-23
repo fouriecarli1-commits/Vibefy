@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { assembleReportSource, renderReport } from '@vibefy/report';
-import { resolvePlan } from '@vibefy/billing';
+import { assembleReportSource, renderReport } from '@vibefycode/report';
+import { resolvePlan } from '@vibefycode/billing';
 import { ActionForm, Field } from '@/components/action-form';
 import { submitAppeal } from '@/app/console/privacy/actions';
 import { createClient } from '@/lib/supabase/server';

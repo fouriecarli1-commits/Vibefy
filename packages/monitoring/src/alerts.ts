@@ -98,7 +98,7 @@ export function badgeSuspendedAlert(
   return {
     kind: 'badge_suspended',
     severity: 'critical',
-    title: `${appName}: Verified by Vibefy badge suspended`,
+    title: `${appName}: Verified by VibefyCode badge suspended`,
     body:
       `The badge for ${appName} has been suspended and its verification page now shows it as ` +
       `suspended. Reason: ${reason} Please remove the badge from your site until it is restored — ` +
@@ -152,7 +152,7 @@ export function badgeExpiringAlert(
     severity: daysRemaining <= 7 ? 'warning' : 'info',
     title: `${appName}: badge expires on ${day(expiresAt)}`,
     body:
-      `The Verified by Vibefy badge for ${appName} expires in ${daysRemaining} days, on ${day(expiresAt)}. ` +
+      `The Verified by VibefyCode badge for ${appName} expires in ${daysRemaining} days, on ${day(expiresAt)}. ` +
       `After that its verification page reads as expired. Request a re-assessment to renew it.`,
     appId,
     badgeId,

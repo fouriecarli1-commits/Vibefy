@@ -1,7 +1,7 @@
 -- =============================================================================
--- 0005 — The badge system: "Verified by Vibefy"
+-- 0005 — The badge system: "Verified by VibefyCode"
 --
--- Vibefy's asset is not the testing, it is the credibility of the mark. A badge
+-- VibefyCode's asset is not the testing, it is the credibility of the mark. A badge
 -- that can be forged, cannot be revoked, or can be bought rather than earned
 -- destroys the business, so this table is treated as security-critical
 -- infrastructure at the same level as authentication.
@@ -43,7 +43,7 @@ create table public.badges (
   certified_origin    text not null check (certified_origin ~* '^https://[a-z0-9.-]+(:\d+)?$'),
 
   -- Ed25519 over the canonical payload. Third parties verify against the public
-  -- key at verify.<domain>/.well-known/vibefy-badge-key without contacting us.
+  -- key at verify.<domain>/.well-known/vibefycode-badge-key without contacting us.
   payload             jsonb not null,
   signature           text not null,
   signing_key_id      text not null,

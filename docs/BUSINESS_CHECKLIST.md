@@ -1,6 +1,6 @@
 # Business checklist
 
-Non-code work that must be finished before Vibefy takes a single paying customer.
+Non-code work that must be finished before VibefyCode takes a single paying customer.
 Claude Code maintains this list; the founder ticks the boxes.
 
 ## Before the first paying customer
@@ -14,8 +14,8 @@ Claude Code maintains this list; the founder ticks the boxes.
 
 ## Before any brand spend
 
-- [ ] **Trademark search for "Vibefy"** in the primary markets, classes **42** (software services) and **35** (business/advertising services).
-- [ ] **Trademark search for the "Verified by Vibefy" badge mark**, same classes.
+- [ ] **Trademark search for "VibefyCode"** in the primary markets, classes **42** (software services) and **35** (business/advertising services).
+- [ ] **Trademark search for the "Verified by VibefyCode" badge mark**, same classes.
 - [ ] Domain availability and acquisition: primary domain plus the `verify.` subdomain.
 - [ ] App Store and Play Store developer-name availability check.
 - [ ] Social handle availability check.

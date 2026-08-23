@@ -4,11 +4,11 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Vibefy — the vibe app rating system',
-    template: '%s · Vibefy',
+    default: 'VibefyCode — the vibe app rating system',
+    template: '%s · VibefyCode',
   },
   description:
-    'Vibefy assesses AI-built apps against a published rubric and issues a revocable, point-in-time "Verified by Vibefy" mark. Scope-limited assessment, not a security guarantee.',
+    'VibefyCode assesses AI-built apps against a published rubric and issues a revocable, point-in-time "Verified by VibefyCode" mark. Scope-limited assessment, not a security guarantee.',
   icons: {
     icon: [
       { url: '/brand/favicon-32.png', sizes: '32x32' },
@@ -36,8 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           >
             <Link href="/" className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/vibefy-mark.svg" alt="" width={36} height={36} aria-hidden="true" />
-              <span className="text-lg font-bold tracking-tight">Vibefy</span>
+              <img src="/brand/vibefycode-mark.svg" alt="" width={36} height={36} aria-hidden="true" />
+              <span className="text-lg font-bold tracking-tight">VibefyCode</span>
             </Link>
             <div className="ml-auto flex flex-wrap items-center gap-5 text-sm">
               <Link href="/directory">Directory</Link>
@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="mt-16 border-t border-line">
           <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-muted">
             <p className="max-w-3xl">
-              A Vibefy assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed
+              A VibefyCode assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed
               evaluation against a published rubric version on a stated date. It is not a
               penetration test, a security audit, or a guarantee of any kind. Absence of a finding
               is not evidence of absence of a defect.
@@ -79,7 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/legal/responsible-disclosure">Responsible disclosure</Link>
               <Link href="/verify">Check a badge</Link>
             </p>
-            <p className="mt-4">© {new Date().getFullYear()} Vibefy</p>
+            <p className="mt-4">© {new Date().getFullYear()} VibefyCode</p>
           </div>
         </footer>
       </body>

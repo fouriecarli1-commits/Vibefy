@@ -6,7 +6,9 @@
  * catch, and stays silent on legitimate usage.
  */
 import { describe, expect, it } from 'vitest';
-import { lintText, FORBIDDEN_PHRASES } from '../tools/copy-lint.mjs';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { lintText, runCopyLint, FORBIDDEN_PHRASES } from '../tools/copy-lint.mjs';
 import { scanText } from '../tools/secret-scan.mjs';
 import {
   contrastRatio,
@@ -22,7 +24,7 @@ describe('copy lint', () => {
   });
 
   it('rejects extensions of the certification mark', () => {
-    for (const claim of ['Vibefy Certified', 'Vibefy Trusted', 'Approved by Vibefy']) {
+    for (const claim of ['VibefyCode Certified', 'VibefyCode Trusted', 'Approved by VibefyCode']) {
       const violations = lintText(claim);
       expect(
         violations.some((v) => v.rule === 'mark-extension' || v.rule === 'forbidden-phrase'),
@@ -33,9 +35,9 @@ describe('copy lint', () => {
 
   it('accepts the permitted forms of the mark', () => {
     for (const permitted of [
-      'Verified by Vibefy',
-      'Vibefy-assessed',
-      'Vibefy Rubric v1.0.0 — score 82/100',
+      'Verified by VibefyCode',
+      'VibefyCode-assessed',
+      'VibefyCode Rubric v1.0.0 — score 82/100',
     ]) {
       expect(lintText(permitted), permitted).toHaveLength(0);
     }
@@ -55,15 +57,15 @@ describe('copy lint', () => {
   });
 
   it('rejects a suppression that gives no reason', () => {
-    const violations = lintText(['// vibefy-copy-lint-allow:', 'const label = "safe";'].join('\n'));
+    const violations = lintText(['// vibefycode-copy-lint-allow:', 'const label = "safe";'].join('\n'));
     expect(violations.some((v) => v.rule === 'suppression-without-reason')).toBe(true);
   });
 
   it('honours a reasoned block suppression, which the Badge Licence needs to name what it forbids', () => {
     const source = [
-      '<!-- vibefy-copy-lint-allow-block: the licence must name the phrases it prohibits -->',
-      'Not permitted: "Vibefy Approved", "Guaranteed by Vibefy".',
-      '<!-- vibefy-copy-lint-allow-block-end -->',
+      '<!-- vibefycode-copy-lint-allow-block: the licence must name the phrases it prohibits -->',
+      'Not permitted: "VibefyCode Approved", "Guaranteed by VibefyCode".',
+      '<!-- vibefycode-copy-lint-allow-block-end -->',
       'Everything after the block is checked again.',
     ].join('\n');
     expect(lintText(source)).toHaveLength(0);
@@ -71,26 +73,26 @@ describe('copy lint', () => {
 
   it('rejects a block suppression with no reason', () => {
     const source = [
-      '<!-- vibefy-copy-lint-allow-block: -->',
-      'Vibefy Approved',
-      '<!-- vibefy-copy-lint-allow-block-end -->',
+      '<!-- vibefycode-copy-lint-allow-block: -->',
+      'VibefyCode Approved',
+      '<!-- vibefycode-copy-lint-allow-block-end -->',
     ].join('\n');
     expect(lintText(source).some((v) => v.rule === 'suppression-without-reason')).toBe(true);
   });
 
   it('rejects a block suppression that is never closed, so it cannot silence a whole file', () => {
     const source = [
-      '<!-- vibefy-copy-lint-allow-block: opened and forgotten -->',
-      'Vibefy Approved',
+      '<!-- vibefycode-copy-lint-allow-block: opened and forgotten -->',
+      'VibefyCode Approved',
     ].join('\n');
     expect(lintText(source).some((v) => v.rule === 'unclosed-suppression')).toBe(true);
   });
 
   it('still checks the lines after a closed block', () => {
     const source = [
-      '<!-- vibefy-copy-lint-allow-block: naming what is prohibited -->',
-      'Vibefy Approved',
-      '<!-- vibefy-copy-lint-allow-block-end -->',
+      '<!-- vibefycode-copy-lint-allow-block: naming what is prohibited -->',
+      'VibefyCode Approved',
+      '<!-- vibefycode-copy-lint-allow-block-end -->',
       '',
       'Your application is secure.',
     ].join('\n');
@@ -99,7 +101,7 @@ describe('copy lint', () => {
 
   it('honours a suppression that gives one', () => {
     const source = [
-      '// vibefy-copy-lint-allow: quoting a store policy verbatim',
+      '// vibefycode-copy-lint-allow: quoting a store policy verbatim',
       'const storePolicy = "the app must be safe";',
     ].join('\n');
     expect(lintText(source).filter((v) => v.rule === 'unqualified-absolute')).toHaveLength(0);
@@ -185,5 +187,30 @@ describe('contrast', () => {
 
   it('still refuses teal as body text on white, which is why it is an accent', () => {
     expect(contrastRatio(resolveToken('brand.teal'), '#FFFFFF')).toBeLessThan(4.5);
+  });
+});
+
+describe('the stale-brand rule', () => {
+  it('catches the old name on its own', () => {
+    const violations = lintText('Your app was assessed by Vibefy.');
+    expect(violations.some((v) => v.rule === 'stale-brand')).toBe(true);
+  });
+
+  it('does not fire on the current name', () => {
+    // The old name is a prefix of the new one, so the rule has to look past it.
+    expect(lintText('Verified by VibefyCode.')).toHaveLength(0);
+    expect(lintText('A VibefyCode assessment is scope-limited.')).toHaveLength(0);
+    expect(lintText('vibefycode-badge-verified.svg')).toHaveLength(0);
+  });
+
+  it('reads the artwork notes, which used to be skipped wholesale', () => {
+    // `brand/source/` was in the linter's skip list because it held binaries.
+    // It now holds prose about the marks, which is what this gate is for.
+    const { fileCount } = runCopyLint();
+    expect(fileCount).toBeGreaterThan(0);
+    expect(
+      readdirSync(join(process.cwd(), 'brand/source')).some((file) => file.endsWith('.md')),
+    ).toBe(true);
+    expect(runCopyLint().violations).toEqual([]);
   });
 });

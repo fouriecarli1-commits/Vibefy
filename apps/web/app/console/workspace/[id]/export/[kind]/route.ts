@@ -4,7 +4,7 @@ import {
   recordAuditExport,
   runAuditExport,
   type AuditExportFormat,
-} from '@vibefy/workspace';
+} from '@vibefycode/workspace';
 import { createClient } from '@/lib/supabase/server';
 import { writeAsUser } from '@/lib/sql';
 
@@ -61,7 +61,7 @@ export async function GET(
         'content-type': result.mediaType,
         'content-disposition': `attachment; filename="${result.filename}"`,
         'cache-control': 'no-store',
-        'x-vibefy-export-sha256': result.sha256,
+        'x-vibefycode-export-sha256': result.sha256,
       },
     });
   } catch (error) {

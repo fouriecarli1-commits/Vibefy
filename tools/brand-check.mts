@@ -8,6 +8,7 @@
  * nothing has been recoloured off-palette, the marks are vector rather than a
  * wrapped raster, and the certification badge carries the wordmark unextended.
  */
+import { SEAL, WORDMARK } from '@vibefycode/shared';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -17,15 +18,16 @@ const svgDir = join(root, 'brand/svg');
 const tokens = JSON.parse(readFileSync(join(root, 'packages/shared/design/tokens.json'), 'utf8'));
 
 const REQUIRED_MASTERS = [
-  'vibefy-mark.svg',
-  'vibefy-mark-mono.svg',
-  'vibefy-mark-mono-dark.svg',
-  'vibefy-logo-horizontal.svg',
-  'vibefy-logo-horizontal-dark.svg',
-  'vibefy-badge-verified.svg',
-  'vibefy-badge-suspended.svg',
-  'vibefy-badge-expired.svg',
-  'vibefy-badge-revoked.svg',
+  'vibefycode-mark.svg',
+  'vibefycode-mark-mono.svg',
+  'vibefycode-mark-mono-dark.svg',
+  'vibefycode-logo-horizontal.svg',
+  'vibefycode-logo-horizontal-dark.svg',
+  'vibefycode-badge-verified.svg',
+  'vibefycode-badge-verified-compact.svg',
+  'vibefycode-badge-suspended.svg',
+  'vibefycode-badge-expired.svg',
+  'vibefycode-badge-revoked.svg',
 ];
 
 /** Every colour any master is allowed to contain. */
@@ -39,9 +41,9 @@ function allowedColours() {
     }
   };
   collect(tokens);
-  // Tints used inside the shield and the check, declared here so that any other
-  // colour appearing in a master is a deliberate decision, not a drift.
-  for (const tint of ['#2E6FE4', '#2AA6DE', '#39E4D2', '#8FF3E8']) values.add(tint);
+  // No allowance beyond the palette. Every colour in every master is a token, so
+  // a new one appearing is a deliberate decision that has to be made in
+  // tokens.json — where the contrast gate can see it.
   return values;
 }
 
@@ -75,23 +77,43 @@ export function runBrandCheck() {
     }
   }
 
-  // The certification badge carries the wordmark, split across three lines, and
-  // nothing that extends it.
-  const badge = existsSync(join(svgDir, 'vibefy-badge-verified.svg'))
-    ? readFileSync(join(svgDir, 'vibefy-badge-verified.svg'), 'utf8')
-    : '';
-  for (const word of ['Verified', 'by', 'Vibefy']) {
-    if (!new RegExp(`>${word}<`).test(badge)) {
-      failures.push(`The certification badge is missing the wordmark line "${word}".`);
-    }
+  // The wordmark, checked where it is decided rather than where it is drawn.
+  //
+  // The seal sets its legends one glyph per <text> so that no renderer's
+  // `textPath` support can decide whether our name appears — which means the
+  // rendered SVG has no contiguous "VERIFIED BY VIBEFYCODE" string to grep for.
+  // So the constants that produce those glyphs are checked instead, and the
+  // accessible name — the thing a screen reader actually announces, and the
+  // thing alt text carries — is checked in the file.
+  if (`${WORDMARK.strong}${WORDMARK.light}` !== 'VIBEFYCODE') {
+    failures.push(
+      `The wordmark halves spell "${WORDMARK.strong}${WORDMARK.light}", not "VIBEFYCODE". The mark is one word in two weights.`,
+    );
   }
-  if (/Secure|Certified|Approved|Guaranteed|Compliant/i.test(badge)) {
-    failures.push('The certification badge extends the mark beyond "Verified by Vibefy".');
+  if (SEAL.bottomArc.text !== 'VERIFIED BY VIBEFYCODE') {
+    failures.push(
+      `The seal's legend reads "${SEAL.bottomArc.text}". The wordmark is exactly "Verified by VibefyCode" and may never be extended.`,
+    );
+  }
+  if (SEAL.topArc.text !== 'VERIFIED BY') {
+    failures.push(`The seal's upper legend reads "${SEAL.topArc.text}", not "VERIFIED BY".`);
+  }
+
+  for (const master of ['vibefycode-badge-verified.svg', 'vibefycode-badge-verified-compact.svg']) {
+    const path = join(svgDir, master);
+    if (!existsSync(path)) continue;
+    const badge = readFileSync(path, 'utf8');
+    if (!/Verified by VibefyCode/.test(badge)) {
+      failures.push(`${master} does not announce "Verified by VibefyCode" as its accessible name.`);
+    }
+    if (/Secure|Certified|Approved|Guaranteed|Compliant/i.test(badge)) {
+      failures.push(`${master} extends the mark beyond "Verified by VibefyCode".`);
+    }
   }
 
   // Every non-active state must say, in words, that it is not a verification.
   for (const state of ['suspended', 'expired', 'revoked']) {
-    const file = join(svgDir, `vibefy-badge-${state}.svg`);
+    const file = join(svgDir, `vibefycode-badge-${state}.svg`);
     if (!existsSync(file)) continue;
     const contents = readFileSync(file, 'utf8');
     if (!/Not currently/i.test(contents)) {
@@ -104,7 +126,7 @@ export function runBrandCheck() {
   const unexpected = readdirSync(svgDir).filter((file) => !REQUIRED_MASTERS.includes(file));
   for (const file of unexpected) {
     failures.push(
-      `${file} is in brand/svg/ but is not a generated master. Derivatives come from tools/brand-build.mjs.`,
+      `${file} is in brand/svg/ but is not a generated master. Derivatives come from tools/brand-build.mts.`,
     );
   }
 

@@ -20,7 +20,7 @@ import type {
   RequestSummary,
 } from './types.ts';
 
-export interface VibefyClientOptions {
+export interface VibefyCodeClientOptions {
   readonly url: string;
   readonly anonKey: string;
   /** Platform storage for the session. React Native passes AsyncStorage; the browser passes nothing. */
@@ -31,7 +31,7 @@ export interface VibefyClientOptions {
   };
 }
 
-export function createVibefyClient(options: VibefyClientOptions): SupabaseClient {
+export function createVibefyCodeClient(options: VibefyCodeClientOptions): SupabaseClient {
   return createClient(options.url, options.anonKey, {
     auth: {
       ...(options.storage ? { storage: options.storage } : {}),

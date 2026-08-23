@@ -1,4 +1,4 @@
-# Vibefy — Kick-off record (PART 12 of the build brief)
+# VibefyCode — Kick-off record (PART 12 of the build brief)
 
 Recorded 2026-08-22. This file is the answer to PART 12 of the build brief and the
 starting point for M0. It is a record, not a specification — the brief remains the
@@ -8,13 +8,13 @@ specification.
 
 ## 1. The brief, read back in fifteen lines
 
-1. Vibefy is a trust layer for AI-built ("vibe-coded") apps, not an app store.
+1. VibefyCode is a trust layer for AI-built ("vibe-coded") apps, not an app store.
 2. An owner submits an app; we prove they are allowed to let us test it; we test it.
 3. Testing is deterministic checks plus a Claude-driven Playwright walkthrough plus an adversarial pass.
 4. Findings are scored against a published, versioned rubric with six weighted dimensions.
 5. Every finding must carry evidence; unverifiable model claims are dropped, never published.
 6. A human reviewer must approve before anything is certified. AI never certifies alone.
-7. Paying customers get a "Verified by Vibefy" badge, served from our origin as a signed SVG.
+7. Paying customers get a "Verified by VibefyCode" badge, served from our origin as a signed SVG.
 8. The badge always links to a public verification page that states exactly what was and was not assessed.
 9. Badges expire (12 months maximum) and can be revoked instantly; revocation propagates because we serve the image.
 10. Payment buys depth, re-testing and monitoring. It never buys a better score, and a test proves it.

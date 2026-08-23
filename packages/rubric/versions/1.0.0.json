@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "name": "Vibefy Rubric",
+  "name": "VibefyCode Rubric",
   "status": "draft",
   "changelog": "First rubric. Six weighted dimensions, severity-and-confidence penalties, and hard gates that no arithmetic can outvote.",
   "certification": {

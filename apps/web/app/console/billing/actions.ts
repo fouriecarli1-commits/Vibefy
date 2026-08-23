@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { redirect } from 'next/navigation';
-import { StripeProvider, type PaymentProvider, type PlanId } from '@vibefy/billing';
+import { StripeProvider, type PaymentProvider, type PlanId } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
 import type { ActionState } from '@/app/console/apps/actions';
 

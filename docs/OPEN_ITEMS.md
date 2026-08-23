@@ -8,10 +8,11 @@ codebase must appear here. Nothing leaves this list silently.
 | Item                                                                      | Blocking                                            | Notes                                                                                   |
 | ------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Legal entity and jurisdiction                                             | Legal drafts can be finalised, not started          | Drafts are written GDPR-grade; selecting a jurisdiction is a variant switch             |
-| Primary domain (`vibefy.app` / `.io` / `getvibefy.com`)                   | Badge origin, email sending domain, OAuth callbacks | `verify.<domain>` must be a separate subdomain from the app                             |
+| Primary domain (`vibefycode.app` / `.io` / `getvibefycode.com`)                   | Badge origin, email sending domain, OAuth callbacks | `verify.<domain>` must be a separate subdomain from the app                             |
 | Contact email                                                             | Legal documents, transactional email `From` address |                                                                                         |
-| Trademark search for "Vibefy" and "Verified by Vibefy", classes 42 and 35 | Brand spend, launch                                 | See `BUSINESS_CHECKLIST.md`; a trust mark we do not own is not a trust mark             |
-| Lossless originals of the two brand marks                                 | Highest-fidelity derivative export                  | Supplied artwork is 300dpi JPEG; vector or PNG originals would improve the traced marks |
+| Trademark search for "VibefyCode" and "Verified by VibefyCode", classes 42 and 35 | Brand spend, launch, and now the public directory                                 | See `BUSINESS_CHECKLIST.md`; a trust mark we do not own is not a trust mark             |
+| **The VibefyCode logo and stamp as files** | Everything derived from them | They arrived as images in conversation, so `brand/source/` is empty and the masters in `brand/svg/` are reconstructions. Drop the originals in — vector if they exist — and re-derive. See `brand/source/README.md`. |
+| **The supplied stamp has a typo in its own name** | Regenerating that artwork | Its outer arc reads "VERIFIED BY VIBFCODE", with a second ghosted arc overlapping. The reconstruction spells it correctly and carries the arc once; fix the source before anything is derived from it. |
 
 ## Deferred by milestone
 
@@ -36,7 +37,7 @@ mistaken for finished.
 | Email alerts are not sent | `alerts.delivery_channel` is only ever `push` | M6 delivers to phones that have the app installed. For everyone else the console is still the only place an alert appears. Adding an email sender is another sweep beside `sweepAlertPush`, not a migration. |
 | EAS build and store submission are not configured | `apps/mobile` | The app runs in Expo Go and a development build. `eas.json`, signing credentials and store listings need the Apple and Google accounts, which follow the legal-entity decision. |
 | The liveness probe bypasses the scope guard | `apps/worker/src/monitoring.ts`, `httpLivenessProbe` | It is a single GET to the badge's own certified origin, which is narrower than any authorised scope. It should still go through the guarded dispatcher so there is one egress path, not two. |
-| Badge fidelity against the supplied artwork | `packages/badge/src/render.ts` | The marks are traced from 300dpi JPEG; vector originals would close the delta. |
+| Badge fidelity against the supplied artwork | `packages/badge/src/render.ts` | The mark and seal are reconstructions from images in conversation, not derivations from files. The delta closes when the originals land in `brand/source/`. |
 | The `verify.` subdomain is not deployed | Routing | The routes exist and work; host-based routing is blocked on the domain decision. |
 | Key-compromise re-signing is manual | `docs/RUNBOOK.md` | Planned rotation is covered by keeping retired keys published. A bulk re-signing script is not written. |
 | Identity-provider registration is an operator step | `/console/workspace/<id>/sso` | The domain claim, DNS verification, enforcement and sign-in routing are built. Registering the SAML/OIDC provider with the auth service is manual, and the console says so. |

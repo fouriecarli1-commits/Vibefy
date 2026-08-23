@@ -46,7 +46,7 @@ let app: FixtureApp;
 let outcome: AssessmentOutcome;
 
 function poolConfig() {
-  const dsn = process.env.VIBEFY_TEST_DSN!;
+  const dsn = process.env.VIBEFYCODE_TEST_DSN!;
   const url = new URL(dsn);
   return { host: url.searchParams.get('host')!, database: url.pathname.slice(1), user: 'postgres' };
 }

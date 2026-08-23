@@ -1,5 +1,5 @@
 {
-  "name": "vibefy",
+  "name": "vibefycode",
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@10.33.0",
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "bash scripts/dev.sh",
-    "build": "pnpm -r --filter ./packages/** build && pnpm --filter @vibefy/web build",
+    "build": "pnpm -r --filter ./packages/** build && pnpm --filter @vibefycode/web build",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,7 +16,7 @@
     "check:copy": "node tools/copy-lint.mjs",
     "check:secrets": "node tools/secret-scan.mjs",
     "check:contrast": "tsx tools/contrast-check.mts",
-    "check:brand": "node tools/brand-check.mjs",
+    "check:brand": "tsx tools/brand-check.mts",
     "verify": "pnpm check:secrets && pnpm check:copy && pnpm check:contrast && pnpm check:brand && pnpm check:stubs && pnpm legal:registry && pnpm typecheck && pnpm test",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
@@ -26,15 +26,15 @@
     "tokens:build": "node tools/tokens-build.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "legal:registry": "node tools/legal-registry.mjs",
-    "dev:worker": "pnpm --filter @vibefy/worker start",
+    "dev:worker": "pnpm --filter @vibefycode/worker start",
     "badge:keygen": "tsx tools/generate-badge-key.mts",
-    "dev:mobile": "pnpm -F @vibefy/mobile start"
+    "dev:mobile": "pnpm -F @vibefycode/mobile start"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
     "@types/pg": "8.23.1",
-    "@vibefy/badge": "workspace:*",
-    "@vibefy/shared": "workspace:*",
+    "@vibefycode/badge": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
     "pg": "8.23.0",
     "playwright": "^1.62.1",
     "prettier": "3.6.2",

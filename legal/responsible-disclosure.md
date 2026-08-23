@@ -35,7 +35,7 @@ people. That is a different situation from an ordinary finding, and it is handle
 Nothing here transfers your obligations to you. You remain the controller of your users' data
 and the person who must notify them.
 
-## Part 2 — Reporting a vulnerability in Vibefy
+## Part 2 — Reporting a vulnerability in VibefyCode
 
 We would rather hear from you than read about it.
 

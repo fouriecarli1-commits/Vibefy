@@ -1,12 +1,12 @@
-# Vibefy
+# VibefyCode
 
-**The vibe app rating system.** Vibefy is the trust and verification layer for AI-built
+**The vibe app rating system.** VibefyCode is the trust and verification layer for AI-built
 ("vibe-coded") apps: an owner submits an app, we verify they are authorised to let us test it,
 we assess it against a published rubric, a human reviews the result, and — for paying
-customers — we issue a revocable, cryptographically signed **"Verified by Vibefy"** badge.
+customers — we issue a revocable, cryptographically signed **"Verified by VibefyCode"** badge.
 
-Vibefy is not an app store, and a Vibefy badge is not a security guarantee. See
-[the scope block](#what-a-vibefy-assessment-is-not).
+VibefyCode is not an app store, and a VibefyCode badge is not a security guarantee. See
+[the scope block](#what-a-vibefycode-assessment-is-not).
 
 ---
 
@@ -14,7 +14,7 @@ Vibefy is not an app store, and a Vibefy badge is not a security guarantee. See
 
 Milestone **M7 — Public directory**. Intake, ownership verification, the authorisation
 gate, the six-stage pipeline, the reviewer queue, reports with PDF export, entitlements, Stripe
-billing, the signed "Verified by Vibefy" badge with its public verification surface, and
+billing, the signed "Verified by VibefyCode" badge with its public verification surface, and
 continuous monitoring, and the agency and organisation surfaces — shared workspaces, seats and
 roles, policy profiles, white-label reports, audit export, single sign-on and the portfolio
 dashboard — the Expo mobile app with push notifications, and the public directory are built. The marketing
@@ -52,7 +52,7 @@ Runs, in order:
 | `check:secrets`  | No credential ever reaches the repository                                                                     |
 | `check:copy`     | No output over-claims — see the forbidden-phrase list in `tools/copy-lint.mjs`                                |
 | `check:contrast` | Every brand colour pair meets WCAG 2.2 AA; we cannot sell an accessibility score from an inaccessible product |
-| `check:brand`    | The badge and wordmark are used only in their permitted forms                                                 |
+| `check:brand`    | The badge and wordmark are used only in their permitted forms, and no master has drifted off-palette          |
 | `typecheck`      |                                                                                                               |
 | `test`           | Including the RLS isolation tests and the rating-independence test                                            |
 
@@ -102,9 +102,9 @@ tools/             The CI gates listed above
    badge is still live is a separate question, and only our origin answers it — which is why we
    serve the image rather than handing out a file.
 
-## What a Vibefy assessment is not
+## What a VibefyCode assessment is not
 
-> A Vibefy assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed
+> A VibefyCode assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed
 > evaluation against a published rubric version on a stated date. It is not a penetration
 > test, a security audit, a code audit, a legal or regulatory compliance certification, or a
 > guarantee of any kind. Absence of a finding is not evidence of absence of a defect.

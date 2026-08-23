@@ -21,7 +21,7 @@ import {
   type AssessmentTarget,
   type ModelTransport,
   type StageContext,
-} from '@vibefy/engine';
+} from '@vibefycode/engine';
 import { persistOutcome } from './persist.ts';
 
 export const ENGINE_VERSION = '1.0.0';

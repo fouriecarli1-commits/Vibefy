@@ -2,7 +2,7 @@
  * The scope-and-limitations language, in one place.
  *
  * This text must appear in the Terms of Service, in every report, and on every
- * verification page — above the fold, not in a footer. "Verified by Vibefy" is
+ * verification page — above the fold, not in a footer. "Verified by VibefyCode" is
  * defensible only because the verification page defines precisely what was
  * verified; the mark is a pointer and this block is the substance.
  *
@@ -24,8 +24,8 @@ export function scopeStatement({
   assessedOn,
 }: ScopeStatementFacts): string {
   return [
-    `This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation of ${appName}, conducted by Vibefy against published Vibefy Rubric version ${rubricVersion} on ${assessedOn}.`,
-    `"Verified by Vibefy" means only that the application was assessed against that rubric and met the published threshold on that date.`,
+    `This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation of ${appName}, conducted by VibefyCode against published VibefyCode Rubric version ${rubricVersion} on ${assessedOn}.`,
+    `"Verified by VibefyCode" means only that the application was assessed against that rubric and met the published threshold on that date.`,
     `It is not a penetration test, a security audit, a code audit, a legal or regulatory compliance certification, or a guarantee of any kind.`,
     `It does not certify that the application is secure, error-free, lawful, or fit for any particular purpose.`,
     `Findings are limited to what was observable within the authorised scope using the methods described in the methodology document.`,
@@ -35,7 +35,7 @@ export function scopeStatement({
 
 /** Printed on every exported PDF. Reports are for the customer, and for nobody else. */
 export const NON_RELIANCE_LEGEND =
-  'This report is prepared for the named customer only. No third party — including investors, acquirers, insurers or end users — may rely on it for any purpose. Vibefy accepts no duty of care to any person other than the named customer.';
+  'This report is prepared for the named customer only. No third party — including investors, acquirers, insurers or end users — may rely on it for any purpose. VibefyCode accepts no duty of care to any person other than the named customer.';
 
 export const AI_DISCLOSURE =
   'This assessment was produced with AI assistance and reviewed by a human before publication. AI output may contain errors; the appeals process exists for that reason.';
@@ -45,7 +45,7 @@ export const AI_DISCLOSURE =
  * what it does and does not mean.
  */
 export function badgeAltText(facts: ScopeStatementFacts): string {
-  return `Verified by Vibefy — ${facts.appName}, Rubric v${facts.rubricVersion}, assessed ${facts.assessedOn}. Scope-limited assessment, not a security guarantee.`;
+  return `Verified by VibefyCode — ${facts.appName}, Rubric v${facts.rubricVersion}, assessed ${facts.assessedOn}. Scope-limited assessment, not a security guarantee.`;
 }
 
 /**
@@ -53,9 +53,9 @@ export function badgeAltText(facts: ScopeStatementFacts): string {
  * extension of the certification mark and is rejected by tools/copy-lint.mjs.
  */
 export const PERMITTED_MARK_PHRASES = [
-  'Verified by Vibefy',
-  'Vibefy-assessed',
-  'Vibefy Rubric v1.0.0 — score X/100',
+  'Verified by VibefyCode',
+  'VibefyCode-assessed',
+  'VibefyCode Rubric v1.0.0 — score X/100',
 ] as const;
 
 /**

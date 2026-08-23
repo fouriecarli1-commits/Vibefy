@@ -10,8 +10,8 @@
  * findings that survived evidence enforcement, the ones that did not and why,
  * the rubric score, the narrative, the evidence rows and the cost breakdown.
  */
-import { scoreAssessment, type ScoringInput, type ScoringResult } from '@vibefy/rubric';
-import { scopeStatement, NON_RELIANCE_LEGEND, AI_DISCLOSURE } from '@vibefy/shared';
+import { scoreAssessment, type ScoringInput, type ScoringResult } from '@vibefycode/rubric';
+import { scopeStatement, NON_RELIANCE_LEGEND, AI_DISCLOSURE } from '@vibefycode/shared';
 import { CostCeilingExceededError, type CostRecord } from './runtime/cost.ts';
 import { CeilingExceededError, ScopeViolationError } from './runtime/scope.ts';
 import { promptBundleSha256 } from './model/prompts.ts';

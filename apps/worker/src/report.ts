@@ -14,10 +14,10 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
-import { resolveBrowserExecutable } from '@vibefy/engine';
-import { NON_RELIANCE_LEGEND } from '@vibefy/shared';
-import { assembleReportSource, renderReport, type ReportTier } from '@vibefy/report';
-import { resolvePlan } from '@vibefy/billing';
+import { resolveBrowserExecutable } from '@vibefycode/engine';
+import { NON_RELIANCE_LEGEND } from '@vibefycode/shared';
+import { assembleReportSource, renderReport, type ReportTier } from '@vibefycode/report';
+import { resolvePlan } from '@vibefycode/billing';
 import type { PoolClient } from 'pg';
 
 export interface StoredReport {
@@ -64,7 +64,7 @@ export class LocalReportStorage implements ReportStorage {
  * code one — see docs/OPEN_ITEMS.md.
  */
 export function resolveReportStorage(): ReportStorage {
-  return new LocalReportStorage(process.env.VIBEFY_REPORT_DIR ?? '.tmp/reports');
+  return new LocalReportStorage(process.env.VIBEFYCODE_REPORT_DIR ?? '.tmp/reports');
 }
 
 /** Prints the rendered HTML to PDF. Self-contained input, so no network is needed. */
@@ -92,7 +92,7 @@ export async function renderPdf(html: string): Promise<Buffer> {
       headerTemplate: '<div></div>',
       footerTemplate:
         '<div style="font-size:8px;color:#5A6488;width:100%;padding:0 16mm;display:flex;justify-content:space-between">' +
-        '<span>Vibefy assessment — point-in-time, scope-limited. Not a guarantee.</span>' +
+        '<span>VibefyCode assessment — point-in-time, scope-limited. Not a guarantee.</span>' +
         '<span class="pageNumber"></span>/<span class="totalPages"></span></div>',
       margin: { top: '18mm', bottom: '20mm', left: '16mm', right: '16mm' },
     });

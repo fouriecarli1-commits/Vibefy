@@ -24,7 +24,7 @@
       "requiresConsent": true,
       "consentDocumentType": "assessment_services_agreement",
       "isDraft": true,
-      "sha256": "e7b33f86ad0bf190b1bdcf73c34a7598b090ddb266ecc5da0c5a5185856ca640"
+      "sha256": "dc93e7313a6203b236a9c4097c0cceff08829751bcf5ed082eaa5137c79c45a3"
     },
     "authorisation-to-test.md": {
       "version": "1.0.0-draft",
@@ -32,15 +32,15 @@
       "requiresConsent": true,
       "consentDocumentType": "authorisation_to_test",
       "isDraft": true,
-      "sha256": "b51433344178d6169c582161568b9c6d84b654cab1f750eea674e6cab29a42a2"
+      "sha256": "e53f50dbd591d460cabcfd59470ecf189e956418ff96cbb707f4eb791cd9089d"
     },
     "badge-licence.md": {
-      "version": "1.1.0-draft",
+      "version": "2.0.0-draft",
       "status": "not in force",
       "requiresConsent": true,
       "consentDocumentType": "badge_licence",
       "isDraft": true,
-      "sha256": "619f5ccb6c4f9a2c74cc72922b508ff9629b25760280babce90cbea7249e3536"
+      "sha256": "1cb77b32ecd445be2d7b08b674d500cd298670ae53b36d6612490193b69207f2"
     },
     "cookie-notice.md": {
       "version": "1.0.0-draft",
@@ -48,7 +48,7 @@
       "requiresConsent": true,
       "consentDocumentType": "cookie_notice",
       "isDraft": true,
-      "sha256": "57c1adfc2e9bbb4618425dfed200b32c9d53eac42bdf3ed86987f3e23a974fcf"
+      "sha256": "98cbf24c2f1fab6e758a07d13265a3fe45a8dc773c9afd27730db7740bf01706"
     },
     "data-processing-agreement.md": {
       "version": "1.0.0-draft",
@@ -56,7 +56,7 @@
       "requiresConsent": true,
       "consentDocumentType": "data_processing_agreement",
       "isDraft": true,
-      "sha256": "6519dffccfd0acdd2ae15ac1dbc6684ba5c7aa6e9049724fb1d80eb3ad8019dc"
+      "sha256": "9469bb3ba22353168505f0450c98ae19403367beca378db3e1974e88dd33b268"
     },
     "ip-takedown.md": {
       "version": "1.0.0-draft",
@@ -64,7 +64,7 @@
       "requiresConsent": false,
       "consentDocumentType": null,
       "isDraft": true,
-      "sha256": "225e56fe1209b8c1f05aa0a85438137a83c7435f83243e9fceb0a9321ebd1b71"
+      "sha256": "85c2e53642bc6833275d55e4a19e311b91e09dee494d53574766131295181afc"
     },
     "marketing-services-agreement.md": {
       "version": "1.0.0-draft",
@@ -104,7 +104,7 @@
       "requiresConsent": false,
       "consentDocumentType": null,
       "isDraft": true,
-      "sha256": "4bd2701bcb21fba314c8b087c6f80d88574103e40814f1f60fdc7b49e5052182"
+      "sha256": "5befa7f59266da1b50bd97ccec0d3e523eaeef4dbf5309b85cdf83911007dc35"
     },
     "terms-of-service.md": {
       "version": "1.0.0-draft",
@@ -112,7 +112,7 @@
       "requiresConsent": true,
       "consentDocumentType": "terms_of_service",
       "isDraft": true,
-      "sha256": "5e84bf679fb04f803a09bca52dd801b54b5eec94fd1eb19ba2d0667bde2704f1"
+      "sha256": "5fe24184edde22010112ada628260641a6024efb4df66b3bfaa2ecb016bdd8fe"
     }
   }
 }

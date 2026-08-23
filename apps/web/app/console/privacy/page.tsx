@@ -8,7 +8,7 @@ import {
   RESPONSE_DAYS,
   RETENTION_SCHEDULE,
   type RequestStatus,
-} from '@vibefy/governance';
+} from '@vibefycode/governance';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { submitDataRequest } from './actions';

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MOBILE_CAPABILITIES } from '@vibefy/api';
-import { NON_RELIANCE_LEGEND } from '@vibefy/shared';
+import { MOBILE_CAPABILITIES } from '@vibefycode/api';
+import { NON_RELIANCE_LEGEND } from '@vibefycode/shared';
 import { supabase } from '@/lib/supabase.ts';
 import { registerForPush, unregisterPush } from '@/lib/push.ts';
 import { palette, spacing } from '@/lib/theme.ts';
@@ -92,7 +92,7 @@ export default function AccountScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.h2}>What a Vibefy assessment is not</Text>
+        <Text style={styles.h2}>What a VibefyCode assessment is not</Text>
         <Text style={styles.muted}>{NON_RELIANCE_LEGEND}</Text>
       </View>
 

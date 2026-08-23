@@ -16,7 +16,7 @@ testing was lawful.
 
 Testing a computer system without authorisation is a criminal offence in most jurisdictions,
 including under the UAE Cybercrime Law, the US Computer Fraud and Abuse Act, the UK Computer
-Misuse Act and the South African ECT Act. Vibefy's adversarial pass makes that risk real rather
+Misuse Act and the South African ECT Act. VibefyCode's adversarial pass makes that risk real rather
 than theoretical. We therefore do not begin any run until this warranty is in place.
 
 ## 2. What you warrant
@@ -37,7 +37,7 @@ By accepting, you warrant that:
 
 ## 3. What you authorise
 
-You authorise Vibefy, for the period stated, to perform against the declared scope:
+You authorise VibefyCode, for the period stated, to perform against the declared scope:
 
 - Automated retrieval and inspection of publicly reachable resources;
 - Automated browsing of the application, including sign-up, sign-in and core flows, using the
@@ -71,7 +71,7 @@ record superseding this one — nothing is deleted, because the history is the e
 
 ## 7. Your indemnity
 
-You indemnify Vibefy against any claim, loss or reasonable cost arising from this warranty
+You indemnify VibefyCode against any claim, loss or reasonable cost arising from this warranty
 being untrue, including any claim by an owner, host or platform provider whose system was
 tested in reliance on it.
 

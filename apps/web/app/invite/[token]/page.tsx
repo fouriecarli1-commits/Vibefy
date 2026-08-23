@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: 'Invitation' };
  * Accepting an invitation.
  *
  * The page shows nothing about the workspace before the invitation is accepted —
- * not its name, not its size. A link that leaks who else uses Vibefy to anyone
+ * not its name, not its size. A link that leaks who else uses VibefyCode to anyone
  * it is forwarded to is a link that leaks a customer list.
  */
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {

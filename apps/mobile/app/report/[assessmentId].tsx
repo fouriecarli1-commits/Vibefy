@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { AI_DISCLOSURE } from '@vibefy/shared';
+import { AI_DISCLOSURE } from '@vibefycode/shared';
 import { supabase } from '@/lib/supabase.ts';
 import { scoreColour, spacing } from '@/lib/theme.ts';
 import { Loading, styles } from '@/lib/ui.tsx';

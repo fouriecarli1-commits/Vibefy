@@ -59,13 +59,13 @@ function mintedIds(request: TransportRequest): string[] {
 
 beforeAll(async () => {
   db = await connect();
-  const dsn = new URL(process.env.VIBEFY_TEST_DSN!);
+  const dsn = new URL(process.env.VIBEFYCODE_TEST_DSN!);
   pool = new Pool({
     host: dsn.searchParams.get('host')!,
     database: dsn.pathname.slice(1),
     user: 'postgres',
   });
-  storageRoot = mkdtempSync(join(tmpdir(), 'vibefy-reports-'));
+  storageRoot = mkdtempSync(join(tmpdir(), 'vibefycode-reports-'));
   storage = new LocalReportStorage(storageRoot);
 
   owner = await seedAccount(db, 'report-owner');

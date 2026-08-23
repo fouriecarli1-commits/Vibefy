@@ -7,7 +7,7 @@ import {
   requestReTest,
   type AssessmentSummary,
   type RequestSummary,
-} from '@vibefy/api';
+} from '@vibefycode/api';
 import { supabase } from '@/lib/supabase.ts';
 import { palette, scoreColour, spacing } from '@/lib/theme.ts';
 import { Button, Loading, styles } from '@/lib/ui.tsx';

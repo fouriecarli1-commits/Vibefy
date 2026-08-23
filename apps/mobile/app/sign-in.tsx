@@ -46,7 +46,7 @@ export default function SignInScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.h1}>Sign in to Vibefy</Text>
+      <Text style={styles.h1}>Sign in to VibefyCode</Text>
       <Text style={styles.muted}>
         Use the account you created on the web. New accounts are made there, where the Terms and the
         Privacy Policy are shown in full and your acceptance is recorded against the exact wording.

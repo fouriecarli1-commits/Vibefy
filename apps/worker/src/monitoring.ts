@@ -14,7 +14,7 @@
  *   4. Applications that stop answering lose their badge, and get it back when
  *      they answer again.
  *
- * None of the decisions live in this file. They live in `@vibefy/monitoring`,
+ * None of the decisions live in this file. They live in `@vibefycode/monitoring`,
  * which has no database access, so they can be tested exhaustively and quoted
  * back verbatim in an appeal.
  */
@@ -35,8 +35,8 @@ import {
   type ComparableDimension,
   type ComparableFinding,
   type MonitoredPlan,
-} from '@vibefy/monitoring';
-import { entitlementFor } from '@vibefy/billing';
+} from '@vibefycode/monitoring';
+import { entitlementFor } from '@vibefycode/billing';
 import type { PoolClient } from 'pg';
 
 type Logger = (message: string, detail?: Record<string, unknown>) => void;
@@ -61,7 +61,7 @@ export const httpLivenessProbe: LivenessProbeFn = async (url) => {
       method: 'GET',
       redirect: 'follow',
       signal: controller.signal,
-      headers: { 'user-agent': 'VibefyMonitor/1.0 (+https://vibefy.app/methodology)' },
+      headers: { 'user-agent': 'VibefyCodeMonitor/1.0 (+https://vibefycode.app/methodology)' },
     });
     return { status: response.status };
   } catch (error) {

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { listAlerts, markAlertRead, type AlertSummary } from '@vibefy/api';
+import { listAlerts, markAlertRead, type AlertSummary } from '@vibefycode/api';
 import { supabase } from '@/lib/supabase.ts';
 import { palette } from '@/lib/theme.ts';
 import { Empty, Loading, styles } from '@/lib/ui.tsx';

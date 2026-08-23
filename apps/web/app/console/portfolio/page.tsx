@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefy/policy';
+import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefycode/policy';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Portfolio' };

@@ -1,7 +1,7 @@
 /**
  * The scoring boundary.
  *
- * "Payment never buys a score" is a claim Vibefy sells. A claim enforced only by
+ * "Payment never buys a score" is a claim VibefyCode sells. A claim enforced only by
  * developer discipline is not enforced. So the input to every scoring function is
  * a type that has no field for a plan, a price, a spend, a marketing
  * relationship or an account age — it is not that scoring ignores commercial

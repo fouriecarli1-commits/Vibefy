@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { getRubric, rubricChecksum, CURRENT_RUBRIC_VERSION } from '@vibefy/rubric';
+import { getRubric, rubricChecksum, CURRENT_RUBRIC_VERSION } from '@vibefycode/rubric';
 
 export const metadata: Metadata = {
   title: 'Methodology',
   description:
-    'The Vibefy rubric in full: dimensions, weights, gates, the certification threshold and the scoring method.',
+    'The VibefyCode rubric in full: dimensions, weights, gates, the certification threshold and the scoring method.',
 };
 
 /**
@@ -20,7 +20,7 @@ export default function MethodologyPage() {
       <header className="space-y-3">
         <h1 className="text-3xl font-bold tracking-tight">Rating methodology</h1>
         <p className="text-muted">
-          Vibefy Rubric v{rubric.version} · checksum{' '}
+          VibefyCode Rubric v{rubric.version} · checksum{' '}
           <code className="text-sm">{rubricChecksum(CURRENT_RUBRIC_VERSION).slice(0, 16)}…</code>
         </p>
         <p className="max-w-3xl">{rubric.changelog}</p>

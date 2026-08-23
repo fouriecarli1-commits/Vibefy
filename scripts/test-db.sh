@@ -13,11 +13,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_DIR="${VIBEFY_TEST_PGROOT:-$ROOT/.tmp/pg}"
+RUN_DIR="${VIBEFYCODE_TEST_PGROOT:-$ROOT/.tmp/pg}"
 DATA_DIR="$RUN_DIR/data"
 SOCKET_DIR="$RUN_DIR/socket"
 LOG_FILE="$RUN_DIR/postgres.log"
-DB_NAME="vibefy_test"
+DB_NAME="vibefycode_test"
 
 find_pg_bin() {
   if command -v pg_ctl >/dev/null 2>&1 && command -v initdb >/dev/null 2>&1; then
@@ -35,14 +35,14 @@ find_pg_bin() {
 # directory and re-exec. The socket stays world-accessible so the test process,
 # whatever user it runs as, can still connect.
 if [ "$(id -u)" -eq 0 ]; then
-  PG_ACCOUNT="${VIBEFY_TEST_PGUSER:-postgres}"
+  PG_ACCOUNT="${VIBEFYCODE_TEST_PGUSER:-postgres}"
   if id "$PG_ACCOUNT" >/dev/null 2>&1; then
     mkdir -p "$RUN_DIR"
     chown -R "$PG_ACCOUNT" "$RUN_DIR"
     exec su -s /bin/bash "$PG_ACCOUNT" -c "$(printf '%q ' "$0" "$@")"
   fi
   echo "Refusing to run Postgres as root and no '$PG_ACCOUNT' account exists." >&2
-  echo "Create one, or set VIBEFY_TEST_PGUSER to an existing unprivileged user." >&2
+  echo "Create one, or set VIBEFYCODE_TEST_PGUSER to an existing unprivileged user." >&2
   exit 1
 fi
 

@@ -1,5 +1,5 @@
 {
-  "name": "@vibefy/badge",
+  "name": "@vibefycode/badge",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vibefy/shared": "workspace:*"
+    "@vibefycode/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

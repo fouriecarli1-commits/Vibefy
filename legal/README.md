@@ -8,7 +8,7 @@
 ## Jurisdiction
 
 Written to a **GDPR-grade baseline**, the strictest common standard across the markets under
-consideration. A jurisdiction layer (`VIBEFY_JURISDICTION` = `gdpr` | `uae_pdpl` | `za_popia` |
+consideration. A jurisdiction layer (`VIBEFYCODE_JURISDICTION` = `gdpr` | `uae_pdpl` | `za_popia` |
 `us`) selects variants of the data-protection clauses without rewriting the documents. The
 entity and governing law are not yet decided; every placeholder reading `[JURISDICTION]`,
 `[LEGAL_ENTITY]` or `[PRIMARY_DOMAIN]` is resolved before launch, not before building.
@@ -17,10 +17,10 @@ entity and governing law are not yet decided; every placeholder reading `[JURISD
 
 | File                                     | What it governs                                         |
 | ---------------------------------------- | ------------------------------------------------------- |
-| `terms-of-service.md`                    | Use of the Vibefy platform                              |
+| `terms-of-service.md`                    | Use of the VibefyCode platform                              |
 | `assessment-services-agreement.md`       | What an assessment is, and what it is not               |
 | `authorisation-to-test.md`               | The customer's warranty that we may test the target     |
-| `badge-licence.md`                       | The trademark licence for the "Verified by Vibefy" mark |
+| `badge-licence.md`                       | The trademark licence for the "Verified by VibefyCode" mark |
 | `acceptable-use-policy.md`               | What we will not assess or certify                      |
 | `privacy-policy.md`                      | What we collect, why, and for how long                  |
 | `data-processing-agreement.md`           | Controller/processor terms and the sub-processor list   |

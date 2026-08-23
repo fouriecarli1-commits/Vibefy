@@ -58,4 +58,4 @@ printf '  Inbucket (mail) %shttp://localhost:54324%s\n' "$BOLD" "$OFF"
 printf '\n  Assessments run in a separate worker process. In another terminal:\n'
 printf '    %spnpm dev:worker%s\n\n' "$BOLD" "$OFF"
 
-exec pnpm --filter @vibefy/web dev
+exec pnpm --filter @vibefycode/web dev

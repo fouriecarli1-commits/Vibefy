@@ -35,12 +35,12 @@ export interface ConsoleEntry {
  *
  * Normally Playwright resolves this itself. Two situations need an override: a
  * container image that bakes in a specific browser, and a machine whose cached
- * browser build predates the pinned Playwright version. `VIBEFY_BROWSER_EXECUTABLE`
+ * browser build predates the pinned Playwright version. `VIBEFYCODE_BROWSER_EXECUTABLE`
  * covers the first; the discovery fallback covers the second, so the browser
  * pass never silently stops running and leaves a thinner report behind.
  */
 export function resolveBrowserExecutable(): string | undefined {
-  const configured = process.env.VIBEFY_BROWSER_EXECUTABLE;
+  const configured = process.env.VIBEFYCODE_BROWSER_EXECUTABLE;
   if (configured && existsSync(configured)) return configured;
 
   const cache = process.env.PLAYWRIGHT_BROWSERS_PATH;
@@ -94,7 +94,7 @@ export class BrowserSession {
     this.context = await this.browser.newContext({
       viewport: this.options.viewport ?? DESKTOP_VIEWPORT,
       userAgent:
-        'Mozilla/5.0 (compatible; VibefyAssessment/1.0; +https://vibefy.example/methodology)',
+        'Mozilla/5.0 (compatible; VibefyCodeAssessment/1.0; +https://vibefycode.example/methodology)',
       ignoreHTTPSErrors: false,
     });
 

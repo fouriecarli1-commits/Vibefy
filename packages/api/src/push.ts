@@ -3,7 +3,7 @@
  *
  * Expo's push service takes a batch of messages and returns a ticket per
  * message. This module builds the batch and interprets the result; it does not
- * decide *what* is worth pushing — that is `@vibefy/monitoring`'s job, and the
+ * decide *what* is worth pushing — that is `@vibefycode/monitoring`'s job, and the
  * separation matters because a notification is the most intrusive thing this
  * product does to somebody's day.
  *

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { renderBadgeSvg, type BadgeStatus } from '@vibefy/badge';
+import { renderBadgeSvg, type BadgeStatus } from '@vibefycode/badge';
 import { readAsAnon, writeAsService } from '@/lib/sql';
 
 /**
@@ -43,6 +43,14 @@ export async function GET(
   }
   const id = file.slice(0, -4);
 
+  // The embed snippet puts the customer's chosen size in the URL, so the served
+  // artwork matches the space it will occupy. Clamped rather than trusted: this
+  // is a public endpoint and the number only ever picks a layout.
+  const requested = Number(request.nextUrl.searchParams.get('size'));
+  const sizePx = Number.isFinite(requested)
+    ? Math.min(Math.max(Math.round(requested), 64), 1024)
+    : undefined;
+
   const badge = await readAsAnon(async (client) => {
     const { rows } = await client.query<{
       status: BadgeStatus;
@@ -62,7 +70,7 @@ export async function GET(
   if (!badge) {
     // Deliberately not a 404 image: an unknown badge id on someone's website
     // should read as "not verified", not as a broken image they might ignore.
-    const svg = renderBadgeSvg({ status: 'revoked' });
+    const svg = renderBadgeSvg({ status: 'revoked', ...(sizePx ? { sizePx } : {}) });
     return new NextResponse(svg, {
       status: 404,
       headers: {
@@ -81,6 +89,7 @@ export async function GET(
     rubricVersion: badge.rubric_version,
     assessedOn: new Date(badge.assessed_at).toISOString().slice(0, 10),
     verificationUrl,
+    ...(sizePx ? { sizePx } : {}),
   });
 
   const observed = originFrom(request);
@@ -119,9 +128,11 @@ export async function GET(
       // Five minutes. Long enough to be cheap, short enough that a revocation
       // reaches every embedded instance within minutes.
       'cache-control': 'public, max-age=300, must-revalidate',
+      // The layout depends on the size in the query string, so caches must key on it.
+      vary: 'Accept',
       'access-control-allow-origin': '*',
-      'x-vibefy-status': badge.status,
-      'x-vibefy-verify': verificationUrl,
+      'x-vibefycode-status': badge.status,
+      'x-vibefycode-verify': verificationUrl,
       // The image is never a document; a hostile SVG served inline is a script.
       'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
       'x-content-type-options': 'nosniff',

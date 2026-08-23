@@ -9,8 +9,8 @@
  * it under the caller's own row-level-security identity and the worker can run
  * it with direct access — one assembly path, two trust levels.
  */
-import { getRubric } from '@vibefy/rubric';
-import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefy/policy';
+import { getRubric } from '@vibefycode/rubric';
+import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefycode/policy';
 import type { ReportSource } from './types.ts';
 
 /** The smallest database surface this needs. `pg.PoolClient` satisfies it. */

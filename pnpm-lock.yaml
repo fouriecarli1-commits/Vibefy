@@ -14,10 +14,10 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
-      '@vibefy/badge':
+      '@vibefycode/badge':
         specifier: workspace:*
         version: link:packages/badge
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:packages/shared
       pg:
@@ -50,10 +50,10 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.112.3
         version: 2.112.3
-      '@vibefy/api':
+      '@vibefycode/api':
         specifier: workspace:*
         version: link:../../packages/api
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       expo:
@@ -108,37 +108,37 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.112.3
         version: 2.112.3
-      '@vibefy/badge':
+      '@vibefycode/badge':
         specifier: workspace:*
         version: link:../../packages/badge
-      '@vibefy/billing':
+      '@vibefycode/billing':
         specifier: workspace:*
         version: link:../../packages/billing
-      '@vibefy/directory':
+      '@vibefycode/directory':
         specifier: workspace:*
         version: link:../../packages/directory
-      '@vibefy/engine':
+      '@vibefycode/engine':
         specifier: workspace:*
         version: link:../../packages/engine
-      '@vibefy/governance':
+      '@vibefycode/governance':
         specifier: workspace:*
         version: link:../../packages/governance
-      '@vibefy/policy':
+      '@vibefycode/policy':
         specifier: workspace:*
         version: link:../../packages/policy
-      '@vibefy/report':
+      '@vibefycode/report':
         specifier: workspace:*
         version: link:../../packages/report
-      '@vibefy/rubric':
+      '@vibefycode/rubric':
         specifier: workspace:*
         version: link:../../packages/rubric
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@vibefy/worker':
+      '@vibefycode/worker':
         specifier: workspace:*
         version: link:../worker
-      '@vibefy/workspace':
+      '@vibefycode/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
       marked:
@@ -181,31 +181,31 @@ importers:
 
   apps/worker:
     dependencies:
-      '@vibefy/api':
+      '@vibefycode/api':
         specifier: workspace:*
         version: link:../../packages/api
-      '@vibefy/badge':
+      '@vibefycode/badge':
         specifier: workspace:*
         version: link:../../packages/badge
-      '@vibefy/billing':
+      '@vibefycode/billing':
         specifier: workspace:*
         version: link:../../packages/billing
-      '@vibefy/engine':
+      '@vibefycode/engine':
         specifier: workspace:*
         version: link:../../packages/engine
-      '@vibefy/governance':
+      '@vibefycode/governance':
         specifier: workspace:*
         version: link:../../packages/governance
-      '@vibefy/monitoring':
+      '@vibefycode/monitoring':
         specifier: workspace:*
         version: link:../../packages/monitoring
-      '@vibefy/report':
+      '@vibefycode/report':
         specifier: workspace:*
         version: link:../../packages/report
-      '@vibefy/rubric':
+      '@vibefycode/rubric':
         specifier: workspace:*
         version: link:../../packages/rubric
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       pg:
@@ -243,7 +243,7 @@ importers:
 
   packages/badge:
     dependencies:
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -269,7 +269,7 @@ importers:
 
   packages/directory:
     dependencies:
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -288,10 +288,10 @@ importers:
       '@axe-core/playwright':
         specifier: 4.13.0
         version: 4.13.0(playwright-core@1.62.1)
-      '@vibefy/rubric':
+      '@vibefycode/rubric':
         specifier: workspace:*
         version: link:../rubric
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../shared
       axe-core:
@@ -343,13 +343,13 @@ importers:
 
   packages/report:
     dependencies:
-      '@vibefy/policy':
+      '@vibefycode/policy':
         specifier: workspace:*
         version: link:../policy
-      '@vibefy/rubric':
+      '@vibefycode/rubric':
         specifier: workspace:*
         version: link:../rubric
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -362,7 +362,7 @@ importers:
 
   packages/rubric:
     dependencies:
-      '@vibefy/shared':
+      '@vibefycode/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:

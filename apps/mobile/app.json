@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Vibefy",
-    "slug": "vibefy",
-    "scheme": "vibefy",
+    "name": "VibefyCode",
+    "slug": "vibefycode",
+    "scheme": "vibefycode",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.vibefy.mobile"
+      "bundleIdentifier": "app.vibefycode.mobile"
     },
     "android": {
-      "package": "app.vibefy.mobile",
+      "package": "app.vibefycode.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"

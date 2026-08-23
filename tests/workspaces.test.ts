@@ -265,7 +265,7 @@ describe('audit export', () => {
     );
     expect(mine.rowCount).toBeGreaterThan(0);
     expect(mine.sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(mine.filename).toMatch(/^vibefy-assessments-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(mine.filename).toMatch(/^vibefycode-assessments-\d{4}-\d{2}-\d{2}\.csv$/);
 
     // The same query, asked by someone else about the same workspace, returns
     // nothing — the scoping is row-level security, not the organisation_id
@@ -335,7 +335,7 @@ describe('single sign-on routing', () => {
     const space = await createWorkspace('sso-space', 5);
     await db.query(
       `insert into public.sso_connections (organisation_id, email_domain, provider, domain_challenge, created_by)
-       values ($1, 'acme-sso.example', 'saml', 'vibefy-site-verification=abc123', $2)`,
+       values ($1, 'acme-sso.example', 'saml', 'vibefycode-site-verification=abc123', $2)`,
       [space, owner.userId],
     );
 
@@ -370,7 +370,7 @@ describe('single sign-on routing', () => {
     const space = await createWorkspace('sso-unverified', 5);
     await db.query(
       `insert into public.sso_connections (organisation_id, email_domain, provider, domain_challenge, created_by)
-       values ($1, 'unverified-sso.example', 'oidc', 'vibefy-site-verification=zzz', $2)`,
+       values ($1, 'unverified-sso.example', 'oidc', 'vibefycode-site-verification=zzz', $2)`,
       [space, owner.userId],
     );
     await expect(
@@ -386,7 +386,7 @@ describe('single sign-on routing', () => {
     const claim = (org: string) =>
       db.query(
         `insert into public.sso_connections (organisation_id, email_domain, provider, domain_challenge, created_by)
-         values ($1, 'contested.example', 'saml', 'vibefy-site-verification=q', $2)`,
+         values ($1, 'contested.example', 'saml', 'vibefycode-site-verification=q', $2)`,
         [org, owner.userId],
       );
     await claim(first);
@@ -398,7 +398,7 @@ describe('single sign-on routing', () => {
     await expect(
       db.query(
         `insert into public.sso_connections (organisation_id, email_domain, provider, domain_challenge, default_role, created_by)
-         values ($1, 'roles-sso.example', 'saml', 'vibefy-site-verification=r', 'owner', $2)`,
+         values ($1, 'roles-sso.example', 'saml', 'vibefycode-site-verification=r', 'owner', $2)`,
         [space, owner.userId],
       ),
     ).rejects.toThrow(/sso_default_role_is_not_owner/);

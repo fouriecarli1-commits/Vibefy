@@ -6,7 +6,7 @@
  * deadline, and a response deadline on a data-subject request.
  *
  * The pattern is the same as everywhere else in this worker — the decision is a
- * pure function in `@vibefy/governance`, this file is the part that talks to
+ * pure function in `@vibefycode/governance`, this file is the part that talks to
  * Postgres, and every sweep is idempotent.
  */
 import {
@@ -16,7 +16,7 @@ import {
   isOverdue,
   spendWindows,
   type RetainedRecord,
-} from '@vibefy/governance';
+} from '@vibefycode/governance';
 import type { PoolClient } from 'pg';
 
 type Logger = (message: string, detail?: Record<string, unknown>) => void;

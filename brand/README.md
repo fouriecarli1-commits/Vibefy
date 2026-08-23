@@ -1,26 +1,28 @@
-# Vibefy brand assets
+# VibefyCode brand assets
 
 ## What is authoritative
 
 `brand/source/` holds the founder-supplied artwork. It is the authority on what the marks
 look like. **Nothing in this repository may redesign, recolour or "improve" them.**
 
-`brand/geometry.mjs` is a clean vector reconstruction of that artwork — the same forms,
-proportions and palette, rebuilt as editable paths because the badge is served as SVG at
-runtime and an auto-trace of a gradient JPEG produces thousands of noisy paths that render
-badly at the 96px minimum. Everything else in `brand/` is generated from it by
-`pnpm brand:build`.
+`packages/shared/src/brand.ts` is a clean vector reconstruction of that artwork — the same
+forms, proportions and palette, rebuilt as editable paths because the badge is served as SVG
+at runtime and an auto-trace of a gradient raster produces thousands of noisy paths that
+render badly at the 96px minimum. Everything else in `brand/` is generated from it by
+`pnpm brand:build`, and so is the badge served at request time: one geometry source, so the
+mark on a customer's site and the mark in our own header cannot drift apart.
 
-> **Open item:** the supplied artwork is 300dpi JPEG. When the original vector files (or the
-> wordmark's font licence) are available, the paths in `geometry.mjs` are replaced from them
-> and every derivative regenerates unchanged in shape and count. Tracked in
-> `docs/OPEN_ITEMS.md`.
+> **Open item — `brand/source/` is currently empty.** The VibefyCode logo and stamp were
+> supplied as images in conversation rather than as files, so there is nothing here to derive
+> from and the masters are reconstructions. See `brand/source/README.md` for what to drop in,
+> and for the spelling defect in the supplied stamp that the reconstruction deliberately does
+> not reproduce. Tracked in `docs/OPEN_ITEMS.md`.
 
 ## What is generated
 
 | Path           | Contents                                                                                         | Committed      |
 | -------------- | ------------------------------------------------------------------------------------------------ | -------------- |
-| `brand/svg/`   | Nine SVG masters: mark, mono light/dark, horizontal lockup light/dark, and the four badge states | yes            |
+| `brand/svg/`   | Ten SVG masters: mark, mono light/dark, horizontal lockup light/dark, the four badge states and the compact badge | yes            |
 | `brand/png/`   | 1x / 2x / 3x raster exports of the mark, badge and lockup                                        | no — generated |
 | `brand/icons/` | Favicons, Apple touch icon, Android Chrome icons, maskable icon                                  | no — generated |
 
@@ -35,10 +37,10 @@ A badge is never a broken image. Every state renders as a legible mark:
 
 | State       | Renders as                                                                |
 | ----------- | ------------------------------------------------------------------------- |
-| `active`    | The certification mark: shield, check, "Verified by Vibefy"               |
-| `suspended` | Amber ring, barred shield, "Suspended — Not currently verified by Vibefy" |
-| `expired`   | Grey ring, barred shield, "Expired — Not currently verified by Vibefy"    |
-| `revoked`   | Red ring, barred shield, "Revoked — Not currently verified by Vibefy"     |
+| `active`    | The certification mark: shield, check, "Verified by VibefyCode"               |
+| `suspended` | Amber ring, barred shield, "Suspended — Not currently verified by VibefyCode" |
+| `expired`   | Grey ring, barred shield, "Expired — Not currently verified by VibefyCode"    |
+| `revoked`   | Red ring, barred shield, "Revoked — Not currently verified by VibefyCode"     |
 
 The centred layout of the three inactive states is deliberately different from the active
 lockup, so the two are distinguishable at a glance and at thumbnail size.
@@ -64,11 +66,11 @@ These are the same rules the Badge Licence states in words. They are implemented
 
 ## Language
 
-The wordmark is exactly **"Verified by Vibefy"**. It is never extended. `pnpm check:copy`
+The wordmark is exactly **"Verified by VibefyCode"**. It is never extended. `pnpm check:copy`
 fails the build on any phrase that stretches it, and on absolute words used without a scope
 qualifier anywhere in the product's copy.
 
-Permitted: "Verified by Vibefy", "Vibefy-assessed", "Vibefy Rubric v1.0.0 — score 82/100".
+Permitted: "Verified by VibefyCode", "VibefyCode-assessed", "VibefyCode Rubric v1.0.0 — score 82/100".
 
 ## Palette
 

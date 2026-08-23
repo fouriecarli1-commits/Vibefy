@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { POLICY_NOTE } from '@vibefy/policy';
+import { POLICY_NOTE } from '@vibefycode/policy';
 import { ActionForm, Checkbox, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { deletePolicyProfile, savePolicyProfile } from '../../actions';

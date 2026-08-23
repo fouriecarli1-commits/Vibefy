@@ -37,7 +37,7 @@ export async function GET(
 
   if (!badge) {
     return NextResponse.json(
-      { error: 'No badge with that identifier has been issued by Vibefy.' },
+      { error: 'No badge with that identifier has been issued by VibefyCode.' },
       { status: 404, headers: { 'access-control-allow-origin': '*' } },
     );
   }
@@ -49,13 +49,13 @@ export async function GET(
       payload: badge.payload,
       signature: badge.signature,
       algorithm: 'EdDSA (Ed25519)',
-      keySet: `${verifyOrigin.replace(/\/+$/, '')}/.well-known/vibefy-badge-key`,
+      keySet: `${verifyOrigin.replace(/\/+$/, '')}/.well-known/vibefycode-badge-key`,
       canonicalisation:
         'Sign and verify over the payload serialised with its keys in this exact order: v, kid, badgeId, slug, appName, certifiedOrigin, rubricVersion, score, assessedOn, issuedAt, expiresAt, ownerIsMarketingClient — no whitespace, score fixed to one decimal place.',
       currentStatus: badge.status,
       verificationPage: `${verifyOrigin.replace(/\/+$/, '')}/a/${badge.slug}`,
       signatureAttests:
-        'That Vibefy assessed this application against the named rubric version on the named date, and it scored what the payload says. This remains true forever and can be checked offline.',
+        'That VibefyCode assessed this application against the named rubric version on the named date, and it scored what the payload says. This remains true forever and can be checked offline.',
       signatureDoesNotAttest:
         'That the badge is currently active. Suspension, expiry and revocation are live states — check currentStatus, or the verification page. A genuine signature on a revoked badge is still a genuine signature.',
     },

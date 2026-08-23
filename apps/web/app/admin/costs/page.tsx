@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { CEILINGS } from '@vibefy/governance';
+import { CEILINGS } from '@vibefycode/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { createClient } from '@/lib/supabase/server';
 
@@ -32,7 +32,7 @@ export default async function CostsPage() {
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Unit economics</h1>
         <p className="text-muted">
-          This dashboard is for Vibefy administrators. Row-level security means the underlying rows
+          This dashboard is for VibefyCode administrators. Row-level security means the underlying rows
           are unreadable to anyone else in any case.
         </p>
       </div>

@@ -1,7 +1,7 @@
 /**
  * Badge integrity.
  *
- * Vibefy's asset is the credibility of the mark, not the testing. A badge that
+ * VibefyCode's asset is the credibility of the mark, not the testing. A badge that
  * can be issued without being earned, that never expires, or whose history can
  * be rewritten would end the business, so these are treated as security tests.
  */

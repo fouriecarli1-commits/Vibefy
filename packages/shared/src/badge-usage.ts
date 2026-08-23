@@ -30,7 +30,7 @@ export const BADGE_USAGE = {
 export type BadgeStatus = 'active' | 'suspended' | 'expired' | 'revoked';
 
 export interface BadgeEmbedOptions extends ScopeStatementFacts {
-  /** e.g. https://verify.vibefy.example */
+  /** e.g. https://verify.vibefycode.example */
   readonly verifyOrigin: string;
   readonly publicId: string;
   readonly slug: string;
@@ -55,13 +55,16 @@ export function badgeEmbedSnippet(options: BadgeEmbedOptions): string {
   const origin = options.verifyOrigin.replace(/\/+$/, '');
   if (!/^https:\/\//.test(origin)) {
     throw new BadgeUsageError(
-      'The badge is served over HTTPS from the Vibefy verification origin only.',
+      'The badge is served over HTTPS from the VibefyCode verification origin only.',
     );
   }
 
   const alt = badgeAltText(options);
   const verificationUrl = `${origin}/a/${options.slug}`;
-  const imageUrl = `${origin}/badge/${options.publicId}.svg`;
+  // The size travels with the request. The renderer serves the full seal or the
+  // compact layout accordingly — a seal shrunk to 96px is a smudge, and the
+  // licence permits embedding from 96px.
+  const imageUrl = `${origin}/badge/${options.publicId}.svg?size=${size}`;
 
   return [
     `<a href="${verificationUrl}" rel="noopener" target="_blank"`,
@@ -84,5 +87,5 @@ function escapeAttribute(value: string): string {
 
 /** The SVG filename a given status renders from. */
 export function badgeAssetFor(status: BadgeStatus): string {
-  return status === 'active' ? 'vibefy-badge-verified.svg' : `vibefy-badge-${status}.svg`;
+  return status === 'active' ? 'vibefycode-badge-verified.svg' : `vibefycode-badge-${status}.svg`;
 }

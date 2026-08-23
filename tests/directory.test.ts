@@ -126,10 +126,10 @@ describe('ordering cannot be bought', () => {
     const manifest = JSON.parse(
       readFileSync(join(process.cwd(), 'packages/rubric/package.json'), 'utf8'),
     ) as { dependencies?: Record<string, string> };
-    expect(Object.keys(manifest.dependencies ?? {})).not.toContain('@vibefy/directory');
+    expect(Object.keys(manifest.dependencies ?? {})).not.toContain('@vibefycode/directory');
     for (const file of readdirSync(join(process.cwd(), 'packages/rubric/src'))) {
       expect(readFileSync(join(process.cwd(), 'packages/rubric/src', file), 'utf8')).not.toMatch(
-        /@vibefy\/directory/,
+        /@vibefycode\/directory/,
       );
     }
   });

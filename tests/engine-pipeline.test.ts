@@ -56,7 +56,7 @@ beforeAll(async () => {
   app = await startVulnerableApp();
 
   // A small repository fixture, so the static stage has something to analyse.
-  repoPath = mkdtempSync(join(tmpdir(), 'vibefy-repo-'));
+  repoPath = mkdtempSync(join(tmpdir(), 'vibefycode-repo-'));
   mkdirSync(join(repoPath, 'src'), { recursive: true });
   writeFileSync(
     join(repoPath, 'package.json'),

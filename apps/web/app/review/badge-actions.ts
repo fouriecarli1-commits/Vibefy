@@ -27,7 +27,7 @@ async function reviewerClient() {
     .eq('id', user.id)
     .single();
   if (profile?.platform_role !== 'reviewer' && profile?.platform_role !== 'admin') {
-    return { error: 'Only a Vibefy reviewer can act on a badge.' as const };
+    return { error: 'Only a VibefyCode reviewer can act on a badge.' as const };
   }
   return { supabase };
 }

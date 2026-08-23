@@ -20,8 +20,8 @@ import { resolveTxt } from 'node:dns/promises';
 import { lookup } from 'node:dns/promises';
 import { isPrivateAddress } from '../runtime/addresses.ts';
 
-export const CHALLENGE_PATH = '/.well-known/vibefy-challenge.txt';
-export const DNS_RECORD_PREFIX = 'vibefy-site-verification=';
+export const CHALLENGE_PATH = '/.well-known/vibefycode-challenge.txt';
+export const DNS_RECORD_PREFIX = 'vibefycode-site-verification=';
 
 export type OwnershipMethod =
   | 'dns_txt'
@@ -108,7 +108,7 @@ export async function verifyDnsTxt(host: string, token: string): Promise<Verific
     detail: matched
       ? `A TXT record on ${host} carries the challenge token.`
       : `${flattened.length} TXT record(s) were found on ${host}, none carrying the challenge token. DNS changes can take a few minutes to propagate.`,
-    // Only Vibefy's own records are kept. A customer's other TXT records are
+    // Only VibefyCode's own records are kept. A customer's other TXT records are
     // their business, not evidence we have any reason to retain.
     observed: flattened.filter((value) => value.startsWith(DNS_RECORD_PREFIX)),
   };
@@ -150,7 +150,7 @@ export async function verifyWellKnownFile(
       method: 'GET',
       redirect: 'manual', // a redirect could carry us to a host nobody authorised
       signal: controller.signal,
-      headers: { 'user-agent': 'VibefyOwnershipCheck/1.0', accept: 'text/plain' },
+      headers: { 'user-agent': 'VibefyCodeOwnershipCheck/1.0', accept: 'text/plain' },
     });
 
     if (response.status !== 200) {

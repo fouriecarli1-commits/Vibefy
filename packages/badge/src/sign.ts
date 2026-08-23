@@ -73,7 +73,7 @@ export function verifyBadge(
       payload: null,
       kid: null,
       failures: ['malformed_payload'],
-      explanation: 'This is not a well-formed Vibefy badge payload.',
+      explanation: 'This is not a well-formed VibefyCode badge payload.',
     };
   }
 
@@ -85,7 +85,7 @@ export function verifyBadge(
       payload,
       kid: payload.kid,
       failures: ['unknown_key'],
-      explanation: `This badge names signing key "${payload.kid}", which Vibefy does not publish. Vibefy did not issue it.`,
+      explanation: `This badge names signing key "${payload.kid}", which VibefyCode does not publish. VibefyCode did not issue it.`,
     };
   }
 
@@ -125,20 +125,20 @@ function explain(
   failures: readonly VerificationFailure[],
 ): string {
   if (!signatureValid) {
-    return 'The signature does not match this payload. Either the badge was altered, or Vibefy did not issue it.';
+    return 'The signature does not match this payload. Either the badge was altered, or VibefyCode did not issue it.';
   }
   if (failures.includes('expired')) {
-    return `Vibefy did assess ${payload.appName} against Rubric v${payload.rubricVersion} on ${payload.assessedOn}, scoring ${payload.score}. That badge expired on ${payload.expiresAt.slice(0, 10)} and must no longer be displayed.`;
+    return `VibefyCode did assess ${payload.appName} against Rubric v${payload.rubricVersion} on ${payload.assessedOn}, scoring ${payload.score}. That badge expired on ${payload.expiresAt.slice(0, 10)} and must no longer be displayed.`;
   }
   if (failures.includes('not_yet_valid')) {
-    return 'This badge claims to have been issued in the future, which Vibefy does not do.';
+    return 'This badge claims to have been issued in the future, which VibefyCode does not do.';
   }
   return [
-    `Vibefy assessed ${payload.appName} against Rubric v${payload.rubricVersion} on ${payload.assessedOn}, scoring ${payload.score} out of 100.`,
+    `VibefyCode assessed ${payload.appName} against Rubric v${payload.rubricVersion} on ${payload.assessedOn}, scoring ${payload.score} out of 100.`,
     'The signature is genuine, so that historical fact is confirmed offline.',
-    'It does not confirm the badge is currently active — suspension and revocation are live states, and only vibefy’s verification page can answer that.',
+    'It does not confirm the badge is currently active — suspension and revocation are live states, and only vibefycode’s verification page can answer that.',
     payload.ownerIsMarketingClient
-      ? 'The owner is also a Vibefy marketing-services client. This is disclosed wherever the rating appears.'
+      ? 'The owner is also a VibefyCode marketing-services client. This is disclosed wherever the rating appears.'
       : '',
   ]
     .filter(Boolean)

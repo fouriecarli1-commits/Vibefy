@@ -25,7 +25,7 @@ async function reviewerContext() {
     .eq('id', user.id)
     .single();
   if (profile?.platform_role !== 'reviewer' && profile?.platform_role !== 'admin') {
-    return { error: 'Only a Vibefy reviewer can act on the queue.' as const };
+    return { error: 'Only a VibefyCode reviewer can act on the queue.' as const };
   }
   return { supabase, user };
 }

@@ -34,7 +34,7 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
         <code>{document.sha256.slice(0, 16)}…</code>
       </p>
       <div
-        className="prose-vibefy space-y-4 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-line-strong [&_blockquote]:pl-4 [&_blockquote]:text-muted [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol_li]:list-decimal [&_table]:block [&_table]:overflow-x-auto [&_table]:text-sm [&_td]:border-b [&_td]:border-line [&_td]:p-2 [&_th]:border-b [&_th]:border-line-strong [&_th]:p-2 [&_th]:text-left"
+        className="prose-vibefycode space-y-4 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-line-strong [&_blockquote]:pl-4 [&_blockquote]:text-muted [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_ol_li]:list-decimal [&_table]:block [&_table]:overflow-x-auto [&_table]:text-sm [&_td]:border-b [&_td]:border-line [&_td]:p-2 [&_th]:border-b [&_th]:border-line-strong [&_th]:p-2 [&_th]:text-left"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </article>

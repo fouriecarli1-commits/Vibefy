@@ -166,7 +166,7 @@ export async function runAuditExport(
   return {
     kind: request.kind,
     format,
-    filename: `vibefy-${request.kind}-${stamp}.${format}`,
+    filename: `vibefycode-${request.kind}-${stamp}.${format}`,
     mediaType: format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8',
     body,
     rowCount: rows.length,

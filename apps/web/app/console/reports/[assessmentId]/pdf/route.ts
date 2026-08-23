@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { resolvePlan } from '@vibefy/billing';
-import { resolveReportStorage } from '@vibefy/worker';
+import { resolvePlan } from '@vibefycode/billing';
+import { resolveReportStorage } from '@vibefycode/worker';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser } from '@/lib/sql';
 
@@ -76,11 +76,11 @@ export async function GET(
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       'content-type': 'application/pdf',
-      'content-disposition': `attachment; filename="vibefy-report-${assessmentId.slice(0, 8)}.pdf"`,
+      'content-disposition': `attachment; filename="vibefycode-report-${assessmentId.slice(0, 8)}.pdf"`,
       'cache-control': 'private, no-store',
       // The hash is published so a recipient can check the file they were given
       // is the file we generated.
-      'x-vibefy-report-sha256': context.report.sha256,
+      'x-vibefycode-report-sha256': context.report.sha256,
     },
   });
 }

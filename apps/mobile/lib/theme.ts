@@ -1,4 +1,4 @@
-import { themes } from '@vibefy/shared';
+import { themes } from '@vibefycode/shared';
 
 /**
  * One palette, three surfaces.

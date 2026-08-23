@@ -2,7 +2,7 @@
 /**
  * Copy lint — the language-discipline gate.
  *
- * "Verified by Vibefy" is defensible only because it is narrow. The moment any surface
+ * "Verified by VibefyCode" is defensible only because it is narrow. The moment any surface
  * says the word this file forbids, the mark stops meaning "assessed against a published
  * rubric on a date" and starts meaning "safe", which is a claim we cannot support and did
  * not sell. This gate exists so that drift is caught by CI rather than by a regulator or a
@@ -13,7 +13,7 @@
  *   2. RESTRICTED — absolute words permitted only inside a sentence that negates or scopes
  *      them ("this is not a guarantee that the application is secure"). An unavoidable
  *      exception can be marked on the preceding line with:
- *          vibefy-copy-lint-allow: <reason>
+ *          vibefycode-copy-lint-allow: <reason>
  *      The reason is mandatory; a bare suppression is itself a failure.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -44,7 +44,9 @@ const SKIP_DIRS = new Set([
   'build',
   'coverage',
   '.git',
-  'source',
+  // `png` and `icons` hold nothing but binaries. `source` used to be listed here
+  // for the same reason and is not any more: it now holds prose about the marks,
+  // and prose about the marks is exactly what this gate exists to read.
   'png',
   'icons',
 ]);
@@ -53,12 +55,12 @@ const SKIP_FILES = new Set(['tools/copy-lint.mjs', 'tools/copy-lint.test.ts']);
 
 /** Never permitted. These extend the mark into a claim we do not make. */
 export const FORBIDDEN_PHRASES = [
-  'vibefy verified secure',
-  'vibefy certified safe',
-  'vibefy approved',
-  'guaranteed by vibefy',
-  'vibefy compliant',
-  'vibefy certified secure',
+  'vibefycode verified secure',
+  'vibefycode certified safe',
+  'vibefycode approved',
+  'guaranteed by vibefycode',
+  'vibefycode compliant',
+  'vibefycode certified secure',
   'certified secure',
   'hack-proof',
   'hackproof',
@@ -68,15 +70,25 @@ export const FORBIDDEN_PHRASES = [
   '100% secure',
   'fully secure',
   'guaranteed secure',
-  'penetration tested by vibefy',
+  'penetration tested by vibefycode',
 ];
 
 /**
- * The wordmark is exactly "Verified by Vibefy". Anything of the shape
- * "Vibefy <strong-adjective>" or "<strong-adjective> by Vibefy" is an extension of the mark.
+ * The wordmark is exactly "Verified by VibefyCode". Anything of the shape
+ * "VibefyCode <strong-adjective>" or "<strong-adjective> by VibefyCode" is an extension of the mark.
  */
 export const MARK_EXTENSION_PATTERN =
-  /\bvibefy[\s-]+(verified|certified|approved|secure|safe|compliant|guaranteed|trusted)\b|\b(certified|approved|guaranteed|secured)\s+by\s+vibefy\b/i;
+  /\bvibefycode[\s-]+(verified|certified|approved|secure|safe|compliant|guaranteed|trusted)\b|\b(certified|approved|guaranteed|secured)\s+by\s+vibefycode\b/i;
+
+/**
+ * The old name, on its own.
+ *
+ * The brand is VibefyCode. "Vibefy" was the name until the rename, and a
+ * half-renamed sentence is the most likely way for the wrong one to reach a
+ * customer — it reads fine to whoever wrote it. Anything that genuinely needs
+ * the old name (the superseded artwork, this comment) says so with a reason.
+ */
+export const STALE_BRAND_PATTERN = /\bvibefy(?!code)\b/i;
 
 /** Absolute words that require a negation or a scope qualifier in the same sentence. */
 export const RESTRICTED_WORDS = [
@@ -150,20 +162,29 @@ export function lintText(text, path = '<input>') {
           path,
           line: index + 1,
           rule: 'forbidden-phrase',
-          detail: `"${phrase}" is never permitted. The mark is exactly "Verified by Vibefy".`,
+          detail: `"${phrase}" is never permitted. The mark is exactly "Verified by VibefyCode".`,
         });
       }
     }
     const markMatch = MARK_EXTENSION_PATTERN.exec(line);
-    if (markMatch && !/verified by vibefy/i.test(line)) {
+    if (markMatch && !/verified by vibefycode/i.test(line)) {
       violations.push({
         path,
         line: index + 1,
         rule: 'mark-extension',
-        detail: `"${markMatch[0]}" extends the certification mark. Permitted forms: "Verified by Vibefy", "Vibefy-assessed", "Vibefy Rubric vX — score N/100".`,
+        detail: `"${markMatch[0]}" extends the certification mark. Permitted forms: "Verified by VibefyCode", "VibefyCode-assessed", "VibefyCode Rubric vX — score N/100".`,
       });
     }
-    const inline = /vibefy-copy-lint-allow:([^\n]*)/.exec(lower);
+    const staleMatch = STALE_BRAND_PATTERN.exec(line);
+    if (staleMatch) {
+      violations.push({
+        path,
+        line: index + 1,
+        rule: 'stale-brand',
+        detail: `"${staleMatch[0]}" is the old name. The brand is VibefyCode, and the mark is exactly "Verified by VibefyCode".`,
+      });
+    }
+    const inline = /vibefycode-copy-lint-allow:([^\n]*)/.exec(lower);
     if (inline && !isMeaningfulReason(inline[1])) {
       violations.push({
         path,
@@ -177,7 +198,7 @@ export function lintText(text, path = '<input>') {
   // Restricted words are judged per paragraph, not per line: prose wraps, and a negation
   // that lands on the previous physical line still scopes the sentence it belongs to.
   for (const block of paragraphsOf(lines, suppressed)) {
-    const inlineAllow = /vibefy-copy-lint-allow:([^\n]*)/.exec(block.text);
+    const inlineAllow = /vibefycode-copy-lint-allow:([^\n]*)/.exec(block.text);
     if (inlineAllow && isMeaningfulReason(inlineAllow[1])) continue;
     const lower = block.text.toLowerCase();
     for (const sentence of sentencesOf(lower)) {
@@ -208,12 +229,12 @@ function suppressedBlocks(lines, path) {
   let openedAt = null;
 
   lines.forEach((line, index) => {
-    if (/vibefy-copy-lint-allow-block-end/.test(line)) {
+    if (/vibefycode-copy-lint-allow-block-end/.test(line)) {
       if (openedAt !== null) suppressed.add(index);
       openedAt = null;
       return;
     }
-    const opener = /vibefy-copy-lint-allow-block:(.*)$/.exec(line);
+    const opener = /vibefycode-copy-lint-allow-block:(.*)$/.exec(line);
     if (opener) {
       if (!isMeaningfulReason(opener[1])) {
         blockViolations.push({
@@ -245,7 +266,7 @@ function suppressedBlocks(lines, path) {
 
 /**
  * A suppression must say why. Comment terminators are stripped first, so
- * `<!-- vibefy-copy-lint-allow-block: -->` reads as the empty reason it is
+ * `<!-- vibefycode-copy-lint-allow-block: -->` reads as the empty reason it is
  * rather than as the string "-->".
  */
 function isMeaningfulReason(raw) {
@@ -313,7 +334,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const v of violations)
       console.error(`  ${v.path}:${v.line}  [${v.rule}]\n      ${v.detail}`);
     console.error('\nIf the wording is genuinely unavoidable, add on the line above:');
-    console.error('  vibefy-copy-lint-allow: <why this wording is correct>\n');
+    console.error('  vibefycode-copy-lint-allow: <why this wording is correct>\n');
     process.exit(1);
   }
   console.log(`✓ Copy lint passed — ${fileCount} files, no over-claiming language.`);

@@ -11,8 +11,8 @@ export interface ActingAs {
 }
 
 const dsnParts = () => {
-  const dsn = process.env.VIBEFY_TEST_DSN;
-  if (!dsn) throw new Error('VIBEFY_TEST_DSN is not set — global setup did not run');
+  const dsn = process.env.VIBEFYCODE_TEST_DSN;
+  if (!dsn) throw new Error('VIBEFYCODE_TEST_DSN is not set — global setup did not run');
   const url = new URL(dsn);
   const host = url.searchParams.get('host');
   if (!host) throw new Error(`Expected a Unix socket DSN, got ${dsn}`);

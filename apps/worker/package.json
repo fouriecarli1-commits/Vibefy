@@ -1,5 +1,5 @@
 {
-  "name": "@vibefy/worker",
+  "name": "@vibefycode/worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,17 +12,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vibefy/engine": "workspace:*",
-    "@vibefy/rubric": "workspace:*",
-    "@vibefy/shared": "workspace:*",
+    "@vibefycode/engine": "workspace:*",
+    "@vibefycode/rubric": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
     "pg": "8.23.0",
-    "@vibefy/report": "workspace:*",
+    "@vibefycode/report": "workspace:*",
     "playwright": "1.62.1",
-    "@vibefy/billing": "workspace:*",
-    "@vibefy/badge": "workspace:*",
-    "@vibefy/monitoring": "workspace:*",
-    "@vibefy/api": "workspace:*",
-    "@vibefy/governance": "workspace:*"
+    "@vibefycode/billing": "workspace:*",
+    "@vibefycode/badge": "workspace:*",
+    "@vibefycode/monitoring": "workspace:*",
+    "@vibefycode/api": "workspace:*",
+    "@vibefycode/governance": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

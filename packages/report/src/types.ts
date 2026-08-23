@@ -6,7 +6,7 @@
  * database alone — which is what "reproducible and defensible" has to mean when
  * a customer disputes a finding.
  */
-import type { RubricDimensionId, FindingSeverity, ConfidenceLevel } from '@vibefy/rubric';
+import type { RubricDimensionId, FindingSeverity, ConfidenceLevel } from '@vibefycode/rubric';
 
 /** What the customer is entitled to see. Never what they were scored. */
 export type ReportTier = 'free' | 'paid';
@@ -79,7 +79,7 @@ export interface ReportSource {
    * The agency handing this report to a client, if there is one.
    *
    * White-label means *their* cover block, not their assessment. The document
-   * still says who performed the work, against which rubric, and every Vibefy
+   * still says who performed the work, against which rubric, and every VibefyCode
    * mark in it is the supplied mark, unaltered.
    */
   readonly branding?: ReportBranding | null;

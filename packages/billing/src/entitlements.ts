@@ -4,7 +4,7 @@
  * Entitlements decide **coverage and access**: how deep an assessment runs, how
  * often it may run, what the report shows, and whether a PDF or a badge is
  * available. They never decide a score, and nothing in this module is reachable
- * from `@vibefy/rubric` — a test asserts that, because a promise about scoring
+ * from `@vibefycode/rubric` — a test asserts that, because a promise about scoring
  * is only worth what enforces it.
  *
  * Read the vocabulary carefully: `depth` is how much of the pipeline runs.

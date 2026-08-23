@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { CHALLENGE_PATH, DNS_RECORD_PREFIX } from '@vibefy/engine/authorisation';
-import { badgeEmbedSnippet, BADGE_USAGE } from '@vibefy/shared';
+import { CHALLENGE_PATH, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisation';
+import { badgeEmbedSnippet, BADGE_USAGE } from '@vibefycode/shared';
 import {
   acceptBadgeLicence,
   requestAssessment,
@@ -159,7 +159,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
   const verifyOrigin =
     process.env.NEXT_PUBLIC_VERIFY_URL ??
     process.env.NEXT_PUBLIC_SITE_URL ??
-    'https://verify.vibefy.example';
+    'https://verify.vibefycode.example';
 
   return (
     <div className="max-w-3xl space-y-10">
@@ -407,7 +407,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/badge/${badge.public_id}.svg`}
-                  alt={`Verified by Vibefy — ${app.name}, Rubric v${badge.rubric_version}, assessed ${new Date(badge.assessed_at as string).toISOString().slice(0, 10)}. Scope-limited assessment, not a security guarantee.`}
+                  alt={`Verified by VibefyCode — ${app.name}, Rubric v${badge.rubric_version}, assessed ${new Date(badge.assessed_at as string).toISOString().slice(0, 10)}. Scope-limited assessment, not a security guarantee.`}
                   width={128}
                   height={128}
                 />
@@ -447,7 +447,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                     })}
                   </pre>
                   <p className="text-sm text-muted">
-                    The image is served from Vibefy on every load, never copied to your server. That
+                    The image is served from VibefyCode on every load, never copied to your server. That
                     is what lets a suspension or a revocation take effect within minutes — and it is
                     why there is no file to download.
                   </p>
@@ -474,17 +474,17 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                 </p>
               )}
               <p className="mt-2 max-w-prose text-sm text-muted">
-                "Verified by Vibefy" is a trade mark. The licence lets you display it for this
+                "Verified by VibefyCode" is a trade mark. The licence lets you display it for this
                 application, on this domain, until it expires — and sets out what you may not do: no
                 recolouring, no cropping, no altering the wordmark, no displaying it after it
                 expires or is revoked, and never without the link to the verification page. Read it
-                in full: <Link href="/legal/badge-licence">Vibefy Badge Licence Agreement</Link>.
+                in full: <Link href="/legal/badge-licence">VibefyCode Badge Licence Agreement</Link>.
               </p>
               <div className="mt-5">
                 <ActionForm action={acceptBadgeLicence} submitLabel="Accept the licence">
                   <input type="hidden" name="appId" value={id} />
                   <Checkbox
-                    label="I accept the Vibefy Badge Licence Agreement for this application."
+                    label="I accept the VibefyCode Badge Licence Agreement for this application."
                     name="accepted"
                     hint="Recorded with the version, a hash of the exact wording, the time, your IP and your user agent — in a record that cannot be edited afterwards."
                   />

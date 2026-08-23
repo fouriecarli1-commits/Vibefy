@@ -187,16 +187,16 @@ describe('webhook verification', () => {
       organisationId: 'org',
       plan: 'one_off',
       customerEmail: 'a@example.test',
-      successUrl: 'https://vibefy.example/ok',
-      cancelUrl: 'https://vibefy.example/no',
+      successUrl: 'https://vibefycode.example/ok',
+      cancelUrl: 'https://vibefycode.example/no',
       idempotencyKey: 'key-1',
     });
     const second = await provider.createCheckoutSession({
       organisationId: 'org',
       plan: 'one_off',
       customerEmail: 'a@example.test',
-      successUrl: 'https://vibefy.example/ok',
-      cancelUrl: 'https://vibefy.example/no',
+      successUrl: 'https://vibefycode.example/ok',
+      cancelUrl: 'https://vibefycode.example/no',
       idempotencyKey: 'key-1',
     });
     expect(second.id).toBe(first.id);
@@ -210,7 +210,7 @@ describe('applying events to our records', () => {
 
   beforeAll(async () => {
     db = await connect();
-    const dsn = new URL(process.env.VIBEFY_TEST_DSN!);
+    const dsn = new URL(process.env.VIBEFYCODE_TEST_DSN!);
     pool = new Pool({
       host: dsn.searchParams.get('host')!,
       database: dsn.pathname.slice(1),

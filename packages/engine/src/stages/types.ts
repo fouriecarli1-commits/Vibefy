@@ -6,7 +6,7 @@
  * outside it. A stage cannot open its own network connection, spend money the
  * meter did not authorise, or publish a finding without attaching evidence.
  */
-import type { RubricDimensionId, FindingSeverity, ConfidenceLevel } from '@vibefy/rubric';
+import type { RubricDimensionId, FindingSeverity, ConfidenceLevel } from '@vibefycode/rubric';
 import type { ScopeGuard } from '../runtime/scope.ts';
 import type { CostMeter } from '../runtime/cost.ts';
 import type { ModelClient } from '../model/client.ts';

@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { buildKeySet, loadRetiredKeys, loadSigningKey, verifyBadge } from '@vibefy/badge';
+import { buildKeySet, loadRetiredKeys, loadSigningKey, verifyBadge } from '@vibefycode/badge';
 import { readAsAnon } from '@/lib/sql';
 
 export const metadata: Metadata = {
   title: 'Check a badge',
   description:
-    'Verify a "Verified by Vibefy" badge signature, and see what it does and does not mean.',
+    'Verify a "Verified by VibefyCode" badge signature, and see what it does and does not mean.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -55,8 +55,8 @@ export default async function VerifyPage({
       <header className="space-y-3">
         <h1 className="text-3xl font-bold tracking-tight">Check a badge</h1>
         <p className="text-muted">
-          Paste the badge identifier from a "Verified by Vibefy" mark — it is the part before{' '}
-          <code>.svg</code> in the image URL — and this will tell you what Vibefy actually attested,
+          Paste the badge identifier from a "Verified by VibefyCode" mark — it is the part before{' '}
+          <code>.svg</code> in the image URL — and this will tell you what VibefyCode actually attested,
           and whether it still stands.
         </p>
       </header>
@@ -79,9 +79,9 @@ export default async function VerifyPage({
 
       {badgeId && !record && (
         <section role="alert" className="rounded-xl border border-line p-5">
-          <h2 className="font-semibold text-bad">Vibefy has never issued that badge</h2>
+          <h2 className="font-semibold text-bad">VibefyCode has never issued that badge</h2>
           <p className="mt-2 text-sm text-muted">
-            No badge with that identifier exists. If you were shown a Vibefy mark linking to it,
+            No badge with that identifier exists. If you were shown a VibefyCode mark linking to it,
             treat the mark as unverified — and please{' '}
             <Link href="/legal/ip-takedown">tell us where you saw it</Link>.
           </p>
@@ -95,7 +95,7 @@ export default async function VerifyPage({
               1. Is the signature genuine?
             </h2>
             <p className={`mt-2 font-medium ${result.signatureValid ? 'text-ok' : 'text-bad'}`}>
-              {result.signatureValid ? 'Yes — Vibefy issued this.' : 'No.'}
+              {result.signatureValid ? 'Yes — VibefyCode issued this.' : 'No.'}
             </p>
             <p className="mt-2 text-sm text-muted">{result.explanation}</p>
           </section>
@@ -135,7 +135,7 @@ export default async function VerifyPage({
               <code>{record.certified_origin}</code>
             </p>
             <p className="mt-2 text-sm text-muted">
-              A Vibefy badge on any other website is being displayed outside its licence, whatever
+              A VibefyCode badge on any other website is being displayed outside its licence, whatever
               its signature says.
             </p>
           </section>
@@ -145,7 +145,7 @@ export default async function VerifyPage({
       <section className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
         <h2 className="font-semibold text-ink">Checking it without us</h2>
         <p className="mt-2">
-          The signing keys are published at <code>/.well-known/vibefy-badge-key</code> as a JWKS,
+          The signing keys are published at <code>/.well-known/vibefycode-badge-key</code> as a JWKS,
           and each badge's signed payload is at <code>/api/badge/&lt;identifier&gt;</code>. Any
           Ed25519 implementation can verify it offline. The response documents the exact
           canonicalisation, because two implementations must produce identical bytes or the

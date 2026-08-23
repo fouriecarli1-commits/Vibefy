@@ -10,7 +10,7 @@
  * renders from, not read from the current source files, so a later edit to the
  * standard wording can never change what a customer was actually told.
  */
-import { NON_RELIANCE_LEGEND, AI_DISCLOSURE, legibleOr, themes } from '@vibefy/shared';
+import { NON_RELIANCE_LEGEND, AI_DISCLOSURE, legibleOr, themes } from '@vibefycode/shared';
 import { redactForTier, scoreFingerprint } from './redact.ts';
 import type { RenderedReport, ReportFinding, ReportSource, ReportTier } from './types.ts';
 
@@ -108,7 +108,7 @@ function stylesheet(): string {
 export function renderReport(source: ReportSource, tier: ReportTier): RenderedReport {
   const view = redactForTier(source, tier);
   const fingerprint = scoreFingerprint(source);
-  const title = `Vibefy assessment — ${source.appName}`;
+  const title = `VibefyCode assessment — ${source.appName}`;
 
   const findingsHtml = view.findings
     .map(
@@ -166,7 +166,7 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
         }
         <div>
           <p class="whitelabel-line">Prepared for you by ${escapeHtml(branding.displayName)}.</p>
-          <p class="muted">The assessment itself was carried out by Vibefy against published rubric v${escapeHtml(source.rubricVersion)}. ${escapeHtml(branding.displayName)} did not score this application and cannot change what it scored.</p>
+          <p class="muted">The assessment itself was carried out by VibefyCode against published rubric v${escapeHtml(source.rubricVersion)}. ${escapeHtml(branding.displayName)} did not score this application and cannot change what it scored.</p>
           ${branding.contactLine ? `<p class="muted">${escapeHtml(branding.contactLine)}</p>` : ''}
         </div>
       </aside>`
@@ -192,7 +192,7 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
-<meta name="vibefy-score-fingerprint" content="${escapeHtml(fingerprint)}">
+<meta name="vibefycode-score-fingerprint" content="${escapeHtml(fingerprint)}">
 <style>${stylesheet()}</style>
 </head>
 <body>
@@ -200,7 +200,7 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
 
 ${brandingHtml}
 <header class="cover">
-  <p class="muted">Vibefy assessment · Rubric v${escapeHtml(source.rubricVersion)}</p>
+  <p class="muted">VibefyCode assessment · Rubric v${escapeHtml(source.rubricVersion)}</p>
   <h1>${escapeHtml(source.appName)}</h1>
   <p class="muted">${escapeHtml(source.appUrl ?? '')} · assessed ${escapeHtml(source.assessedOn)}${
     source.reviewedOn ? ` · reviewed ${escapeHtml(source.reviewedOn)}` : ''

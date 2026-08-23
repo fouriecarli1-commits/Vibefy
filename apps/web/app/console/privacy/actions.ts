@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { REQUEST_KINDS, refusalIsAnswerable, type RequestType } from '@vibefy/governance';
+import { REQUEST_KINDS, refusalIsAnswerable, type RequestType } from '@vibefycode/governance';
 import { createClient } from '@/lib/supabase/server';
 import type { ActionState } from '@/app/console/apps/actions';
 

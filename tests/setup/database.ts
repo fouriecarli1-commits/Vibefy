@@ -16,5 +16,5 @@ export default function setup(): void {
     .split('\n')
     .pop();
   if (!dsn) throw new Error('test-db.sh did not return a connection string');
-  process.env.VIBEFY_TEST_DSN = dsn;
+  process.env.VIBEFYCODE_TEST_DSN = dsn;
 }

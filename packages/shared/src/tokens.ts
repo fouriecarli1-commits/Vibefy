@@ -26,10 +26,10 @@ export const themes: Record<ThemeName, SemanticTokens> = {
 /** CSS custom properties for a theme, ready to inject into a stylesheet or an SVG. */
 export function cssVariables(theme: ThemeName): Record<string, string> {
   const entries = Object.entries(themes[theme]).map(([key, value]) => [
-    `--vibefy-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`,
+    `--vibefycode-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`,
     value,
   ]);
-  const brandEntries = Object.entries(brand).map(([key, value]) => [`--vibefy-${key}`, value]);
+  const brandEntries = Object.entries(brand).map(([key, value]) => [`--vibefycode-${key}`, value]);
   return Object.fromEntries([...brandEntries, ...entries]);
 }
 

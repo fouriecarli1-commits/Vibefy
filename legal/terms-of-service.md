@@ -9,13 +9,13 @@
 
 ## 1. Who we are
 
-Vibefy ("Vibefy", "we", "us") is operated by [LEGAL_ENTITY], registered in [JURISDICTION].
+VibefyCode ("VibefyCode", "we", "us") is operated by [LEGAL_ENTITY], registered in [JURISDICTION].
 Contact: [CONTACT_EMAIL]. "You" means the person or organisation using the platform.
 
 ## 2. What the service is
 
-Vibefy assesses applications against a published, versioned rubric and, where the published
-threshold is met and a human reviewer approves, issues a time-limited "Verified by Vibefy"
+VibefyCode assesses applications against a published, versioned rubric and, where the published
+threshold is met and a human reviewer approves, issues a time-limited "Verified by VibefyCode"
 mark. The assessment is described in the Assessment Services Agreement; the mark is licensed
 under the Badge Licence Agreement. Those documents form part of these Terms.
 
@@ -24,8 +24,8 @@ under the Badge Licence Agreement. Those documents form part of these Terms.
 This clause appears in these Terms, in every report, and on every verification page.
 
 > This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation
-> of the application identified above, conducted by Vibefy against published Vibefy Rubric
-> version X on [date]. "Verified by Vibefy" means only that the application was assessed
+> of the application identified above, conducted by VibefyCode against published VibefyCode Rubric
+> version X on [date]. "Verified by VibefyCode" means only that the application was assessed
 > against that rubric and met the published threshold on that date. It is not a penetration
 > test, a security audit, a code audit, a legal or regulatory compliance certification, or a
 > guarantee of any kind. It does not certify that the application is secure, error-free,
@@ -89,7 +89,7 @@ mark; and any third-party claim caused by your application or by testing you aut
 ## 12. No reliance by third parties
 
 Reports are prepared for you alone. No third party — including investors, acquirers, insurers
-or your end users — may rely on a Vibefy report or mark for any purpose. Every exported report
+or your end users — may rely on a VibefyCode report or mark for any purpose. Every exported report
 carries a non-reliance legend to that effect.
 
 ## 13. Our right to refuse and to revoke

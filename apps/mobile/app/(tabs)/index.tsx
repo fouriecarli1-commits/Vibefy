@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
-import { listApps, type AppSummary } from '@vibefy/api';
+import { listApps, type AppSummary } from '@vibefycode/api';
 import { supabase } from '@/lib/supabase.ts';
 import { palette, scoreColour, spacing } from '@/lib/theme.ts';
 import { Button, Empty, Loading, styles } from '@/lib/ui.tsx';

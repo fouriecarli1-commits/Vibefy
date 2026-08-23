@@ -1,5 +1,5 @@
 {
-  "name": "@vibefy/mobile",
+  "name": "@vibefycode/mobile",
   "version": "0.0.0",
   "private": true,
   "main": "expo-router/entry",
@@ -12,8 +12,8 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "2.112.3",
-    "@vibefy/api": "workspace:*",
-    "@vibefy/shared": "workspace:*",
+    "@vibefycode/api": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
     "expo": "54.0.12",
     "expo-constants": "18.0.9",
     "expo-device": "8.0.9",

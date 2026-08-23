@@ -30,7 +30,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: ['@vibefy/shared', '@vibefy/rubric'],
+  transpilePackages: ['@vibefycode/shared', '@vibefycode/rubric'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

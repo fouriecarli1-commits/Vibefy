@@ -1,6 +1,6 @@
 # Runbook
 
-How to run, verify, debug and deploy Vibefy. Written for one person with no team to ask.
+How to run, verify, debug and deploy VibefyCode. Written for one person with no team to ask.
 
 ## Everyday commands
 
@@ -35,10 +35,10 @@ The five gates, in the order CI runs them and why that order:
 
 1. **`check:secrets`** — a leaked credential is the most expensive mistake, and the cheapest to
    catch. Scans tracked _and_ untracked files. Also runs as a pre-commit hook on staged changes.
-2. **`check:copy`** — no phrase that extends "Verified by Vibefy", no absolute word without a
+2. **`check:copy`** — no phrase that extends "Verified by VibefyCode", no absolute word without a
    scope qualifier. If it fires on wording you believe is correct, add
-   `vibefy-copy-lint-allow: <reason>` on the line above, or a
-   `vibefy-copy-lint-allow-block: <reason>` … `vibefy-copy-lint-allow-block-end` region. The
+   `vibefycode-copy-lint-allow: <reason>` on the line above, or a
+   `vibefycode-copy-lint-allow-block: <reason>` … `vibefycode-copy-lint-allow-block-end` region. The
    reason is required and must be a real sentence.
 3. **`check:contrast`** — every token pair against WCAG 2.2 AA. **Fix the token, not the
    threshold.**
@@ -62,18 +62,18 @@ scripts/test-db.sh stop
 ```
 
 If it refuses to start as root, it drops to the `postgres` account automatically; set
-`VIBEFY_TEST_PGUSER` if that account does not exist.
+`VIBEFYCODE_TEST_PGUSER` if that account does not exist.
 
 ## Common failures
 
 | Symptom                                      | Cause                                           | Fix                                                                     |
 | -------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL is not set`        | `.env.local` missing or unfilled                | `cp .env.example .env.local`, paste the values `supabase start` printed |
-| Tests fail with `VIBEFY_TEST_DSN is not set` | Global setup did not run                        | Run `pnpm test`, not `vitest` directly                                  |
-| `initdb: cannot be run as root`              | No unprivileged account                         | `VIBEFY_TEST_PGUSER=<user> pnpm test`                                   |
+| Tests fail with `VIBEFYCODE_TEST_DSN is not set` | Global setup did not run                        | Run `pnpm test`, not `vitest` directly                                  |
+| `initdb: cannot be run as root`              | No unprivileged account                         | `VIBEFYCODE_TEST_PGUSER=<user> pnpm test`                                   |
 | Migration fails with `append-only`           | A migration tried to UPDATE an evidence table   | That is the trigger doing its job. Insert a superseding row instead     |
 | `no verified, unexpired authorisation`       | An assessment was created without authorisation | That is the gate doing its job. Complete verification first             |
-| CI fails on "brand/svg is out of date"       | `geometry.mjs` changed without regenerating     | `pnpm brand:build` and commit                                           |
+| CI fails on "brand/svg is out of date"       | `packages/shared/src/brand.ts` changed without regenerating | `pnpm brand:build` and commit                               |
 | Copy lint fires on legal text                | Absolute word in a sentence with no negation    | Reword, or use a reasoned suppression                                   |
 
 ## Adding a migration
@@ -101,7 +101,7 @@ price of the tier each depth serves.
 
 ### When the browser will not launch
 
-The runner resolves Playwright's browser itself. Two overrides exist: `VIBEFY_BROWSER_EXECUTABLE`
+The runner resolves Playwright's browser itself. Two overrides exist: `VIBEFYCODE_BROWSER_EXECUTABLE`
 for a container image that bakes one in, and a discovery fallback for a machine whose cached
 browser build predates the pinned Playwright version. If neither finds one, the browser pass is
 skipped with a note rather than failing the run — but the report is thinner, so fix it.
@@ -158,15 +158,15 @@ them** — the console never signs anything, deliberately.
 ### Rotating
 
 1. `pnpm badge:keygen` with a new id.
-2. Add the _previous_ public JWK to `VIBEFY_BADGE_RETIRED_KEYS` (it is printed as
+2. Add the _previous_ public JWK to `VIBEFYCODE_BADGE_RETIRED_KEYS` (it is printed as
    a comment by the generator; you can also read it from
-   `/.well-known/vibefy-badge-key` before you switch).
-3. Point `VIBEFY_BADGE_KEY_ID` and `VIBEFY_BADGE_SIGNING_KEY_B64` at the new key.
+   `/.well-known/vibefycode-badge-key` before you switch).
+3. Point `VIBEFYCODE_BADGE_KEY_ID` and `VIBEFYCODE_BADGE_SIGNING_KEY_B64` at the new key.
 4. Restart the worker.
 
 Existing badges keep verifying, because they record which key signed them and the
 retired public key stays published. **Never remove a retired key**: a verifier
-that suddenly fails cannot tell "this badge is forged" from "Vibefy tidied up".
+that suddenly fails cannot tell "this badge is forged" from "VibefyCode tidied up".
 
 ### If the key is suspected compromised
 
@@ -450,6 +450,52 @@ cannot be created without one.
 assessment. Every outcome needs written reasons — a rejection especially, since
 that is the one the published policy exists for.
 
+## The marks
+
+`pnpm brand:build` is the only way any brand asset is produced. It writes the
+SVG masters, the PNG exports at 1x/2x/3x, the full icon set, the mobile icons
+and splash, and the web app's public assets — all from one geometry source,
+`packages/shared/src/brand.ts`. Never hand-edit anything it writes.
+
+```bash
+pnpm brand:build              # everything
+pnpm brand:build --svg-only   # skip rasterisation
+pnpm check:brand              # the gate: masters present, palette clean, wordmark intact
+```
+
+### Looking at what you changed
+
+The gate checks correctness, not whether it looks right. For that, render and
+open it:
+
+```bash
+node -e "require('sharp')('brand/svg/vibefycode-badge-verified.svg',{density:600})\
+  .resize(600).flatten({background:'#fff'}).png().toFile('/tmp/seal.png')"
+```
+
+Check the seal at 512px **and** the compact badge at 96px. They are different
+artwork for a reason.
+
+### Two things that will bite
+
+**`textPath` renders as nothing in librsvg**, which is what rasterises our own
+PNG masters. The seal's arc legends are placed one glyph at a time
+(`arcTextPlacements`) for exactly this reason. If you reintroduce `textPath`,
+the browser will look fine and the PNG masters will come out with no wordmark
+on them. A test asserts no badge SVG contains it.
+
+**The badge embeds no font file.** Every text element pins its width with
+`textLength`, so a machine without Poppins gets different letterforms and the
+same lockup. Drop the pin and the wordmark will clip on some machines and not
+others — the first build of the new lockup clipped to "VIBEFYCO".
+
+### The artwork in `brand/source/` is the authority
+
+Except that right now it is empty: the VibefyCode logo and stamp arrived as
+images in conversation rather than as files, so the masters are reconstructions.
+`brand/source/README.md` says what to drop in and what to check. Until then the
+delta is registered in `docs/OPEN_ITEMS.md`.
+
 ## Changing a legal document
 
 1. Edit the file in `/legal`, bump its `**Version:**`.
@@ -481,7 +527,7 @@ Not yet wired — the domain and hosting accounts are open items. When they are:
 1. **Suspected data exposure** — follow the incident response plan in `BUSINESS_CHECKLIST.md`.
    72-hour notification clock starts at awareness, not at confirmation.
 2. **Badge signing key suspected compromised** — revoke the published key at
-   `/.well-known/vibefy-badge-key`, generate a new key pair, re-sign every active badge, and
+   `/.well-known/vibefycode-badge-key`, generate a new key pair, re-sign every active badge, and
    publish what happened. Do not quietly rotate.
 3. **Runaway assessment cost** — the global daily spend cap pauses new runs automatically. Check
    the internal cost dashboard, then `cost_records` for the assessment responsible.

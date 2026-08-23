@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 420" role="img" aria-label="VibefyCode — vibe app rating system">
+  <title>VibefyCode — vibe app rating system</title>
+  <g transform="translate(36 18) scale(0.74)">
+  <defs>
+    <linearGradient id="mark-ribbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2FD3C4"/>
+      <stop offset="48%" stop-color="#2E9BE0"/>
+      <stop offset="100%" stop-color="#1F5FE0"/>
+    </linearGradient>
+    <linearGradient id="mark-arrow" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2E9BE0"/>
+      <stop offset="62%" stop-color="#E8730C"/>
+      <stop offset="100%" stop-color="#F9A03F"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke="#C7D0DE" stroke-width="6" fill="none" opacity="1">
+      <path d="M96 300 L138 300 L160 278"/>
+      <path d="M110 366 L152 366 L172 346"/>
+      <path d="M150 232 L120 232 L104 216"/>
+      <path d="M118 424 L166 424"/>
+      <path d="M404 300 L440 300 L456 284"/>
+      <path d="M398 232 L432 232"/>
+    </g>
+    <g fill="#C7D0DE" opacity="1">
+      <circle cx="92" cy="300" r="8"/>
+      <circle cx="106" cy="366" r="8"/>
+      <circle cx="100" cy="212" r="8"/>
+      <circle cx="114" cy="424" r="8"/>
+      <circle cx="460" cy="280" r="8"/>
+      <circle cx="436" cy="232" r="8"/>
+      <rect x="388" y="400" width="15" height="26" rx="3"/>
+      <rect x="411" y="384" width="15" height="42" rx="3"/>
+      <rect x="434" y="362" width="15" height="64" rx="3"/>
+    </g>
+    <path d="M268 402 C312 360 356 320 398 276" stroke="url(#mark-arrow)" stroke-width="26"/>
+    <path d="M452 232 L414 302 L374 256 Z" fill="#E8730C" stroke="none"/>
+    <path d="M132 118 C160 214 200 306 244 372" stroke="url(#mark-ribbon)" stroke-width="44"/>
+    <path d="M244 372 C238 404 208 416 186 400 C164 384 168 350 194 342 C220 334 240 352 240 374" stroke="url(#mark-ribbon)" stroke-width="22"/>
+    <circle cx="200" cy="372" r="13" fill="#FFFFFF" stroke="none"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="#FFFFFF" stroke-width="62"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="url(#mark-ribbon)" stroke-width="44"/>
+  </g>
+  </g>
+  <g font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" fill="#16205A" letter-spacing="6">
+    <text x="446" y="250" font-size="132" textLength="880" lengthAdjust="spacingAndGlyphs"><tspan font-weight="700">VIBEFY</tspan><tspan font-weight="400">CODE</tspan></text>
+    <text x="450" y="322" font-size="48" font-weight="500" textLength="560" lengthAdjust="spacingAndGlyphs">vibe app rating system</text>
+  </g>
+</svg>

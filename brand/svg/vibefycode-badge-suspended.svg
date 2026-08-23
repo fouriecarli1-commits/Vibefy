@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     viewBox="0 0 512 512" role="img"
+     aria-label="Not currently verified by VibefyCode — suspended." width="512" height="512">
+  <title>Not currently verified by VibefyCode — suspended.</title>
+  <desc>A VibefyCode assessment is point-in-time and scope-limited. It is not a penetration test, a security audit, or a guarantee.</desc>
+  <defs>
+    <linearGradient id="seal-ribbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2FD3C4"/>
+      <stop offset="48%" stop-color="#2E9BE0"/>
+      <stop offset="100%" stop-color="#1F5FE0"/>
+    </linearGradient>
+    <linearGradient id="seal-arrow" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2E9BE0"/>
+      <stop offset="62%" stop-color="#E8730C"/>
+      <stop offset="100%" stop-color="#F9A03F"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="252" fill="#FFFFFF"/>
+  <g fill="none" stroke="#8A4B08">
+    <circle cx="256" cy="256" r="246" stroke-width="3" opacity="1"/>
+    <circle cx="256" cy="256" r="239" stroke-width="1.2" opacity="0.65"/>
+    <circle cx="256" cy="256" r="206" stroke-width="1.6" opacity="0.65"/>
+    <circle cx="256" cy="256" r="199" stroke-width="1" opacity="0.65"/>
+    <circle cx="256" cy="256" r="151" stroke-width="1" opacity="0.65"/>
+    <circle cx="256" cy="256" r="144" stroke-width="1" opacity="0.65"/>
+  </g>
+
+
+
+  <g aria-hidden="true" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" fill="#5C3205" text-anchor="middle">
+    <text x="256" y="120" font-size="40" font-weight="700" letter-spacing="3" textLength="234">SUSPENDED</text>
+    <text x="256" y="452" font-size="28" font-weight="600">Not currently verified by VibefyCode</text>
+  </g>
+  <g transform="translate(256 206) scale(0.38) translate(-256 -256)" opacity="0.5">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M268 402 C312 360 356 320 398 276" stroke="currentColor" stroke-width="26"/>
+    <path d="M452 232 L414 302 L374 256 Z" fill="currentColor" stroke="none"/>
+    <path d="M132 118 C160 214 200 306 244 372" stroke="currentColor" stroke-width="44"/>
+    <path d="M244 372 C238 404 208 416 186 400 C164 384 168 350 194 342 C220 334 240 352 240 374" stroke="currentColor" stroke-width="22"/>
+    <circle cx="200" cy="372" r="13" fill="#FFFFFF" stroke="none"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="#FFFFFF" stroke-width="62"/>
+    <path d="M256 372 C300 306 340 214 368 118" stroke="currentColor" stroke-width="44"/>
+  </g>
+  </g>
+  <text x="256" y="332" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="28" fill="#5C3205" textLength="185" lengthAdjust="spacingAndGlyphs"><tspan font-weight="700">VIBEFY</tspan><tspan font-weight="400">CODE</tspan></text>
+  <path d="M180 358 L332 358" stroke="#C98A2E" stroke-width="14" stroke-linecap="round"/>
+</svg>

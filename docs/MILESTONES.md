@@ -80,7 +80,7 @@ tested; it is the inner half of that boundary, not a replacement for it.
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview                                                                                  |
 | 2. Tests pass, including the four mandatory areas    | ✅ 325 tests. Payments now have their own suite, run against a fake that signs with a real HMAC                                                     |
-| 3. The independence test passes                      | ✅ Extended: `packages/rubric` may not depend on `@vibefy/billing`, `@vibefy/report` or `stripe`, and a report renders the same score at both tiers |
+| 3. The independence test passes                      | ✅ Extended: `packages/rubric` may not depend on `@vibefycode/billing`, `@vibefycode/report` or `stripe`, and a report renders the same score at both tiers |
 | 4. RLS verified                                      | ✅ Extended to `assessment_requests` and `billing_events`                                                                                           |
 | 5. No secrets in the repo                            | ✅                                                                                                                                                  |
 | 6. Legal artefacts surfaced with acceptance recorded | ✅ The refund policy is summarised on the billing page and linked in full                                                                           |
@@ -128,7 +128,7 @@ built and tested; it has never spoken to Stripe, because there is nothing to spe
 ### What M3 built
 
 - **Ed25519 signing** over a fixed, published canonicalisation. A third party verifies a badge
-  offline with any JOSE library, against a JWKS at `/.well-known/vibefy-badge-key`.
+  offline with any JOSE library, against a JWKS at `/.well-known/vibefycode-badge-key`.
 - **The distinction the scheme rests on**, written into the payload, the API response and the
   checker page: the signature attests that the assessment happened and scored what it says —
   a fact that survives revocation — and says nothing about whether the badge is live.
@@ -315,7 +315,7 @@ that needs the bundle identifier and the Apple/Google accounts, which follow the
   There is no stored flag to go stale and no cache to invalidate.
 - **Opt-out that means it** — one control, immediate, and certification untouched, which is what
   the Badge Licence now promises in writing. Every change of mind is kept in an append-only table.
-- **One disclosure, one wording**, in `@vibefy/shared`, used by both the verification page and the
+- **One disclosure, one wording**, in `@vibefycode/shared`, used by both the verification page and the
   listing. PART 8.1 requires it wherever a rating is displayed.
 - **A Badge Licence clause** covering listing, what it shows, the opt-out, the disclosure and the
   no-paid-placement rule — which bumped the version and invalidated existing acceptances, because

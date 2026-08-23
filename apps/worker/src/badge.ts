@@ -12,8 +12,8 @@
  * one lands without anything having to remember to fire.
  */
 import { randomBytes } from 'node:crypto';
-import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefy/badge';
-import { isMonitored, type MonitoredPlan } from '@vibefy/monitoring';
+import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefycode/badge';
+import { isMonitored, type MonitoredPlan } from '@vibefycode/monitoring';
 import registry from '../../../legal/registry.json' with { type: 'json' };
 import type { PoolClient } from 'pg';
 

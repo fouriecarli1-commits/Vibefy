@@ -2,7 +2,7 @@
 /**
  * Brand asset pipeline.
  *
- * One geometry source — `@vibefy/shared` — produces every SVG master, every PNG
+ * One geometry source — `@vibefycode/shared` — produces every SVG master, every PNG
  * export and the full app-icon set, and the same renderer produces the badge
  * served at request time. Before this, the build-time masters and the runtime
  * badge were separate implementations of the same artwork, which is precisely
@@ -12,11 +12,11 @@
  *   pnpm brand:build              build SVG masters and raster exports
  *   pnpm brand:build --svg-only   skip rasterisation
  */
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { renderBadgeSvg, renderMarkSvg, type BadgeStatus } from '@vibefy/badge';
-import { FONT_STACK, MARK, PALETTE, badgeStatusColours, gradient } from '@vibefy/shared';
+import { renderBadgeSvg, renderMarkSvg, type BadgeStatus } from '@vibefycode/badge';
+import { FONT_STACK, PALETTE, WORDMARK, badgeStatusColours } from '@vibefycode/shared';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const svgDir = join(root, 'brand/svg');
@@ -27,47 +27,42 @@ const mobileAssetDir = join(root, 'apps/mobile/assets');
 // pipeline rather than by a manual copy.
 const webPublicDir = join(root, 'apps/web/public/brand');
 
-const gradientStops = gradient.primaryStops
-  .map((stop) => `      <stop offset="${stop.offset}" stop-color="${stop.color}"/>`)
-  .join('\n');
-
+/**
+ * The horizontal lockup: mark on the left, wordmark on the right.
+ *
+ * The wordmark is one word in two weights — VIBEFY bold, CODE regular — exactly
+ * as the supplied artwork sets it. Setting it as two words, or hyphenating it,
+ * or spacing it out, all turn the mark into something we do not own.
+ */
 function horizontalLockupSvg({ onDark = false } = {}): string {
   const wordmarkColour = onDark ? PALETTE.mist : PALETTE.navy;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-label="Vibefy — vibe app rating system">
-  <title>Vibefy — vibe app rating system</title>
-  <defs>
-    <linearGradient id="vibefy-lockup-gradient" x1="0" y1="1" x2="1" y2="0">
-${gradientStops}
-    </linearGradient>
-    <linearGradient id="vibefy-lockup-check" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0%" stop-color="${PALETTE.azure}"/>
-      <stop offset="100%" stop-color="#39E4D2"/>
-    </linearGradient>
-  </defs>
-  <g transform="translate(20 30) scale(0.72)" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path d="${MARK.swoosh}" stroke="url(#vibefy-lockup-gradient)" stroke-width="${MARK.swooshWidth}"/>
-    <path d="${MARK.chevron}" stroke="url(#vibefy-lockup-check)" stroke-width="${MARK.chevronWidth}"/>
-    <g stroke="${PALETTE.teal}" stroke-width="${MARK.arcWidth}">
-${MARK.arcs.map((arc) => `      <path d="${arc.d}" opacity="${arc.opacity}"/>`).join('\n')}
-    </g>
-  </g>
-  <g font-family="${FONT_STACK}" lengthAdjust="spacingAndGlyphs" fill="${wordmarkColour}">
-    <text x="430" y="262" font-size="180" font-weight="700" textLength="520">Vibefy</text>
-    <text x="436" y="330" font-size="60" font-weight="500" textLength="500">vibe app rating system</text>
+  const markSvg = renderMarkSvg()
+    .replace(/^[\s\S]*?<title>VibefyCode<\/title>\n/, '')
+    .replace(/<\/svg>\n?$/, '');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 420" role="img" aria-label="VibefyCode — vibe app rating system">
+  <title>VibefyCode — vibe app rating system</title>
+  <g transform="translate(36 18) scale(0.74)">
+${markSvg}  </g>
+  <g font-family="${FONT_STACK}" fill="${wordmarkColour}" letter-spacing="6">
+    <text x="446" y="250" font-size="132" textLength="880" lengthAdjust="spacingAndGlyphs"><tspan font-weight="700">${WORDMARK.strong}</tspan><tspan font-weight="400">${WORDMARK.light}</tspan></text>
+    <text x="450" y="322" font-size="48" font-weight="500" textLength="560" lengthAdjust="spacingAndGlyphs">vibe app rating system</text>
   </g>
 </svg>
 `;
 }
 
 const SVG_TARGETS: readonly [string, string][] = [
-  ['vibefy-mark.svg', renderMarkSvg()],
-  ['vibefy-mark-mono.svg', renderMarkSvg({ mono: true })],
-  ['vibefy-mark-mono-dark.svg', renderMarkSvg({ mono: true, onDark: true })],
-  ['vibefy-logo-horizontal.svg', horizontalLockupSvg()],
-  ['vibefy-logo-horizontal-dark.svg', horizontalLockupSvg({ onDark: true })],
+  ['vibefycode-mark.svg', renderMarkSvg()],
+  ['vibefycode-mark-mono.svg', renderMarkSvg({ mono: true })],
+  ['vibefycode-mark-mono-dark.svg', renderMarkSvg({ mono: true, onDark: true })],
+  ['vibefycode-logo-horizontal.svg', horizontalLockupSvg()],
+  ['vibefycode-logo-horizontal-dark.svg', horizontalLockupSvg({ onDark: true })],
+  // The compact layout is a master in its own right: it is what most customers
+  // actually display, so it is gated and reviewed like everything else.
+  ['vibefycode-badge-verified-compact.svg', renderBadgeSvg({ status: 'active', sizePx: 96 })],
   ...(Object.keys(badgeStatusColours).filter((key) => !key.startsWith('$')) as BadgeStatus[]).map(
     (status): [string, string] => [
-      status === 'active' ? 'vibefy-badge-verified.svg' : `vibefy-badge-${status}.svg`,
+      status === 'active' ? 'vibefycode-badge-verified.svg' : `vibefycode-badge-${status}.svg`,
       // No app, no date: a generic master that named an application would be a lie.
       renderBadgeSvg({ status }),
     ],
@@ -75,9 +70,9 @@ const SVG_TARGETS: readonly [string, string][] = [
 ];
 
 const PNG_TARGETS = [
-  { source: 'vibefy-mark.svg', name: 'vibefy-mark', width: 512 },
-  { source: 'vibefy-badge-verified.svg', name: 'vibefy-badge-verified', width: 512 },
-  { source: 'vibefy-logo-horizontal.svg', name: 'vibefy-logo-horizontal', width: 1200 },
+  { source: 'vibefycode-mark.svg', name: 'vibefycode-mark', width: 512 },
+  { source: 'vibefycode-badge-verified.svg', name: 'vibefycode-badge-verified', width: 512 },
+  { source: 'vibefycode-logo-horizontal.svg', name: 'vibefycode-logo-horizontal', width: 1200 },
 ];
 
 const ICON_TARGETS = [
@@ -95,9 +90,22 @@ const ICON_TARGETS = [
   { name: 'adaptive-icon.png', size: 1024, padding: 0.26 },
 ] as const;
 
+/**
+ * Every output directory is emptied before it is written.
+ *
+ * Without this a renamed asset leaves its predecessor behind, and the web app
+ * keeps serving the old mark from a path nothing generates any more — which is
+ * exactly what happened when Vibefy became VibefyCode. `brand/svg/` is gated
+ * against stray files; the others are gitignored and were not.
+ */
+function reset(dir: string): void {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+}
+
 async function main(): Promise<void> {
   const svgOnly = process.argv.includes('--svg-only');
-  mkdirSync(svgDir, { recursive: true });
+  reset(svgDir);
 
   for (const [name, contents] of SVG_TARGETS) writeFileSync(join(svgDir, name), contents);
   console.log(`✓ ${SVG_TARGETS.length} SVG masters written to brand/svg/`);
@@ -112,8 +120,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  mkdirSync(pngDir, { recursive: true });
-  mkdirSync(iconDir, { recursive: true });
+  reset(pngDir);
+  reset(iconDir);
 
   for (const target of PNG_TARGETS) {
     for (const scale of [1, 2, 3]) {
@@ -128,7 +136,7 @@ async function main(): Promise<void> {
   for (const icon of ICON_TARGETS) {
     const padding = 'padding' in icon ? icon.padding : 0;
     const inner = Math.round(icon.size * (1 - padding * 2));
-    let pipeline = sharp(join(svgDir, 'vibefy-mark.svg'), { density: 600 }).resize({
+    let pipeline = sharp(join(svgDir, 'vibefycode-mark.svg'), { density: 600 }).resize({
       width: inner,
       height: inner,
       fit: 'contain',
@@ -155,14 +163,14 @@ async function main(): Promise<void> {
   for (const name of ['icon.png', 'adaptive-icon.png']) {
     copyFileSync(join(iconDir, name), join(mobileAssetDir, name));
   }
-  await sharp(join(svgDir, 'vibefy-logo-horizontal.svg'), { density: 600 })
+  await sharp(join(svgDir, 'vibefycode-logo-horizontal.svg'), { density: 600 })
     .resize({ width: 1200, height: 600, fit: 'contain', background: '#FFFFFF' })
     .flatten({ background: '#FFFFFF' })
     .png({ compressionLevel: 9 })
     .toFile(join(mobileAssetDir, 'splash.png'));
   console.log('✓ Mobile icons and splash written to apps/mobile/assets/');
 
-  mkdirSync(webPublicDir, { recursive: true });
+  reset(webPublicDir);
   for (const [name] of SVG_TARGETS) copyFileSync(join(svgDir, name), join(webPublicDir, name));
   for (const icon of ICON_TARGETS)
     copyFileSync(join(iconDir, icon.name), join(webPublicDir, icon.name));

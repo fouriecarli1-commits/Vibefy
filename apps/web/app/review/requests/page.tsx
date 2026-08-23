@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { daysRemaining, isOverdue, RESPONSE_DAYS, type RequestStatus } from '@vibefy/governance';
+import { daysRemaining, isOverdue, RESPONSE_DAYS, type RequestStatus } from '@vibefycode/governance';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { resolveDataRequest } from '@/app/console/privacy/actions';

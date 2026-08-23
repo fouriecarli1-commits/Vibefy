@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
-import { entitlementFor, type PlanTier } from '@vibefy/billing';
+import { entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { startCheckout } from './actions';
 import { ActionForm } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';

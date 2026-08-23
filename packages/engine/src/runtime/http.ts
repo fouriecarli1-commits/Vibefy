@@ -73,7 +73,7 @@ export class ScopedHttp {
             // We identify ourselves. An assessment service that arrives
             // disguised is indistinguishable from an attacker in a customer's
             // logs, and would deserve to be treated as one.
-            'user-agent': 'VibefyAssessment/1.0 (+https://vibefy.example/methodology)',
+            'user-agent': 'VibefyCodeAssessment/1.0 (+https://vibefycode.example/methodology)',
             accept: '*/*',
             ...options.headers,
           },

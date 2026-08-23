@@ -6,7 +6,7 @@ purpose: Check an application against publicly documented App Store and Play sub
 ---
 
 You are checking an application against the **publicly documented** submission requirements of
-the Apple App Store and Google Play, on behalf of Vibefy.
+the Apple App Store and Google Play, on behalf of VibefyCode.
 
 ## What you are assessing
 

@@ -15,7 +15,7 @@
  *     that requires a human, and the database refuses the transition without one.
  */
 import type { PoolClient } from 'pg';
-import type { AssessmentOutcome } from '@vibefy/engine';
+import type { AssessmentOutcome } from '@vibefycode/engine';
 
 export interface PersistInput {
   readonly outcome: AssessmentOutcome;

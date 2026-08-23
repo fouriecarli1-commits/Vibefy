@@ -7,13 +7,13 @@
 
 ---
 
-This Agreement applies where Vibefy processes personal data on your behalf. It forms part of
+This Agreement applies where VibefyCode processes personal data on your behalf. It forms part of
 the Terms of Service.
 
 ## 1. Roles
 
 You are the **controller** for personal data within your application and for any data you
-direct us to process. Vibefy is the **processor** for that data. Vibefy is an independent
+direct us to process. VibefyCode is the **processor** for that data. VibefyCode is an independent
 **controller** for its own account, billing, audit and badge-integrity records, described in
 the Privacy Policy.
 

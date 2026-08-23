@@ -11,22 +11,22 @@
  *   pnpm badge:keygen my-key-id       generate a key with a chosen id
  *
  * Rotation: generate a new key, move the old public JWK into
- * VIBEFY_BADGE_RETIRED_KEYS, and point VIBEFY_BADGE_KEY_ID at the new one.
+ * VIBEFYCODE_BADGE_RETIRED_KEYS, and point VIBEFYCODE_BADGE_KEY_ID at the new one.
  * Retired public keys stay published forever — removing one would silently break
  * every badge it ever signed, and a verifier that suddenly fails cannot tell
- * "forged" from "Vibefy tidied up".
+ * "forged" from "VibefyCode tidied up".
  */
-import { generateSigningKey } from '@vibefy/badge';
+import { generateSigningKey } from '@vibefycode/badge';
 
-const kid = process.argv[2] ?? `vibefy-badge-${new Date().toISOString().slice(0, 7)}`;
+const kid = process.argv[2] ?? `vibefycode-badge-${new Date().toISOString().slice(0, 7)}`;
 const { privateKeyB64, jwk } = generateSigningKey(kid);
 
 const lines = [
   '# Add these to the platform secret store. Never to the repository.',
-  `VIBEFY_BADGE_KEY_ID=${kid}`,
-  `VIBEFY_BADGE_SIGNING_KEY_B64=${privateKeyB64}`,
+  `VIBEFYCODE_BADGE_KEY_ID=${kid}`,
+  `VIBEFYCODE_BADGE_SIGNING_KEY_B64=${privateKeyB64}`,
   '',
-  '# The public half is served at /.well-known/vibefy-badge-key. It is derived',
+  '# The public half is served at /.well-known/vibefycode-badge-key. It is derived',
   '# from the private key at start-up, so it does not need to be configured —',
   '# but keep a copy for the retired-keys list when you rotate:',
   `# ${JSON.stringify(jwk)}`,

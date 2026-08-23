@@ -140,7 +140,7 @@ const source: ReportSource = {
     { stage: 'store_readiness', status: 'skipped', notes: ['Not intended for an app store.'] },
   ],
   scopeStatement:
-    'This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation of Kettle, conducted by Vibefy against published Vibefy Rubric version 1.0.0 on 2026-08-22. It is not a penetration test, a security audit, a code audit, a legal or regulatory compliance certification, or a guarantee of any kind. Absence of a finding is not evidence of absence of a defect.',
+    'This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation of Kettle, conducted by VibefyCode against published VibefyCode Rubric version 1.0.0 on 2026-08-22. It is not a penetration test, a security audit, a code audit, a legal or regulatory compliance certification, or a guarantee of any kind. Absence of a finding is not evidence of absence of a defect.',
   promptBundleSha256: 'b'.repeat(64),
   intendedForAppStore: true,
 };
@@ -150,7 +150,7 @@ describe('what payment does not buy', () => {
     const free = renderReport(source, 'free');
     const paid = renderReport(source, 'paid');
     const fingerprint = (html: string) =>
-      /vibefy-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
+      /vibefycode-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
 
     expect(fingerprint(free.html)).toBe(fingerprint(paid.html));
     expect(free.html).toContain('46.3');
@@ -296,7 +296,7 @@ describe('white-label', () => {
   it('puts the agency on the cover and still says who did the assessment', () => {
     const html = renderReport(branded('#1F4FD8'), 'paid').html;
     expect(html).toContain('Prepared for you by Acme Digital.');
-    expect(html).toContain('The assessment itself was carried out by Vibefy');
+    expect(html).toContain('The assessment itself was carried out by VibefyCode');
     // The sentence that stops a handover report reading as the agency's own
     // verification of its own work.
     expect(html).toContain('did not score this application and cannot change what it scored');
@@ -314,7 +314,7 @@ describe('white-label', () => {
 
   it('does not change what the report scored', () => {
     const fingerprint = (html: string) =>
-      /vibefy-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
+      /vibefycode-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
     expect(fingerprint(renderReport(branded('#1F4FD8'), 'paid').html)).toBe(
       fingerprint(renderReport(source, 'paid').html),
     );

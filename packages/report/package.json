@@ -1,5 +1,5 @@
 {
-  "name": "@vibefy/report",
+  "name": "@vibefycode/report",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vibefy/rubric": "workspace:*",
-    "@vibefy/shared": "workspace:*",
-    "@vibefy/policy": "workspace:*"
+    "@vibefycode/rubric": "workspace:*",
+    "@vibefycode/shared": "workspace:*",
+    "@vibefycode/policy": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

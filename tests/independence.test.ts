@@ -174,14 +174,14 @@ describe('the scoring module cannot see money', () => {
       readFileSync(join(process.cwd(), 'packages/rubric/package.json'), 'utf8'),
     ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
-    expect(declared).not.toContain('@vibefy/billing');
-    expect(declared).not.toContain('@vibefy/report');
+    expect(declared).not.toContain('@vibefycode/billing');
+    expect(declared).not.toContain('@vibefycode/report');
     expect(declared).not.toContain('stripe');
 
     for (const file of readdirSync(scoringDir).filter((name) => name.endsWith('.ts'))) {
       const source = readFileSync(join(scoringDir, file), 'utf8');
       expect(source, `${file} must not import billing`).not.toMatch(
-        /from ['"]@vibefy\/(billing|report|monitoring)/,
+        /from ['"]@vibefycode\/(billing|report|monitoring)/,
       );
       expect(source, `${file} must not read the price list`).not.toMatch(/config\/pricing/);
     }
@@ -207,7 +207,7 @@ describe('what suspends a badge cannot see money either', () => {
     for (const term of forbidden) {
       expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
     }
-    expect(source, `${file} must not import billing`).not.toMatch(/from ['"]@vibefy\/(billing)/);
+    expect(source, `${file} must not import billing`).not.toMatch(/from ['"]@vibefycode\/(billing)/);
   });
 
   it('does not let the schedule reach the verdict', () => {
@@ -224,7 +224,7 @@ describe('what suspends a badge cannot see money either', () => {
       readFileSync(join(process.cwd(), 'packages/rubric/package.json'), 'utf8'),
     ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     expect(Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })).not.toContain(
-      '@vibefy/monitoring',
+      '@vibefycode/monitoring',
     );
   });
 });
@@ -258,7 +258,7 @@ describe('what a report shows never changes what it scored', () => {
     const free = renderReport(source, entitlementFor('free').reportTier);
     const paid = renderReport(source, entitlementFor('one_off').reportTier);
     const fingerprint = (html: string) =>
-      /vibefy-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
+      /vibefycode-score-fingerprint" content="([^"]+)"/.exec(html)?.[1];
     expect(fingerprint(free.html)).toBe(fingerprint(paid.html));
   });
 });

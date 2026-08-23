@@ -10,15 +10,15 @@
 ## 1. What we do
 
 We assess the application you nominate, within the scope you authorise, against a published
-version of the Vibefy Rubric, using a combination of deterministic automated checks, an
+version of the VibefyCode Rubric, using a combination of deterministic automated checks, an
 AI-driven functional walkthrough, a non-destructive adversarial pass, and human review. We
 return a scored report with findings, evidence and prioritised remediation.
 
 ## 2. What an assessment is not
 
 > This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation
-> of the application identified above, conducted by Vibefy against published Vibefy Rubric
-> version X on [date]. "Verified by Vibefy" means only that the application was assessed
+> of the application identified above, conducted by VibefyCode against published VibefyCode Rubric
+> version X on [date]. "Verified by VibefyCode" means only that the application was assessed
 > against that rubric and met the published threshold on that date. It is not a penetration
 > test, a security audit, a code audit, a legal or regulatory compliance certification, or a
 > guarantee of any kind. It does not certify that the application is secure, error-free,
