@@ -78,75 +78,77 @@ export const MARK = {
 /**
  * The certification seal.
  *
- * Concentric rings, a band of repeating micro-text, guilloche patches, and the
- * wordmark set on an arc — the vocabulary of a printed seal, which is the point:
- * it has to read as a stamp at a glance and survive being scaled down to 96px on
- * somebody else's website.
+ * The composition follows the founder-supplied seal renders in
+ * `brand/source/reference/`: a legend arced across the top between two stars, the
+ * mark on a light field, a banner ribbon carrying the wordmark, and a fan base
+ * beneath it.
  *
- * `minimumDetailPx` is where the micro-text and guilloche stop being texture and
- * start being dirt. Below it they are not rendered at all rather than rendered
- * illegibly.
+ * The *artwork* deliberately does not follow them. Those renders are chrome
+ * bevels, lens flares and photographic texture; this is flat vector on the
+ * palette. Three reasons, none of them aesthetic: the badge is generated as SVG
+ * on every request, which is the entire revocation mechanism; the licence
+ * permits embedding from 96px, where a rendered-chrome seal is a grey smudge;
+ * and every colour in a master has to be a token so the contrast gate can see it.
+ *
+ * The ring band is filled rather than stroked. Hairline rules disappear first
+ * when a seal is scaled down, and this one has to survive being small.
  */
 export const SEAL = {
-  /** Concentric rules, outermost first. Two heavy, the rest hairlines. */
-  rings: [
-    { r: 246, width: 3 },
-    { r: 239, width: 1.2 },
-    { r: 206, width: 1.6 },
-    { r: 199, width: 1 },
-    { r: 151, width: 1 },
-    { r: 144, width: 1 },
-  ],
+  /** The navy ring band, as an annulus rather than a set of rules. */
+  band: { outer: 248, inner: 197 },
+  /** A single accent rule inside the band, for the depth the flat fill loses. */
+  bandRule: { r: 239, width: 1.5 },
+  /** The light field the mark sits on. */
+  field: { r: 197 },
+  fieldRule: { r: 188, width: 1.5 },
+
+  /** The legend arced across the top of the band, and the stars that close it. */
+  topArc: { r: 220, step: 7.6, size: 30, text: 'VERIFIED BY' },
+  topStars: { angle: 56, r: 220, size: 13 },
 
   /**
-   * The repeating trust legend, running the whole way round its own band.
+   * The banner. Two fold tabs behind, then the body, arced so it sits with the
+   * circle rather than across it. The ends overhang the disc, as the reference
+   * seals have them.
+   */
+  /**
+   * The folded ends, tucked behind the banner in the darker ink.
    *
-   * Repeated rather than stretched: a seal's micro-text is a legend that recurs,
-   * and one phrase spaced out around the ring is the tell of a fake one.
+   * Kept inside the disc. The reference seals let them overhang, which works
+   * when the banner is a shaded metal object and reads as two stray rectangles
+   * when it is a flat shape.
    */
-  microTextRadius: 228,
-  microTextSize: 9,
-  microText: 'VIBEFYCODE TRUST',
-  microTextRepeats: 9,
-
-  /**
-   * The two legend arcs. Angles are degrees clockwise from twelve o'clock, and
-   * the spans are chosen so nothing meets anything: the top run occupies roughly
-   * ±36°, the bottom ±66°, and the flanks are left for the furniture.
-   */
-  topArc: { r: 186, step: 6.5, size: 32, text: 'VERIFIED BY' },
-  bottomArc: { r: 192, step: 6, size: 26, text: 'VERIFIED BY VIBEFYCODE' },
-
-  /** Guilloche patches at ten and two o'clock, as the printed original has them. */
-  guilloche: [
-    { cx: 106, cy: 139, w: 40, h: 78 },
-    { cx: 406, cy: 139, w: 40, h: 78 },
+  bannerFolds: [
+    'M100 378 L140 392 L140 450 L100 436 Z',
+    'M412 378 L372 392 L372 450 L412 436 Z',
+  ],
+  banner: 'M120 392 Q256 344 392 392 L392 452 Q256 404 120 452 Z',
+  bannerRule: 'M120 402 Q256 354 392 402',
+  bannerText: { y: 414, size: 32 },
+  bannerStars: [
+    { cx: 136, cy: 406, size: 10 },
+    { cx: 376, cy: 406, size: 10 },
   ],
 
-  /**
-   * The two verification checks, on the flanks at nine and three o'clock — the
-   * one band where neither legend arc nor the mark reaches.
-   */
-  checks: [
-    { cx: 126, cy: 262, scale: 0.9 },
-    { cx: 386, cy: 262, scale: 0.9 },
-  ],
-  check: 'M-16 0 L-5 12 L16 -13',
-  checkWidth: 5,
+  /** Where the mark sits on the field. */
+  markCentre: { x: 256, y: 212 },
+  markScale: 0.62,
 
-  /** Where the mark and the wordmark sit inside the inner field. */
-  markCentre: { x: 256, y: 206 },
-  markScale: 0.38,
-  wordmark: { y: 332, size: 28 },
+  /**
+   * A badge that is not a verification says so in the field, between the mark
+   * and the banner — not in the band, where the disc clips it.
+   *
+   * The mark shrinks to make the room, because the sentence matters more than
+   * the artwork on a badge whose whole job is to say the artwork no longer
+   * applies.
+   */
+  inactiveMark: { x: 256, y: 190, scale: 0.5 },
+  statusNote: { y: 336, size: 27 },
 
   /**
    * Below this rendered width the seal is not drawn at all — the compact layout
-   * below is used instead.
-   *
-   * A seal's furniture is texture at 512px and dirt at 96px, and the licence
-   * permits embedding from 96px. Shrinking the full artwork to fit would ship a
-   * trust mark that looks like a smudge, which is worse than shipping a plainer
-   * one that can be read.
+   * below is used instead. A banner and an arc legend are texture at 512px and
+   * illegible at 96px, and the licence permits embedding from 96px.
    */
   minimumDetailPx: 220,
 } as const;
@@ -154,19 +156,22 @@ export const SEAL = {
 /**
  * The seal at embed sizes.
  *
- * Same silhouette, same colours, same wordmark — everything that cannot survive
- * being 96px across is removed rather than shrunk. What is left has to answer
- * one question at a glance: whose mark is this, and does it say verified.
+ * Same family, same colours, same banner. What goes is everything that cannot be
+ * read at 96px: the arc legend becomes straight text, the stars and the fan base
+ * go entirely, and the mark grows into the space they leave.
  */
 export const SEAL_COMPACT = {
-  rings: [
-    { r: 246, width: 7 },
-    { r: 229, width: 2 },
-  ],
+  band: { outer: 248, inner: 210 },
+  field: { r: 210 },
   markCentre: { x: 256, y: 196 },
-  markScale: 0.6,
-  legend: { y: 356, size: 40, text: 'VERIFIED BY' },
-  wordmark: { y: 412, size: 46 },
+  markScale: 0.62,
+  legend: { y: 338, size: 40, text: 'VERIFIED BY' },
+  /** Wider than the disc and clipped to it, so it ends on the edge rather than in the band. */
+  banner: 'M20 356 L492 356 L492 424 L20 424 Z',
+  bannerText: { y: 406, size: 48 },
+  inactiveMark: { x: 256, y: 168, scale: 0.46 },
+  inactiveLegend: { y: 292, size: 36 },
+  statusNote: { y: 332, size: 26 },
 } as const;
 
 /**
@@ -254,5 +259,56 @@ export function arcTextPlacements(options: {
       y: cy - radius * Math.cos(radians),
       rotation: flip ? angle + 180 : angle,
     };
+  });
+}
+
+/**
+ * A five-pointed star, centred on the origin.
+ *
+ * Generated rather than stored, because the seal uses it at four sizes and a
+ * hand-written path per size is four chances to draw a slightly different star.
+ */
+export function starPath(radius: number, points = 5): string {
+  const inner = radius * 0.42;
+  const segments: string[] = [];
+  for (let index = 0; index < points * 2; index += 1) {
+    const r = index % 2 === 0 ? radius : inner;
+    const angle = (Math.PI * index) / points - Math.PI / 2;
+    segments.push(
+      `${index === 0 ? 'M' : 'L'}${(r * Math.cos(angle)).toFixed(2)} ${(r * Math.sin(angle)).toFixed(2)}`,
+    );
+  }
+  return `${segments.join(' ')} Z`;
+}
+
+/**
+ * An annulus — a filled ring — as a single path with two subpaths and an
+ * even-odd fill.
+ *
+ * Filled rather than stroked because a stroked ring's width is a property of the
+ * stroke, and strokes are the first thing a renderer rounds away at small sizes.
+ */
+export function annulusPath(outer: number, inner: number, cx = 256, cy = 256): string {
+  const ring = (r: number) =>
+    `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z`;
+  return `${ring(outer)} ${ring(inner)}`;
+}
+
+/** The wedges of the fan base, radiating from a point below the banner. */
+export function fanPaths(fan: {
+  x: number;
+  y: number;
+  radius: number;
+  count: number;
+  spreadDegrees: number;
+}): string[] {
+  const step = fan.spreadDegrees / fan.count;
+  const first = 90 - fan.spreadDegrees / 2;
+  return Array.from({ length: fan.count }, (_, index) => {
+    const from = ((first + index * step) * Math.PI) / 180;
+    const to = ((first + (index + 0.62) * step) * Math.PI) / 180;
+    const point = (angle: number) =>
+      `${(fan.x + fan.radius * Math.cos(angle)).toFixed(2)} ${(fan.y + fan.radius * Math.sin(angle)).toFixed(2)}`;
+    return `M${fan.x} ${fan.y} L${point(from)} L${point(to)} Z`;
   });
 }

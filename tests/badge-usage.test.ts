@@ -143,16 +143,16 @@ describe('the seal', () => {
     const seal = renderBadgeSvg({ status: 'active' });
     const compact = renderBadgeSvg({ status: 'active', sizePx: 96 });
 
-    // The legends are set one glyph per <text>, so the seal is counted by its
-    // furniture rather than searched for a phrase it deliberately never contains.
-    expect(seal).toContain(SEAL.check);
+    // The band legend is set one glyph per <text>, so the full seal is counted by
+    // its glyphs rather than searched for a phrase it deliberately never contains.
     const glyphs = (svg: string) => (svg.match(/<text/g) ?? []).length;
-    expect(glyphs(seal)).toBeGreaterThan(150);
+    expect(glyphs(seal)).toBeGreaterThan(10);
+    expect(seal).toContain(SEAL.banner);
 
-    // At 96px that furniture is noise, so it is removed rather than shrunk.
-    expect(compact).not.toContain(SEAL.check);
-    expect(glyphs(compact)).toBeLessThan(5);
-    expect(compact.length).toBeLessThan(seal.length / 2);
+    // At 96px the arc, the stars and the folded ends are noise, so they go.
+    expect(compact).not.toContain(SEAL.banner);
+    expect(glyphs(compact)).toBeLessThan(4);
+    expect(compact.length).toBeLessThan(seal.length);
 
     // What must survive at every size: whose mark it is, and what it claims.
     for (const svg of [seal, compact]) {

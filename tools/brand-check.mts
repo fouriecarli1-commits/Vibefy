@@ -8,7 +8,7 @@
  * nothing has been recoloured off-palette, the marks are vector rather than a
  * wrapped raster, and the certification badge carries the wordmark unextended.
  */
-import { SEAL, WORDMARK } from '@vibefycode/shared';
+import { SEAL, SEAL_COMPACT, WORDMARK } from '@vibefycode/shared';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -90,13 +90,15 @@ export function runBrandCheck() {
       `The wordmark halves spell "${WORDMARK.strong}${WORDMARK.light}", not "VIBEFYCODE". The mark is one word in two weights.`,
     );
   }
-  if (SEAL.bottomArc.text !== 'VERIFIED BY VIBEFYCODE') {
-    failures.push(
-      `The seal's legend reads "${SEAL.bottomArc.text}". The wordmark is exactly "Verified by VibefyCode" and may never be extended.`,
-    );
-  }
+  // The seal says "VERIFIED BY" on the band and the wordmark on the banner. Read
+  // together they are the mark, and neither half may drift.
   if (SEAL.topArc.text !== 'VERIFIED BY') {
-    failures.push(`The seal's upper legend reads "${SEAL.topArc.text}", not "VERIFIED BY".`);
+    failures.push(`The seal's legend reads "${SEAL.topArc.text}", not "VERIFIED BY".`);
+  }
+  if (SEAL_COMPACT.legend.text !== 'VERIFIED BY') {
+    failures.push(
+      `The compact badge's legend reads "${SEAL_COMPACT.legend.text}", not "VERIFIED BY".`,
+    );
   }
 
   for (const master of ['vibefycode-badge-verified.svg', 'vibefycode-badge-verified-compact.svg']) {

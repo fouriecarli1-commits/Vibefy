@@ -22,6 +22,8 @@ import {
   SEAL,
   SEAL_COMPACT,
   VIEWBOX,
+  annulusPath,
+  starPath,
   WORDMARK,
   badgeAltText,
   badgeStatusColours,
@@ -192,138 +194,104 @@ function arcText(options: {
 /**
  * The seal, rendered at request time.
  *
- * Four states, none of which is ever a broken image. The active one is the
- * printed seal: rings, a band of repeating trust text, guilloche patches, the
- * wordmark on two arcs and the mark in the middle. The other three keep the
- * silhouette and drop the celebration — same rings, same geometry, a bar where
- * the checks are, and wording that says plainly what is no longer true.
+ * Four states, none of which is ever a broken image. The active one is the full
+ * seal: a navy band carrying the legend between two stars, the mark on a light
+ * field, a banner with the wordmark, and a fan base. The other three keep the
+ * silhouette and drop the celebration — same band, same banner, a bar where the
+ * mark's colour was, and wording that says plainly what is no longer true.
  */
 export function renderBadgeSvg(facts: BadgeRenderFacts): string {
   const colours = badgeStatusColours[facts.status];
   const active = facts.status === 'active';
   const label = badgeDescription(facts);
   const compact = typeof facts.sizePx === 'number' && facts.sizePx < SEAL.minimumDetailPx;
-  const detail = active && !compact;
 
-  const furniture = active ? PALETTE.sand : colours.ring;
-  const furnitureLight = active ? PALETTE.sandLight : colours.ring;
+  // The band and the banner carry the same ink in every state; only its colour
+  // changes, so a suspended badge reads as the same object in a different mood.
+  const ink = active ? PALETTE.navy : colours.accent;
+  const onInk = PALETTE.mist;
+  const field = '#FFFFFF';
+  const layout = compact ? SEAL_COMPACT : SEAL;
 
-  const rings = (compact ? SEAL_COMPACT.rings : SEAL.rings)
-    .map(
-      (ring) =>
-        `    <circle cx="256" cy="256" r="${ring.r}" stroke-width="${ring.width}" opacity="${
-          ring.width > 2 ? 1 : 0.65
-        }"/>`,
-    )
-    .join('\n');
+  const band = `  <path d="${annulusPath(layout.band.outer, layout.band.inner)}" fill="${ink}" fill-rule="evenodd"/>
+  <circle cx="256" cy="256" r="${layout.field.r}" fill="${field}"/>`;
 
-  // Repeated rather than stretched: a seal's micro-text is a repeating legend,
-  // and stretching one phrase around the ring is the tell of a fake one.
-  const microLegend = Array.from({ length: SEAL.microTextRepeats }, () => SEAL.microText).join(
-    ' \u00B7 ',
-  );
-  const microText = detail
-    ? `  <g aria-hidden="true" opacity="0.85">
-${arcText({
-  text: microLegend,
-  radius: SEAL.microTextRadius,
-  centreAngle: 0,
-  step: 360 / microLegend.length,
-  size: SEAL.microTextSize,
-  weight: 600,
-  fill: furniture,
-})}
-  </g>`
-    : '';
+  const rules = compact
+    ? ''
+    : `  <circle cx="256" cy="256" r="${SEAL.bandRule.r}" fill="none" stroke="${onInk}" stroke-width="${SEAL.bandRule.width}" opacity="0.45"/>
+  <circle cx="256" cy="256" r="${SEAL.fieldRule.r}" fill="none" stroke="${ink}" stroke-width="${SEAL.fieldRule.width}" opacity="0.28"/>`;
 
-  const guilloche = detail
-    ? `  <g aria-hidden="true" stroke="${furnitureLight}" stroke-width="0.7" fill="none" opacity="0.45">
-${SEAL.guilloche
-  .map((patch) =>
-    Array.from(
-      { length: 7 },
-      (_, index) =>
-        `      <path d="M${patch.cx - patch.w / 2} ${patch.cy - patch.h / 2 + (index * patch.h) / 6} q${patch.w / 2} ${patch.h / 12} ${patch.w} 0"/>`,
-    ).join('\n'),
-  )
-  .join('\n')}
-${SEAL.guilloche
-  .map((patch) =>
-    Array.from(
-      { length: 5 },
-      (_, index) =>
-        `      <path d="M${patch.cx - patch.w / 2 + (index * patch.w) / 4} ${patch.cy - patch.h / 2} q${patch.w / 10} ${patch.h / 2} 0 ${patch.h}"/>`,
-    ).join('\n'),
-  )
-  .join('\n')}
-  </g>`
-    : '';
-
-  const checks = detail
-    ? `  <g aria-hidden="true" fill="none" stroke="${furniture}" stroke-width="${SEAL.checkWidth}"
-       stroke-linecap="round" stroke-linejoin="round" opacity="0.75">
-${SEAL.checks
-  .map(
-    (check) =>
-      `      <path d="${SEAL.check}" transform="translate(${check.cx} ${check.cy}) scale(${check.scale})"/>`,
-  )
-  .join('\n')}
-  </g>`
-    : '';
+  const star = (cx: number, cy: number, size: number, fill: string) =>
+    `    <path d="${starPath(size)}" transform="translate(${cx} ${cy})" fill="${fill}"/>`;
 
   const legend = compact
     ? `  <g aria-hidden="true" text-anchor="middle" font-family="${FONT_STACK}">
-    <text x="256" y="${SEAL_COMPACT.legend.y}" font-size="${SEAL_COMPACT.legend.size}" font-weight="700"
-          letter-spacing="4" fill="${active ? PALETTE.sand : colours.text}">${
+    <text x="256" y="${active ? SEAL_COMPACT.legend.y : SEAL_COMPACT.inactiveLegend.y}"
+          font-size="${active ? SEAL_COMPACT.legend.size : SEAL_COMPACT.inactiveLegend.size}"
+          font-weight="700" letter-spacing="3" fill="${ink}"
+          textLength="248" lengthAdjust="spacingAndGlyphs">${
             active ? SEAL_COMPACT.legend.text : colours.label.toUpperCase()
           }</text>
   </g>`
-    : active
-    ? `  <g aria-hidden="true">
+    : `  <g aria-hidden="true">
 ${arcText({
-  text: SEAL.topArc.text,
+  text: active ? SEAL.topArc.text : colours.label.toUpperCase(),
   radius: SEAL.topArc.r,
   centreAngle: 0,
   step: SEAL.topArc.step,
   size: SEAL.topArc.size,
   weight: 700,
-  fill: PALETTE.sand,
+  fill: onInk,
 })}
-${arcText({
-  text: SEAL.bottomArc.text,
-  radius: SEAL.bottomArc.r,
-  centreAngle: 180,
-  step: SEAL.bottomArc.step,
-  size: SEAL.bottomArc.size,
-  weight: 700,
-  fill: PALETTE.navy,
-  flip: true,
-})}
-  </g>`
-      : `  <g aria-hidden="true" font-family="${FONT_STACK}" fill="${colours.text}" text-anchor="middle">
-    <text x="256" y="120" font-size="40" font-weight="700" letter-spacing="3" textLength="${
-      colours.label.length * 26
-    }">${colours.label.toUpperCase()}</text>
-    <text x="256" y="452" font-size="28" font-weight="600">Not currently verified by VibefyCode</text>
+${[-SEAL.topStars.angle, SEAL.topStars.angle]
+  .map((angle) => {
+    const radians = (angle * Math.PI) / 180;
+    return star(
+      256 + SEAL.topStars.r * Math.sin(radians),
+      256 - SEAL.topStars.r * Math.cos(radians),
+      SEAL.topStars.size,
+      onInk,
+    );
+  })
+  .join('\n')}
   </g>`;
 
-  const layout = compact ? SEAL_COMPACT : SEAL;
-  const centre = active
-    ? `  <g transform="translate(${layout.markCentre.x} ${layout.markCentre.y}) scale(${layout.markScale}) translate(-256 -256)">
-${markGroup({ idPrefix: 'seal', detail })}
-  </g>
-${wordmarkText({ x: 256, y: layout.wordmark.y, size: layout.wordmark.size, fill: PALETTE.navy })}`
-    : `  <g transform="translate(${layout.markCentre.x} ${layout.markCentre.y}) scale(${layout.markScale}) translate(-256 -256)" opacity="0.5">
-${markGroup({ idPrefix: 'seal', mono: true, detail: false })}
-  </g>
-${wordmarkText({ x: 256, y: layout.wordmark.y, size: layout.wordmark.size, fill: colours.text })}
-  <path d="M180 ${layout.wordmark.y + 26} L332 ${layout.wordmark.y + 26}" stroke="${colours.accent}" stroke-width="14" stroke-linecap="round"/>`;
+  // The reference seals put a fan of flutes beneath the banner. It is left out
+  // here: it reads as a flourish when it is shaded metal and as a scribble when
+  // it is a flat shape, and a trust mark cannot afford an element that looks
+  // like a rendering fault.
 
-  // Both spellings of the reference: browsers honour `href`, and librsvg — which
-  // is what rasterises our own PNG masters — still only honours `xlink:href`.
-  // Emitting one of the two produces a seal with no wordmark on it somewhere.
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-     viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" role="img"
+  const banner = compact
+    ? `  <g aria-hidden="true" clip-path="url(#seal-disc)">
+    <path d="${SEAL_COMPACT.banner}" fill="${ink}"/>
+  </g>
+${wordmarkText({ x: 256, y: SEAL_COMPACT.bannerText.y, size: SEAL_COMPACT.bannerText.size, fill: onInk })}`
+    : `  <g aria-hidden="true">
+${SEAL.bannerFolds.map((fold) => `    <path d="${fold}" fill="${active ? PALETTE.ink : colours.ring}"/>`).join('\n')}
+    <path d="${SEAL.banner}" fill="${ink}"/>
+    <path d="${SEAL.bannerRule}" fill="none" stroke="${onInk}" stroke-width="1.5" opacity="0.4"/>
+${SEAL.bannerStars.map((s) => star(s.cx, s.cy, s.size, onInk)).join('\n')}
+  </g>
+${wordmarkText({ x: 256, y: SEAL.bannerText.y, size: SEAL.bannerText.size, fill: onInk })}`;
+
+  // Non-active states say so in words, under the banner, where the eye lands
+  // after the wordmark. Never inside the mark, which is never altered.
+  const note = compact ? SEAL_COMPACT.statusNote : SEAL.statusNote;
+  const disclaimer = active
+    ? ''
+    : `  <g aria-hidden="true" font-family="${FONT_STACK}" text-anchor="middle" fill="${ink}">
+    <text x="256" y="${note.y}" font-size="${note.size}" font-weight="600">Not currently verified</text>
+  </g>`;
+
+  const placement = active ? layout.markCentre : layout.inactiveMark;
+  const scale = active ? layout.markScale : layout.inactiveMark.scale;
+  const mark = `  <g transform="translate(${placement.x} ${placement.y}) scale(${scale}) translate(-256 -256)"${
+    active ? '' : ' opacity="0.45"'
+  }>
+${markGroup({ idPrefix: 'seal', detail: active && !compact, ...(active ? {} : { mono: true }) })}
+  </g>`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" role="img"
      aria-label="${escapeXml(label)}" width="${VIEWBOX}" height="${VIEWBOX}">
   <title>${escapeXml(label)}</title>
   <desc>${escapeXml(
@@ -333,16 +301,14 @@ ${wordmarkText({ x: 256, y: layout.wordmark.y, size: layout.wordmark.size, fill:
   )}</desc>
   <defs>
 ${markGradients('seal')}
+    <clipPath id="seal-disc"><circle cx="256" cy="256" r="${layout.band.outer}"/></clipPath>
   </defs>
-  <circle cx="256" cy="256" r="252" fill="#FFFFFF"/>
-  <g fill="none" stroke="${furniture}">
-${rings}
-  </g>
-${guilloche}
-${microText}
-${checks}
+${band}
+${rules}
 ${legend}
-${centre}
+${mark}
+${disclaimer}
+${banner}
 </svg>
 `;
 }
