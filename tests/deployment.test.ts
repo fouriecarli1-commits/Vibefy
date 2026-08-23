@@ -68,15 +68,20 @@ describe('the hosting configuration', () => {
     expect(vercel.regions).toEqual(['fra1']);
   });
 
-  it('builds the monorepo from the root rather than from a dashboard form', () => {
-    expect(vercel.buildCommand).toBe('pnpm build');
-    expect(vercel.outputDirectory).toBe('apps/web/.next');
-    // Frozen: a deployment that silently resolves different dependency versions
-    // than the tests ran against is a deployment nothing verified.
-    expect(String(vercel.installCommand)).toContain('--frozen-lockfile');
+  it('leaves the paths to Vercel rather than restating them', () => {
+    // Learned the hard way on the first real deployment. Vercel detects the
+    // Next.js app in `apps/web` and makes that the root directory; an
+    // `outputDirectory` of `apps/web/.next` is then resolved *relative to it*,
+    // and the build failed looking for `apps/web/apps/web/.next`. Two places
+    // describing the same path is one place too many, so only the facts Vercel
+    // cannot infer are stated here.
+    expect(vercel.framework).toBe('nextjs');
+    expect(vercel.buildCommand).toBeUndefined();
+    expect(vercel.outputDirectory).toBeUndefined();
+    expect(vercel.installCommand).toBeUndefined();
   });
 
-  it('builds the web app and nothing that needs a browser', () => {
+  it('says plainly that it cannot run the assessment worker', () => {
     // The worker drives Chromium for minutes at a time; a serverless function
     // cannot hold one. Pretending otherwise produces assessments that hang.
     const scripts = (JSON.parse(read('package.json')) as { scripts: Record<string, string> })

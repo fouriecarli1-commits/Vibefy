@@ -642,9 +642,11 @@ for re-acceptance. If you did not intend that, you did not want a version bump.
 
 ### Standing rules
 
-- **Web:** Vercel, EU region. `vercel.json` pins `fra1`, the build command and the output
-  directory, so an import needs no dashboard configuration and two deployments cannot differ
-  because someone typed something different into a form.
+- **Web:** Vercel, EU region. `vercel.json` states only what Vercel cannot work out for itself —
+  the framework and the region. It deliberately does _not_ restate the build command or the
+  output directory: Vercel detects the Next.js app in `apps/web` and makes that the root
+  directory, and a path given here is then resolved relative to it. The first real deployment
+  failed looking for `apps/web/apps/web/.next` for exactly that reason.
 - **Database:** Supabase, EU region (Frankfurt or Ireland). The region is not a preference: the
   privacy notice says data is held in the EU, and this is the setting that makes that true.
 - **Secrets:** never in the repo. `.env.local` locally, the platform secret store in production.
@@ -662,8 +664,10 @@ Written for someone with no local toolchain. Nothing here needs a terminal.
    `supabase/schema.sql` → Run. That file is generated from `supabase/migrations` by
    `pnpm schema:build`, and `pnpm check:schema` fails the build if it has drifted — so what gets
    pasted is what the tests ran against.
-3. **Import the repository into Vercel.** Root directory: the repository root, not `apps/web`.
-   `vercel.json` supplies the rest.
+3. **Import the repository into Vercel.** Use _Import Git Repository_ and pick the existing
+   repo — not the flow headed _Create a Git repository_, which makes a second copy that nothing
+   afterwards pushes to. Accept the detected settings; Vercel finds the Next.js app in `apps/web`
+   on its own.
 4. **Set the environment variables** before the first deployment (Vercel → Settings →
    Environment Variables), for all three environments:
 
