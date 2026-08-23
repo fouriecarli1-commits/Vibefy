@@ -1,2 +1,2 @@
-# Vibefy
-Vibefy certification
+# VibefyCode
+VibefyCode certification
