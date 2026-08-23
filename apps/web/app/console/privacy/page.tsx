@@ -11,7 +11,7 @@ import {
 } from '@vibefycode/governance';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
-import { submitDataRequest } from './actions';
+import { setAlertEmailLevel, submitDataRequest } from './actions';
 
 export const metadata: Metadata = { title: 'Your data' };
 
@@ -42,6 +42,12 @@ export default async function PrivacyPage() {
     .from('data_requests')
     .select('id, request_type, status, details, response, refusal_basis, due_at, created_at, completed_at')
     .order('created_at', { ascending: false });
+
+  const { data: me } = await supabase
+    .from('users')
+    .select('alert_email_level')
+    .eq('id', user.id)
+    .maybeSingle();
 
   const { data: deletions } = await supabase
     .from('retention_deletions')
@@ -136,6 +142,33 @@ export default async function PrivacyPage() {
           </ul>
         </section>
       )}
+
+      <section aria-labelledby="email" className="space-y-4">
+        <h2 id="email" className="text-xl font-semibold">
+          Alerts by email
+        </h2>
+        <div className="rounded-xl border border-line p-5">
+          <p className="text-sm text-muted">
+            We email you about your own applications — a re-assessment that found something
+            different, an application that stopped answering, a badge about to expire. There is no
+            marketing list to leave, and no tracking pixel in any of it.
+          </p>
+          <div className="mt-5">
+            <ActionForm action={setAlertEmailLevel} submitLabel="Save preference">
+              <Select
+                label="What should reach your inbox?"
+                name="alertEmailLevel"
+                defaultValue={String(me?.alert_email_level ?? 'all')}
+                options={[
+                  { value: 'all', label: 'Anything worth a look, and anything that needs action' },
+                  { value: 'critical_only', label: 'Only what needs action' },
+                ]}
+                hint="A badge suspension is a notice we are required to give you, so it is sent either way."
+              />
+            </ActionForm>
+          </div>
+        </div>
+      </section>
 
       <section aria-labelledby="retention" className="space-y-4">
         <h2 id="retention" className="text-xl font-semibold">

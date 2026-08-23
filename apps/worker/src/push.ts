@@ -65,7 +65,7 @@ export async function findPendingPushes(
         and al.created_at > now() - interval '7 days'
         and not exists (
           select 1 from public.alert_deliveries ad
-           where ad.alert_id = al.id and ad.device_token_id = dt.id
+           where ad.alert_id = al.id and ad.channel = 'push' and ad.target_id = dt.id
         )
       order by al.created_at
       limit $1`,
@@ -124,9 +124,9 @@ export async function sweepAlertPush(
         else result.failed += 1;
 
         await client.query(
-          `insert into public.alert_deliveries (alert_id, device_token_id, status, detail)
-           values ($1, $2, $3, $4)
-           on conflict (alert_id, device_token_id) do nothing`,
+          `insert into public.alert_deliveries (alert_id, channel, target_id, status, detail)
+           values ($1, 'push', $2, $3, $4)
+           on conflict (alert_id, channel, target_id) do nothing`,
           [row.alert_id, row.device_token_id, outcome.delivered ? 'sent' : 'failed', outcome.detail],
         );
 

@@ -33,7 +33,8 @@ mistaken for finished.
 
 | Gap | Where | Why it is acceptable for now |
 | --- | --- | --- |
-| Email alerts are not sent | `alerts.delivery_channel` is only ever `push` | M6 delivers to phones that have the app installed. For everyone else the console is still the only place an alert appears. Adding an email sender is another sweep beside `sweepAlertPush`, not a migration. |
+| Bounce and complaint webhooks are not wired | `public.email_suppressions` | An address is suppressed when the provider rejects it at send time. Bounces reported later, by webhook, are not yet ingested — so a slow bounce is retried until it fails at send. The table and the sweep already handle the row; what is missing is the endpoint. |
+| SPF, DKIM and DMARC are not set up | The sending domain | Blocked on the domain decision. Without them the notices land in spam, and a notice in spam is not a notice. |
 | EAS build and store submission are not configured | `apps/mobile` | The app runs in Expo Go and a development build. `eas.json`, signing credentials and store listings need the Apple and Google accounts, which follow the legal-entity decision. |
 | The liveness probe bypasses the scope guard | `apps/worker/src/monitoring.ts`, `httpLivenessProbe` | It is a single GET to the badge's own certified origin, which is narrower than any authorised scope. It should still go through the guarded dispatcher so there is one egress path, not two. |
 | Only the wordmark is outlined | `packages/shared/src/wordmark.generated.ts` | The legends — "VERIFIED BY", the status words, the tagline — are still live text with pinned widths. They are descriptive, not the mark, so a substituted font is cosmetic there. Outlining them would remove the last font dependency from the badge. |

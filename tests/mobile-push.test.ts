@@ -249,7 +249,8 @@ describe('the delivery sweep', () => {
     const deviceId = await registerDevice(owner, 'append-1');
     const alertId = await raise(owner, appId, 'critical', `push-append-${Date.now()}`);
     await db.query(
-      `insert into public.alert_deliveries (alert_id, device_token_id, status) values ($1, $2, 'sent')`,
+      `insert into public.alert_deliveries (alert_id, channel, target_id, status)
+       values ($1, 'push', $2, 'sent')`,
       [alertId, deviceId],
     );
     await expect(

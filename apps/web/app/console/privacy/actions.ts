@@ -201,3 +201,41 @@ export async function resolveAppeal(
   revalidatePath('/review/appeals');
   return { notice: 'Recorded, with the reasons, permanently.' };
 }
+
+/**
+ * Choosing which alerts arrive by email.
+ *
+ * There is deliberately no "none". A badge suspension is a notice we are obliged
+ * to give under the Badge Licence, and a notice a customer can switch off is not
+ * one — so the quiet setting silences everything except the critical ones, and
+ * says so.
+ */
+export async function setAlertEmailLevel(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'You are signed out.' };
+
+  const level = String(formData.get('alertEmailLevel') ?? '');
+  if (!['all', 'critical_only'].includes(level)) return { error: 'Unknown setting.' };
+
+  // The grant on public.users is column-level, so this action could not change
+  // anyone's platform role or email even if it tried to.
+  const { error } = await supabase
+    .from('users')
+    .update({ alert_email_level: level })
+    .eq('id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/console/privacy');
+  return {
+    notice:
+      level === 'all'
+        ? 'You will get an email for anything that needs a look, and anything that needs action.'
+        : 'Only alerts that need action will be emailed. Everything else waits for you in the console.',
+  };
+}

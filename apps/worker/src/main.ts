@@ -10,6 +10,7 @@
  * that boundary; the container's egress allowlist is the outer half.
  */
 import { Pool } from 'pg';
+import { resendFromEnvironment } from '@vibefycode/notify';
 import { NotAuthorisedError, runAssessmentJob } from './run-assessment.ts';
 import { claimNextRequest, completeRequest, failRequest } from './queue.ts';
 import { resolveReportStorage, sweepPendingReports } from './report.ts';
@@ -21,6 +22,7 @@ import {
   sweepScheduledReassessments,
 } from './monitoring.ts';
 import { sweepAlertPush } from './push.ts';
+import { sweepAlertEmail } from './email.ts';
 import {
   spendingIsPaused,
   sweepGovernanceDeadlines,
@@ -100,6 +102,12 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
 export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }> {
   const pool = new Pool({ connectionString: requireEnv('SUPABASE_DB_URL'), max: 4 });
   const storage = resolveReportStorage();
+  const emailProvider = resendFromEnvironment();
+  if (!emailProvider) {
+    log('email not configured — alerts will reach the console and phones only', {
+      needs: 'RESEND_API_KEY and ALERT_EMAIL_FROM',
+    });
+  }
   let running = true;
 
   const loop = async () => {
@@ -155,6 +163,11 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
     // a copy of it, and one that fails is retried rather than lost.
     void sweepAlertPush(pool, undefined, log).catch((error) =>
       log('alert push sweep failed', { error: String(error) }),
+    );
+    // The other half of the same promise: an alert has to reach someone who did
+    // not install the app.
+    void sweepAlertEmail(pool, emailProvider, log).catch((error) =>
+      log('alert email sweep failed', { error: String(error) }),
     );
     // Governance: the ceiling, the retention deadline and the response deadline.
     // All three were recorded in the schema from M1 and acted on by nothing.

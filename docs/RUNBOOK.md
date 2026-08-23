@@ -303,6 +303,58 @@ select created_at, kind, format, row_count, sha256, period_start, period_end
 Hash the file they are holding and compare. Two things are never in one of those
 files by design: a full IP address, and anybody's email address.
 
+## Alerts: who gets told, and how
+
+Three channels, in the order that matters:
+
+1. **In the console and the app.** A `critical` alert appears on whatever console
+   page the customer opens, and at the top of the mobile home screen. This is the
+   one that gets read.
+2. **Push**, to phones with the app installed and notifications allowed.
+3. **Email**, which is the channel of *record* — a badge suspension is a notice
+   we are obliged to give, and there has to be evidence it was sent.
+
+`alert_deliveries` is the ledger for all of it:
+
+```sql
+select d.channel::text, d.status, d.detail, d.attempted_at
+  from public.alert_deliveries d where d.alert_id = '<alert id>'
+ order by d.attempted_at;
+```
+
+### A customer says they were never told
+
+```sql
+-- What we raised, and whether anything left the building.
+select id, severity::text, title, created_at, delivered_at, delivery_channel
+  from public.alerts where organisation_id = '<org id>' order by created_at desc limit 10;
+
+-- Is their address suppressed?
+select * from public.email_suppressions
+ where email = (select email from public.users where id = '<user id>');
+
+-- What did they ask to receive? There is no level that silences a critical.
+select alert_email_level from public.users where id = '<user id>';
+```
+
+A suppressed address means a hard bounce: the address does not exist. Removing
+the row makes us write to it again, so only do that once it is known good.
+
+### Setting up sending
+
+```
+RESEND_API_KEY=...
+ALERT_EMAIL_FROM="VibefyCode <alerts@<domain>>"
+ALERT_EMAIL_REPLY_TO=<support address>     # optional
+```
+
+Without both of the first two, the worker logs once that email is not configured
+and sends nothing. That is a legitimate deployment, not a fault.
+
+**SPF, DKIM and DMARC on the sending domain are not optional.** Without them
+these land in spam, and a notice in spam is not a notice. It is on the open-items
+list, blocked on the domain decision.
+
 ## The mobile app
 
 ```bash

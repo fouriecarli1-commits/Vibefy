@@ -22,7 +22,8 @@
     "@vibefycode/badge": "workspace:*",
     "@vibefycode/monitoring": "workspace:*",
     "@vibefycode/api": "workspace:*",
-    "@vibefycode/governance": "workspace:*"
+    "@vibefycode/governance": "workspace:*",
+    "@vibefycode/notify": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

@@ -71,6 +71,7 @@ packages/workspace Invitation tokens, seat arithmetic and the audit export
 packages/api       One typed client the console and the phone both use — there is no mobile API
 packages/directory Public listing: search, rubric-only ordering, and the disclosures
 packages/governance Spend ceilings, the retention schedule, and data-subject rights
+packages/notify    The email boundary, its fake, and the alert template
 packages/badge     Ed25519 signing, the published key set, and the badge renderer
 packages/shared    Types, design tokens, and the guarantees shared by every surface
 packages/rubric    The rubric as versioned data, plus the scoring functions

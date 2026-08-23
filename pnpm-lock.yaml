@@ -199,6 +199,9 @@ importers:
       '@vibefycode/monitoring':
         specifier: workspace:*
         version: link:../../packages/monitoring
+      '@vibefycode/notify':
+        specifier: workspace:*
+        version: link:../../packages/notify
       '@vibefycode/report':
         specifier: workspace:*
         version: link:../../packages/report
@@ -324,6 +327,19 @@ importers:
         version: 7.0.2
 
   packages/monitoring:
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/notify:
+    dependencies:
+      '@vibefycode/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: 26.2.0

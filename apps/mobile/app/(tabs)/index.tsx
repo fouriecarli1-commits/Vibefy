@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
-import { listApps, type AppSummary } from '@vibefycode/api';
+import { listAlerts, listApps, markAlertRead, type AlertSummary, type AppSummary } from '@vibefycode/api';
 import { supabase } from '@/lib/supabase.ts';
 import { palette, scoreColour, spacing } from '@/lib/theme.ts';
 import { Button, Empty, Loading, styles } from '@/lib/ui.tsx';
@@ -23,12 +23,17 @@ const BADGE_LABEL: Record<string, string> = {
 export default function ApplicationsScreen() {
   const router = useRouter();
   const [apps, setApps] = useState<AppSummary[] | null>(null);
+  const [urgent, setUrgent] = useState<AlertSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setApps(await listApps(supabase));
+      // Surfaced on the screen they open, not left in a tab they have no reason
+      // to visit. A push notification only reaches someone who allowed them.
+      const alerts = await listAlerts(supabase, 20).catch(() => []);
+      setUrgent(alerts.filter((alert) => alert.severity === 'critical' && !alert.readAt).slice(0, 3));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -63,6 +68,39 @@ export default function ApplicationsScreen() {
         ListHeaderComponent={
           <View style={{ gap: spacing.sm }}>
             {error && <Text style={styles.error}>{error}</Text>}
+            {urgent.map((alert) => (
+              <View
+                key={alert.alertId}
+                accessibilityRole="alert"
+                style={[styles.card, { borderColor: palette.danger, borderWidth: 2 }]}
+              >
+                <Text style={[styles.h2, { color: palette.danger }]}>{alert.title}</Text>
+                <Text style={styles.muted}>{alert.body}</Text>
+                <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
+                  <Text
+                    accessibilityRole="link"
+                    style={{ color: palette.link, fontSize: 15 }}
+                    onPress={() => {
+                      if (alert.assessmentId) router.push(`/report/${alert.assessmentId}`);
+                      else if (alert.appId) router.push(`/application/${alert.appId}`);
+                    }}
+                  >
+                    Open it
+                  </Text>
+                  <Text
+                    accessibilityRole="button"
+                    style={{ color: palette.textMuted, fontSize: 15 }}
+                    onPress={async () => {
+                      // Marks it read. It stays in the alert history either way.
+                      await markAlertRead(supabase, alert.alertId).catch(() => undefined);
+                      await load();
+                    }}
+                  >
+                    Dismiss
+                  </Text>
+                </View>
+              </View>
+            ))}
             <Button label="Add an application" onPress={() => router.push('/submit')} />
           </View>
         }
