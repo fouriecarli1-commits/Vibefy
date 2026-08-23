@@ -36,14 +36,17 @@ describe('the drafted set', () => {
   });
 
   it('marks every document as a draft pending counsel', () => {
-    for (const [file, entry] of Object.entries(registry.documents)) {
+    for (const [file, entry] of Object.entries(registry.documents) as [
+      string,
+      RegistryEntry,
+    ][]) {
       expect(entry.isDraft, `${file} lost its DRAFT header`).toBe(true);
       expect(entry.version, `${file} has no version`).toBeTruthy();
     }
   });
 
   it('pins each document to a hash, so acceptance records exactly what was agreed', () => {
-    for (const entry of Object.values(registry.documents)) {
+    for (const entry of Object.values(registry.documents) as RegistryEntry[]) {
       expect(entry.sha256).toMatch(/^[0-9a-f]{64}$/);
     }
   });
@@ -120,6 +123,13 @@ describe('the clauses the brief requires', () => {
     }
   });
 });
+
+interface RegistryEntry {
+  readonly version: string | null;
+  readonly isDraft: boolean;
+  readonly sha256: string;
+  readonly requiresConsent: boolean;
+}
 
 describe('the drafts do not over-claim', () => {
   it.each(Object.keys(registry.documents))('%s passes the copy lint', (file) => {

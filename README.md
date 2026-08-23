@@ -42,7 +42,8 @@ tells you what is missing rather than failing halfway.
 ## The checks that gate every commit
 
 ```bash
-pnpm verify
+pnpm verify      # the fast gate
+pnpm verify:all  # the same, plus an axe scan of the built app
 ```
 
 Runs, in order:
@@ -54,7 +55,7 @@ Runs, in order:
 | `check:contrast` | Every brand colour pair meets WCAG 2.2 AA; we cannot sell an accessibility score from an inaccessible product |
 | `check:brand`    | The badge and wordmark are used only in their permitted forms, and no master has drifted off-palette          |
 | `typecheck`      |                                                                                                               |
-| `test`           | Including the RLS isolation tests and the rating-independence test                                            |
+| `test`           | Including the RLS isolation tests, the rating-independence test, and axe over the report, badge and email     |
 
 ## Repository layout
 

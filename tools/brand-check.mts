@@ -31,13 +31,13 @@ const REQUIRED_MASTERS = [
 ];
 
 /** Every colour any master is allowed to contain. */
-function allowedColours() {
+function allowedColours(): Set<string> {
   const values = new Set(['#FFFFFF', 'currentColor', 'none']);
-  const collect = (node) => {
+  const collect = (node: Record<string, unknown>): void => {
     for (const value of Object.values(node)) {
       if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value))
         values.add(value.toUpperCase());
-      else if (value && typeof value === 'object') collect(value);
+      else if (value && typeof value === 'object') collect(value as Record<string, unknown>);
     }
   };
   collect(tokens);

@@ -33,6 +33,7 @@ mistaken for finished.
 
 | Gap | Where | Why it is acceptable for now |
 | --- | --- | --- |
+| The authenticated console is not accessibility-scanned | `pnpm check:a11y` | Twelve public pages are scanned on every CI run, plus the report, the badge and the alert email in `pnpm test`. Reaching the console needs a live auth service, which the local harness does not run — so the pages a customer spends most time on are covered by the contrast gate and by review, not by axe. |
 | Bounce and complaint webhooks are not wired | `public.email_suppressions` | An address is suppressed when the provider rejects it at send time. Bounces reported later, by webhook, are not yet ingested — so a slow bounce is retried until it fails at send. The table and the sweep already handle the row; what is missing is the endpoint. |
 | SPF, DKIM and DMARC are not set up | The sending domain | Blocked on the domain decision. Without them the notices land in spam, and a notice in spam is not a notice. |
 | EAS build and store submission are not configured | `apps/mobile` | The app runs in Expo Go and a development build. `eas.json`, signing credentials and store listings need the Apple and Google accounts, which follow the legal-entity decision. |

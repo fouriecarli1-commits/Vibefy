@@ -12,7 +12,7 @@
  * in the codebase permitted to reach a private address.
  */
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import { AddressInfo } from 'node:net';
+import type { AddressInfo } from 'node:net';
 
 // Assembled at runtime rather than written as a literal. It is a fabricated
 // value the engine is meant to find in the served page, but a push-protection

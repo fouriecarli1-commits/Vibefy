@@ -20,16 +20,20 @@ export { contrastRatio, relativeLuminance } from '../packages/shared/src/contras
 import { contrastRatio } from '../packages/shared/src/contrast.ts';
 
 /** Resolve a dotted token path such as "light.text" or "brand.teal". */
-export function resolveToken(path) {
+export function resolveToken(path: string): string {
   const parts = path.split('.');
-  const source = parts[0] === 'brand' ? tokens : tokens.semantic;
-  const value = parts.reduce((node, key) => (node == null ? node : node[key]), source);
+  const source: unknown = parts[0] === 'brand' ? tokens : tokens.semantic;
+  const value = parts.reduce<unknown>(
+    (node, key) =>
+      node == null ? node : (node as Record<string, unknown>)[key],
+    source,
+  );
   if (typeof value !== 'string') throw new Error(`Unknown token path: ${path}`);
   return value;
 }
 
-export function runContrastChecks() {
-  const failures = [];
+export function runContrastChecks(): string[] {
+  const failures: string[] = [];
 
   for (const pair of tokens.contrastPairs) {
     const fg = resolveToken(pair.fg);
@@ -49,11 +53,12 @@ export function runContrastChecks() {
     const colour = resolveToken(path);
     const semanticUses = Object.entries(tokens.semantic.light).filter(
       ([key, value]) =>
-        value.toLowerCase() === colour.toLowerCase() && /^(text|link|textMuted)/.test(key),
+        String(value).toLowerCase() === colour.toLowerCase() && /^(text|link|textMuted)/.test(key),
     );
-    if (semanticUses.length > 0) {
+    const firstUse = semanticUses[0];
+    if (firstUse) {
       failures.push(
-        `${path} (${colour}) is declared unusable as body text on light surfaces but is assigned to semantic.light.${semanticUses[0][0]}`,
+        `${path} (${colour}) is declared unusable as body text on light surfaces but is assigned to semantic.light.${firstUse[0]}`,
       );
     }
     const ratio = contrastRatio(colour, lightSurface);

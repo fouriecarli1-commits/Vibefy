@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "bash scripts/dev.sh",
     "build": "pnpm -r --filter ./packages/** build && pnpm --filter @vibefycode/web build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "brand:build": "tsx tools/brand-build.mts",
@@ -28,13 +28,17 @@
     "legal:registry": "node tools/legal-registry.mjs",
     "dev:worker": "pnpm --filter @vibefycode/worker start",
     "badge:keygen": "tsx tools/generate-badge-key.mts",
-    "dev:mobile": "pnpm -F @vibefycode/mobile start"
+    "dev:mobile": "pnpm -F @vibefycode/mobile start",
+    "check:a11y": "tsx tools/a11y-scan.mts",
+    "verify:all": "pnpm verify && pnpm check:a11y"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@types/node": "26.2.0",
     "@types/pg": "8.23.1",
     "@vibefycode/badge": "workspace:*",
     "@vibefycode/shared": "workspace:*",
+    "axe-core": "4.13.0",
     "pg": "8.23.0",
     "playwright": "^1.62.1",
     "prettier": "3.6.2",
@@ -47,5 +51,6 @@
     "onlyBuiltDependencies": [
       "esbuild"
     ]
-  }
+  },
+  "type": "module"
 }

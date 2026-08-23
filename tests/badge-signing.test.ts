@@ -68,8 +68,9 @@ describe('canonicalisation', () => {
   });
 
   it('refuses a partial payload rather than signing a half-truth', () => {
-    const partial = { ...payload() } as Partial<BadgePayload>;
-    delete partial.expiresAt;
+    // Built without the key rather than by deleting it: the fields are readonly,
+    // and a payload that never had an expiry is the case being described.
+    const { expiresAt: _omitted, ...partial } = payload();
     expect(() => canonicalise(partial as BadgePayload)).toThrow(/missing "expiresAt"/);
   });
 

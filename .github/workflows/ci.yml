@@ -71,3 +71,35 @@ jobs:
 
       - name: Fail if any STUB_ is undocumented
         run: node tools/stub-check.mjs
+
+  accessibility:
+    name: WCAG 2.2 AA — our own pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Its own job because it needs the app built and served, which is a
+    # different order of setup from a unit test. We score other people on this
+    # dimension; being unscanned ourselves was the sharpest credibility gap in
+    # the repository.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Postgres 16 client and server
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y postgresql-16
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start the local Postgres the public pages read
+        run: bash scripts/test-db.sh reset
+
+      - name: Scan
+        run: pnpm check:a11y

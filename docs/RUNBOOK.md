@@ -303,6 +303,34 @@ select created_at, kind, format, row_count, sha256, period_start, period_end
 Hash the file they are holding and compare. Two things are never in one of those
 files by design: a full IP address, and anybody's email address.
 
+## Accessibility
+
+We score other people on WCAG 2.2 AA. Two gates cover us:
+
+```bash
+pnpm test          # the report, the badge and the alert email — pure functions
+pnpm check:a11y    # builds the app, serves it, scans twelve public pages
+pnpm verify:all    # both, plus everything else
+```
+
+`pnpm verify` deliberately leaves the page scan out — it needs a build and a
+server, and the fast gate should stay fast. CI runs it as its own job.
+
+### When it fails
+
+The output names the rule, the impact, the element and a link to the rule's
+page. Fix the markup; do not add the rule to an ignore list. There is no ignore
+list, and adding one is a decision to record in `DECISIONS.md` with a reason.
+
+### What it does not cover
+
+The authenticated console. Reaching it needs a live auth service the local
+harness does not run, so those pages are covered by the contrast gate and by
+review rather than by axe. Registered in `docs/OPEN_ITEMS.md`.
+
+And the standing caveat, which is the same one we print in every report: an
+automated scan finds a minority of real barriers. A clean run is a floor.
+
 ## Alerts: who gets told, and how
 
 Three channels, in the order that matters:
