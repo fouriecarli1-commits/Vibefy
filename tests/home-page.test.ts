@@ -20,21 +20,30 @@ const css = read('apps/web/app/globals.css');
 const masters = readFileSync;
 
 describe('the mark leads the page', () => {
-  it('shows the mark itself, not the small header lockup', () => {
-    expect(home).toContain('/brand/vibefycode-mark.svg');
-    expect(home).toContain('hero-mark');
+  it('shows the founder’s own artwork, not a reconstruction of it', () => {
+    // Everywhere else the mark is drawn from geometry, because a badge has to
+    // render per request to stay revocable and has to survive 96 px. The
+    // welcome page is neither: one image, once, at the size a logo is meant to
+    // be looked at — so it is the artwork, at the cost of 378 KB.
+    expect(home).toContain('/brand/vibefycode-hero-dark.svg');
+    expect(home).toContain('hero-lockup');
+    expect(home).not.toContain('/brand/vibefycode-mark.svg');
   });
 
   it('is sized to be looked at rather than to be identified', () => {
     // A logo at 26px is a wayfinding device. This one is the subject.
-    const rule = css.slice(css.indexOf('.hero-mark {'), css.indexOf('.hero-mark img'));
-    expect(rule).toMatch(/width:\s*clamp\(\s*\d{3}px/);
+    const rule = css.slice(css.indexOf('.hero-lockup {'), css.indexOf('.hero-lockup img'));
+    expect(rule).toMatch(/width:\s*min\(100%,\s*clamp\(\s*\d{3}px/);
   });
 
-  it('is decorative in the markup, because the name is beside it', () => {
-    // Announcing "VibefyCode" twice to a screen reader is worse than not
-    // announcing the image at all.
-    expect(home).toMatch(/vibefycode-mark\.svg"[\s\S]{0,80}alt=""/);
+  it('carries the name in its alt text, because the image is the name', () => {
+    // The wordmark is inside the artwork rather than beside it in live text, so
+    // an empty alt would leave a screen reader with no name at all.
+    expect(home).toMatch(/vibefycode-hero-dark\.svg"[\s\S]{0,120}alt="VibefyCode"/);
+  });
+
+  it('is fetched at high priority, because 378 KB above the fold is the page', () => {
+    expect(home).toMatch(/vibefycode-hero-dark\.svg"[\s\S]{0,160}fetchPriority="high"/);
   });
 });
 
@@ -45,11 +54,11 @@ describe('the light that moves over it', () => {
     const sheen = css.slice(css.indexOf('.hero-sheen {'), css.indexOf('@keyframes hero-sweep'));
     expect(sheen).toContain('mask-image');
     expect(sheen).toContain('-webkit-mask-image');
-    expect(sheen).toContain('/brand/vibefycode-mark.svg');
+    expect(sheen).toContain('/brand/vibefycode-hero-dark.svg');
   });
 
   it('is faster when pointed at, and never blocks a click', () => {
-    expect(css).toMatch(/\.hero-mark:hover \.hero-sheen \{[\s\S]*?animation-duration/);
+    expect(css).toMatch(/\.hero-lockup:hover \.hero-sheen \{[\s\S]*?animation-duration/);
     expect(css).toMatch(/\.hero-sheen \{[\s\S]*?pointer-events: none/);
   });
 
@@ -79,7 +88,7 @@ describe('the badge is shown, in every state it can be in', () => {
 
   it('shows the active badge at a size somebody can read', () => {
     expect(home).toContain('vibefycode-badge-verified.svg');
-    expect(home).toMatch(/badge-verified\.svg"[\s\S]{0,200}width=\{200\}/);
+    expect(home).toMatch(/badge-verified\.svg"[\s\S]{0,200}width=\{280\}/);
   });
 
   it('shows what it looks like when it is not in force', () => {
@@ -129,5 +138,45 @@ describe('the example of a site carrying the badge', () => {
 
   it('uses the compact badge, which is the one built for that size', () => {
     expect(home).toContain('vibefycode-badge-verified-compact.svg');
+  });
+});
+
+describe('the hero artwork is the supplied file, and is published', () => {
+  // The founder said plainly that a reconstruction of his logo is not his logo
+  // and that the welcome page should carry the real thing whatever it costs.
+  // That is his call about his own mark, so these assert the arrangement rather
+  // than re-argue it: the artwork ships, unaltered except for the one thing
+  // that makes it readable on this product's own background.
+  const source = read('brand/source/supplied-lockup-transparent.svg');
+  const build = read('tools/brand-build.mts');
+
+  it('publishes the supplied file itself, not a redraw of it', () => {
+    expect(build).toContain('supplied-lockup-transparent.svg');
+    expect(build).toContain('vibefycode-hero.svg');
+    expect(build).toContain('vibefycode-hero-dark.svg');
+  });
+
+  it('changes nothing about the artwork except the wordmark’s ink', () => {
+    // The drawing was made for a white page: its letters are #002344, which on
+    // this surface is very nearly invisible. Only the `fill` attribute moves,
+    // and only on the wordmark — the same light/dark pair every other master in
+    // this brand already ships.
+    expect(source).toContain('fill="#002344"');
+    expect(build).toContain('HERO_WORDMARK_INK');
+    expect(build).toMatch(/replaceAll\(/);
+  });
+
+  it('fails the build rather than shipping a hero nobody can read', () => {
+    // If a future supplied file inks its wordmark differently, the swap would
+    // silently do nothing and the name would disappear into the background.
+    expect(build).toContain('no longer inks its wordmark');
+  });
+
+  it('is the artwork without the AI watermark, which the badge render carries', () => {
+    // `supplied-badge.svg` has "Made with AI" burned into its pixels, top right.
+    // A trust mark cannot display a third party's provenance claim about itself,
+    // so that file stays out of anything served — see brand/source/README.md.
+    expect(build).not.toContain('supplied-badge.svg');
+    expect(home).not.toContain('supplied-badge');
   });
 });

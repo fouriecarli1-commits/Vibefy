@@ -12,7 +12,7 @@
  *   pnpm brand:build              build SVG masters and raster exports
  *   pnpm brand:build --svg-only   skip rasterisation
  */
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { renderBadgeSvg, renderMarkSvg, type BadgeStatus } from '@vibefycode/badge';
@@ -26,6 +26,21 @@ const mobileAssetDir = join(root, 'apps/mobile/assets');
 // The web app serves the marks from its own public directory, populated by this
 // pipeline rather than by a manual copy.
 const webPublicDir = join(root, 'apps/web/public/brand');
+
+/**
+ * The supplied lockup, served as-is on the welcome page.
+ *
+ * `supplied-lockup-transparent.svg` is the one supplied file that is both clean
+ * and usable: a transparent background, no watermark burned into its pixels,
+ * the mark in full colour and the wordmark as real outlines. The badge renders
+ * in the same family carry "Made with AI" in the top right corner, which a
+ * trust mark cannot show, so they stay out.
+ */
+const HERO_ARTWORK = 'vibefycode-hero.svg';
+const HERO_ARTWORK_DARK = 'vibefycode-hero-dark.svg';
+/** The ink the artwork sets its wordmark in — for a white page. */
+const HERO_WORDMARK_INK = '#002344';
+const heroSource = join(root, 'brand/source/supplied-lockup-transparent.svg');
 
 /**
  * The horizontal lockup: mark on the left, wordmark on the right.
@@ -176,7 +191,28 @@ async function main(): Promise<void> {
   for (const [name] of SVG_TARGETS) copyFileSync(join(svgDir, name), join(webPublicDir, name));
   for (const icon of ICON_TARGETS)
     copyFileSync(join(iconDir, icon.name), join(webPublicDir, icon.name));
-  console.log('✓ Web public assets refreshed in apps/web/public/brand/');
+
+  // The founder's own artwork, published for the welcome page.
+  //
+  // Twice: as supplied, and with the wordmark's ink swapped for the dark-surface
+  // token. The artwork was drawn for a white page — its letters are #002344,
+  // which on this product's own background is very nearly invisible. Only the
+  // `fill` attribute changes, and only on the wordmark; every curve, colour and
+  // proportion of the drawing is untouched. This is the same light/dark pair
+  // every other master in this brand already ships, and the alternative is a
+  // logo you cannot read on the page it belongs to.
+  copyFileSync(heroSource, join(webPublicDir, HERO_ARTWORK));
+  const supplied = readFileSync(heroSource, 'utf8');
+  const onDark = supplied.replaceAll(`fill="${HERO_WORDMARK_INK}"`, `fill="${PALETTE.mist}"`);
+  if (onDark === supplied) {
+    throw new Error(
+      `The supplied lockup no longer inks its wordmark ${HERO_WORDMARK_INK}. Read it before shipping a hero nobody can read.`,
+    );
+  }
+  writeFileSync(join(webPublicDir, HERO_ARTWORK_DARK), onDark);
+  console.log(
+    `✓ Web public assets refreshed in apps/web/public/brand/ (hero artwork ${Math.round(statSync(heroSource).size / 1024)} KB, light and dark)`,
+  );
 }
 
 await main();

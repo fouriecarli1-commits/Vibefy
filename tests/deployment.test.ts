@@ -208,3 +208,40 @@ describe('dark is the product, not a preference', () => {
     expect(tokensCss).toContain('--vibefycode-surface: #ffffff');
   });
 });
+
+describe('CI can actually start', () => {
+  // Every run from the first push to 2026-08-25 failed inside eleven seconds,
+  // at `pnpm/action-setup`, before one gate had spoken. The cause is a conflict
+  // rather than a break: the action refuses to run when the pnpm version is
+  // given twice, and `package.json` already gives it. So the repository had a
+  // full CI pipeline that had never executed a line of it, and a red tick that
+  // meant nothing because it had always been red.
+  //
+  // Asserted here rather than trusted, because the failure mode is silence: a
+  // pipeline that cannot start looks exactly like a pipeline that is failing,
+  // and neither looks like a pipeline that is passing.
+  const workflow = read('.github/workflows/ci.yml');
+  const packageJson = JSON.parse(read('package.json')) as { packageManager?: string };
+
+  it('does not tell the setup action the pnpm version twice', () => {
+    expect(packageJson.packageManager).toMatch(/^pnpm@/);
+
+    const setupBlocks = workflow.split('pnpm/action-setup').slice(1);
+    expect(setupBlocks.length).toBeGreaterThan(0);
+    for (const block of setupBlocks) {
+      // Only the block's own inputs — up to the next step in the list.
+      const inputs = block.slice(0, block.indexOf('\n      - '));
+      expect(inputs).not.toContain('version:');
+    }
+  });
+
+  it('runs every gate `pnpm verify` runs, so local green and CI green agree', () => {
+    const scripts = (JSON.parse(read('package.json')) as { scripts: Record<string, string> })
+      .scripts;
+    const verify = scripts.verify ?? '';
+    expect(verify, 'package.json has no `verify` script').not.toBe('');
+    for (const gate of verify.split('&&').map((part) => part.trim())) {
+      expect(workflow, `${gate} is in pnpm verify but not in CI`).toContain(gate);
+    }
+  });
+});

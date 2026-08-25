@@ -20,9 +20,20 @@ export default function HomePage() {
     <div className="space-y-16">
       {/* --- The mark, at the size it deserves ------------------------------ */}
       <section className="flex flex-col items-center gap-7 pt-4 text-center">
-        <div className="hero-mark">
+        {/*
+          The founder's own artwork, served unmodified — mark and wordmark
+          together, exactly as he drew them.
+
+          Everywhere else this product draws the mark from geometry, because a
+          badge has to render per request to stay revocable and has to survive
+          96 px. The welcome page is neither of those. It is one image, once, at
+          the size a logo is meant to be looked at, and there the artwork beats
+          any reconstruction of it. It costs 378 KB, which is the trade that was
+          made deliberately rather than the one that was overlooked.
+        */}
+        <div className="hero-lockup">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/vibefycode-mark.svg" alt="" aria-hidden="true" />
+          <img src="/brand/vibefycode-hero-dark.svg" alt="VibefyCode" fetchPriority="high" />
           <span className="hero-sheen" aria-hidden="true" />
         </div>
 
@@ -73,9 +84,9 @@ export default function HomePage() {
             <img
               src="/brand/vibefycode-badge-verified.svg"
               alt="The Verified by VibefyCode badge"
-              width={200}
-              height={200}
-              className="h-[200px] w-[200px]"
+              width={280}
+              height={280}
+              className="h-[280px] w-[280px]"
             />
             <span className="chip" data-tone="ok">
               Active

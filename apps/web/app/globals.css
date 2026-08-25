@@ -663,10 +663,25 @@ body::before {
    asked it not to is a logo that made a person feel unwell to look clever.
    =========================================================================== */
 
+/* The supplied artwork, at the size a logo is meant to be looked at. Its own
+   aspect ratio, so nothing is stretched to fit a square the drawing is not. */
+.hero-lockup {
+  position: relative;
+  display: block;
+  width: min(100%, clamp(300px, 78vw, 620px));
+  isolation: isolate;
+}
+
+.hero-lockup img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .hero-mark {
   position: relative;
   display: inline-block;
-  width: clamp(200px, 34vw, 340px);
+  width: clamp(240px, 46vw, 400px);
   aspect-ratio: 1;
   isolation: isolate;
 }
@@ -678,7 +693,7 @@ body::before {
 }
 
 /* The glow under it, so the mark sits on the dark ground rather than on top. */
-.hero-mark::before {
+.hero-lockup::before {
   content: '';
   position: absolute;
   inset: 8%;
@@ -694,7 +709,7 @@ body::before {
   opacity: 0.75;
 }
 
-.hero-mark:hover::before {
+.hero-lockup:hover::before {
   opacity: 1;
 }
 
@@ -713,8 +728,10 @@ body::before {
   background-size: 260% 100%;
   background-repeat: no-repeat;
   /* Clipped to the mark itself. Both properties: WebKit still wants its own. */
-  mask-image: url('/brand/vibefycode-mark.svg');
-  -webkit-mask-image: url('/brand/vibefycode-mark.svg');
+  /* Masked to the artwork's own alpha, so the light travels over the drawing
+     rather than over the rectangle it sits in. */
+  mask-image: url('/brand/vibefycode-hero-dark.svg');
+  -webkit-mask-image: url('/brand/vibefycode-hero-dark.svg');
   mask-size: 100% 100%;
   -webkit-mask-size: 100% 100%;
   mask-repeat: no-repeat;
@@ -723,7 +740,7 @@ body::before {
   animation-delay: 1.4s;
 }
 
-.hero-mark:hover .hero-sheen {
+.hero-lockup:hover .hero-sheen {
   animation-duration: 2.2s;
   animation-delay: 0s;
 }

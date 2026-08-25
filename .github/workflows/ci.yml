@@ -22,9 +22,11 @@ jobs:
           # but a shallow clone still lets `git ls-files` enumerate it.
           fetch-depth: 1
 
+      # No `version:` here on purpose. `package.json` sets `packageManager`, and
+      # this action refuses to run when it is told the version twice — which is
+      # how every CI run since the first one failed inside eleven seconds,
+      # before a single gate had a chance to say anything.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -72,8 +74,16 @@ jobs:
       - name: Schema file matches the migrations
         run: pnpm check:schema
 
+      - name: Legal register is complete
+        # Missing from CI entirely until 2026-08-25 — the one gate `pnpm verify`
+        # ran that nothing on the server did. Nobody noticed, because no run had
+        # ever got far enough to notice anything.
+        run: pnpm legal:registry
+
       - name: Fail if any STUB_ is undocumented
-        run: node tools/stub-check.mjs
+        # Spelled as the script rather than as the command it happens to run, so
+        # `pnpm verify` and this file cannot drift into meaning different things.
+        run: pnpm check:stubs
 
   accessibility:
     name: WCAG 2.2 AA — our own pages
@@ -85,9 +95,11 @@ jobs:
     # the repository.
     steps:
       - uses: actions/checkout@v4
+      # No `version:` here on purpose. `package.json` sets `packageManager`, and
+      # this action refuses to run when it is told the version twice — which is
+      # how every CI run since the first one failed inside eleven seconds,
+      # before a single gate had a chance to say anything.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
