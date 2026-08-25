@@ -193,3 +193,360 @@ body::before {
   background-clip: text;
   color: transparent;
 }
+
+/* ===========================================================================
+   Navigation
+   ---------------------------------------------------------------------------
+   One row on a wide screen, one button on a narrow one. The breakpoint is set
+   by the content rather than by a device: below 62rem the row cannot hold the
+   groups plus the mark without wrapping, and a wrapping nav reads as broken.
+   =========================================================================== */
+
+.nav-shell {
+  margin-inline: auto;
+  max-width: 72rem;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.nav-logo img {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+
+.nav-burger {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--vibefycode-text);
+  background: var(--vibefycode-surface-muted);
+  border: 1px solid var(--vibefycode-border);
+  border-radius: 7px;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+}
+
+.nav-burger-bars {
+  display: grid;
+  gap: 3px;
+}
+
+.nav-burger-bars span {
+  display: block;
+  width: 14px;
+  height: 1.5px;
+  background: var(--vibefycode-accent);
+  border-radius: 1px;
+}
+
+.nav-panel {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.nav-group {
+  position: relative;
+}
+
+.nav-trigger,
+.nav-direct {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--vibefycode-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    color 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.nav-trigger:hover,
+.nav-direct:hover,
+.nav-trigger[aria-expanded='true'] {
+  color: var(--vibefycode-text);
+  background: var(--vibefycode-surface-muted);
+  border-color: var(--vibefycode-border);
+}
+
+/* The section you are in is stated, not implied by a colour alone. */
+.nav-trigger[data-active='true'],
+.nav-direct[data-active='true'] {
+  color: var(--vibefycode-accent);
+  border-color: color-mix(in srgb, var(--vibefycode-accent) 40%, transparent);
+}
+
+.nav-caret {
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  transition: transform 160ms ease;
+}
+
+.nav-trigger[aria-expanded='true'] .nav-caret {
+  transform: rotate(180deg);
+}
+
+.nav-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  left: 0;
+  z-index: 50;
+  min-width: 17rem;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: var(--vibefycode-surface-muted);
+  border: 1px solid var(--vibefycode-border);
+  border-radius: 10px;
+  box-shadow: 0 18px 40px -20px rgb(0 0 0 / 0.75);
+}
+
+.nav-menu[data-open='true'] {
+  display: block;
+}
+
+.nav-menu-item {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 7px;
+  text-decoration: none;
+  color: var(--vibefycode-text);
+}
+
+.nav-menu-item:hover {
+  background: color-mix(in srgb, var(--vibefycode-accent) 12%, transparent);
+}
+
+.nav-menu-item[aria-current='page'] {
+  background: color-mix(in srgb, var(--vibefycode-accent) 16%, transparent);
+}
+
+.nav-menu-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.nav-menu-hint {
+  font-size: 0.76rem;
+  color: var(--vibefycode-text-muted);
+  line-height: 1.35;
+}
+
+.nav-cta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--vibefycode-accent);
+  border: 1px solid var(--vibefycode-accent);
+  border-radius: 7px;
+  padding: 0.5rem 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.nav-cta:hover {
+  background: var(--vibefycode-accent);
+  color: var(--vibefycode-on-accent);
+}
+
+/* --- Narrow screens ------------------------------------------------------ */
+
+@media (max-width: 62rem) {
+  .nav-panel {
+    display: none;
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--vibefycode-border);
+  }
+
+  .nav-panel[data-open='true'] {
+    display: flex;
+  }
+
+  .nav-trigger,
+  .nav-direct,
+  .nav-cta {
+    width: 100%;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    padding: 0.7rem 0.75rem;
+  }
+
+  .nav-direct,
+  .nav-cta {
+    justify-content: flex-start;
+  }
+
+  /* In the panel a group opens in place. A floating menu over a page you have
+     already pushed down is disorientating on a small screen. */
+  .nav-menu {
+    position: static;
+    min-width: 0;
+    margin: 0.25rem 0 0.5rem;
+    box-shadow: none;
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--vibefycode-border);
+    border-radius: 0;
+    padding: 0 0 0 0.7rem;
+  }
+}
+
+@media (min-width: 62.0625rem) {
+  .nav-burger {
+    display: none;
+  }
+
+  .nav-panel {
+    display: flex !important;
+  }
+}
+
+/* ===========================================================================
+   Blocks and bars
+   ---------------------------------------------------------------------------
+   The shapes every page is built from, so that "a section" looks the same
+   everywhere and a reader learns the vocabulary once.
+   =========================================================================== */
+
+.panel {
+  background: var(--vibefycode-surface-muted);
+  border: 1px solid var(--vibefycode-border);
+  border-radius: 12px;
+  padding: clamp(1.1rem, 0.9rem + 0.8vw, 1.5rem);
+}
+
+/* A bar is a panel that reports one thing: a state, a total, a warning. */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  background: var(--vibefycode-surface-muted);
+  border: 1px solid var(--vibefycode-border);
+  border-left: 3px solid var(--vibefycode-accent);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+}
+
+.bar[data-tone='warn'] {
+  border-left-color: var(--vibefycode-warning);
+}
+
+.bar[data-tone='bad'] {
+  border-left-color: var(--vibefycode-danger);
+}
+
+.grid-cards {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+
+/* A single number and what it counts. The number leads; the label explains. */
+.stat {
+  display: grid;
+  gap: 0.2rem;
+  background: var(--vibefycode-surface-muted);
+  border: 1px solid var(--vibefycode-border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.7rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--vibefycode-text-muted);
+}
+
+/* A short label that carries a state. Shape as well as colour, so it survives
+   being printed, being screenshotted, and being read by someone colourblind. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  border-radius: 5px;
+  border: 1px solid var(--vibefycode-border);
+  color: var(--vibefycode-text-muted);
+  white-space: nowrap;
+}
+
+.chip[data-tone='ok'] {
+  color: var(--vibefycode-success);
+  border-color: color-mix(in srgb, var(--vibefycode-success) 45%, transparent);
+}
+
+.chip[data-tone='warn'] {
+  color: var(--vibefycode-warning);
+  border-color: color-mix(in srgb, var(--vibefycode-warning) 45%, transparent);
+}
+
+.chip[data-tone='bad'] {
+  color: var(--vibefycode-danger);
+  border-color: color-mix(in srgb, var(--vibefycode-danger) 45%, transparent);
+}
+
+/* An uppercase micro-heading, for labelling a block without spending a heading
+   level on it. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--vibefycode-text-muted);
+}
