@@ -30,6 +30,36 @@ They also draw a different V from the logo. The mark in `brand/svg/` follows the
 a badge and a website that disagree about the same mark is precisely what PART 0.5 exists to
 prevent.
 
+## What a usable original looks like
+
+This is the specification to hand to a designer, or to check an export against. One file in the
+first row closes the open item; the rest are conveniences.
+
+| What                    | Format              | Size                       | Why                                                                                          |
+| ----------------------- | ------------------- | -------------------------- | -------------------------------------------------------------------------------------------- |
+| **The mark alone**      | `.svg`, real paths  | Any — a vector has no size | The one file that matters. Everything else is generated from it.                             |
+| The horizontal lockup   | `.svg`, real paths  | Any                        | Mark plus wordmark, as it appears in the site header.                                        |
+| Fallback raster of each | `.png`, transparent | 2048 px on the long edge   | For the two places a vector is not accepted — some app store listings, some social profiles. |
+
+Requirements, all of them checkable with `pnpm brand:inspect`:
+
+1. **Real geometry.** `<path>`, `<circle>`, `<polygon>` — not `<image>` with a base64 payload.
+   A raster inside an `.svg` wrapper is still a raster.
+2. **Text converted to outlines.** A `<text>` element renders in whatever font the viewer's
+   machine happens to have, which on somebody else's website is not the font you chose.
+3. **No AI-generation metadata.** No C2PA manifest, no `<ContainsAiGeneratedContent>`, and no
+   watermark burned into the pixels. A trust mark cannot carry a third party's provenance claim
+   about itself.
+4. **Flat colour, no effects.** No gradients that need three hundred stops, no drop shadows, no
+   bevels. The badge is rendered as SVG on every request at sizes down to 96 px; effects do not
+   survive that and cost bytes on every load.
+5. **Transparent background.** No white rectangle behind the artwork — the mark sits on a dark
+   surface in this product and on whatever a customer chooses on theirs.
+
+Most design tools can produce this. The instruction to give is: _"export as SVG, with text
+converted to outlines and no embedded images."_ If the result fails `pnpm brand:inspect`, the
+tool exported a picture and the option was missed.
+
 ## If you replace the logo
 
 Drop the new file in as `vibefycode-logo-horizontal.*`, update the paths in

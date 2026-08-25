@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "brand:build": "tsx tools/brand-build.mts",
+    "brand:inspect": "node tools/inspect-svg.mjs",
     "check:copy": "node tools/copy-lint.mjs",
     "check:secrets": "node tools/secret-scan.mjs",
     "check:contrast": "tsx tools/contrast-check.mts",
