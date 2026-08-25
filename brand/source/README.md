@@ -1,6 +1,6 @@
 # Supplied artwork
 
-Eight SVG files supplied by the founder on 2026-08-25, replacing the raster artwork removed
+Nine SVG files supplied by the founder on 2026-08-25, replacing the raster artwork removed
 earlier the same day. **They are the authority on what the marks look like.** Everything in
 `brand/svg/`, `brand/png/`, `brand/icons/`, `apps/mobile/assets/` and `apps/web/public/brand/` is
 written from `packages/shared/src/brand.ts` by `pnpm brand:build`, and nothing derived may be
@@ -22,6 +22,7 @@ Run `pnpm brand:inspect brand/source/<file>` to reproduce any row of this.
 | `supplied-mark-black.svg`          | —                    | raster, 145 KB PNG  | yes           |
 | `supplied-mark-photographic.svg`   | —                    | raster, 733 KB JPEG | no            |
 | `supplied-mark-photographic-2.svg` | —                    | raster, 733 KB JPEG | no            |
+| `supplied-lockup-transparent.svg`  | **vector**, outlined | raster, 204 KB PNG  | yes           |
 | `supplied-badge.svg`               | —                    | raster, 1087 KB PNG | no            |
 
 So the set is **half vector**, and it is the useful half that is missing.
@@ -31,14 +32,41 @@ the three files that contain words. That is a genuine original, and it is better
 project currently draws: `packages/shared/src/wordmark.generated.ts` holds a reconstruction of the
 letterforms, and these are the letterforms themselves.
 
-**The mark is not.** In all eight files the V is a placed picture, whatever else surrounds it. The
+**The mark is not.** In all nine files the V is a placed picture, whatever else surrounds it. The
 `<path>` elements that are not letters are clip and mask rectangles — four corners and a close,
 carrying no shape. That is what a design tool produces when the artwork was generated as an image
 and then positioned on a canvas: exporting as SVG outlines the _text_ and wraps the _picture_, and
 both come out of the same menu item, so it looks like it worked.
 
 Getting the mark as geometry needs it drawn as geometry — traced from one of these, or redrawn.
-No export setting reaches it, because there is nothing in the source file to export.
+No export setting reaches it, because there is nothing in the source file to export. That trace has
+now been done; see the next section.
+
+## `traced-mark.svg` — the mark as geometry, at last
+
+Not supplied. **Derived**, which is what PART 0.5 asks for: same forms, same proportions, no
+redesign. `supplied-mark-black.svg` carries a 1600×1472 single-channel silhouette of the mark —
+pure black and white, no gradient, clean edges — and that is the one input a contour tracer handles
+well. The result is eighteen paths of real curve data: the woven ribbon, the arrow, the circuit
+traces and the bar chart, in the arrangement the supplied artwork draws them.
+
+It is reproduced by extracting that silhouette from the base64 `<image>` inside
+`supplied-mark-black.svg`, running `potrace` over it at `turdsize=8, alphamax=1.0,
+opttolerance=0.2`, and discarding the first traced curve — potrace reads the canvas frame as
+foreground, which inverts the whole image if it is kept. The tracer is installed for the job and
+not added to the toolchain: this runs once per supplied mark, not once per build.
+
+Two things it is not, and both matter before anything adopts it:
+
+1. **It is 21 KB where the current geometry is 2 KB.** The badge is served as SVG on every request,
+   from our origin, on somebody else's page. Ten times the bytes on every load is a real cost.
+2. **The circuit traces become noise below about 64 px.** At the 96 px the Badge Licence permits it
+   holds; at favicon sizes the hand-authored geometry in `packages/shared/src/brand.ts` reads better
+   because it draws less.
+
+So adopting it is a decision with a trade-off in it, not a straight upgrade, and it is recorded
+here rather than made silently. The likely answer is both: the trace for large renders, the simpler
+geometry for icons.
 
 ## What a usable original looks like
 
