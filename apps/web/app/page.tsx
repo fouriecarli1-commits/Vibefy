@@ -2,30 +2,43 @@ import Link from 'next/link';
 import { getRubric } from '@vibefycode/rubric';
 
 /**
- * The home page.
+ * The first page anybody sees.
  *
- * Every block on it is one of the shapes defined in `globals.css` — a panel, a
- * bar, a stat, a chip — because a reader should learn the vocabulary once and
- * then recognise it on every other page. Nothing here is a shape that appears
- * nowhere else.
+ * Three things have to happen here, in this order: they see the mark, they see
+ * the thing they would be buying, and they see it doing its job on somebody
+ * else's website. A product whose entire value is a small graphic on another
+ * company's page has to show that graphic on another company's page.
+ *
+ * Everything below the fold is built from the same five shapes the rest of the
+ * product uses — panel, bar, stat, chip, eyebrow — so the vocabulary is learned
+ * here and recognised everywhere after.
  */
 export default function HomePage() {
   const rubric = getRubric();
-  const dimensionCount = rubric.dimensions.length;
 
   return (
-    <div className="space-y-12">
-      <section className="space-y-5">
-        <p className="eyebrow">The vibe app rating system</p>
-        <h1 className="max-w-3xl text-4xl font-bold sm:text-5xl">
-          The trust layer for <span className="vibefycode-gradient-text">AI-built apps</span>
-        </h1>
-        <p className="max-w-2xl text-lg text-muted">
-          You built it fast. VibefyCode tells you — with evidence — what a first real user, an app
-          store reviewer, or someone poking at your API would find. Every finding carries a
-          screenshot, a trace or an HTTP exchange. Nothing we cannot evidence gets published.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
+    <div className="space-y-16">
+      {/* --- The mark, at the size it deserves ------------------------------ */}
+      <section className="flex flex-col items-center gap-7 pt-4 text-center">
+        <div className="hero-mark">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/vibefycode-mark.svg" alt="" aria-hidden="true" />
+          <span className="hero-sheen" aria-hidden="true" />
+        </div>
+
+        <div className="space-y-4">
+          <p className="eyebrow">The vibe app rating system</p>
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold sm:text-5xl">
+            The trust layer for <span className="vibefycode-gradient-text">AI-built apps</span>
+          </h1>
+          <p className="mx-auto max-w-2xl text-lg text-muted">
+            You built it fast. VibefyCode tells you — with evidence — what a first real user, an app
+            store reviewer, or someone poking at your API would find. Then, if it earns one, you get
+            a mark you can put on your site that we take down again if it stops being true.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-3">
           <Link
             href="/sign-up"
             className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
@@ -33,19 +46,162 @@ export default function HomePage() {
             Create an account
           </Link>
           <Link
-            href="/methodology"
+            href="/trust-check"
             className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
           >
-            Read the rubric
+            Check an app before you pay
           </Link>
         </div>
       </section>
 
-      {/* The three numbers that describe the standard, before any prose about
-          it. A reader who reads nothing else has still learned the shape. */}
+      {/* --- What you actually get ------------------------------------------ */}
+      <section aria-labelledby="badge-heading" className="space-y-6">
+        <div className="space-y-2 text-center">
+          <h2 id="badge-heading" className="text-2xl font-bold">
+            This is the mark you earn
+          </h2>
+          <p className="mx-auto max-w-2xl text-muted">
+            Issued only after a person has reviewed the assessment. Every one carries a signature
+            anybody can check, and a page anybody can open — including the people you are trying to
+            persuade.
+          </p>
+        </div>
+
+        <div className="grid items-center gap-8 sm:grid-cols-[auto_1fr]">
+          <div className="flex flex-col items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/vibefycode-badge-verified.svg"
+              alt="The Verified by VibefyCode badge"
+              width={200}
+              height={200}
+              className="h-[200px] w-[200px]"
+            />
+            <span className="chip" data-tone="ok">
+              Active
+            </span>
+          </div>
+
+          <ul className="space-y-3">
+            {[
+              {
+                title: 'It says one thing, precisely',
+                body: 'That this application was assessed against a published rubric version, on a stated date, and met the published threshold. Not that it is free of defects, and not that it is a security audit.',
+              },
+              {
+                title: 'It can be checked by a stranger',
+                body: 'The badge carries a signature and a public identifier. Anybody can open its verification page and see the score, the date, and whether it is still in force.',
+              },
+              {
+                title: 'It comes down when it stops being true',
+                body: 'On a continuous plan the application is re-assessed. A material regression suspends the badge automatically, and the customer is told what changed and why.',
+              },
+            ].map((item) => (
+              <li key={item.title} className="panel space-y-1.5">
+                <h3 className="font-semibold">{item.title}</h3>
+                <p className="text-sm text-muted">{item.body}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* The states, so nobody is surprised by one. A badge is never a broken
+            image — every non-active state renders as its own legible mark. */}
+        <div className="space-y-3">
+          <p className="eyebrow text-center">And what it looks like when it is not in force</p>
+          <ul className="flex flex-wrap items-end justify-center gap-6">
+            {[
+              { file: 'vibefycode-badge-suspended.svg', label: 'Suspended', tone: 'warn' },
+              { file: 'vibefycode-badge-expired.svg', label: 'Expired', tone: undefined },
+              { file: 'vibefycode-badge-revoked.svg', label: 'Revoked', tone: 'bad' },
+            ].map((state) => (
+              <li key={state.file} className="flex flex-col items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/brand/${state.file}`}
+                  alt={`The badge in its ${state.label.toLowerCase()} state`}
+                  width={96}
+                  height={96}
+                  className="h-24 w-24"
+                />
+                <span className="chip" data-tone={state.tone}>
+                  {state.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* --- The badge doing its job ----------------------------------------- */}
+      <section aria-labelledby="example-heading" className="space-y-5">
+        <div className="space-y-2">
+          <h2 id="example-heading" className="text-2xl font-bold">
+            How it looks on a real site
+          </h2>
+          <p className="max-w-2xl text-muted">
+            One line of HTML in your footer. It links to the verification page, so a visitor who
+            does not believe it can find out in one click — which is the only reason a mark like
+            this is worth anything.
+          </p>
+        </div>
+
+        <div className="browser">
+          <div className="browser-bar">
+            <span className="browser-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            {/* A fictional application, deliberately. A mock built to look like
+                a real company's site is a mock that gets read as an endorsement
+                of one. */}
+            <span className="browser-address">https://kettle.example</span>
+          </div>
+
+          <div className="browser-page" aria-hidden="true">
+            <div className="space-y-2">
+              <div className="mock-line" style={{ width: '38%', height: 16 }} />
+              <div className="mock-line" style={{ width: '72%' }} />
+              <div className="mock-line" style={{ width: '61%' }} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[0, 1, 2].map((column) => (
+                <div key={column} className="space-y-2">
+                  <div className="mock-line" style={{ width: '52%' }} />
+                  <div className="mock-line" style={{ width: '88%' }} />
+                  <div className="mock-line" style={{ width: '70%' }} />
+                </div>
+              ))}
+            </div>
+
+            <div className="mock-footer">
+              <div className="space-y-2" style={{ minWidth: '40%' }}>
+                <div className="mock-line" style={{ width: '55%' }} />
+                <div className="mock-line" style={{ width: '35%' }} />
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/vibefycode-badge-verified-compact.svg"
+                alt=""
+                width={96}
+                height={96}
+                className="h-24 w-24"
+              />
+            </div>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted">
+          A fictional application, used so the example demonstrates the badge rather than endorsing
+          anybody.
+        </p>
+      </section>
+
+      {/* --- What the score is made of --------------------------------------- */}
       <section aria-label="The standard, in numbers" className="grid-cards">
         <div className="stat">
-          <span className="stat-value">{dimensionCount}</span>
+          <span className="stat-value">{rubric.dimensions.length}</span>
           <span className="stat-label">Scored dimensions</span>
         </div>
         <div className="stat">

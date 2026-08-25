@@ -34,13 +34,11 @@
   </g>
   <g transform="translate(256 190) scale(0.5) translate(-256 -256)" opacity="0.45">
   <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M268 402 C312 360 356 320 398 276" stroke="currentColor" stroke-width="26"/>
+    <path d="M302 334 C338 314 372 294 402 274" stroke="currentColor" stroke-width="26"/>
     <path d="M452 232 L414 302 L374 256 Z" fill="currentColor" stroke="none"/>
-    <path d="M132 118 C160 214 200 306 244 372" stroke="currentColor" stroke-width="44"/>
-    <path d="M244 372 C238 404 208 416 186 400 C164 384 168 350 194 342 C220 334 240 352 240 374" stroke="currentColor" stroke-width="22"/>
-    <circle cx="200" cy="372" r="13" fill="#FFFFFF" stroke="none"/>
-    <path d="M256 372 C300 306 340 214 368 118" stroke="#FFFFFF" stroke-width="62"/>
-    <path d="M256 372 C300 306 340 214 368 118" stroke="currentColor" stroke-width="44"/>
+    <path d="M136 104 C164 212 198 306 240 354 C282 306 316 212 344 104" stroke="currentColor" stroke-width="42" opacity="0.55"/>
+    <path d="M168 116 C196 224 230 318 272 366 C314 318 348 224 376 116" stroke="#FFFFFF" stroke-width="60"/>
+    <path d="M168 116 C196 224 230 318 272 366 C314 318 348 224 376 116" stroke="currentColor" stroke-width="42"/>
   </g>
   </g>
   <g aria-hidden="true" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle" fill="#C98A2E">

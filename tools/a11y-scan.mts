@@ -93,6 +93,17 @@ async function main(): Promise<void> {
 
   let server: ChildProcess | undefined;
   if (!external) {
+    // The pages that read the database need a *current* one. Three times now a
+    // stale local cluster — missing a migration added since it was last
+    // created — has made `/directory` render its error page, and an error page
+    // has no title and no lang attribute, so the scan reported two
+    // accessibility violations for what was really an out-of-date schema. The
+    // failure told the truth about the page and lied about the cause.
+    if (!process.env.SUPABASE_DB_URL) {
+      console.log('· Bringing the local test database up to date…');
+      await run('bash', ['scripts/test-db.sh', 'reset'], root);
+    }
+
     console.log('· Building the app…');
     await run('pnpm', ['exec', 'next', 'build'], web);
     server = spawn('pnpm', ['exec', 'next', 'start', '-p', String(PORT)], {

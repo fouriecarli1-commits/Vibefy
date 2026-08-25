@@ -4,3 +4,4 @@ brand/icons/
 .next/
 dist/
 coverage/
+apps/web/next-env.d.ts

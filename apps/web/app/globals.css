@@ -650,3 +650,171 @@ body::before {
     padding-left: 1rem;
   }
 }
+
+/* ===========================================================================
+   The hero mark
+   ---------------------------------------------------------------------------
+   A light passing over the mark, masked to its own shape so the sheen travels
+   across the ribbons rather than across a rectangle containing them. The mask
+   is the same SVG the image is, so the two can never disagree.
+
+   It moves slowly on its own and faster when pointed at. Both stop entirely
+   under `prefers-reduced-motion` — a logo that keeps moving for somebody who
+   asked it not to is a logo that made a person feel unwell to look clever.
+   =========================================================================== */
+
+.hero-mark {
+  position: relative;
+  display: inline-block;
+  width: clamp(200px, 34vw, 340px);
+  aspect-ratio: 1;
+  isolation: isolate;
+}
+
+.hero-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The glow under it, so the mark sits on the dark ground rather than on top. */
+.hero-mark::before {
+  content: '';
+  position: absolute;
+  inset: 8%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 55%,
+    color-mix(in srgb, var(--vibefycode-accent) 26%, transparent) 0%,
+    transparent 68%
+  );
+  filter: blur(26px);
+  transition: opacity 400ms ease;
+  opacity: 0.75;
+}
+
+.hero-mark:hover::before {
+  opacity: 1;
+}
+
+.hero-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    108deg,
+    transparent 38%,
+    rgb(255 255 255 / 0.62) 48%,
+    rgb(255 255 255 / 0.9) 51%,
+    rgb(255 255 255 / 0.62) 54%,
+    transparent 64%
+  );
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  /* Clipped to the mark itself. Both properties: WebKit still wants its own. */
+  mask-image: url('/brand/vibefycode-mark.svg');
+  -webkit-mask-image: url('/brand/vibefycode-mark.svg');
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  animation: hero-sweep 7s ease-in-out infinite;
+  animation-delay: 1.4s;
+}
+
+.hero-mark:hover .hero-sheen {
+  animation-duration: 2.2s;
+  animation-delay: 0s;
+}
+
+@keyframes hero-sweep {
+  0% {
+    background-position: 190% 0;
+  }
+  /* The sweep itself takes a fifth of the cycle; the rest is the pause between,
+     which is what stops it reading as a spinner. */
+  22%,
+  100% {
+    background-position: -90% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-sheen {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ===========================================================================
+   The example: a badge as it sits on somebody else's site
+   =========================================================================== */
+
+.browser {
+  border: 1px solid var(--vibefycode-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vibefycode-surface-muted);
+}
+
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--vibefycode-border);
+  background: color-mix(in srgb, var(--vibefycode-surface) 60%, var(--vibefycode-surface-muted));
+}
+
+.browser-dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.browser-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--vibefycode-border-interactive);
+  opacity: 0.55;
+}
+
+.browser-address {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--vibefycode-text-muted);
+  background: var(--vibefycode-surface);
+  border: 1px solid var(--vibefycode-border);
+  border-radius: 5px;
+  padding: 0.2rem 0.6rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-page {
+  padding: 1.4rem 1.2rem;
+  display: grid;
+  gap: 1.2rem;
+}
+
+/* Grey blocks standing in for somebody else's content. Deliberately abstract:
+   a mock that looks like a real company's page is a mock that gets mistaken
+   for an endorsement of one. */
+.mock-line {
+  height: 9px;
+  border-radius: 3px;
+  background: var(--vibefycode-border);
+}
+
+.mock-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--vibefycode-border);
+}

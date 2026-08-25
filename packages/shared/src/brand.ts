@@ -27,32 +27,43 @@ export const VIEWBOX = 512;
  * the first thing lost by anyone redrawing it as a plain chevron.
  */
 export const MARK = {
-  /** Left ribbon: upper-left down to the vertex, carrying the teal end of the gradient. */
-  leftRibbon: 'M132 118 C160 214 200 306 244 372',
-  /** Right ribbon: vertex up to upper-right, carrying the blue end. */
-  rightRibbon: 'M256 372 C300 306 340 214 368 118',
-  ribbonWidth: 44,
-
   /**
-   * The knot: the left ribbon curls back beneath the vertex and returns.
+   * The V, as two overlapping ribbons rather than as two strokes and a knot.
    *
-   * Drawn as an open curl around a counter rather than a closed blob — the hole
-   * is what makes it read as a ribbon passing through itself instead of a
-   * thickening of the stroke.
+   * This is the third attempt at the supplied artwork and the first that holds.
+   * The earlier ones drew the left arm, the right arm and a curl joining them,
+   * and both read as a W: three descending strokes, whatever the curl was doing
+   * underneath. The reference is not built that way. It is one V ribbon sitting
+   * behind another, offset up and to the left — a doubled edge, which is what
+   * gives it depth and what a single stroke can never suggest.
+   *
+   * Each is one continuous path, so the bottom is a turn rather than a join and
+   * the shape cannot come apart into separate strokes at any size.
+   *
+   * It remains a reconstruction. `brand/source/` holds the reference, which
+   * carries an AI watermark in its pixels and cannot ship as the mark.
    */
-  knot: 'M244 372 C238 404 208 416 186 400 C164 384 168 350 194 342 C220 334 240 352 240 374',
-  knotWidth: 22,
-  counter: { cx: 200, cy: 372, r: 13 },
+  ribbonBack: 'M136 104 C164 212 198 306 240 354 C282 306 316 212 344 104',
+  ribbonFront: 'M168 116 C196 224 230 318 272 366 C314 318 348 224 376 116',
+  ribbonWidth: 42,
 
   /**
-   * The interlace. The right ribbon crosses in front of the left, so it is drawn
-   * a second time in the surface colour, slightly wider, immediately beneath
-   * itself: the gap that leaves is what the eye reads as "over".
+   * The separation between the two ribbons.
+   *
+   * The front one is drawn a second time in the surface colour, wider, directly
+   * beneath itself. The gap that leaves is the whole illusion: without it the
+   * two ribbons merge into one thick shape and the doubling disappears.
    */
-  knockoutWidth: 62,
+  knockoutWidth: 60,
 
-  /** The rising arrow. Emerges from behind the right ribbon and climbs out of the frame. */
-  arrowShaft: 'M268 402 C312 360 356 320 398 276',
+  /**
+   * The rising arrow. Emerges from *behind* the front ribbon's right arm.
+   *
+   * Its start point sits inside the arm's stroke on purpose: an arrow that
+   * begins in open space leaves a rounded cap floating next to the mark, which
+   * reads as a printing fault rather than as a shaft passing behind something.
+   */
+  arrowShaft: 'M302 334 C338 314 372 294 402 274',
   arrowShaftWidth: 26,
   /** Solid head, continuing the shaft's angle so the two read as one stroke. */
   arrowHead: 'M452 232 L414 302 L374 256 Z',
