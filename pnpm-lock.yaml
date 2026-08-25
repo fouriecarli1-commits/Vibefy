@@ -144,6 +144,9 @@ importers:
       '@vibefycode/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@vibefycode/trustcheck':
+        specifier: workspace:*
+        version: link:../../packages/trustcheck
       '@vibefycode/worker':
         specifier: workspace:*
         version: link:../worker
@@ -181,9 +184,15 @@ importers:
       '@types/react-dom':
         specifier: 19.2.4
         version: 19.2.4(@types/react@19.2.18)
+      sharp:
+        specifier: 0.35.3
+        version: 0.35.3(@types/node@26.2.0)
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3
+      tsx:
+        specifier: 4.23.12
+        version: 4.23.12
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -403,6 +412,25 @@ importers:
       '@types/node':
         specifier: 26.2.0
         version: 26.2.0
+
+  packages/trustcheck:
+    dependencies:
+      '@vibefycode/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@vibefycode/shared':
+        specifier: workspace:*
+        version: link:../shared
+      undici:
+        specifier: 8.10.0
+        version: 8.10.0
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
 
   packages/workspace:
     devDependencies:

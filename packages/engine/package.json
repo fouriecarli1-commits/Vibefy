@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./authorisation": "./src/authorisation/index.ts"
+    "./authorisation": "./src/authorisation/index.ts",
+    "./scope": "./src/runtime/scope.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
