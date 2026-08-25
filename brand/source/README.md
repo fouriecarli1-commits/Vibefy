@@ -42,6 +42,27 @@ Getting the mark as geometry needs it drawn as geometry — traced from one of t
 No export setting reaches it, because there is nothing in the source file to export. That trace has
 now been done; see the next section.
 
+## A compression pass was tried, and rejected
+
+On 2026-08-25 the same nine files were run through an online SVG compressor and re-uploaded. They
+were removed again, because the pass did the opposite of what was wanted on all three counts:
+
+|               | Before                                 | After                                                                                   |
+| ------------- | -------------------------------------- | --------------------------------------------------------------------------------------- |
+| The V mark    | raster PNG                             | raster PNG, **byte for byte the same**                                                  |
+| The wordmark  | 10 outlined letterforms, smooth curves | merged and **flattened into polygons** — the `O` in `CODE` renders as a visible decagon |
+| AI provenance | present                                | **still present**, in six of the seven                                                  |
+
+A compressor shrinks bytes. It cannot turn a picture into shapes, so the payload it could not help
+with was left alone, and the only real geometry in the files — the letterforms — was the one thing
+it could reduce, so that is what it reduced. `net woorde` went from 36.6 KB to 30.0 KB, and the
+6.6 KB was paid for out of the curves.
+
+Worth writing down because the failure is invisible at reading size. The damage shows at about 4×,
+which is a size nobody checks and every printed banner exceeds.
+
+The uncompressed originals in this directory are the authority and were never replaced.
+
 ## `traced-mark.svg` — the mark as geometry, at last
 
 Not supplied. **Derived**, which is what PART 0.5 asks for: same forms, same proportions, no
