@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { triageAssessment, type TriageFinding } from '@vibefycode/governance';
 import { adjustAssessment, approveAssessment, rejectAssessment } from '../actions';
 import { ActionForm, Checkbox, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
@@ -58,6 +59,29 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
       SEVERITY_ORDER.indexOf(String(a.severity)) - SEVERITY_ORDER.indexOf(String(b.severity)),
   );
 
+  // The same summary the queue showed, restated at the top of the page where
+  // the decision is made — so what needs checking is read before the findings
+  // rather than reconstructed from them.
+  const triage = triageAssessment({
+    overallScore: assessment.overall_score === null ? null : Number(assessment.overall_score),
+    certificationEligible: assessment.certification_eligible === true,
+    gateFailures: blockers,
+    findings: (findings ?? []).map(
+      (finding): TriageFinding => ({
+        title: String(finding.title),
+        severity: finding.severity as TriageFinding['severity'],
+        dimension: String(finding.dimension),
+        confidence: finding.confidence as TriageFinding['confidence'],
+        isPublished: finding.is_published === true,
+        evidenceCount: ((finding.finding_evidence as unknown as { evidence_id: string }[]) ?? [])
+          .length,
+      }),
+    ),
+    failedStages: (runs ?? [])
+      .filter((run) => String(run.status) !== 'succeeded')
+      .map((run) => String(run.stage)),
+  });
+
   return (
     <div className="max-w-3xl space-y-10">
       <header className="space-y-2">
@@ -87,6 +111,43 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           </p>
         </section>
       )}
+
+      <section aria-labelledby="triage" className="space-y-3">
+        <h2 id="triage" className="text-xl font-bold">
+          What to check
+        </h2>
+        <p className="text-sm text-muted">{triage.headline}</p>
+
+        {triage.attention.length > 0 ? (
+          <ul className="space-y-2">
+            {triage.attention.map((entry) => (
+              <li key={entry.id} className="bar" data-tone="warn">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{entry.label}</p>
+                  <p className="text-xs text-muted">{entry.detail}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="bar">
+            <p className="text-sm">
+              Nothing unusual was flagged. That is not an approval — it means the checks below found
+              nothing that singles this assessment out, and the findings still want reading.
+            </p>
+          </div>
+        )}
+
+        {triage.routine.length > 0 && (
+          <ul className="space-y-1">
+            {triage.routine.map((line) => (
+              <li key={line} className="text-xs text-muted">
+                {line}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section aria-labelledby="findings" className="space-y-4">
         <h2 id="findings" className="text-2xl font-bold tracking-tight">
