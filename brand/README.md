@@ -12,11 +12,39 @@ render badly at the 96px minimum. Everything else in `brand/` is generated from 
 `pnpm brand:build`, and so is the badge served at request time: one geometry source, so the
 mark on a customer's site and the mark in our own header cannot drift apart.
 
-> **Open item — `brand/source/` is currently empty.** The VibefyCode logo and stamp were
-> supplied as images in conversation rather than as files, so there is nothing here to derive
-> from and the masters are reconstructions. See `brand/source/README.md` for what to drop in,
-> and for the spelling defect in the supplied stamp that the reconstruction deliberately does
-> not reproduce. Tracked in `docs/OPEN_ITEMS.md`.
+> **Open item — there is still no vector original.** `brand/source/` holds the supplied logo
+> as a raster image, which is the authority on what the mark looks like but cannot be scaled
+> or edited as geometry. The masters in `brand/svg/` are therefore a reconstruction. See
+> `brand/source/README.md` for what to drop in when a vector original exists, and
+> **"Is that file really a vector?"** below for how to tell before you rely on one. Tracked in
+> `docs/OPEN_ITEMS.md`.
+
+## Is that file really a vector?
+
+A design tool will hand you `logo.svg` whether it contains shapes or a photograph. Both open,
+both preview, and they are indistinguishable in a file browser. The difference only shows up
+later — on a printed banner, or at 16 pixels in a browser tab — which is the worst time to
+find out.
+
+```bash
+pnpm brand:inspect path/to/logo.svg
+```
+
+It reports three things and then gives a verdict:
+
+| It looks for                                | Because                                                                                                                     |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `<path>` elements with shape data           | This is the geometry. No geometry, no vector — regardless of the file extension.                                            |
+| An embedded `<image>` with a base64 payload | A picture hidden inside the envelope. It will blur when scaled past its export size.                                        |
+| AI-generation provenance                    | A C2PA manifest or `<ContainsAiGeneratedContent>`. A trust mark cannot carry somebody else's watermark or provenance claim. |
+
+By hand, the same check takes ten seconds: open the file in a plain text editor. If you see
+`<path d="M136 104 C164 212 …">`, it is a vector. If all you see is
+`<image xlink:href="data:image/png;base64,` followed by thousands of characters, it is a
+picture in an envelope.
+
+`tests/svg-inspection.test.ts` runs the inspector over every master in `brand/svg/`, so a
+wrapped raster cannot quietly become one of the marks we ship.
 
 ## What is generated
 
