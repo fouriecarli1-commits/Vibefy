@@ -63,31 +63,44 @@ which is a size nobody checks and every printed banner exceeds.
 
 The uncompressed originals in this directory are the authority and were never replaced.
 
-## `traced-mark.svg` — the mark as geometry, at last
+## The trace, and where it is used
 
-Not supplied. **Derived**, which is what PART 0.5 asks for: same forms, same proportions, no
-redesign. `supplied-mark-black.svg` carries a 1600×1472 single-channel silhouette of the mark —
-pure black and white, no gradient, clean edges — and that is the one input a contour tracer handles
-well. The result is eighteen paths of real curve data: the woven ribbon, the arrow, the circuit
-traces and the bar chart, in the arrangement the supplied artwork draws them.
+Not supplied. **Derived**, which is what PART 0.5 asks for: same forms, same
+proportions, no redesign. `supplied-mark-black.svg` carries a 1600×1472
+single-channel silhouette — pure black and white, no gradient, clean edges, and
+the ribbon's weave drawn as gaps — and that is the one input a contour tracer
+handles well. Eighteen contours of real curve data: the woven ribbon, the arrow,
+six circuit traces with their dots, and three bars.
 
-It is reproduced by extracting that silhouette from the base64 `<image>` inside
-`supplied-mark-black.svg`, running `potrace` over it at `turdsize=8, alphamax=1.0,
-opttolerance=0.2`, and discarding the first traced curve — potrace reads the canvas frame as
-foreground, which inverts the whole image if it is kept. The tracer is installed for the job and
-not added to the toolchain: this runs once per supplied mark, not once per build.
+```bash
+pip install potracer pillow
+node tools/build-mark-outline.mjs      # → packages/shared/src/mark-outline.generated.ts
+```
 
-Two things it is not, and both matter before anything adopts it:
+The tracer is a prerequisite of that script and not of the build. It runs once
+per supplied mark; `pnpm brand:build` never needs it, which matters because the
+build also runs on Vercel where no Python tracer exists. A test asserts the
+separation.
 
-1. **It is 21 KB where the current geometry is 2 KB.** The badge is served as SVG on every request,
-   from our origin, on somebody else's page. Ten times the bytes on every load is a real cost.
-2. **The circuit traces become noise below about 64 px.** At the 96 px the Badge Licence permits it
-   holds; at favicon sizes the hand-authored geometry in `packages/shared/src/brand.ts` reads better
-   because it draws less.
+**It is used for the two single-colour masters and nowhere else.** A silhouette
+is exactly what a trace produces well and exactly what a mono mark is, so
+nothing is lost there — and the 21 KB is affordable for a master somebody
+downloads once, where it would not be on a badge served on every page load.
 
-So adopting it is a decision with a trade-off in it, not a straight upgrade, and it is recorded
-here rather than made silently. The likely answer is both: the trace for large renders, the simpler
-geometry for icons.
+**The colour mark stays drawn.** This was tried the other way first. Segmenting
+the coloured artwork by hue gives clean regions — teal-to-blue ribbon, orange
+arrow, grey furniture — and traces to a tidy 8 KB, but the ribbon's overlap is
+carried by continuous _shading_ rather than by a colour boundary, so the two
+arms flatten into one solid shape and the weave disappears. The V survives; the
+character does not. Hence the split, rather than one file doing both jobs
+badly.
+
+## `traced-mark.svg` — the flat silhouette, kept as filed
+
+The raw trace before it was fitted to the shared 512 box: eighteen contours, one
+fill, no palette. Kept because it is the artefact the mono masters are built
+from, and because it is the file to hand a designer who asks what the mark looks
+like as geometry.
 
 ## What a usable original looks like
 

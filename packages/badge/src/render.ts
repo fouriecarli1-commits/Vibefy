@@ -18,6 +18,7 @@ import {
   arcTextPlacements,
   FONT_STACK,
   MARK,
+  MARK_OUTLINE,
   PALETTE,
   SEAL,
   SEAL_COMPACT,
@@ -296,17 +297,34 @@ ${banner}
 /** The mark on its own, for the console, the app icon and the verification page. */
 export function renderMarkSvg(options: { mono?: boolean; onDark?: boolean } = {}): string {
   const mono = options.mono === true;
-  const defs = mono ? '' : `  <defs>\n${markGradients('mark')}\n  </defs>\n`;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" role="img" aria-label="VibefyCode"${
-    mono ? ` color="${options.onDark ? PALETTE.mist : PALETTE.navy}"` : ''
-  }>
+  // The single-colour master is the traced artwork rather than the drawn
+  // geometry. A silhouette is exactly what a trace produces well, and exactly
+  // what a mono mark is — so this is the one place the supplied outline can be
+  // used without losing anything. The colour mark keeps `MARK`, whose weave is
+  // carried by two overlapping strokes and a knockout; the trace has no colours
+  // to separate those with, and flattens them into one shape.
+  //
+  // Its 21 KB is affordable here and nowhere else: these two masters are
+  // downloaded once by whoever needs a press asset, not served on every page
+  // load like the badge.
+  if (mono) {
+    const ink = options.onDark ? PALETTE.mist : PALETTE.navy;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${MARK_OUTLINE.viewBox} ${MARK_OUTLINE.viewBox}" role="img" aria-label="VibefyCode">
   <title>VibefyCode</title>
-${defs}${markGroup({
-    idPrefix: 'mark',
-    ...(mono ? { mono: true } : {}),
-    ...(options.onDark ? { onDark: true } : {}),
-  })}
+  <g fill="${ink}" fill-rule="evenodd">
+${MARK_OUTLINE.paths.map((d) => `    <path d="${d}"/>`).join('\n')}
+  </g>
+</svg>
+`;
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" role="img" aria-label="VibefyCode">
+  <title>VibefyCode</title>
+  <defs>
+${markGradients('mark')}
+  </defs>
+${markGroup({ idPrefix: 'mark', ...(options.onDark ? { onDark: true } : {}) })}
 </svg>
 `;
 }
