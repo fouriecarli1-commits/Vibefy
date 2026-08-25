@@ -1,6 +1,35 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { JetBrains_Mono, Poppins } from 'next/font/google';
 import './globals.css';
+
+/*
+ * The brand faces, actually loaded.
+ *
+ * Poppins was named in the font stack and fetched by nothing, so every page
+ * rendered in whatever the visitor's system happened to use — which is most of
+ * the reason the product looked unfinished. `next/font` downloads and
+ * self-hosts them at build time, so there is no third-party request at runtime
+ * and no layout shift while a face arrives.
+ *
+ * The mono face is not decoration. This product's content is scores, rule ids,
+ * hashes, key identifiers and timestamps, and those are read by comparing
+ * characters rather than by reading words. Tabular figures are the difference
+ * between a column of numbers you can scan and one you have to squint at.
+ */
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-poppins',
+  display: 'swap',
+});
+
+const mono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-jetbrains',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -20,7 +49,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${poppins.variable} ${mono.variable}`}>
       <body className="min-h-dvh bg-surface text-ink antialiased">
         <a
           href="#main"
@@ -29,23 +58,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
 
-        <header className="border-b border-line">
+        <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur">
           <nav
             aria-label="Primary"
-            className="mx-auto flex max-w-5xl flex-wrap items-center gap-6 px-6 py-4"
+            className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-3.5"
           >
-            <Link href="/" className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+            <Link href="/" className="flex items-center" aria-label="VibefyCode — home">
+              {/*
+                The outlined lockup, on its dark variant. Not the mark plus the
+                name set in a live font: that is a different drawing on every
+                machine, and the name is the trade mark.
+                eslint-disable-next-line @next/next/no-img-element
+              */}
               <img
-                src="/brand/vibefycode-mark.svg"
-                alt=""
-                width={36}
-                height={36}
-                aria-hidden="true"
+                src="/brand/vibefycode-logo-horizontal-dark.svg"
+                alt="VibefyCode"
+                width={140}
+                height={42}
+                className="h-[26px] w-auto"
               />
-              <span className="text-lg font-bold tracking-tight">VibefyCode</span>
             </Link>
-            <div className="ml-auto flex flex-wrap items-center gap-5 text-sm">
+            <div className="nav-links ml-auto flex flex-wrap items-center gap-x-5 gap-y-2">
               <Link href="/directory">Directory</Link>
               <Link href="/methodology">Methodology</Link>
               <Link href="/console">Console</Link>
@@ -55,22 +88,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/console/alerts">Alerts</Link>
               <Link href="/console/privacy">Your data</Link>
               <Link href="/console/billing">Billing</Link>
-              <Link
-                href="/sign-in"
-                className="rounded-lg border border-line-strong px-3 py-1.5 font-medium"
-              >
+              <Link href="/sign-in" className="nav-cta">
                 Sign in
               </Link>
             </div>
           </nav>
         </header>
 
-        <main id="main" className="mx-auto max-w-5xl px-6 py-12">
+        <main id="main" className="mx-auto max-w-6xl px-6 py-12">
           {children}
         </main>
 
         <footer className="mt-16 border-t border-line">
-          <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-muted">
+          <div className="mx-auto max-w-6xl px-6 py-8 text-sm text-muted">
             <p className="max-w-3xl">
               A VibefyCode assessment is a point-in-time, scope-limited, AI-assisted and
               human-reviewed evaluation against a published rubric version on a stated date. It is

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "next build",
+    "build": "tsx ../../tools/brand-build.mts && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
@@ -37,6 +37,8 @@
     "@types/react-dom": "19.2.4",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
-    "@types/pg": "8.23.1"
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.12",
+    "sharp": "0.35.3"
   }
 }

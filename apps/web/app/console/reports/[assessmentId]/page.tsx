@@ -80,7 +80,7 @@ export default async function ReportPage({
         {page.plan.entitlement.pdfExport ? (
           <a
             href={`/console/reports/${assessmentId}/pdf`}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent"
           >
             Download PDF
           </a>

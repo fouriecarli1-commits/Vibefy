@@ -121,3 +121,90 @@ describe('the web app can compile the workspace it imports', () => {
     }
   });
 });
+
+describe('what the deployed page actually serves', () => {
+  const layout = read('apps/web/app/layout.tsx');
+
+  it('builds the brand assets as part of building the app', () => {
+    // `apps/web/public/brand/` is generated and gitignored. Before this, the
+    // build step that fills it ran only on a developer's machine — so the
+    // deployed header asked for a logo that was never uploaded, and got a 404.
+    // Nothing catches that: axe does not check whether an image loaded.
+    const scripts = (
+      JSON.parse(read('apps/web/package.json')) as { scripts: Record<string, string> }
+    ).scripts;
+    expect(scripts.build).toContain('brand-build');
+    expect(read('.gitignore')).toContain('apps/web/public/brand/');
+  });
+
+  it('asks for a mark the brand build produces', () => {
+    const requested = [...layout.matchAll(/["'](\/brand\/[\w.-]+)["']/g)].map((m) => m[1]!);
+    expect(requested.length).toBeGreaterThan(0);
+
+    const pipeline = read('tools/brand-build.mts');
+    for (const path of requested) {
+      const filename = path.replace('/brand/', '');
+      expect(pipeline, `${filename} is requested by the layout but never built`).toContain(
+        filename,
+      );
+    }
+  });
+
+  it('loads the brand faces rather than only naming them', () => {
+    // Poppins sat in the font stack and was fetched by nothing, so every page
+    // rendered in whatever the visitor's system happened to have. A font stack
+    // is a wish; `next/font` is a file.
+    expect(layout).toContain("from 'next/font/google'");
+    expect(layout).toContain('Poppins');
+    const css = read('apps/web/app/globals.css');
+    expect(css).toContain('var(--font-poppins)');
+    // Self-reference: `--font-mono: var(--font-mono)` resolves to nothing.
+    expect(css).not.toMatch(/--font-mono:\s*var\(--font-mono\)/);
+  });
+
+  it('keeps element rules inside a layer, so utilities still win', () => {
+    // Unlayered CSS beats layered CSS whatever the specificity says, and
+    // Tailwind's utilities are layered. An unlayered `a { color }` silently
+    // overrode every `text-*` class on a link.
+    const css = read('apps/web/app/globals.css');
+    const base = css.slice(css.indexOf('@layer base'));
+    expect(base).toMatch(/^\s*a\s*\{/m);
+  });
+
+  it('names the label colour that belongs with the accent', () => {
+    // Seven buttons hardcoded `text-white`. That was legible on the old blue
+    // accent and 1.86:1 on the new teal one — a palette change should not be
+    // able to make a button unreadable.
+    const css = read('apps/web/app/globals.css');
+    expect(css).toContain('--color-on-accent');
+    for (const file of [
+      'apps/web/app/page.tsx',
+      'apps/web/app/verify/page.tsx',
+      'apps/web/components/action-form.tsx',
+      'apps/web/components/auth-form.tsx',
+    ]) {
+      expect(read(file), `${file} still hardcodes a button label colour`).not.toMatch(
+        /bg-accent[^"']*text-white/,
+      );
+    }
+  });
+});
+
+describe('dark is the product, not a preference', () => {
+  // Lower-cased: the generator writes the hex as it appears in tokens.json and
+  // Prettier normalises it afterwards, so the test should not care which ran last.
+  const tokensCss = read('apps/web/app/tokens.css').toLowerCase();
+
+  it('serves the dark palette to everyone, not only to dark-mode machines', () => {
+    const root = tokensCss.slice(tokensCss.indexOf(':root {'), tokensCss.indexOf('}'));
+    expect(root).toContain('--vibefycode-surface: #070b1a');
+    // The rule, not the word — the generated file explains in a comment why
+    // there is no such media query, and that comment is the point.
+    expect(tokensCss).not.toMatch(/@media\s*\(\s*prefers-color-scheme/);
+  });
+
+  it('keeps light reachable, because a printed report needs it', () => {
+    expect(tokensCss).toContain("[data-theme='light']");
+    expect(tokensCss).toContain('--vibefycode-surface: #ffffff');
+  });
+});

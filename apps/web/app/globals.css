@@ -12,8 +12,12 @@
   --color-ok: var(--vibefycode-success);
   --color-warn: var(--vibefycode-warning);
   --color-bad: var(--vibefycode-danger);
-  --font-sans:
-    'Poppins', 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The label colour that belongs with `--color-accent`. Named, so a button can
+     ask for the right one instead of guessing white — which is how seven
+     buttons ended up at 1.86:1 the moment the accent changed. */
+  --color-on-accent: var(--vibefycode-on-accent);
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, 'SFMono-Regular', Menlo, monospace;
 }
 
 html {
@@ -25,6 +29,142 @@ body {
   font-family: var(--font-sans);
   line-height: 1.6;
   text-wrap: pretty;
+}
+
+/*
+ * The ground.
+ *
+ * A faint square rule, fixed behind the content — the ruling of an instrument
+ * panel rather than a texture. It is drawn from the border token, so it moves
+ * with the palette and disappears entirely on the light theme, where a grid
+ * would read as graph paper. Kept under 4% opacity: it should be felt at a
+ * glance and invisible when you look for it.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--vibefycode-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--vibefycode-border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.38;
+  mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 0%, transparent 75%);
+}
+
+:root[data-theme='light'] body::before {
+  display: none;
+}
+
+/*
+ * Data is set in the mono face, everywhere.
+ *
+ * Scores, rule ids, hashes, key identifiers, badge slugs and timestamps are
+ * compared character by character rather than read as words, and `tabular-nums`
+ * is what lets a column of scores line up instead of shimmering.
+ */
+.tabular,
+[data-numeric] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Navigation reads as an instrument label: small, spaced, quiet until it is
+ * pointed at. The underline grows from the accent rather than appearing, so a
+ * pointer moving across the row draws a line instead of flashing one.
+ */
+.nav-links a {
+  font-size: 0.8125rem;
+  color: var(--vibefycode-text-muted);
+  text-decoration: none;
+  position: relative;
+  padding-block: 0.35rem;
+  transition: color 120ms ease;
+}
+
+.nav-links a:hover {
+  color: var(--vibefycode-text);
+}
+
+.nav-links a:not(.nav-cta)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--vibefycode-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 160ms ease;
+}
+
+.nav-links a:not(.nav-cta):hover::after,
+.nav-links a:not(.nav-cta):focus-visible::after {
+  transform: scaleX(1);
+}
+
+.nav-cta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--vibefycode-accent);
+  border: 1px solid var(--vibefycode-accent);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.nav-cta:hover {
+  background: var(--vibefycode-accent);
+  color: var(--vibefycode-on-accent);
+}
+
+/*
+ * Element rules belong in `@layer base`.
+ *
+ * Unlayered CSS beats layered CSS whatever the specificity says, and Tailwind's
+ * utilities are layered. Written outside a layer, this `a` rule quietly won
+ * against every `text-*` class on a link — which turned the primary button's
+ * label link-blue on a teal ground, at 1.08:1.
+ */
+@layer base {
+  a {
+    color: var(--vibefycode-link);
+    text-underline-offset: 0.18em;
+    text-decoration-thickness: 1px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    font-size: 0.875em;
+    background: var(--vibefycode-surface-muted);
+    border: 1px solid var(--vibefycode-border);
+    padding: 0.08em 0.36em;
+    border-radius: 4px;
+  }
 }
 
 /* WCAG 2.2 asks for a focus indicator that is actually visible. The default
