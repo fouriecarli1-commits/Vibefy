@@ -91,10 +91,11 @@ export const MARK = {
 /**
  * The certification seal.
  *
- * The composition follows the founder-supplied seal renders in
- * `brand/source/reference/`: a legend arced across the top between two stars, the
+ * The composition follows the founder-supplied seal renders, which lived in
+ * `brand/source/reference/` until they were removed on 2026-08-25 for carrying a
+ * "Made with AI" watermark: a legend arced across the top between two stars, the
  * mark on a light field, a banner ribbon carrying the wordmark, and a fan base
- * beneath it.
+ * beneath it. The composition is recorded here because the renders no longer are.
  *
  * The *artwork* deliberately does not follow them. Those renders are chrome
  * bevels, lens flares and photographic texture; this is flat vector on the
