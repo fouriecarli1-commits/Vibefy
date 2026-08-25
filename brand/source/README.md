@@ -1,24 +1,44 @@
 # Supplied artwork
 
-**This directory is currently empty of artwork.** The founder removed the supplied raster files
-on 2026-08-25 — a JPEG of the horizontal lockup, and three seal renders that carried a "Made with
-AI" watermark burned into the pixels — with the intention of replacing them with vector originals.
-Those originals have not arrived yet.
+Eight SVG files supplied by the founder on 2026-08-25, replacing the raster artwork removed
+earlier the same day. **They are the authority on what the marks look like.** Everything in
+`brand/svg/`, `brand/png/`, `brand/icons/`, `apps/mobile/assets/` and `apps/web/public/brand/` is
+written from `packages/shared/src/brand.ts` by `pnpm brand:build`, and nothing derived may be
+"improved" — see PART 0.5 and PART 11 of the build brief.
 
-So there is nothing here to derive from, and the geometry in `packages/shared/src/brand.ts` is
-currently the only description of the marks that this project holds. Everything in `brand/svg/`,
-`brand/png/`, `brand/icons/`, `apps/mobile/assets/` and `apps/web/public/brand/` is written from
-it by `pnpm brand:build`, and nothing derived may be "improved" — see PART 0.5 and PART 11 of the
-build brief.
+Renamed on arrival, because the uploaded filenames carried spaces, export dimensions and a
+browser's duplicate suffix. Nothing else about them was touched.
 
-That geometry began as a reconstruction of the supplied logo rather than as an original design.
-With the supplied file gone there is nothing left to compare it against, which is a real loss and
-is why the item stays open in `docs/OPEN_ITEMS.md`: **the first correct vector original that
-arrives becomes the authority, and the reconstruction is replaced by it, not reconciled with it.**
+## What is actually inside them
 
-The reconstruction is deliberate rather than a shortcut, and stays the right approach even once an
-original exists: the badge is served as SVG on every request, and an auto-trace of a gradient
-raster produces thousands of noisy paths that render badly at the 96px minimum embed size.
+Run `pnpm brand:inspect brand/source/<file>` to reproduce any row of this.
+
+| File                               | The wordmark         | The V mark          | AI provenance |
+| ---------------------------------- | -------------------- | ------------------- | ------------- |
+| `supplied-wordmark.svg`            | **vector**, outlined | —                   | yes           |
+| `supplied-lockup-horizontal.svg`   | **vector**, outlined | raster, 99 KB PNG   | yes           |
+| `supplied-lockup-stacked.svg`      | **vector**, outlined | raster, 110 KB PNG  | yes           |
+| `supplied-mark.svg`                | —                    | raster, 6 PNGs      | yes           |
+| `supplied-mark-black.svg`          | —                    | raster, 145 KB PNG  | yes           |
+| `supplied-mark-photographic.svg`   | —                    | raster, 733 KB JPEG | no            |
+| `supplied-mark-photographic-2.svg` | —                    | raster, 733 KB JPEG | no            |
+| `supplied-badge.svg`               | —                    | raster, 1087 KB PNG | no            |
+
+So the set is **half vector**, and it is the useful half that is missing.
+
+**The wordmark is real geometry.** Ten outlined letterforms — `VIBEFYCODE` — with curve data, in
+the three files that contain words. That is a genuine original, and it is better than what this
+project currently draws: `packages/shared/src/wordmark.generated.ts` holds a reconstruction of the
+letterforms, and these are the letterforms themselves.
+
+**The mark is not.** In all eight files the V is a placed picture, whatever else surrounds it. The
+`<path>` elements that are not letters are clip and mask rectangles — four corners and a close,
+carrying no shape. That is what a design tool produces when the artwork was generated as an image
+and then positioned on a canvas: exporting as SVG outlines the _text_ and wraps the _picture_, and
+both come out of the same menu item, so it looks like it worked.
+
+Getting the mark as geometry needs it drawn as geometry — traced from one of these, or redrawn.
+No export setting reaches it, because there is nothing in the source file to export.
 
 ## What a usable original looks like
 

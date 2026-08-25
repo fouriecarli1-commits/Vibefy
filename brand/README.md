@@ -2,9 +2,8 @@
 
 ## What is authoritative
 
-`brand/source/` is where founder-supplied artwork lives, and it is the authority on what the
-marks look like whenever it holds any. **Nothing in this repository may redesign, recolour or
-"improve" it.** It is empty of artwork at the moment — see the open item below.
+`brand/source/` holds the founder-supplied artwork. It is the authority on what the marks look
+like. **Nothing in this repository may redesign, recolour or "improve" it.**
 
 `packages/shared/src/brand.ts` is a clean vector reconstruction of that artwork — the same
 forms, proportions and palette, rebuilt as editable paths because the badge is served as SVG
@@ -13,12 +12,12 @@ render badly at the 96px minimum. Everything else in `brand/` is generated from 
 `pnpm brand:build`, and so is the badge served at request time: one geometry source, so the
 mark on a customer's site and the mark in our own header cannot drift apart.
 
-> **Open item — there is no source artwork in this repository.** The supplied raster files were
-> removed on 2026-08-25 to be replaced by vector originals, and those have not arrived yet. Until
-> one does, `packages/shared/src/brand.ts` is the only description of the marks this project holds,
-> and it is a reconstruction with nothing left to check it against. `brand/source/README.md` states
-> what a usable original looks like and how to upload one; **"Is that file really a vector?"** below
-> says how to tell whether a candidate qualifies. Tracked in `docs/OPEN_ITEMS.md`.
+> **Open item — the mark still has no vector original.** Eight SVGs supplied on 2026-08-25 now
+> sit in `brand/source/` and are the authority. Three of them carry the **wordmark** as real
+> outlined geometry, which is an original this project did not have before. In all eight the **V
+> mark itself is a placed picture**, so it still cannot be scaled or edited as shapes. See
+> `brand/source/README.md` for the file-by-file breakdown, and **"Is that file really a vector?"**
+> below for how that was determined. Tracked in `docs/OPEN_ITEMS.md`.
 
 ## Is that file really a vector?
 
