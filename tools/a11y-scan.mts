@@ -39,6 +39,8 @@ const PAGES = [
   '/legal/rating-methodology-and-independence',
   '/verify',
   '/directory',
+  '/trust-check',
+  '/trust-check/traps/the-free-trial-that-was-not',
   '/sign-in',
   '/sign-up',
   '/not-a-page-that-exists',

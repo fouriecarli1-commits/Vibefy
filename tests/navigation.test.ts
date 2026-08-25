@@ -1,0 +1,127 @@
+/**
+ * The primary navigation.
+ *
+ * It was nine links in one row, which is not navigation — it is a list of
+ * everything, and a reader has to check each item to find out whether it is for
+ * them. On a phone that row wrapped into four lines and pushed the page down.
+ *
+ * These tests are about the behaviour that makes a menu usable rather than
+ * merely present: it can be opened, it says so, and it can always be closed.
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const nav = readFileSync(join(process.cwd(), 'apps/web/components/site-nav.tsx'), 'utf8');
+const css = readFileSync(join(process.cwd(), 'apps/web/app/globals.css'), 'utf8');
+const layout = readFileSync(join(process.cwd(), 'apps/web/app/layout.tsx'), 'utf8');
+
+describe('the row is grouped, not listed', () => {
+  it('puts the links into named groups', () => {
+    expect(nav).toContain("label: 'Verify'");
+    expect(nav).toContain("label: 'Console'");
+  });
+
+  it('leaves at most four things in the top row', () => {
+    // Two group triggers, one direct link, one call to action. More than that
+    // and it is the nine-link row again with extra steps.
+    const groups = [...nav.matchAll(/^\s{4}id: '/gm)].length;
+    const direct = /const DIRECT[\s\S]*?\];/.exec(nav)![0];
+    const directCount = [...direct.matchAll(/href:/g)].length;
+    expect(groups + directCount).toBeLessThanOrEqual(4);
+  });
+
+  it('says what each destination is for', () => {
+    // A label alone makes a reader open a page to find out whether it was the
+    // one they wanted. Every item carries a line saying who it is for.
+    const items = [...nav.matchAll(/\{ href: '[^']+', label: '[^']+', hint: '[^']+' \}/g)];
+    const hrefs = [...nav.matchAll(/href: '/g)];
+    expect(items.length + 1).toBeGreaterThanOrEqual(hrefs.length - 2);
+    expect(nav).not.toMatch(/hint: ''/);
+  });
+});
+
+describe('it can be opened and closed', () => {
+  it('states whether the menu is open, for a screen reader as well', () => {
+    expect(nav).toContain('aria-expanded={menuOpen}');
+    expect(nav).toContain('aria-controls="site-nav-panel"');
+    expect(nav).toContain('aria-expanded={open}');
+  });
+
+  it('closes on Escape and on a click outside', () => {
+    // A menu that traps you is worse than no menu.
+    expect(nav).toContain("event.key === 'Escape'");
+    expect(nav).toContain('pointerdown');
+    expect(nav).toContain('navRef.current.contains');
+  });
+
+  it('closes when the route changes', () => {
+    // Otherwise tapping a link leaves the panel covering the page you asked for.
+    expect(nav).toMatch(
+      /useEffect\([\s\S]{0,200}setMenuOpen\(false\);[\s\S]{0,80}\}, \[pathname\]\)/,
+    );
+  });
+
+  it('opens on click rather than on hover', () => {
+    // Hover is not available to a finger. A hover-only menu is an unreachable
+    // menu on the device most people will use.
+    expect(nav).toContain('onClick={() =>');
+    expect(css).not.toMatch(/\.nav-trigger:hover\s*\+\s*\.nav-menu/);
+    expect(css).not.toMatch(/\.nav-group:hover\s+\.nav-menu\s*\{[^}]*display:\s*block/);
+  });
+
+  it('marks the section you are in', () => {
+    expect(nav).toContain("aria-current={isCurrent(item.href) ? 'page' : undefined}");
+  });
+});
+
+describe('narrow screens get a menu, not a wrapped row', () => {
+  it('collapses the row into one button below the breakpoint', () => {
+    expect(css).toMatch(/@media \(max-width: 62rem\)[\s\S]*?\.nav-panel \{[\s\S]*?display: none;/);
+    expect(css).toMatch(/\.nav-panel\[data-open='true'\] \{\s*display: flex;/);
+  });
+
+  it('hides the button on wide screens with CSS, not with JavaScript', () => {
+    // A JavaScript-hidden control is briefly visible while the page loads, which
+    // reads as a flicker on every navigation.
+    expect(css).toMatch(
+      /@media \(min-width: 62\.0625rem\)[\s\S]*?\.nav-burger \{\s*display: none;/,
+    );
+    expect(nav).not.toMatch(/window\.(innerWidth|matchMedia)/);
+  });
+
+  it('opens a group in place on a phone rather than floating over the page', () => {
+    expect(css).toMatch(
+      /@media \(max-width: 62rem\)[\s\S]*?\.nav-menu \{[\s\S]*?position: static;/,
+    );
+  });
+});
+
+describe('the page vocabulary', () => {
+  it('defines the shapes every page is built from', () => {
+    for (const shape of ['.panel', '.bar', '.stat', '.chip', '.eyebrow', '.grid-cards']) {
+      expect(css, `${shape} is not defined`).toContain(`${shape} {`);
+    }
+  });
+
+  it('carries state in shape as well as colour', () => {
+    // A chip that differs only by hue is invisible to a colourblind reader and
+    // to a black-and-white printout.
+    expect(css).toContain("[data-tone='ok']");
+    expect(css).toContain("[data-tone='warn']");
+    expect(css).toContain("[data-tone='bad']");
+    expect(css).toMatch(/\.bar \{[\s\S]*?border-left: 3px solid/);
+  });
+
+  it('uses those shapes on the home page rather than one-off styling', () => {
+    const home = readFileSync(join(process.cwd(), 'apps/web/app/page.tsx'), 'utf8');
+    expect(home).toContain('className="panel');
+    expect(home).toContain('className="stat"');
+    expect(home).toContain('grid-cards');
+  });
+
+  it('renders the navigation inside a labelled landmark', () => {
+    expect(layout).toContain('aria-label="Primary"');
+    expect(layout).toContain('<SiteNav />');
+  });
+});

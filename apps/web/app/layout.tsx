@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { JetBrains_Mono, Poppins } from 'next/font/google';
+import { SiteNav } from '@/components/site-nav';
 import './globals.css';
 
 /*
@@ -59,39 +60,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
 
         <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur">
-          <nav
-            aria-label="Primary"
-            className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-3.5"
-          >
-            <Link href="/" className="flex items-center" aria-label="VibefyCode — home">
-              {/*
-                The outlined lockup, on its dark variant. Not the mark plus the
-                name set in a live font: that is a different drawing on every
-                machine, and the name is the trade mark.
-                eslint-disable-next-line @next/next/no-img-element
-              */}
-              <img
-                src="/brand/vibefycode-logo-horizontal-dark.svg"
-                alt="VibefyCode"
-                width={140}
-                height={42}
-                className="h-[26px] w-auto"
-              />
-            </Link>
-            <div className="nav-links ml-auto flex flex-wrap items-center gap-x-5 gap-y-2">
-              <Link href="/directory">Directory</Link>
-              <Link href="/methodology">Methodology</Link>
-              <Link href="/console">Console</Link>
-              <Link href="/console/portfolio">Portfolio</Link>
-              <Link href="/review">Review</Link>
-              <Link href="/verify">Check a badge</Link>
-              <Link href="/console/alerts">Alerts</Link>
-              <Link href="/console/privacy">Your data</Link>
-              <Link href="/console/billing">Billing</Link>
-              <Link href="/sign-in" className="nav-cta">
-                Sign in
-              </Link>
-            </div>
+          <nav aria-label="Primary">
+            <SiteNav />
           </nav>
         </header>
 

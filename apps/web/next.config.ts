@@ -48,6 +48,7 @@ const nextConfig: NextConfig = {
     '@vibefycode/report',
     '@vibefycode/rubric',
     '@vibefycode/shared',
+    '@vibefycode/trustcheck',
     '@vibefycode/workspace',
   ],
   async headers() {
