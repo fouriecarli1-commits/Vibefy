@@ -107,11 +107,9 @@ ${MARK.bars.map((b) => `      <rect x="${b.x}" y="${b.y}" width="${b.w}" height=
   return `  <g fill="none" stroke-linecap="round" stroke-linejoin="round">${furniture}
     <path d="${MARK.arrowShaft}" stroke="${arrow}" stroke-width="${MARK.arrowShaftWidth}"/>
     <path d="${MARK.arrowHead}" fill="${mono ? 'currentColor' : PALETTE.amber}" stroke="none"/>
-    <path d="${MARK.leftRibbon}" stroke="${ribbon}" stroke-width="${MARK.ribbonWidth}"/>
-    <path d="${MARK.knot}" stroke="${ribbon}" stroke-width="${MARK.knotWidth}"/>
-    <circle cx="${MARK.counter.cx}" cy="${MARK.counter.cy}" r="${MARK.counter.r}" fill="${surface}" stroke="none"/>
-    <path d="${MARK.rightRibbon}" stroke="${surface}" stroke-width="${MARK.knockoutWidth}"/>
-    <path d="${MARK.rightRibbon}" stroke="${ribbon}" stroke-width="${MARK.ribbonWidth}"/>
+    <path d="${MARK.ribbonBack}" stroke="${mono ? 'currentColor' : PALETTE.teal}" stroke-width="${MARK.ribbonWidth}"${mono ? ' opacity="0.55"' : ''}/>
+    <path d="${MARK.ribbonFront}" stroke="${surface}" stroke-width="${MARK.knockoutWidth}"/>
+    <path d="${MARK.ribbonFront}" stroke="${ribbon}" stroke-width="${MARK.ribbonWidth}"/>
   </g>`;
 }
 
