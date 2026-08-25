@@ -163,7 +163,10 @@ export default async function DirectoryPage({
           </select>
         </div>
         <div className="sm:col-span-3">
-          <button type="submit" className="rounded-lg bg-accent px-4 py-2.5 font-medium text-white">
+          <button
+            type="submit"
+            className="rounded-lg bg-accent px-4 py-2.5 font-medium text-on-accent"
+          >
             Apply
           </button>
         </div>

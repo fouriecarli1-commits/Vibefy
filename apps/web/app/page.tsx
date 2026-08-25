@@ -19,7 +19,10 @@ export default function HomePage() {
           screenshot, a trace or an HTTP exchange. Nothing we cannot evidence gets published.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
-          <Link href="/sign-up" className="rounded-lg bg-accent px-5 py-2.5 font-medium text-white">
+          <Link
+            href="/sign-up"
+            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
+          >
             Create an account
           </Link>
           <Link

@@ -31,7 +31,7 @@ export function ActionForm({
         type="submit"
         disabled={pending}
         className={`rounded-lg px-4 py-2.5 font-medium disabled:opacity-60 ${
-          destructive ? 'border border-line-strong text-bad' : 'bg-accent text-white'
+          destructive ? 'border border-line-strong text-bad' : 'bg-accent text-on-accent'
         }`}
       >
         {pending ? (pendingLabel ?? 'Working…') : submitLabel}

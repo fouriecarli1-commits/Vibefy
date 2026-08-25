@@ -160,7 +160,7 @@ export function AuthForm({
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-white disabled:opacity-60"
+        className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-on-accent disabled:opacity-60"
       >
         {busy ? 'Working…' : mode === 'sign-up' ? 'Create account' : 'Sign in'}
       </button>
