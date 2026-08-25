@@ -42,6 +42,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The suite drives a real browser: the engine's exploration stages, and
+      # the PDF the report is rendered to. Without this, those stages fail, the
+      # narrative comes back empty and the cost records come back short — three
+      # unrelated-looking assertions with one cause. The a11y job had this from
+      # the start; this one never did, and nothing noticed because no run had
+      # ever reached the tests.
+      - run: pnpm exec playwright install --with-deps chromium
+
       # Ordered cheapest-and-most-important first, so a leaked credential or an
       # over-claiming string fails in seconds rather than after the test suite.
       - name: Secret scan

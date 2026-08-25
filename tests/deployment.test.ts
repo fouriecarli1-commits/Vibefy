@@ -245,3 +245,19 @@ describe('CI can actually start', () => {
     }
   });
 });
+
+describe('CI installs what the tests actually need', () => {
+  const workflow = read('.github/workflows/ci.yml');
+
+  it('installs a browser in every job that runs the suite', () => {
+    // The engine drives Chromium and the report renders a PDF through it. On a
+    // machine without the browser those stages fail, and what surfaces is three
+    // assertions that look unrelated: a narrative field that is undefined, a
+    // stage count one short, and a launch error. Cheaper to assert the install.
+    const jobs = workflow.split(/^  \w[\w-]*:$/m).filter((job) => job.includes('pnpm test'));
+    expect(jobs.length).toBeGreaterThan(0);
+    for (const job of jobs) {
+      expect(job).toContain('playwright install');
+    }
+  });
+});
