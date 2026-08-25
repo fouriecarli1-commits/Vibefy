@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { startCheckout } from './actions';
+import { serviceDetailFor } from '@vibefycode/billing';
 import { ActionForm } from '@/components/action-form';
+import { Disclosure, ServiceDetailBody } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Billing' };
@@ -99,31 +101,46 @@ export default async function BillingPage({
         <h2 id="plans" className="text-xl font-semibold">
           Plans
         </h2>
+        <p className="max-w-2xl text-sm text-muted">
+          Every plan opens to the whole story: what happens after you pay, how long each step takes,
+          what is <em>not</em> included, and how to stop. Read that before the price.
+        </p>
         <ul className="space-y-4">
           {pricing.tiers
             .filter((tier) => tier.id !== 'free')
-            .map((tier) => (
-              <li key={tier.id} className="rounded-xl border border-line p-5">
-                <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <h3 className="font-semibold">{tier.label}</h3>
-                  <span className="tabular-nums">
-                    {tier.priceUsd === null
-                      ? 'By quote'
-                      : `$${tier.priceUsd}${tier.billing === 'monthly' ? '/month' : ' once'}`}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted">{tier.contents}</p>
-                {tier.priceUsd !== null && organisationId && (
-                  <div className="mt-4">
+            .map((tier) => {
+              const detail = serviceDetailFor(tier.id);
+              return (
+                <li key={tier.id} className="panel space-y-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    <h3 className="font-semibold">{tier.label}</h3>
+                    <span className="chip" data-numeric>
+                      {tier.priceUsd === null
+                        ? 'By quote'
+                        : `$${tier.priceUsd}${tier.billing === 'monthly' ? ' / month' : ' once'}`}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted">{tier.contents}</p>
+
+                  {detail && (
+                    <Disclosure
+                      summary={`What ${tier.label} actually includes`}
+                      hint="Step by step, with what is not included and how to cancel"
+                    >
+                      <ServiceDetailBody detail={detail} />
+                    </Disclosure>
+                  )}
+
+                  {tier.priceUsd !== null && organisationId && (
                     <ActionForm action={startCheckout} submitLabel={`Choose ${tier.label}`}>
                       <input type="hidden" name="organisationId" value={organisationId} />
                       <input type="hidden" name="plan" value={tier.id} />
                       {app && <input type="hidden" name="appId" value={app} />}
                     </ActionForm>
-                  </div>
-                )}
-              </li>
-            ))}
+                  )}
+                </li>
+              );
+            })}
         </ul>
       </section>
 
