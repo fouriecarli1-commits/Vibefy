@@ -550,3 +550,103 @@ body::before {
   text-transform: uppercase;
   color: var(--vibefycode-text-muted);
 }
+
+/* ===========================================================================
+   Disclosure
+   ---------------------------------------------------------------------------
+   Native `<details>`, styled. The marker is drawn rather than inherited so it
+   is the same shape in every browser, and the default triangle is removed on
+   both the modern and the WebKit-prefixed pseudo-element.
+   =========================================================================== */
+
+.disclosure {
+  border: 1px solid var(--vibefycode-border);
+  border-radius: 10px;
+  background: var(--vibefycode-surface);
+}
+
+.disclosure + .disclosure {
+  margin-top: 0.5rem;
+}
+
+.disclosure-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 10px;
+}
+
+.disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure-summary::marker {
+  content: '';
+}
+
+.disclosure-summary:hover {
+  background: var(--vibefycode-surface-muted);
+}
+
+.disclosure-marker {
+  position: relative;
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 0.28rem;
+  border: 1px solid var(--vibefycode-accent);
+  border-radius: 3px;
+}
+
+/* A plus that becomes a minus. Both strokes are drawn; the vertical one is
+   hidden when open, so the shape changes without anything moving. */
+.disclosure-marker::before,
+.disclosure-marker::after {
+  content: '';
+  position: absolute;
+  background: var(--vibefycode-accent);
+  inset: 50% 20%;
+  transform: translateY(-50%);
+  height: 1px;
+}
+
+.disclosure-marker::after {
+  inset: 20% 50%;
+  width: 1px;
+  height: auto;
+  transform: translateX(-50%);
+  transition: opacity 140ms ease;
+}
+
+.disclosure[open] .disclosure-marker::after {
+  opacity: 0;
+}
+
+.disclosure-label {
+  display: block;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.disclosure-hint {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--vibefycode-text-muted);
+  line-height: 1.4;
+}
+
+.disclosure-body {
+  padding: 0.25rem 1rem 1.1rem 2.55rem;
+  border-top: 1px solid var(--vibefycode-border);
+  margin-top: -1px;
+  padding-top: 1rem;
+}
+
+@media (max-width: 34rem) {
+  .disclosure-body {
+    padding-left: 1rem;
+  }
+}
