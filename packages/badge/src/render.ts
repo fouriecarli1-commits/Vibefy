@@ -114,6 +114,62 @@ ${MARK.bars.map((b) => `      <rect x="${b.x}" y="${b.y}" width="${b.w}" height=
   </g>`;
 }
 
+/**
+ * Two hex colours, blended.
+ *
+ * Used to build the seal's brushed-metal band out of one ink rather than out of
+ * five hand-picked colours: the four states each get the same treatment in
+ * their own hue, so a suspended badge reads as the same object in a different
+ * mood rather than as a different badge.
+ */
+function mix(from: string, to: string, amount: number): string {
+  const channel = (hex: string, at: number) => Number.parseInt(hex.slice(at, at + 2), 16);
+  const blend = (at: number) =>
+    Math.round(channel(from, at) + (channel(to, at) - channel(from, at)) * amount)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${blend(1)}${blend(3)}${blend(5)}`;
+}
+
+/**
+ * The band, the field and the rim.
+ *
+ * The supplied artwork is a photographic chrome seal on a dark centre. That
+ * cannot be reproduced — it is shaded pixels, and this file emits an SVG on
+ * every request so a revoked badge stops reading as verified within minutes.
+ * What a flat vector *can* do is the thing the chrome is actually saying: a
+ * struck metal ring catching light on two sides, around a dark field.
+ *
+ * So the band is a diagonal sweep from a lit edge through the ink to a shadowed
+ * edge, and the field is a dark disc lifted slightly at its centre. Three stops
+ * and a radial. It reads as an object rather than as a printed circle, and it
+ * survives being scaled to 96px, which the photograph does not.
+ */
+/**
+ * The band's colour when the badge is in force.
+ *
+ * A warm grey rather than a blue-grey: the mark is teal and blue, and a cold
+ * ring around it makes the whole seal read as one temperature with no centre.
+ */
+const SEAL_STEEL = '#C3C7CE';
+
+function sealGradients(ink: string): string {
+  const lit = mix(ink, '#FFFFFF', 0.34);
+  const shadow = mix(ink, '#000000', 0.42);
+  const fieldCentre = mix(PALETTE.ink, '#FFFFFF', 0.1);
+
+  return `    <linearGradient id="seal-band" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0%" stop-color="${lit}"/>
+      <stop offset="34%" stop-color="${ink}"/>
+      <stop offset="72%" stop-color="${shadow}"/>
+      <stop offset="100%" stop-color="${mix(ink, '#FFFFFF', 0.18)}"/>
+    </linearGradient>
+    <radialGradient id="seal-field" cx="0.5" cy="0.42" r="0.72">
+      <stop offset="0%" stop-color="${fieldCentre}"/>
+      <stop offset="100%" stop-color="${PALETTE.ink}"/>
+    </radialGradient>`;
+}
+
 function markGradients(idPrefix: string): string {
   return `    <linearGradient id="${idPrefix}-ribbon" x1="0" y1="0" x2="1" y2="1">
 ${GRADIENT_STOPS.map((stop) => `      <stop offset="${stop.offset}" stop-color="${stop.color}"/>`).join('\n')}
@@ -189,18 +245,35 @@ export function renderBadgeSvg(facts: BadgeRenderFacts): string {
 
   // The band and the banner carry the same ink in every state; only its colour
   // changes, so a suspended badge reads as the same object in a different mood.
-  const ink = active ? PALETTE.navy : colours.accent;
-  const onInk = PALETTE.mist;
-  const field = '#FFFFFF';
+  // The active band is struck steel; the other three are struck in their own
+  // colour. That is what the supplied artwork does — a silver seal — and it has
+  // a second use here: a badge that is in force looks like a different metal
+  // from one that is not, before any word is read.
+  const ink = active ? SEAL_STEEL : colours.accent;
+  // Dark legend on the steel, light legend on the coloured bands. The band is
+  // the badge's only large text and it has to carry at any size, so the ink is
+  // chosen against its own background rather than fixed.
+  const onInk = active ? PALETTE.ink : PALETTE.mist;
   const layout = compact ? SEAL_COMPACT : SEAL;
 
-  const band = `  <path d="${annulusPath(layout.band.outer, layout.band.inner)}" fill="${ink}" fill-rule="evenodd"/>
-  <circle cx="256" cy="256" r="${layout.field.r}" fill="${field}"/>`;
+  // The field is dark, as the supplied artwork has it. That is not decoration:
+  // the mark is a luminous ribbon, and it glows on ink where on white it merely
+  // sits. It also puts the badge on the same ground as the rest of the product.
+  const band = `  <path d="${annulusPath(layout.band.outer, layout.band.inner)}" fill="url(#seal-band)" fill-rule="evenodd"/>
+  <circle cx="256" cy="256" r="${layout.field.r}" fill="url(#seal-field)"/>`;
+
+  // Two bright rims and one inside the field. A struck seal is read by its
+  // edges: without them the band is a coloured ring, and with them it is a
+  // raised object with a lip. Drawn even when compact, unlike the printed
+  // furniture, because an edge is legible at any size and a legend is not.
+  const rims = `  <circle cx="256" cy="256" r="${layout.band.outer - 2}" fill="none" stroke="${mix(ink, '#FFFFFF', 0.55)}" stroke-width="2.5" opacity="0.55"/>
+  <circle cx="256" cy="256" r="${layout.band.inner + 2}" fill="none" stroke="${mix(ink, '#000000', 0.55)}" stroke-width="2.5" opacity="0.5"/>`;
 
   const rules = compact
-    ? ''
-    : `  <circle cx="256" cy="256" r="${SEAL.bandRule.r}" fill="none" stroke="${onInk}" stroke-width="${SEAL.bandRule.width}" opacity="0.45"/>
-  <circle cx="256" cy="256" r="${SEAL.fieldRule.r}" fill="none" stroke="${ink}" stroke-width="${SEAL.fieldRule.width}" opacity="0.28"/>`;
+    ? rims
+    : `${rims}
+  <circle cx="256" cy="256" r="${SEAL.bandRule.r}" fill="none" stroke="${onInk}" stroke-width="${SEAL.bandRule.width}" opacity="0.4"/>
+  <circle cx="256" cy="256" r="${SEAL.fieldRule.r}" fill="none" stroke="${onInk}" stroke-width="${SEAL.fieldRule.width}" opacity="0.22"/>`;
 
   const star = (cx: number, cy: number, size: number, fill: string) =>
     `    <path d="${starPath(size)}" transform="translate(${cx} ${cy})" fill="${fill}"/>`;
@@ -260,16 +333,22 @@ ${wordmarkSvg({ x: 256, y: SEAL.bannerText.y, width: SEAL.bannerText.width, fill
   const note = compact ? SEAL_COMPACT.statusNote : SEAL.statusNote;
   const disclaimer = active
     ? ''
-    : `  <g aria-hidden="true" font-family="${FONT_STACK}" text-anchor="middle" fill="${ink}">
+    : `  <g aria-hidden="true" font-family="${FONT_STACK}" text-anchor="middle" fill="${onInk}">
     <text x="256" y="${note.y}" font-size="${note.size}" font-weight="600">Not currently verified</text>
   </g>`;
 
   const placement = active ? layout.markCentre : layout.inactiveMark;
   const scale = active ? layout.markScale : layout.inactiveMark.scale;
+  // A dimmed mark on a dark field has to be dimmed *towards* the light, not
+  // towards the ink. In mono the group paints with `currentColor`, which
+  // defaults to black — on the dark field that made the three inactive states
+  // render an almost invisible mark, which reads as a broken image rather than
+  // as a withdrawn one. So the colour is stated, and the opacity lifted to suit
+  // it.
   const mark = `  <g transform="translate(${placement.x} ${placement.y}) scale(${scale}) translate(-256 -256)"${
-    active ? '' : ' opacity="0.45"'
+    active ? '' : ` color="${PALETTE.mist}" opacity="0.3"`
   }>
-${markGroup({ idPrefix: 'seal', detail: active && !compact, ...(active ? {} : { mono: true }) })}
+${markGroup({ idPrefix: 'seal', detail: active && !compact, onDark: true, ...(active ? {} : { mono: true }) })}
   </g>`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" role="img"
@@ -282,6 +361,7 @@ ${markGroup({ idPrefix: 'seal', detail: active && !compact, ...(active ? {} : { 
   )}</desc>
   <defs>
 ${markGradients('seal')}
+${sealGradients(ink)}
     <clipPath id="seal-disc"><circle cx="256" cy="256" r="${layout.band.outer}"/></clipPath>
   </defs>
 ${band}

@@ -42,6 +42,29 @@ Getting the mark as geometry needs it drawn as geometry — traced from one of t
 No export setting reaches it, because there is nothing in the source file to export. That trace has
 now been done; see the next section.
 
+## The badge follows the supplied seal, and cannot be the supplied seal
+
+`supplied-badge.svg` is a photographic chrome seal, and two separate things keep
+it out of anything served.
+
+**It carries "Made with AI" burned into its pixels**, top right, outside the
+disc. A trust mark cannot display a third party's provenance claim about itself,
+and cropping the pill away would not change what the file is — the C2PA manifest
+records the same thing.
+
+**A badge cannot be a fixed image at all.** It is emitted as SVG on every
+request, and that is the entire revocation mechanism: no file exists for a
+customer to cache, so a suspended badge stops reading as verified within minutes.
+A fixed image also cannot carry that application's score and date, cannot be
+signed, and does not survive the 96 px the licence permits.
+
+So the seal in `packages/badge/src/render.ts` follows the artwork's
+**composition** — arc legend between two stars, mark on a field, banner ribbon
+carrying the wordmark — and since 2026-08-26 its **treatment** as well: a struck
+metal band on a dark centre, lit on one edge and shadowed on the other. What it
+does not attempt is photorealism, which is shaded pixels and does not survive
+being scaled down.
+
 ## A compression pass was tried, and rejected
 
 On 2026-08-25 the same nine files were run through an online SVG compressor and re-uploaded. They

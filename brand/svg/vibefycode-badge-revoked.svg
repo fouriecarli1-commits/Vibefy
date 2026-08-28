@@ -13,12 +13,24 @@
       <stop offset="62%" stop-color="#E8730C"/>
       <stop offset="100%" stop-color="#F9A03F"/>
     </linearGradient>
+    <linearGradient id="seal-band" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0%" stop-color="#e68f8a"/>
+      <stop offset="34%" stop-color="#D9564E"/>
+      <stop offset="72%" stop-color="#7e322d"/>
+      <stop offset="100%" stop-color="#e0746e"/>
+    </linearGradient>
+    <radialGradient id="seal-field" cx="0.5" cy="0.42" r="0.72">
+      <stop offset="0%" stop-color="#232a45"/>
+      <stop offset="100%" stop-color="#0B1230"/>
+    </radialGradient>
     <clipPath id="seal-disc"><circle cx="256" cy="256" r="248"/></clipPath>
   </defs>
-  <path d="M 8 256 A 248 248 0 1 0 504 256 A 248 248 0 1 0 8 256 Z M 59 256 A 197 197 0 1 0 453 256 A 197 197 0 1 0 59 256 Z" fill="#D9564E" fill-rule="evenodd"/>
-  <circle cx="256" cy="256" r="197" fill="#FFFFFF"/>
-  <circle cx="256" cy="256" r="239" fill="none" stroke="#F4F7FC" stroke-width="1.5" opacity="0.45"/>
-  <circle cx="256" cy="256" r="188" fill="none" stroke="#D9564E" stroke-width="1.5" opacity="0.28"/>
+  <path d="M 8 256 A 248 248 0 1 0 504 256 A 248 248 0 1 0 8 256 Z M 59 256 A 197 197 0 1 0 453 256 A 197 197 0 1 0 59 256 Z" fill="url(#seal-band)" fill-rule="evenodd"/>
+  <circle cx="256" cy="256" r="197" fill="url(#seal-field)"/>
+  <circle cx="256" cy="256" r="246" fill="none" stroke="#eeb3af" stroke-width="2.5" opacity="0.55"/>
+  <circle cx="256" cy="256" r="199" fill="none" stroke="#622723" stroke-width="2.5" opacity="0.5"/>
+  <circle cx="256" cy="256" r="239" fill="none" stroke="#F4F7FC" stroke-width="1.5" opacity="0.4"/>
+  <circle cx="256" cy="256" r="188" fill="none" stroke="#F4F7FC" stroke-width="1.5" opacity="0.22"/>
   <g aria-hidden="true">
     <text x="0" y="0" transform="translate(170.75 53.19) rotate(-22.80)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">R</text>
     <text x="0" y="0" transform="translate(198.32 43.70) rotate(-15.20)" text-anchor="middle" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="700" fill="#F4F7FC">E</text>
@@ -30,16 +42,16 @@
     <path d="M0.00 -13.00 L3.21 -4.42 L12.36 -4.02 L5.19 1.69 L7.64 10.52 L0.00 5.46 L-7.64 10.52 L-5.19 1.69 L-12.36 -4.02 L-3.21 -4.42 Z" transform="translate(73.61173403789081 132.9775612364357)" fill="#F4F7FC"/>
     <path d="M0.00 -13.00 L3.21 -4.42 L12.36 -4.02 L5.19 1.69 L7.64 10.52 L0.00 5.46 L-7.64 10.52 L-5.19 1.69 L-12.36 -4.02 L-3.21 -4.42 Z" transform="translate(438.3882659621092 132.9775612364357)" fill="#F4F7FC"/>
   </g>
-  <g transform="translate(256 190) scale(0.5) translate(-256 -256)" opacity="0.45">
+  <g transform="translate(256 190) scale(0.5) translate(-256 -256)" color="#F4F7FC" opacity="0.3">
   <g fill="none" stroke-linecap="round" stroke-linejoin="round">
     <path d="M302 334 C338 314 372 294 402 274" stroke="currentColor" stroke-width="26"/>
     <path d="M452 232 L414 302 L374 256 Z" fill="currentColor" stroke="none"/>
     <path d="M136 104 C164 212 198 306 240 354 C282 306 316 212 344 104" stroke="currentColor" stroke-width="42" opacity="0.55"/>
-    <path d="M168 116 C196 224 230 318 272 366 C314 318 348 224 376 116" stroke="#FFFFFF" stroke-width="60"/>
+    <path d="M168 116 C196 224 230 318 272 366 C314 318 348 224 376 116" stroke="#0B1230" stroke-width="60"/>
     <path d="M168 116 C196 224 230 318 272 366 C314 318 348 224 376 116" stroke="currentColor" stroke-width="42"/>
   </g>
   </g>
-  <g aria-hidden="true" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle" fill="#D9564E">
+  <g aria-hidden="true" font-family="Poppins, Montserrat, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" text-anchor="middle" fill="#F4F7FC">
     <text x="256" y="336" font-size="27" font-weight="600">Not currently verified</text>
   </g>
   <g aria-hidden="true">

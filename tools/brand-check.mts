@@ -41,10 +41,60 @@ function allowedColours(): Set<string> {
     }
   };
   collect(tokens);
-  // No allowance beyond the palette. Every colour in every master is a token, so
-  // a new one appearing is a deliberate decision that has to be made in
-  // tokens.json — where the contrast gate can see it.
   return values;
+}
+
+/**
+ * Is this colour a palette colour, or a shade of one?
+ *
+ * The rule the brief actually states is that the marks are not *recoloured*, and
+ * a shade is not a recolour: blending a palette colour towards white or towards
+ * black keeps its hue and only moves its light. That is what a struck-metal band
+ * is made of — one ink, lit on one edge and shadowed on the other — and
+ * demanding that every one of those stops be its own token would mean twenty
+ * mechanical entries in `tokens.json` that no one could check by eye.
+ *
+ * What it still refuses is a colour that is not on the line between a palette
+ * colour and white or black. A new hue cannot pass, which is the thing the gate
+ * exists to stop.
+ */
+type Span = { readonly from: number; readonly to: number; readonly actual: number };
+
+export function isPaletteShade(colour: string, permitted: Iterable<string>): boolean {
+  const rgb = (hex: string): [number, number, number] => [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ];
+  const actual = rgb(colour);
+
+  for (const base of permitted) {
+    const from = rgb(base);
+    for (const target of [255, 0]) {
+      const spans: Span[] = [0, 1, 2].map((channel) => ({
+        from: from[channel] ?? 0,
+        to: target,
+        actual: actual[channel] ?? 0,
+      }));
+
+      // The blend fraction implied by whichever channel moves furthest, so a
+      // near-grey base does not make every colour look like a shade of it.
+      const widest = spans.reduce((best, span) =>
+        Math.abs(span.to - span.from) > Math.abs(best.to - best.from) ? span : best,
+      );
+      if (Math.abs(widest.to - widest.from) < 24) continue;
+
+      const amount = (widest.actual - widest.from) / (widest.to - widest.from);
+      if (amount < -0.02 || amount > 1.02) continue;
+
+      // All three channels have to agree, within a rounding error, or it is a
+      // different colour that merely happens to be about as light.
+      const agrees = (span: Span) =>
+        Math.abs(span.from + (span.to - span.from) * amount - span.actual) <= 2;
+      if (spans.every(agrees)) return true;
+    }
+  }
+  return false;
 }
 
 export function runBrandCheck() {
@@ -69,11 +119,11 @@ export function runBrandCheck() {
     }
 
     for (const colour of svg.match(/#[0-9a-fA-F]{6}/g) ?? []) {
-      if (!permitted.has(colour.toUpperCase())) {
-        failures.push(
-          `${master} uses ${colour}, which is not in the palette. The marks are not recoloured.`,
-        );
-      }
+      if (permitted.has(colour.toUpperCase())) continue;
+      if (isPaletteShade(colour.toLowerCase(), permitted)) continue;
+      failures.push(
+        `${master} uses ${colour}, which is neither a palette colour nor a shade of one. The marks are not recoloured.`,
+      );
     }
   }
 

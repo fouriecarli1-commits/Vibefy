@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { renderMarkSvg } from '@vibefycode/badge';
 import { MARK, MARK_OUTLINE, PALETTE, WORDMARK_OUTLINE, VIEWBOX } from '@vibefycode/shared';
 import { describe, expect, it } from 'vitest';
+import { isPaletteShade } from '../tools/brand-check.mts';
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 
@@ -143,5 +144,51 @@ describe('the generators', () => {
 
   it('warn that the artwork is never compressed first', () => {
     expect(read('tools/build-wordmark.mjs')).toContain('compressor');
+  });
+});
+
+describe('the palette gate still refuses a recolour', () => {
+  // The seal is struck metal now: one ink, lit on one edge and shadowed on the
+  // other. That means shades of palette colours appear in the masters, and the
+  // gate was taught to accept them — which is only safe if it still rejects a
+  // colour that is not on the line between a palette colour and white or black.
+  //
+  // This is the half of the change that matters. Loosening a gate and then not
+  // checking what it still catches is how a gate quietly becomes decoration.
+  const palette = Object.values(
+    (JSON.parse(read('packages/shared/design/tokens.json')) as { brand: Record<string, string> })
+      .brand,
+  ).filter((value) => /^#[0-9a-fA-F]{6}$/.test(value));
+
+  it('accepts a shade of a palette colour', () => {
+    // navy #16205A blended halfway to white, and to black.
+    expect(isPaletteShade('#8b90ad', palette)).toBe(true);
+    expect(isPaletteShade('#0b102d', palette)).toBe(true);
+  });
+
+  it('accepts the palette colours themselves', () => {
+    for (const colour of palette) {
+      expect(isPaletteShade(colour.toLowerCase(), palette), colour).toBe(true);
+    }
+  });
+
+  it('refuses a hue that is not in the palette at all', () => {
+    for (const intruder of ['#ff00ff', '#7cff00', '#00ffcc', '#b8006e']) {
+      expect(isPaletteShade(intruder, palette), intruder).toBe(false);
+    }
+  });
+
+  it('refuses a colour that is merely as light as a shade would be', () => {
+    // A muddy brown at roughly the lightness of navy-toward-white. Same
+    // brightness, different hue — which is exactly the substitution the gate
+    // exists to catch, and the one a lightness-only check would wave through.
+    expect(isPaletteShade('#ad9080', palette)).toBe(false);
+  });
+
+  it('is what the masters are actually checked against', () => {
+    // Asserted so the gate cannot be relaxed to a plain lightness test later
+    // without this failing.
+    expect(read('tools/brand-check.mts')).toContain('isPaletteShade');
+    expect(read('tools/brand-check.mts')).toContain('neither a palette colour nor a shade of one');
   });
 });
