@@ -699,30 +699,48 @@ Running the worker means a machine that can hold a process and launch Chromium: 
 
 ### Deploying the worker to Render
 
-`render.yaml` and `apps/worker/Dockerfile` describe it, so the browser steps are: connect the
-repository, paste two secrets, deploy.
+Done on 2026-08-26 and it worked first time. **Create it by hand, not from the Blueprint.**
+`render.yaml` is in the repository as the written record of these settings, and a test keeps it
+honest, but Render rejected it with "A Blueprint file was found, but there was an issue" and gave
+no detail that reached us. The manual route needs eight fields and has no schema to satisfy.
 
-1. **render.com → New → Blueprint.** Connect GitHub if it asks, then pick `Vibefy`. Render reads
-   `render.yaml` and offers one service, `vibefycode-worker`.
-2. **Paste the two secrets it asks for.** `SUPABASE_DB_URL` is the same connection string the web
-   deployment uses — Supabase → Project Settings → Database → _Connection string_ → **URI**, with
-   the password filled in. `ANTHROPIC_API_KEY` is from console.anthropic.com → API Keys.
-   The other variables can stay empty; the worker logs once that email is not configured and
-   carries on.
-3. **Apply.** The first build takes ten to fifteen minutes — it is pulling a browser image.
-4. **Watch the log.** A working worker prints a JSON line every few seconds and nothing else. If
-   it prints `SUPABASE_DB_URL is not set`, step 2 did not take.
+1. **dashboard.render.com → + New → Background Worker.** Not Web Service: nothing calls this over
+   HTTP, so it has no public URL and there is nothing to visit when it is running.
+2. **Pick the `Vibefy` repository**, then set:
 
-The service is a **worker**, not a web service: nothing calls it over HTTP, so it has no public
-URL and no port. That is why there is nothing to visit when it is running.
+   | Field                          | Value                      |
+   | ------------------------------ | -------------------------- |
+   | Name                           | `vibefycode-worker`        |
+   | Language                       | **Docker** — not Node      |
+   | Branch                         | `main`                     |
+   | Region                         | Frankfurt (EU Central)     |
+   | Dockerfile Path                | `./apps/worker/Dockerfile` |
+   | Docker Build Context Directory | `.`                        |
+   | Instance Type                  | Starter                    |
 
-To check it end to end: request an assessment in the console, then watch `assessment_requests` go
-from `queued` to claimed within about five seconds.
+   The build context is the repository root, not `apps/worker`. The worker imports twelve
+   workspace packages and cannot be built from its own directory alone.
 
-**One caveat worth stating.** The Dockerfile has not been built on this machine — there is no
-Docker daemon here, so Render's first build is its first real test. If it fails, the log names the
-line, and the two things that usually go wrong are a workspace manifest that was not copied and a
-browser image tag that has moved.
+3. **Two environment variables.** `SUPABASE_DB_URL` (Supabase → Settings → Database → Connection
+   string → **URI**, with `[YOUR-PASSWORD]` replaced) and `ANTHROPIC_API_KEY`. Everything else may
+   stay empty; the worker logs once that email is not configured and carries on.
+4. **Create.** The first build takes ten to fifteen minutes — it is pulling a browser image.
+
+**Reading the log.** A healthy worker is quiet: it polls every five seconds and prints nothing
+while the queue is empty. Two lines tell you it is alive and connected:
+
+```
+email not configured — alerts will reach the console and phones only
+```
+
+That one is printed after the database pool is constructed, so seeing it means `SUPABASE_DB_URL`
+was accepted. What you must not see is `worker loop error` repeating — that is the connection
+string being wrong, usually the password still reading `[YOUR-PASSWORD]`.
+
+**Proving it end to end** needs an application whose ownership has been verified, because nothing
+is assessed without an authorisation record. Add an app in the console, publish the DNS record or
+the file it asks for, then request an assessment: `assessment_requests` should go from `queued` to
+claimed within about five seconds, and the log starts naming stages.
 
 ## If something goes wrong in production
 
