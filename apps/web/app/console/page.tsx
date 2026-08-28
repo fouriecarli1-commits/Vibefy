@@ -7,10 +7,33 @@ import { recordSignUpConsents } from '@/lib/consent';
 export const metadata: Metadata = { title: 'Console' };
 
 /**
- * M0 console: proof that authentication, the sign-up trigger and row-level
- * security work end to end. Everything this page reads is filtered by RLS, so
- * it shows the caller's own organisations and nothing else — by construction,
- * not by a WHERE clause we remembered to write.
+ * Screening is the check that runs before anything is authorised, and its state
+ * decides what a customer can do next — so it is shown as a chip rather than
+ * left in the database. Colour alone would be invisible to a colourblind reader;
+ * `data-tone` moves the border as well.
+ */
+const SCREENING_TONE: Record<string, string | undefined> = {
+  cleared: 'ok',
+  passed: 'ok',
+  pending: 'warn',
+  in_review: 'warn',
+  refused: 'bad',
+  blocked: 'bad',
+};
+
+/**
+ * The console's front door.
+ *
+ * Everything here is filtered by row-level security, so it shows the caller's
+ * own workspaces and applications and nothing else — by construction, rather
+ * than by a WHERE clause somebody remembered to write.
+ *
+ * It listed neither for its first weeks. The page queried `apps` and discarded
+ * the result, and nothing anywhere linked to `/console/apps/new`, so the one
+ * action the console exists for was reachable only by typing the URL. The
+ * navigation described this page as "your applications and their state" the
+ * whole time. A page that quietly does not keep its own promise is worse than a
+ * missing page: a missing page sends you looking somewhere else.
  */
 export default async function ConsolePage() {
   const supabase = await createClient();
@@ -38,6 +61,53 @@ export default async function ConsolePage() {
         <p className="text-muted">Signed in as {user.email}</p>
       </header>
 
+      <section aria-labelledby="applications" className="space-y-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 id="applications" className="text-xl font-semibold">
+            Your applications
+          </h2>
+          <Link href="/console/apps/new" className="nav-cta">
+            Add an application
+          </Link>
+        </div>
+
+        {(apps ?? []).length > 0 ? (
+          <ul className="space-y-3">
+            {(apps ?? []).map((app) => {
+              const screening = String(app.screening_status ?? 'pending');
+              return (
+                <li key={String(app.id)} className="panel space-y-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    <h3 className="font-semibold">
+                      <Link href={`/console/apps/${String(app.id)}`}>{String(app.name)}</Link>
+                    </h3>
+                    <span className="chip" data-tone={SCREENING_TONE[screening]}>
+                      {screening.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted">{String(app.primary_url)}</p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          // An empty state that says what to do next. The alternative — an empty
+          // list under a heading — reads as a page that is broken rather than as
+          // one that is waiting.
+          <div className="bar">
+            <div className="space-y-2">
+              <p className="text-sm">
+                Nothing here yet. Add the application you want assessed, and the next step will be
+                proving you are entitled to authorise testing of it.
+              </p>
+              <p className="text-xs text-muted">
+                Nothing is tested before that check passes — for your protection and ours.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
       {error ? (
         <p role="alert" className="rounded-xl border border-line p-5 text-bad">
           Could not load your workspaces: {error.message}
@@ -47,7 +117,7 @@ export default async function ConsolePage() {
           <h2 id="workspaces" className="text-xl font-semibold">
             Your workspaces
           </h2>
-          <ul className="space-y-3">
+          <ul className="grid-cards">
             {(memberships ?? []).map((membership, index) => {
               const organisation = membership.organisations as unknown as {
                 id: string;
@@ -58,9 +128,9 @@ export default async function ConsolePage() {
               } | null;
               if (!organisation) return null;
               return (
-                <li key={organisation.id ?? index} className="rounded-xl border border-line p-5">
+                <li key={organisation.id ?? index} className="panel space-y-1.5">
                   <h3 className="font-semibold">{organisation.name}</h3>
-                  <p className="mt-1 text-sm text-muted">
+                  <p className="text-sm text-muted">
                     /{organisation.slug} · {organisation.account_type}
                     {organisation.is_personal ? ' · personal' : ''} · you are {membership.role}
                   </p>
@@ -70,14 +140,6 @@ export default async function ConsolePage() {
           </ul>
         </section>
       )}
-
-      <section className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
-        <h2 className="font-semibold text-ink">What is not here yet</h2>
-        <p className="mt-2">
-          App intake, the authorisation-to-test flow and the assessment engine arrive in M1; reports
-          and payments in M2; the badge in M3. See docs/OPEN_ITEMS.md.
-        </p>
-      </section>
     </div>
   );
 }
