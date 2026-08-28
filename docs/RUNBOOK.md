@@ -697,6 +697,33 @@ Running the worker means a machine that can hold a process and launch Chromium: 
 `pnpm dev:worker`, or a small always-on container. It needs `SUPABASE_DB_URL` and
 `ANTHROPIC_API_KEY`, and nothing else.
 
+### Deploying the worker to Render
+
+`render.yaml` and `apps/worker/Dockerfile` describe it, so the browser steps are: connect the
+repository, paste two secrets, deploy.
+
+1. **render.com → New → Blueprint.** Connect GitHub if it asks, then pick `Vibefy`. Render reads
+   `render.yaml` and offers one service, `vibefycode-worker`.
+2. **Paste the two secrets it asks for.** `SUPABASE_DB_URL` is the same connection string the web
+   deployment uses — Supabase → Project Settings → Database → _Connection string_ → **URI**, with
+   the password filled in. `ANTHROPIC_API_KEY` is from console.anthropic.com → API Keys.
+   The other variables can stay empty; the worker logs once that email is not configured and
+   carries on.
+3. **Apply.** The first build takes ten to fifteen minutes — it is pulling a browser image.
+4. **Watch the log.** A working worker prints a JSON line every few seconds and nothing else. If
+   it prints `SUPABASE_DB_URL is not set`, step 2 did not take.
+
+The service is a **worker**, not a web service: nothing calls it over HTTP, so it has no public
+URL and no port. That is why there is nothing to visit when it is running.
+
+To check it end to end: request an assessment in the console, then watch `assessment_requests` go
+from `queued` to claimed within about five seconds.
+
+**One caveat worth stating.** The Dockerfile has not been built on this machine — there is no
+Docker daemon here, so Render's first build is its first real test. If it fails, the log names the
+line, and the two things that usually go wrong are a workspace manifest that was not copied and a
+browser image tag that has moved.
+
 ## If something goes wrong in production
 
 1. **Suspected data exposure** — follow the incident response plan in `BUSINESS_CHECKLIST.md`.

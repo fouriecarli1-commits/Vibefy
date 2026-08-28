@@ -261,3 +261,75 @@ describe('CI installs what the tests actually need', () => {
     }
   });
 });
+
+describe('the worker can be deployed', () => {
+  // The engine drives a browser for the minutes an assessment takes, which no
+  // serverless function on any plan can hold open. So the worker runs somewhere
+  // that keeps a process alive, and how to put it there lives in the repository
+  // rather than in somebody's head — the same reason `vercel.json` does.
+  const dockerfile = read('apps/worker/Dockerfile');
+  const renderConfig = read('render.yaml');
+  const workerPackage = JSON.parse(read('apps/worker/package.json')) as {
+    dependencies: Record<string, string>;
+    scripts: Record<string, string>;
+  };
+
+  it('pins the browser image to the Playwright version the worker depends on', () => {
+    // A mismatch here is a launch failure naming a missing shared library, at
+    // deploy time, on a machine nobody can attach a debugger to. Cheap to assert.
+    const pinned = workerPackage.dependencies.playwright;
+    expect(pinned).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(dockerfile).toContain(`mcr.microsoft.com/playwright:v${pinned}`);
+  });
+
+  it('installs from the lockfile rather than resolving afresh', () => {
+    expect(dockerfile).toContain('--frozen-lockfile');
+  });
+
+  it('tells Playwright where the browsers are', () => {
+    // The base image puts them here. Without it Playwright looks under the home
+    // directory of whichever user the platform runs as, and finds nothing.
+    expect(dockerfile).toContain('PLAYWRIGHT_BROWSERS_PATH=/ms-playwright');
+  });
+
+  it('runs the worker as the worker package defines it', () => {
+    expect(workerPackage.scripts.start).toBeTruthy();
+    expect(dockerfile).toContain('--filter", "@vibefycode/worker", "start');
+  });
+
+  it('copies every workspace manifest, because pnpm needs the whole graph', () => {
+    // A missing one fails the install with a message about an unresolvable
+    // workspace link, which reads like a dependency problem and is a COPY.
+    for (const app of ['apps/worker', 'apps/web', 'apps/mobile']) {
+      expect(dockerfile, app).toContain(`${app}/package.json`);
+    }
+    expect(dockerfile).toContain('COPY packages');
+  });
+
+  it('is a worker rather than a web service', () => {
+    // Nothing calls it over HTTP: it claims from the queue and runs sweeps on a
+    // timer. A public port would be attack surface with no use.
+    expect(renderConfig).toContain('type: worker');
+    expect(renderConfig).not.toMatch(/type:\s*web/);
+  });
+
+  it('carries no secret values, only their names', () => {
+    // This file is in the repository. `pnpm check:secrets` would fail the build
+    // on a credential in the tree, and this says the same thing one layer up.
+    for (const key of ['SUPABASE_DB_URL', 'ANTHROPIC_API_KEY', 'RESEND_API_KEY']) {
+      expect(renderConfig).toContain(key);
+    }
+    for (const line of renderConfig.split('\n')) {
+      expect(line, line).not.toMatch(/^\s*value:/);
+    }
+    expect(renderConfig).toContain('sync: false');
+  });
+
+  it('names the environment variables the worker actually reads', () => {
+    // A deploy config that names a variable nothing reads is a variable somebody
+    // will spend an afternoon setting correctly for no effect.
+    const worker = read('apps/worker/src/main.ts');
+    expect(worker).toContain('SUPABASE_DB_URL');
+    expect(renderConfig).toContain('VIBEFYCODE_BADGE_SIGNING_KEY_B64');
+  });
+});

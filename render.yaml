@@ -1,0 +1,47 @@
+# Render deployment for the assessment worker.
+#
+# The web app is on Vercel and stays there. This is the other half: a process
+# that holds a browser open for the minutes an assessment takes, which no
+# serverless function on any plan can do.
+#
+# `type: worker` rather than `web` on purpose. Nothing calls this over HTTP —
+# it claims from `public.assessment_requests` with FOR UPDATE SKIP LOCKED and
+# runs sweeps on a timer. Giving it a public port would be an attack surface
+# with no use.
+services:
+  - type: worker
+    name: vibefycode-worker
+    runtime: docker
+    dockerfilePath: ./apps/worker/Dockerfile
+    # The whole repository, because this is a pnpm workspace and the worker
+    # imports twelve packages from it.
+    dockerContext: .
+    region: frankfurt
+    plan: starter
+    branch: main
+    autoDeploy: true
+
+    envVars:
+      # `sync: false` means Render prompts for the value and stores it in its
+      # own secret store. Never a literal here — this file is in the repository,
+      # and `pnpm check:secrets` fails the build on a credential in the tree.
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+      # Optional. The worker logs once that email is not configured and carries
+      # on without it, so these can be filled in later.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: ALERT_EMAIL_FROM
+        sync: false
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+
+      # Optional. Without it the worker runs assessments and writes reports but
+      # cannot sign a badge, so issuance waits. See docs/RUNBOOK.md.
+      - key: VIBEFYCODE_BADGE_SIGNING_KEY_B64
+        sync: false
+      - key: VIBEFYCODE_BADGE_KEY_ID
+        sync: false
