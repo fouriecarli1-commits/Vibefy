@@ -36,6 +36,26 @@ const webPublicDir = join(root, 'apps/web/public/brand');
  * in the same family carry "Made with AI" in the top right corner, which a
  * trust mark cannot show, so they stay out.
  */
+/**
+ * The supplied badge, published for the welcome page.
+ *
+ * This is the founder's trade mark and the only badge he considers acceptable,
+ * and it turns out to survive being scaled: legible at the 96 px the Badge
+ * Licence permits, and good at 256. The earlier position — that it could not be
+ * used at all — was stated more absolutely than the facts supported.
+ *
+ * One thing is removed and nothing else: Canva's "Made with AI" export pill,
+ * which sits in the top-right corner outside the disc and does not touch the
+ * seal. The two are cleanly separated in the artwork, and the crop is asserted
+ * rather than eyeballed.
+ */
+const BADGE_ARTWORK = 'vibefycode-badge-artwork.webp';
+const badgeSource = join(root, 'brand/source/supplied-badge.svg');
+/** The corner the export pill occupies, in the artwork's own 1024 grid. */
+const BADGE_WATERMARK = { x: 800, y: 0, width: 224, height: 140 };
+/** Twice the largest size the page displays it at, for a retina screen. */
+const BADGE_ARTWORK_PX = 640;
+
 const HERO_ARTWORK = 'vibefycode-hero.svg';
 const HERO_ARTWORK_DARK = 'vibefycode-hero-dark.svg';
 /** The ink the artwork sets its wordmark in — for a white page. */
@@ -210,9 +230,86 @@ async function main(): Promise<void> {
     );
   }
   writeFileSync(join(webPublicDir, HERO_ARTWORK_DARK), onDark);
+
+  const badgeBytes = await buildBadgeArtwork(sharp);
   console.log(
-    `✓ Web public assets refreshed in apps/web/public/brand/ (hero artwork ${Math.round(statSync(heroSource).size / 1024)} KB, light and dark)`,
+    `✓ Web public assets refreshed in apps/web/public/brand/ (hero ${Math.round(statSync(heroSource).size / 1024)} KB light and dark, badge artwork ${Math.round(badgeBytes / 1024)} KB)`,
   );
+}
+
+/**
+ * Lifts the seal out of the supplied file and writes it as a transparent PNG.
+ *
+ * The artwork is two base64 images inside an SVG wrapper: a greyscale mask and
+ * the colour layer it masks. Read straight out rather than rendered through the
+ * wrapper, because the wrapper also carries the export pill and a C2PA manifest
+ * neither of which belongs in a trust mark.
+ */
+// `sharp` is imported dynamically inside `main` so the SVG masters can still be
+// written on a machine without it. It is passed in rather than re-imported, so
+// there is one place that decides whether rasterisation is possible.
+type Sharp = typeof import('sharp').default;
+
+async function buildBadgeArtwork(sharp: Sharp): Promise<number> {
+  const svg = readFileSync(badgeSource, 'utf8');
+  const payloads = [...svg.matchAll(/data:image\/png;base64,([A-Za-z0-9+/=\s]+)/g)].map((match) =>
+    Buffer.from(match[1]!.replace(/\s/g, ''), 'base64'),
+  );
+  if (payloads.length !== 2) {
+    throw new Error(
+      `Expected a mask and a colour layer in ${badgeSource}, found ${payloads.length} images. Read the file before shipping a badge from it.`,
+    );
+  }
+  const [maskPayload, colourPayload] = payloads as [Buffer, Buffer];
+
+  // The mask is read as raw single-channel bytes and edited directly. Doing this
+  // through `composite` looked simpler and was wrong twice: compositing promotes
+  // a greyscale image to three channels, `joinChannel` then appends all three,
+  // and the result is a six-channel image that renders as an opaque black square
+  // with the seal sliding off it. Bytes are unambiguous.
+  const { data: maskBytes, info } = await sharp(maskPayload)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  if (info.width !== 1024 || info.height !== 1024) {
+    throw new Error(
+      `The badge artwork is ${info.width}×${info.height}; the watermark crop is expressed in a 1024 grid. Re-measure it before trusting this.`,
+    );
+  }
+
+  const alpha = Buffer.from(maskBytes);
+  for (let y = BADGE_WATERMARK.y; y < BADGE_WATERMARK.y + BADGE_WATERMARK.height; y += 1) {
+    alpha.fill(0, y * info.width + BADGE_WATERMARK.x, y * info.width + info.width);
+  }
+
+  // The pill is erased from the *alpha*, so the colour beneath it becomes
+  // transparent. Erasing it from the colour layer would leave its silhouette.
+  // No `removeAlpha()` here, however tempting. Sharp applies its operations in
+  // its own order rather than in call order, and removeAlpha runs *after*
+  // joinChannel — so asking for it strips the alpha that was just attached and
+  // returns a three-channel image that renders as an opaque black square. The
+  // colour layer already has no alpha of its own; there is nothing to remove.
+  const composited = await sharp(colourPayload)
+    .joinChannel(alpha, { raw: { width: info.width, height: info.height, channels: 1 } })
+    .png()
+    .toBuffer();
+
+  const seal = await sharp(composited)
+    .trim({ threshold: 1 })
+    .resize(BADGE_ARTWORK_PX, BADGE_ARTWORK_PX, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    // WebP rather than PNG: the same seal is 901 KB as a lossless PNG and 190 KB
+    // here, on a page that also carries a 378 KB hero. Every browser this
+    // product supports reads it, and the alpha is kept lossless so the seal's
+    // edge does not fringe against the dark ground.
+    .webp({ quality: 88, alphaQuality: 100 })
+    .toBuffer();
+
+  writeFileSync(join(webPublicDir, BADGE_ARTWORK), seal);
+  return seal.length;
 }
 
 await main();

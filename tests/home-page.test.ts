@@ -87,8 +87,8 @@ describe('the badge is shown, in every state it can be in', () => {
   ];
 
   it('shows the active badge at a size somebody can read', () => {
-    expect(home).toContain('vibefycode-badge-verified.svg');
-    expect(home).toMatch(/badge-verified\.svg"[\s\S]{0,200}width=\{280\}/);
+    expect(home).toContain('vibefycode-badge-artwork.webp');
+    expect(home).toMatch(/badge-artwork\.webp"[\s\S]{0,200}width=\{300\}/);
   });
 
   it('shows what it looks like when it is not in force', () => {
@@ -172,11 +172,32 @@ describe('the hero artwork is the supplied file, and is published', () => {
     expect(build).toContain('no longer inks its wordmark');
   });
 
-  it('is the artwork without the AI watermark, which the badge render carries', () => {
-    // `supplied-badge.svg` has "Made with AI" burned into its pixels, top right.
-    // A trust mark cannot display a third party's provenance claim about itself,
-    // so that file stays out of anything served — see brand/source/README.md.
-    expect(build).not.toContain('supplied-badge.svg');
-    expect(home).not.toContain('supplied-badge');
+  it('publishes the supplied badge with its export pill removed', () => {
+    // `supplied-badge.svg` carries Canva's "Made with AI" pill in the top-right
+    // corner, outside the disc. Earlier this file asserted the badge artwork was
+    // never used at all, which was stated more absolutely than the facts
+    // supported: the pill and the seal are cleanly separated in the artwork, and
+    // the seal is legible down to the 96 px the licence permits.
+    //
+    // So the rule is no longer "never used". It is "used with the pill removed,
+    // by a crop that is measured rather than eyeballed".
+    expect(build).toContain('supplied-badge.svg');
+    expect(build).toContain('BADGE_WATERMARK');
+    expect(home).toContain('vibefycode-badge-artwork.webp');
+  });
+
+  it('fails the build if the artwork is ever a size the crop was not measured on', () => {
+    // The crop is expressed in the artwork's own 1024 grid. A replacement at a
+    // different size would put the rectangle somewhere else, and the failure
+    // would be a watermark shipped on a trust mark rather than an error.
+    expect(build).toContain('the watermark crop is expressed in a 1024 grid');
+  });
+
+  it('leaves the issued badge generated rather than fixed', () => {
+    // The showcase is one image on one page. The badge served onto customers'
+    // sites is still rendered per request, which is what makes a revocation take
+    // effect in minutes and what lets one badge carry one application's facts.
+    expect(read('apps/web/app/badge/[file]/route.ts')).toContain('renderBadgeSvg');
+    expect(read('apps/web/app/badge/[file]/route.ts')).not.toContain('badge-artwork');
   });
 });

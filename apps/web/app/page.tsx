@@ -81,12 +81,23 @@ export default function HomePage() {
         <div className="grid items-center gap-8 sm:grid-cols-[auto_1fr]">
           <div className="flex flex-col items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/*
+              The founder's own badge artwork, watermark removed and nothing
+              else touched. This is the trade mark, and on the one page whose
+              job is to show what the mark looks like, it is the mark rather
+              than a drawing of it.
+
+              The badge *served onto customers' sites* is still generated per
+              request from `packages/badge` — that is what makes a revocation
+              take effect in minutes, and what lets one badge carry one
+              application's own facts. This is the showcase, not the issue.
+            */}
             <img
-              src="/brand/vibefycode-badge-verified.svg"
+              src="/brand/vibefycode-badge-artwork.webp"
               alt="The Verified by VibefyCode badge"
-              width={280}
-              height={280}
-              className="h-[280px] w-[280px]"
+              width={300}
+              height={300}
+              className="h-[300px] w-[300px]"
             />
             <span className="chip" data-tone="ok">
               Active

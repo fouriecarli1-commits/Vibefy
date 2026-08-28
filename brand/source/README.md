@@ -42,28 +42,33 @@ Getting the mark as geometry needs it drawn as geometry — traced from one of t
 No export setting reaches it, because there is nothing in the source file to export. That trace has
 now been done; see the next section.
 
-## The badge follows the supplied seal, and cannot be the supplied seal
+## The badge: the artwork on the welcome page, generated everywhere else
 
-`supplied-badge.svg` is a photographic chrome seal, and two separate things keep
-it out of anything served.
+`supplied-badge.svg` is the founder's trade mark. An earlier note here said it
+could not be used at all; that was stated more absolutely than the facts
+supported, and it has been reversed.
 
-**It carries "Made with AI" burned into its pixels**, top right, outside the
-disc. A trust mark cannot display a third party's provenance claim about itself,
-and cropping the pill away would not change what the file is — the C2PA manifest
-records the same thing.
+**The export pill comes off cleanly.** Canva's "Made with AI" label sits in the
+top-right corner outside the disc. Measured rather than assumed: in the
+artwork's top strip the seal occupies x[372–665] and the pill x[858–1013], with
+nothing between them. The crop is expressed in the artwork's own 1024 grid and
+`pnpm brand:build` throws if a replacement ever arrives at a different size —
+because the failure mode is a watermark shipped on a trust mark.
 
-**A badge cannot be a fixed image at all.** It is emitted as SVG on every
-request, and that is the entire revocation mechanism: no file exists for a
-customer to cache, so a suspended badge stops reading as verified within minutes.
-A fixed image also cannot carry that application's score and date, cannot be
-signed, and does not survive the 96 px the licence permits.
+**And the seal survives scaling.** Good at 256 px, legible at the 96 px the
+Badge Licence permits. It is published as `vibefycode-badge-artwork.webp`
+(190 KB) and shown at 300 px on the welcome page.
 
-So the seal in `packages/badge/src/render.ts` follows the artwork's
-**composition** — arc legend between two stars, mark on a field, banner ribbon
-carrying the wordmark — and since 2026-08-26 its **treatment** as well: a struck
-metal band on a dark centre, lit on one edge and shadowed on the other. What it
-does not attempt is photorealism, which is shaded pixels and does not survive
-being scaled down.
+**The issued badge is still generated.** The badge served onto a customer's site
+comes from `packages/badge/src/render.ts` on every request, and that is not a
+preference: it is what makes a revocation take effect in minutes, and what lets
+one badge carry one application's own score and date. Its seal follows the
+artwork's composition — arc legend between two stars, mark on a field, banner
+ribbon — and since 2026-08-26 its treatment too: a struck metal band on a dark
+centre, lit on one edge and shadowed on the other.
+
+So the two are not the same file and are not meant to be. One is the mark being
+shown; the other is the mark being issued.
 
 ## A compression pass was tried, and rejected
 
