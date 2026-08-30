@@ -57,6 +57,12 @@ export default function HomePage() {
             Create an account
           </Link>
           <Link
+            href="/how-it-works"
+            className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
+          >
+            What happens to your app
+          </Link>
+          <Link
             href="/trust-check"
             className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
           >

@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./authorisation": "./src/authorisation/index.ts",
-    "./scope": "./src/runtime/scope.ts"
+    "./scope": "./src/runtime/scope.ts",
+    "./evidence": "./src/runtime/evidence.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

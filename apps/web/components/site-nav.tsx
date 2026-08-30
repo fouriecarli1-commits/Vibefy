@@ -39,6 +39,11 @@ const GROUPS: readonly NavGroup[] = [
     id: 'verify',
     label: 'Verify',
     items: [
+      {
+        href: '/how-it-works',
+        label: 'What happens to your app',
+        hint: 'The mechanism, the limits, and what we never see',
+      },
       { href: '/verify', label: 'Check a badge', hint: 'Confirm a mark you found somewhere' },
       {
         href: '/trust-check',
