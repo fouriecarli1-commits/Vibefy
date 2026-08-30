@@ -44,7 +44,7 @@
     }
   ],
   "ceilings": {
-    "perRunCostUsd": { "limited": 0.5, "full": 4, "continuous": 2 },
+    "perRunCostUsd": { "limited": 1, "full": 4, "continuous": 2 },
     "freeTierPerAccountMonthlyUsd": 2,
     "globalDailySpendUsd": 200,
     "freeTierWeeklyBudgetAlertUsd": 100

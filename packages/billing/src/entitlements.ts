@@ -105,6 +105,16 @@ export const ENTITLEMENTS: Readonly<Record<PlanTier, Entitlement>> = {
   },
 };
 
+/**
+ * Every plan, cheapest first.
+ *
+ * Derived from `ENTITLEMENTS` rather than written out again: a hand-kept second
+ * list is a list that loses a tier the day one is added, and the surface that
+ * reads this is the operator's plan picker — where a missing option looks like
+ * the plan does not exist.
+ */
+export const PLAN_TIERS = Object.keys(ENTITLEMENTS) as readonly PlanTier[];
+
 export function entitlementFor(plan: PlanTier): Entitlement {
   const entitlement = ENTITLEMENTS[plan];
   if (!entitlement) throw new Error(`No entitlement defined for plan "${plan}".`);

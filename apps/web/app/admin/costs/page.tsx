@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { CEILINGS } from '@vibefycode/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
@@ -79,6 +80,9 @@ export default async function CostsPage() {
         <p className="text-muted">
           What each assessment costs us to produce, against what we charge for it. Prices come from
           config/pricing.json; nothing on the scoring path can read either.
+        </p>
+        <p className="text-sm text-muted">
+          <Link href="/admin/accounts">Accounts</Link> · <Link href="/review">Review queue</Link>
         </p>
       </header>
 
