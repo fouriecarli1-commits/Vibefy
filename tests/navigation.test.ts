@@ -34,9 +34,17 @@ describe('the row is grouped, not listed', () => {
   it('says what each destination is for', () => {
     // A label alone makes a reader open a page to find out whether it was the
     // one they wanted. Every item carries a line saying who it is for.
-    const items = [...nav.matchAll(/\{ href: '[^']+', label: '[^']+', hint: '[^']+' \}/g)];
-    const hrefs = [...nav.matchAll(/href: '/g)];
-    expect(items.length + 1).toBeGreaterThanOrEqual(hrefs.length - 2);
+    // Counted per entry rather than per line. An earlier version matched only
+    // items written on one line and compared totals with a fudge factor, so
+    // wrapping an entry onto three lines — which Prettier does as soon as the
+    // hint gets long — failed a test about hints for reasons of formatting.
+    //
+    // One hint per entry, exactly. Sign-in is written as JSX rather than as a
+    // data entry, so it does not appear in this count and needs no exception.
+    const hints = [...nav.matchAll(/\bhint: '/g)].length;
+    const hrefs = [...nav.matchAll(/\bhref: '/g)].length;
+    expect(hints).toBe(hrefs);
+    expect(hrefs).toBeGreaterThan(8);
     expect(nav).not.toMatch(/hint: ''/);
   });
 });

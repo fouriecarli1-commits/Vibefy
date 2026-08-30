@@ -135,6 +135,9 @@ importers:
       '@vibefycode/policy':
         specifier: workspace:*
         version: link:../../packages/policy
+      '@vibefycode/remediation':
+        specifier: workspace:*
+        version: link:../../packages/remediation
       '@vibefycode/report':
         specifier: workspace:*
         version: link:../../packages/report

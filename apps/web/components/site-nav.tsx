@@ -40,6 +40,11 @@ const GROUPS: readonly NavGroup[] = [
     label: 'Verify',
     items: [
       {
+        href: '/services/remediation',
+        label: 'Help fixing it',
+        hint: 'The service, and the conflict it creates, stated first',
+      },
+      {
         href: '/how-it-works',
         label: 'What happens to your app',
         hint: 'The mechanism, the limits, and what we never see',

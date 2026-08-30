@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { scopeStatement, AI_DISCLOSURE, MARKETING_CLIENT_DISCLOSURE } from '@vibefycode/shared';
+import {
+  scopeStatement,
+  AI_DISCLOSURE,
+  MARKETING_CLIENT_DISCLOSURE,
+  REMEDIATION_CLIENT_DISCLOSURE,
+} from '@vibefycode/shared';
 import { readAsAnon } from '@/lib/sql';
 
 /**
@@ -29,13 +34,15 @@ interface BadgeRecord {
   app_name: string;
   owner_name: string;
   owner_is_marketing_client: boolean;
+  owner_has_remediation: boolean;
 }
 
 async function loadBadge(slug: string): Promise<BadgeRecord | null> {
   return readAsAnon(async (client) => {
     const { rows } = await client.query<BadgeRecord>(
       `select public_id, slug, status, score, rubric_version, assessed_at, issued_at, expires_at,
-              certified_origin, signature, signing_key_id, app_name, owner_name, owner_is_marketing_client
+              certified_origin, signature, signing_key_id, app_name, owner_name,
+              owner_is_marketing_client, owner_has_remediation
          from public.badge_verification where slug = $1`,
       [slug],
     );
@@ -132,6 +139,21 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
         </p>
         <p className="mt-3 text-sm text-muted">{AI_DISCLOSURE}</p>
       </section>
+
+      {badge.owner_has_remediation && (
+        <section role="note" className="rounded-xl border border-line p-5">
+          <h2 className="font-semibold">Disclosure</h2>
+          <p className="mt-2 text-sm text-muted">
+            {/* The sharper of the two relationships, so it is stated first and in
+                the same place as the score rather than in a policy somebody has
+                to go looking for. A separation nobody can see is a separation
+                nobody has reason to believe. */}
+            {REMEDIATION_CLIENT_DISCLOSURE} The database refuses a review by anyone recorded against
+            that work, and the scoring code cannot import the module the engagement lives in. See
+            the <Link href="/legal/rating-methodology-and-independence">independence policy</Link>.
+          </p>
+        </section>
+      )}
 
       {badge.owner_is_marketing_client && (
         <section role="note" className="rounded-xl border border-line p-5">
