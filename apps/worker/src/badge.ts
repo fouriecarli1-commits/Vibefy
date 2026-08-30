@@ -13,7 +13,9 @@
  */
 import { randomBytes } from 'node:crypto';
 import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefycode/badge';
-import { isMonitored, type MonitoredPlan } from '@vibefycode/monitoring';
+import { badgeIssuedAlert, isMonitored, type MonitoredPlan } from '@vibefycode/monitoring';
+import { badgeEmbedSnippet } from '@vibefycode/shared';
+import { raiseAlert } from './monitoring.ts';
 import registry from '../../../legal/registry.json' with { type: 'json' };
 import type { PoolClient } from 'pg';
 
@@ -225,6 +227,65 @@ export async function issueBadgeFor(
   return { badgeId: rows[0]!.id, slug, publicId };
 }
 
+/**
+ * The verification origin, as the customer will see it in their own footer.
+ *
+ * Falls back to the site URL, and then to nothing — an alert carrying a relative
+ * path is less useful than one that says plainly it could not build the link.
+ */
+function verifyOrigin(): string {
+  return (process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(
+    /\/+$/,
+    '',
+  );
+}
+
+async function announceIssuedBadge(
+  client: PoolClient,
+  candidate: IssuanceCandidate,
+  result: { badgeId: string; slug: string; publicId: string },
+  log: (message: string, detail?: Record<string, unknown>) => void,
+): Promise<void> {
+  const origin = verifyOrigin();
+  if (!origin.startsWith('https://')) {
+    // `badgeEmbedSnippet` refuses to build a snippet against a non-HTTPS origin,
+    // which is correct and would throw here. Saying so once beats a stack trace
+    // every thirty seconds on a deployment whose URL is not configured yet.
+    log('badge issued but not announced — no HTTPS verification origin configured', {
+      badgeId: result.badgeId,
+      needs: 'NEXT_PUBLIC_VERIFY_URL or NEXT_PUBLIC_SITE_URL',
+    });
+    return;
+  }
+
+  const { rows } = await client.query<{ expires_at: string }>(
+    'select expires_at from public.badges where id = $1',
+    [result.badgeId],
+  );
+  const expiresAt = rows[0]?.expires_at;
+  if (!expiresAt) return;
+
+  const draft = badgeIssuedAlert({
+    appName: candidate.appName,
+    appId: candidate.appId,
+    badgeId: result.badgeId,
+    score: candidate.score,
+    rubricVersion: candidate.rubricVersion,
+    expiresAt: new Date(expiresAt),
+    verificationUrl: `${origin}/a/${result.slug}`,
+    embedSnippet: badgeEmbedSnippet({
+      appName: candidate.appName,
+      rubricVersion: candidate.rubricVersion,
+      assessedOn: candidate.assessedOn,
+      verifyOrigin: origin,
+      publicId: result.publicId,
+      slug: result.slug,
+    }),
+  });
+
+  await raiseAlert(client, candidate.organisationId, draft);
+}
+
 export async function sweepBadgeIssuance(
   pool: { connect(): Promise<PoolClient> },
   log: (message: string, detail?: Record<string, unknown>) => void = () => undefined,
@@ -246,6 +307,16 @@ export async function sweepBadgeIssuance(
         const result = await issueBadgeFor(client, candidate, key);
         issued += 1;
         log('badge issued', { badgeId: result.badgeId, slug: result.slug, appId: candidate.appId });
+
+        // Tell them. `badge_suspended` and `badge_expiring` existed from the
+        // start and nothing marked the moment the badge arrived, so the customer
+        // found out by going to look — silence on the one event they paid for.
+        //
+        // Raised here rather than in a sweep of its own: the alert and the badge
+        // are written on the same connection, so a badge cannot exist without
+        // its notice having been attempted. If the alert itself fails, the badge
+        // still stands; a notification is not worth undoing an issuance for.
+        await announceIssuedBadge(client, candidate, result, log);
       } catch (error) {
         log('badge issuance failed', {
           appId: candidate.appId,

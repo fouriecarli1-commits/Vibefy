@@ -64,8 +64,23 @@ export async function findPendingEmails(client: PoolClient, limit = 200): Promis
        left join public.apps app on app.id = al.app_id
       where al.created_at > now() - interval '7 days'
         and u.deleted_at is null
-        and (u.alert_email_level = 'all' or al.severity = 'critical')
-        and al.severity in ('warning', 'critical')
+        -- Two filters, and one exception to both.
+        --
+        -- The severity floor exists so nobody is emailed about routine
+        -- information. badge_issued is information and is still the one event
+        -- the customer paid for: it happens once per badge, it carries the embed
+        -- snippet they need, and a product that reliably delivers its bad news
+        -- and stays quiet about its good news teaches people to dread its name.
+        -- It is exempt from the floor, not promoted above it — calling a badge
+        -- being issued a "warning" to get it delivered would be a lie told to
+        -- the code so it would behave.
+        and (
+          al.kind = 'badge_issued'
+          or (
+            (u.alert_email_level = 'all' or al.severity = 'critical')
+            and al.severity in ('warning', 'critical')
+          )
+        )
         and not exists (
           select 1 from public.email_suppressions s where s.email = u.email
         )

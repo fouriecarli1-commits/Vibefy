@@ -23,6 +23,7 @@ import {
   BADGE_LICENCE_VERSION,
   findIssuanceCandidates,
   issueBadgeFor,
+  sweepBadgeIssuance,
   sweepBadgeLifecycle,
 } from '../apps/worker/src/badge.ts';
 import { connect } from './setup/client.ts';
@@ -257,6 +258,106 @@ describe('issuing', () => {
     } finally {
       client.release();
     }
+  });
+});
+
+describe('telling the customer their badge exists', () => {
+  // For its first months nothing did. `badge_suspended` and `badge_expiring`
+  // were both raised from the start, and the moment the customer actually paid
+  // for passed in silence — they found out by going to look.
+  // `sweepBadgeIssuance` loads the signing key from the environment rather than
+  // taking one, because in production only the worker holds it. These two tests
+  // drive the sweep rather than `issueBadgeFor`, so they have to supply it.
+  const withSigningKey = async (run: () => Promise<void>) => {
+    const before = {
+      k: process.env.VIBEFYCODE_BADGE_SIGNING_KEY_B64,
+      id: process.env.VIBEFYCODE_BADGE_KEY_ID,
+      verify: process.env.NEXT_PUBLIC_VERIFY_URL,
+      site: process.env.NEXT_PUBLIC_SITE_URL,
+    };
+    process.env.VIBEFYCODE_BADGE_SIGNING_KEY_B64 = generated.privateKeyB64;
+    process.env.VIBEFYCODE_BADGE_KEY_ID = generated.kid;
+    try {
+      await run();
+    } finally {
+      for (const [name, value] of [
+        ['VIBEFYCODE_BADGE_SIGNING_KEY_B64', before.k],
+        ['VIBEFYCODE_BADGE_KEY_ID', before.id],
+        ['NEXT_PUBLIC_VERIFY_URL', before.verify],
+        ['NEXT_PUBLIC_SITE_URL', before.site],
+      ] as const) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  };
+  it('raises one notice per badge, carrying the embed snippet', async () => {
+    await approvedAssessment();
+    await acceptLicence(owner);
+    await withSigningKey(async () => {
+      process.env.NEXT_PUBLIC_VERIFY_URL = 'https://verify.vibefycode.test';
+      const raised = await sweepBadgeIssuance(pool);
+      expect(raised).toBeGreaterThan(0);
+
+      // Counted rather than pinned to one. The suite shares a database and
+      // reuses the organisation, so the sweep legitimately issues a badge for
+      // every approved assessment an earlier test left behind. What matters is
+      // that each issued badge got exactly one notice, and that running the
+      // sweep again adds none — the dedupe key doing its job.
+      const alerts = async () =>
+        (
+          await db.query<{ body: string; severity: string; title: string; badge_id: string }>(
+            `select body, severity::text as severity, title, badge_id
+               from public.alerts
+              where kind = 'badge_issued' and organisation_id = $1`,
+            [owner.organisationId],
+          )
+        ).rows;
+
+      const rows = await alerts();
+      expect(rows.length).toBeGreaterThan(0);
+      expect(new Set(rows.map((row) => row.badge_id)).size).toBe(rows.length);
+
+      for (const row of rows) {
+        expect(row.severity).toBe('info');
+        expect(row.title).toMatch(/badge is live/);
+        // The snippet travels in the body rather than as a link to it: somebody
+        // reading this on a phone forwards it to whoever maintains the site,
+        // and that person needs the line, not a login.
+        expect(row.body).toContain('<a href="https://verify.vibefycode.test/a/');
+        expect(row.body).toContain('<img src="https://verify.vibefycode.test/badge/');
+        expect(row.body).toContain('Scope-limited assessment, not a security guarantee');
+      }
+
+      await sweepBadgeIssuance(pool);
+      expect(await alerts()).toHaveLength(rows.length);
+    });
+  });
+
+  it('does not fail the issuance when it cannot build the link', async () => {
+    // `badgeEmbedSnippet` refuses a non-HTTPS origin, correctly. A deployment
+    // whose URL is not configured yet must still issue badges — a notification
+    // is not worth undoing an issuance for.
+    await approvedAssessment();
+    await acceptLicence(owner);
+    await withSigningKey(async () => {
+      delete process.env.NEXT_PUBLIC_VERIFY_URL;
+      delete process.env.NEXT_PUBLIC_SITE_URL;
+
+      const raised = await sweepBadgeIssuance(pool);
+      expect(raised).toBeGreaterThan(0);
+
+      const alerts = await db.query(
+        `select 1 from public.alerts where kind = 'badge_issued' and organisation_id = $1`,
+        [owner.organisationId],
+      );
+      expect(alerts.rows).toHaveLength(0);
+      const badges = await db.query(
+        `select 1 from public.badges where status = 'active' and organisation_id = $1`,
+        [owner.organisationId],
+      );
+      expect(badges.rows.length).toBeGreaterThan(0);
+    });
   });
 });
 

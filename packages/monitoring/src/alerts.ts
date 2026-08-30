@@ -20,6 +20,7 @@ export type AlertKind =
   | 'material_regression'
   | 'badge_suspended'
   | 'badge_expiring'
+  | 'badge_issued'
   | 'application_unreachable'
   | 'application_recovered'
   | 'subscription_problem';
@@ -137,6 +138,49 @@ export function recoveredAlert(appName: string, appId: string, at: Date): AlertD
     body: `${appName} is answering our liveness checks again. Any badge suspended for unreachability has been restored.`,
     appId,
     dedupeKey: `recovered:${appId}:${day(at)}`,
+  };
+}
+
+/**
+ * The one piece of good news, and for its first months the only event the
+ * customer was not told about.
+ *
+ * `badge_suspended` and `badge_expiring` existed from the start. Nothing marked
+ * the moment the badge actually arrived — the moment they paid for — so they
+ * found out by going to look. A product that reliably delivers its bad news and
+ * stays quiet about its good news teaches people to dread hearing from it.
+ *
+ * The embed snippet travels in the body rather than as a link to it. Somebody
+ * reading this on a phone can forward it to whoever maintains the site, and
+ * that person needs the line, not a login.
+ */
+export function badgeIssuedAlert(input: {
+  readonly appName: string;
+  readonly appId: string;
+  readonly badgeId: string;
+  readonly score: number;
+  readonly rubricVersion: string;
+  readonly expiresAt: Date;
+  readonly verificationUrl: string;
+  readonly embedSnippet: string;
+}): AlertDraft {
+  return {
+    kind: 'badge_issued',
+    severity: 'info',
+    title: `${input.appName}: the badge is live`,
+    body:
+      `${input.appName} scored ${input.score.toFixed(1)} against Rubric v${input.rubricVersion} and a reviewer approved it, ` +
+      `so the Verified by VibefyCode badge is now issued. It is in force until ${day(input.expiresAt)}, ` +
+      `and on a continuous plan it is re-assessed before then rather than left to lapse.\n\n` +
+      `Its verification page, which anybody may open: ${input.verificationUrl}\n\n` +
+      `To show it, paste this where you want it to appear:\n\n${input.embedSnippet}\n\n` +
+      `The image is served from VibefyCode on every load and is never copied to your server. ` +
+      `That is what lets a suspension take effect within minutes, and it is why there is no file to download.`,
+    appId: input.appId,
+    badgeId: input.badgeId,
+    // Once per badge. A badge is issued once; a duplicate here would mean the
+    // issuance sweep ran twice over the same row, which is a different bug.
+    dedupeKey: `badge-issued:${input.badgeId}`,
   };
 }
 

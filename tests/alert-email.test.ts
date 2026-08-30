@@ -368,3 +368,32 @@ describe('the console surfaces what needs action, without being asked', () => {
     expect(home).toContain('markAlertRead');
   });
 });
+
+describe('the one piece of good news reaches the inbox', () => {
+  // The severity floor exists so nobody is emailed about routine information,
+  // and `badge_issued` is routine information by that measure — which would
+  // have left the alert visible only to somebody who went looking for it, the
+  // exact problem it was added to solve.
+  //
+  // So it is exempt from the floor rather than promoted above it. Calling a
+  // badge being issued a "warning" to get it delivered would be a lie told to
+  // the code so that the code would behave.
+  const email = readFileSync(join(process.cwd(), 'apps/worker/src/email.ts'), 'utf8');
+
+  it('lets the issuance notice past the severity floor', () => {
+    expect(email).toContain("al.kind = 'badge_issued'");
+  });
+
+  it('keeps the floor for everything else', () => {
+    expect(email).toContain("al.severity in ('warning', 'critical')");
+  });
+
+  it('does not dress it up as a warning to get it sent', () => {
+    const alerts = readFileSync(join(process.cwd(), 'packages/monitoring/src/alerts.ts'), 'utf8');
+    // The whole function, up to the next export. Slicing to the first `}` finds
+    // the end of the parameter type, which is before the severity is set.
+    const from = alerts.indexOf('export function badgeIssuedAlert');
+    const next = alerts.indexOf('export function', from + 1);
+    expect(alerts.slice(from, next === -1 ? undefined : next)).toContain("severity: 'info'");
+  });
+});
