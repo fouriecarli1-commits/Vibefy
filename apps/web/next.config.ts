@@ -46,6 +46,7 @@ const nextConfig: NextConfig = {
     '@vibefycode/notify',
     '@vibefycode/policy',
     '@vibefycode/report',
+    '@vibefycode/remediation',
     '@vibefycode/rubric',
     '@vibefycode/shared',
     '@vibefycode/trustcheck',

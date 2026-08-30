@@ -66,5 +66,21 @@ export const PERMITTED_MARK_PHRASES = [
  * one constant, because two surfaces wording the same disclosure differently is
  * how the softer wording ends up in the place people actually look.
  */
+/**
+ * The remediation disclosure.
+ *
+ * A rating service that also sells repairs has a financial interest in finding
+ * faults. That is not an accusation, it is arithmetic — and it is the objection
+ * every sceptic will raise, correctly, the moment the service exists.
+ *
+ * It cannot be answered by promising restraint. It is answered by the score
+ * being unreachable from the commercial side (asserted in
+ * `tests/independence.test.ts` and `tests/remediation-wall.test.ts`), by the
+ * person who did the work being barred from approving the assessment, and by
+ * saying so on the face of the result rather than in a policy nobody opens.
+ */
+export const REMEDIATION_CLIENT_DISCLOSURE =
+  'VibefyCode was paid to help fix this application. That work had no part in this assessment: the score is produced by the published rubric from evidence, no one who worked on the application may review it, and there is no path by which any payment can change a finding or a score.';
+
 export const MARKETING_CLIENT_DISCLOSURE =
   'This application’s owner is also a client of our marketing services. That relationship had no part in this assessment: the score is produced by the published rubric from evidence, reviewed by a person, and there is no path by which any payment can change it.';
