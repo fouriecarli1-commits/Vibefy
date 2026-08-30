@@ -165,7 +165,7 @@ export default function HomePage() {
       <section aria-labelledby="example-heading" className="space-y-5">
         <div className="space-y-2">
           <h2 id="example-heading" className="text-2xl font-bold">
-            How it looks on a real site
+            Where it sits on your site
           </h2>
           <p className="max-w-2xl text-muted">
             One line of HTML in your footer. It links to the verification page, so a visitor who
@@ -210,11 +210,11 @@ export default function HomePage() {
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/vibefycode-badge-verified-compact.svg"
+                src="/brand/vibefycode-badge-artwork.webp"
                 alt=""
-                width={96}
-                height={96}
-                className="h-24 w-24"
+                width={112}
+                height={112}
+                className="h-28 w-28"
               />
             </div>
           </div>

@@ -22,6 +22,7 @@ import {
   applyProbe,
   assessMateriality,
   badgeExpiringAlert,
+  rubricSupersededAlert,
   badgeSuspendedAlert,
   cadenceFor,
   computeDrift,
@@ -742,6 +743,74 @@ export async function sweepLiveness(
 // ---------------------------------------------------------------------------
 // Sweep 4 — telling people before the badge expires, not after
 // ---------------------------------------------------------------------------
+
+/**
+ * Live badges measured against a rubric version that has since been superseded.
+ *
+ * The join is the whole feature. `badges.rubric_version` and
+ * `rubric_versions.superseded_at` have both existed from the start; nobody had
+ * asked them the question together.
+ *
+ * The current version is whichever is effective and not itself superseded. If
+ * that query returns nothing — a database with no rubric published yet — the
+ * sweep does nothing rather than inventing a version to compare against.
+ */
+export async function sweepSupersededRubric(pool: Poolish, log: Logger = noop): Promise<number> {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query<{
+      badge_id: string;
+      app_id: string;
+      organisation_id: string;
+      name: string;
+      earned_version: string;
+      current_version: string;
+      superseded_at: string;
+      expires_at: string;
+    }>(
+      `with current as (
+         select version
+           from public.rubric_versions
+          where superseded_at is null
+            and effective_from is not null
+            and effective_from <= now()
+          order by effective_from desc
+          limit 1
+       )
+       select b.id as badge_id, b.app_id, b.organisation_id, app.name,
+              b.rubric_version as earned_version,
+              current.version   as current_version,
+              earned.superseded_at,
+              b.expires_at
+         from public.badges b
+         join public.apps app on app.id = b.app_id
+         join public.rubric_versions earned on earned.version = b.rubric_version
+         cross join current
+        where b.status = 'active'
+          and b.expires_at > now()
+          and earned.superseded_at is not null
+          and earned.version <> current.version`,
+    );
+
+    let raised = 0;
+    for (const row of rows) {
+      const draft = rubricSupersededAlert({
+        appName: row.name,
+        appId: row.app_id,
+        badgeId: row.badge_id,
+        earnedVersion: row.earned_version,
+        currentVersion: row.current_version,
+        supersededAt: new Date(row.superseded_at),
+        expiresAt: new Date(row.expires_at),
+      });
+      if (await raiseAlert(client, row.organisation_id, draft)) raised += 1;
+    }
+    if (raised > 0) log('superseded-rubric notices raised', { raised });
+    return raised;
+  } finally {
+    client.release();
+  }
+}
 
 export const EXPIRY_WARNING_DAYS = [30, 7] as const;
 

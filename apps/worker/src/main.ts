@@ -17,6 +17,7 @@ import { resolveReportStorage, sweepPendingReports } from './report.ts';
 import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
 import {
   sweepBadgeExpiryWarnings,
+  sweepSupersededRubric,
   sweepDriftDetection,
   sweepLiveness,
   sweepScheduledReassessments,
@@ -158,6 +159,13 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
     );
     void sweepBadgeExpiryWarnings(pool, log).catch((error) =>
       log('badge expiry sweep failed', { error: String(error) }),
+    );
+    // The standard moving on is a slow fact — a rubric is superseded a handful
+    // of times a year — so it rides the five-minute monitoring beat rather than
+    // getting a timer of its own. Idempotent, like every sweep here: the dedupe
+    // key means running it a thousand times raises the notice once.
+    void sweepSupersededRubric(pool, log).catch((error) =>
+      log('superseded rubric sweep failed', { error: String(error) }),
     );
     // Alerts reach phones from here. The console is still the record; a push is
     // a copy of it, and one that fails is retried rather than lost.

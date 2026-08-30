@@ -138,8 +138,16 @@ describe('the example of a site carrying the badge', () => {
     expect(home).toMatch(/className="browser-page" aria-hidden="true"/);
   });
 
-  it('uses the compact badge, which is the one built for that size', () => {
-    expect(home).toContain('vibefycode-badge-verified-compact.svg');
+  it('shows the badge a visitor would actually see', () => {
+    expect(home).toContain('vibefycode-badge-artwork.webp');
+  });
+
+  it('does not call a fictional site a real one', () => {
+    // The heading said "how it looks on a real site" directly above a caption
+    // explaining that the application is fictional. On the page whose subject is
+    // claims being precise, that is not a small thing to get wrong.
+    expect(home).not.toMatch(/on a real site/i);
+    expect(home).toMatch(/A fictional application/);
   });
 });
 

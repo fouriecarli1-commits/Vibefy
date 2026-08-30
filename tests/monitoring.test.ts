@@ -7,11 +7,14 @@
  * its badge and gets it back, that a re-assessment is queued once and not
  * repeatedly, and that none of it can produce a wall of duplicate alerts.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Client, Pool } from 'pg';
 import {
   recordDriftFor,
   sweepBadgeExpiryWarnings,
+  sweepSupersededRubric,
   sweepDriftDetection,
   sweepLiveness,
   sweepScheduledReassessments,
@@ -352,6 +355,77 @@ describe('alerts do not repeat themselves', () => {
     const expiring = (await alertsFor(space)).filter((alert) => alert.kind === 'badge_expiring');
     expect(expiring).toHaveLength(1);
     expect(expiring[0]!.body).toMatch(/expires in 5 days/);
+  });
+});
+
+describe('when the standard moves on', () => {
+  // A score is never retroactively altered by a rubric revision — the database
+  // refuses to edit a published version — so a badge earned against v1.0.0 stays
+  // valid on v1.0.0 terms. Correct, and it means a customer can be carrying a
+  // live mark measured against a standard nobody uses any more.
+  //
+  // Both halves of the answer were already in the database. Nobody had asked
+  // them together.
+  const supersede = async (from: string, to: string) => {
+    await db.query(
+      `insert into public.rubric_versions (version, definition, checksum, changelog, published_at, effective_from)
+       values ($1, '{}'::jsonb, repeat('a', 64), 'test', now(), now())
+       on conflict (version) do nothing`,
+      [to],
+    );
+    await db.query(`update public.rubric_versions set superseded_at = now() where version = $1`, [
+      from,
+    ]);
+  };
+
+  it('tells a badge holder their rubric version was superseded, once', async () => {
+    const space = await workspace('rubric-superseded');
+    const assessmentId = await assess(space, { score: 80 });
+    const consentId = await acceptBadgeLicence(db, space.owner);
+    await issueBadge(db, space.owner, { appId: space.appId, assessmentId, consentId });
+
+    // Nothing to say while the rubric it was earned against is still current.
+    expect(await sweepSupersededRubric(pool)).toBe(0);
+
+    await supersede('1.0.0', '1.1.0');
+
+    expect(await sweepSupersededRubric(pool)).toBeGreaterThanOrEqual(1);
+    expect(await sweepSupersededRubric(pool)).toBe(0);
+
+    const raised = (await alertsFor(space)).filter((alert) => alert.kind === 'rubric_superseded');
+    expect(raised).toHaveLength(1);
+    expect(raised[0]!.body).toMatch(/earned its badge against Rubric v1\.0\.0/);
+    expect(raised[0]!.body).toMatch(/v1\.1\.0 is now in force/);
+  });
+
+  it('says plainly that the badge is unaffected', () => {
+    // The notice must not read as a suspension. A customer who thinks their
+    // badge just stopped working will pull it off their site, and they would be
+    // wrong to — nothing about the assessment they hold has changed.
+    const alerts = readFileSync(join(process.cwd(), 'packages/monitoring/src/alerts.ts'), 'utf8');
+    const draft = alerts.slice(alerts.indexOf('export function rubricSupersededAlert'));
+    expect(draft).toContain('The badge is unaffected');
+    expect(draft).toContain('never changed after the fact');
+  });
+
+  it('sells nothing', () => {
+    // Monitoring is the half of this product whose independence has to be beyond
+    // question. A signal that arrives bundled with an offer is a signal somebody
+    // can reasonably suspect was generated in order to make the offer — which is
+    // the objection the whole independence policy exists to answer.
+    const alerts = readFileSync(join(process.cwd(), 'packages/monitoring/src/alerts.ts'), 'utf8');
+    const from = alerts.indexOf('export function rubricSupersededAlert');
+    const draft = alerts.slice(from, alerts.indexOf('export function', from + 1));
+    for (const pitch of [
+      'we can',
+      'our team',
+      'upgrade service',
+      'let us fix',
+      'buy ',
+      'discount',
+    ]) {
+      expect(draft.toLowerCase(), `the notice pitches: ${pitch}`).not.toContain(pitch);
+    }
   });
 });
 

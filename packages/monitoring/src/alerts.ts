@@ -21,6 +21,7 @@ export type AlertKind =
   | 'badge_suspended'
   | 'badge_expiring'
   | 'badge_issued'
+  | 'rubric_superseded'
   | 'application_unreachable'
   | 'application_recovered'
   | 'subscription_problem';
@@ -181,6 +182,50 @@ export function badgeIssuedAlert(input: {
     // Once per badge. A badge is issued once; a duplicate here would mean the
     // issuance sweep ran twice over the same row, which is a different bug.
     dedupeKey: `badge-issued:${input.badgeId}`,
+  };
+}
+
+/**
+ * The standard moved, and the badge did not.
+ *
+ * A score is never retroactively altered by a rubric change — the database
+ * refuses to edit a published rubric version for exactly that reason — so a
+ * badge earned against v1.0.0 stays valid on v1.0.0 terms until it expires.
+ * Which is correct, and also means a customer can be carrying a live mark
+ * measured against a standard nobody uses any more, and nothing said so.
+ *
+ * What this notice does **not** do is sell anything. It is raised by monitoring,
+ * and monitoring is the half of this product whose independence has to be
+ * beyond question: a signal that arrives bundled with an offer is a signal
+ * somebody can reasonably suspect was generated to make the offer. It states
+ * what changed and what the customer may do about it, and stops.
+ */
+export function rubricSupersededAlert(input: {
+  readonly appName: string;
+  readonly appId: string;
+  readonly badgeId: string;
+  readonly earnedVersion: string;
+  readonly currentVersion: string;
+  readonly supersededAt: Date;
+  readonly expiresAt: Date;
+}): AlertDraft {
+  return {
+    kind: 'rubric_superseded',
+    severity: 'info',
+    title: `${input.appName}: assessed against Rubric v${input.earnedVersion}, which is no longer current`,
+    body:
+      `${input.appName} earned its badge against Rubric v${input.earnedVersion}. ` +
+      `That version was superseded on ${day(input.supersededAt)}; v${input.currentVersion} is now in force.\n\n` +
+      `The badge is unaffected and stays valid until ${day(input.expiresAt)}. A score is never changed after the fact by ` +
+      `a rubric revision, so nothing about the assessment you already have has moved.\n\n` +
+      `What has changed is the standard the next assessment will use. If you would rather be measured against it now ` +
+      `than at renewal, request a re-assessment; the published rubric sets out what is different.`,
+    appId: input.appId,
+    badgeId: input.badgeId,
+    // Once per badge per rubric version. A customer who sits on an old version
+    // through three revisions should hear about each one, and never twice about
+    // the same one.
+    dedupeKey: `rubric-superseded:${input.badgeId}:${input.currentVersion}`,
   };
 }
 
