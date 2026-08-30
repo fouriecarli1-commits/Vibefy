@@ -12,7 +12,7 @@
 import { Pool } from 'pg';
 import { resendFromEnvironment } from '@vibefycode/notify';
 import { NotAuthorisedError, runAssessmentJob } from './run-assessment.ts';
-import { claimNextRequest, completeRequest, failRequest } from './queue.ts';
+import { claimNextRequest, completeRequest, failRequest, isRetryableFailure } from './queue.ts';
 import { resolveReportStorage, sweepPendingReports } from './report.ts';
 import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
 import {
@@ -87,7 +87,10 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
     const message = error instanceof Error ? error.message : String(error);
     // An unauthorised target does not become authorised by trying again, and
     // retrying it would mean attempting to test something we may not test, twice.
-    const retryable = !(error instanceof NotAuthorisedError);
+    // Nor does a constraint violation resolve itself: the assessment has already
+    // been paid for by the time persistence fails, so requeueing a deterministic
+    // database error buys the same error at full price.
+    const retryable = !(error instanceof NotAuthorisedError) && isRetryableFailure(error);
     const client = await pool.connect();
     try {
       const outcome = await failRequest(client, claimed.id, message, { retryable });

@@ -82,6 +82,33 @@ export async function completeRequest(
 }
 
 /**
+ * Postgres error classes a retry cannot fix.
+ *
+ * This exists because of a real incident. The first production run finished,
+ * cost real money, and then failed to persist against a foreign key — a rubric
+ * version that had never been published. That is a deterministic failure: the
+ * constraint will be violated identically every time. The job was requeued
+ * anyway, so the whole assessment was paid for three times to reach the same
+ * error.
+ *
+ *   22 — data exception (a value that will not fit or will not parse)
+ *   23 — integrity constraint violation (the one that bit us)
+ *   42 — syntax error or access rule violation (our SQL is wrong)
+ *
+ * Everything else still retries. A dropped connection, a deadlock, a
+ * serialisation failure are all worth another attempt, and a deny-list keeps
+ * them retryable rather than an allow-list quietly making them permanent.
+ */
+const UNRETRYABLE_SQLSTATE_CLASSES = ['22', '23', '42'];
+
+/** Whether another attempt could plausibly end differently. */
+export function isRetryableFailure(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code !== 'string') return true;
+  return !UNRETRYABLE_SQLSTATE_CLASSES.includes(code.slice(0, 2));
+}
+
+/**
  * A failed request goes back to the queue unless it has run out of attempts, or
  * unless the failure is one a retry cannot fix — an unauthorised target does not
  * become authorised by trying again, and retrying it would be attempting to test

@@ -36,6 +36,54 @@ export class AuthorisationWithdrawnError extends Error {
   }
 }
 
+/**
+ * Writes down money that was spent by a run which never became an assessment.
+ *
+ * The success path records cost inside `persistOutcome`'s transaction, keyed to
+ * the assessment. When that transaction is the thing that failed, the spend is
+ * no less real — the model was called, the tokens were bought — and the daily
+ * cap reads `cost_records`. Recording nothing would mean the ledger under-reports
+ * precisely when a run is failing repeatedly, which is when it matters most.
+ *
+ * One row per stage, exactly as the success path writes them, with a null
+ * assessment id. Kept deliberately quiet: this runs while another error is on
+ * its way up, and it must never replace it.
+ */
+export async function recordUnattributedCost(
+  // Only `query` — this function never owns the connection, so it must never be
+  // in a position to release one. It also lets the tests hand it a plain Client.
+  client: Pick<PoolClient, 'query'>,
+  input: {
+    readonly organisationId: string;
+    readonly costByStage: AssessmentOutcome['costByStage'];
+  },
+): Promise<number> {
+  let written = 0;
+  for (const record of Object.values(input.costByStage)) {
+    await client.query(
+      `insert into public.cost_records
+         (assessment_id, organisation_id, model, input_tokens, output_tokens, cache_read_tokens,
+          ai_cost_usd, compute_seconds, compute_cost_usd, storage_bytes, third_party_calls, third_party_cost_usd)
+       values (null, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        input.organisationId,
+        record.model,
+        record.inputTokens,
+        record.outputTokens,
+        record.cacheReadTokens,
+        record.aiCostUsd.toFixed(6),
+        record.computeSeconds.toFixed(3),
+        record.computeCostUsd.toFixed(6),
+        record.storageBytes,
+        record.thirdPartyCalls,
+        record.thirdPartyCostUsd.toFixed(6),
+      ],
+    );
+    written += 1;
+  }
+  return written;
+}
+
 export async function persistOutcome(client: PoolClient, input: PersistInput): Promise<string> {
   const { outcome } = input;
 

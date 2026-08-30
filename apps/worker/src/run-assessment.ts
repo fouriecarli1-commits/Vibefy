@@ -22,7 +22,7 @@ import {
   type ModelTransport,
   type StageContext,
 } from '@vibefycode/engine';
-import { persistOutcome } from './persist.ts';
+import { persistOutcome, recordUnattributedCost } from './persist.ts';
 
 export const ENGINE_VERSION = '1.0.0';
 
@@ -129,6 +129,23 @@ export async function runAssessmentJob(
       totalCostUsd: outcome.totalCostUsd,
       status: outcome.status,
     };
+  } catch (error) {
+    // The run has already been paid for. If it cannot be written down as an
+    // assessment, the money is still gone, and the spend cap reads the ledger —
+    // so the cost goes in unattributed rather than vanishing. Best-effort and
+    // deliberately silent on its own failure: the error below is the one worth
+    // reporting, and losing it to a secondary failure here would replace a
+    // precise diagnosis with a vague one.
+    try {
+      const rows = await recordUnattributedCost(client, {
+        organisationId: appRow.organisation_id,
+        costByStage: outcome.costByStage,
+      });
+      log('unpersisted run cost recorded', { rows, costUsd: outcome.totalCostUsd });
+    } catch (ledgerError) {
+      log('unpersisted run cost could not be recorded', { error: String(ledgerError) });
+    }
+    throw error;
   } finally {
     client.release();
   }
