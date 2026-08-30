@@ -50,6 +50,22 @@ const webPublicDir = join(root, 'apps/web/public/brand');
  * rather than eyeballed.
  */
 const BADGE_ARTWORK = 'vibefycode-badge-artwork.webp';
+/**
+ * The three states, derived from the same artwork.
+ *
+ * Tinting alone is not enough and would be dishonest. "VERIFIED BY" is arced
+ * across the top of the supplied seal in pixels, so a suspended badge that has
+ * only been recoloured still says it is verified — in amber. The claim has to be
+ * struck through, not merely tinted, which is why each of these carries a band.
+ */
+const BADGE_STATE_ARTWORK: readonly {
+  readonly status: 'suspended' | 'expired' | 'revoked';
+  readonly label: string;
+}[] = [
+  { status: 'suspended', label: 'SUSPENDED' },
+  { status: 'expired', label: 'EXPIRED' },
+  { status: 'revoked', label: 'REVOKED' },
+];
 const badgeSource = join(root, 'brand/source/supplied-badge.svg');
 /** The corner the export pill occupies, in the artwork's own 1024 grid. */
 const BADGE_WATERMARK = { x: 800, y: 0, width: 224, height: 140 };
@@ -309,6 +325,42 @@ async function buildBadgeArtwork(sharp: Sharp): Promise<number> {
     .toBuffer();
 
   writeFileSync(join(webPublicDir, BADGE_ARTWORK), seal);
+
+  // Each state: the same seal, drained of colour, tinted to its own ink, and
+  // then banded. The draining matters as much as the tint — a fully saturated
+  // red seal reads as a different, angrier badge, where a desaturated one reads
+  // as the same object with something wrong.
+  for (const state of BADGE_STATE_ARTWORK) {
+    const ink = badgeStatusColours[state.status].ring;
+    const band = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${BADGE_ARTWORK_PX}" height="${BADGE_ARTWORK_PX}">
+         <rect x="0" y="${BADGE_ARTWORK_PX * 0.4}" width="${BADGE_ARTWORK_PX}" height="${BADGE_ARTWORK_PX * 0.2}"
+               fill="${PALETTE.ink}" fill-opacity="0.94"/>
+         <rect x="0" y="${BADGE_ARTWORK_PX * 0.4}" width="${BADGE_ARTWORK_PX}" height="3" fill="${ink}"/>
+         <rect x="0" y="${BADGE_ARTWORK_PX * 0.597}" width="${BADGE_ARTWORK_PX}" height="3" fill="${ink}"/>
+         <text x="${BADGE_ARTWORK_PX / 2}" y="${BADGE_ARTWORK_PX * 0.485}" text-anchor="middle"
+               font-family="${FONT_STACK}" font-size="${BADGE_ARTWORK_PX * 0.07}" font-weight="700"
+               letter-spacing="${BADGE_ARTWORK_PX * 0.012}" fill="${PALETTE.mist}">${state.label}</text>
+         <!-- The second line is the point. "VERIFIED BY" is arced across the top
+              of the artwork in pixels and cannot be removed, so the badge has to
+              say the opposite in words rather than merely look unwell. -->
+         <text x="${BADGE_ARTWORK_PX / 2}" y="${BADGE_ARTWORK_PX * 0.556}" text-anchor="middle"
+               font-family="${FONT_STACK}" font-size="${BADGE_ARTWORK_PX * 0.036}" font-weight="600"
+               letter-spacing="${BADGE_ARTWORK_PX * 0.004}" fill="${PALETTE.mist}"
+               fill-opacity="0.85">NOT CURRENTLY VERIFIED</text>
+       </svg>`,
+    );
+
+    const tinted = await sharp(seal)
+      .modulate({ saturation: 0.18 })
+      .tint(ink)
+      .composite([{ input: band, top: 0, left: 0 }])
+      .webp({ quality: 88, alphaQuality: 100 })
+      .toBuffer();
+
+    writeFileSync(join(webPublicDir, `vibefycode-badge-artwork-${state.status}.webp`), tinted);
+  }
+
   return seal.length;
 }
 

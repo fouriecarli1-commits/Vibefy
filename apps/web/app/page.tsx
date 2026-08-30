@@ -139,18 +139,18 @@ export default function HomePage() {
           <p className="eyebrow text-center">And what it looks like when it is not in force</p>
           <ul className="flex flex-wrap items-end justify-center gap-6">
             {[
-              { file: 'vibefycode-badge-suspended.svg', label: 'Suspended', tone: 'warn' },
-              { file: 'vibefycode-badge-expired.svg', label: 'Expired', tone: undefined },
-              { file: 'vibefycode-badge-revoked.svg', label: 'Revoked', tone: 'bad' },
+              { file: 'vibefycode-badge-artwork-suspended.webp', label: 'Suspended', tone: 'warn' },
+              { file: 'vibefycode-badge-artwork-expired.webp', label: 'Expired', tone: undefined },
+              { file: 'vibefycode-badge-artwork-revoked.webp', label: 'Revoked', tone: 'bad' },
             ].map((state) => (
               <li key={state.file} className="flex flex-col items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/brand/${state.file}`}
                   alt={`The badge in its ${state.label.toLowerCase()} state`}
-                  width={96}
-                  height={96}
-                  className="h-24 w-24"
+                  width={132}
+                  height={132}
+                  className="h-[132px] w-[132px]"
                 />
                 <span className="chip" data-tone={state.tone}>
                   {state.label}

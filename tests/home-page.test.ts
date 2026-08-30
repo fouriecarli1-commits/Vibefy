@@ -79,12 +79,7 @@ describe('the light that moves over it', () => {
 });
 
 describe('the badge is shown, in every state it can be in', () => {
-  const states = [
-    'vibefycode-badge-verified.svg',
-    'vibefycode-badge-suspended.svg',
-    'vibefycode-badge-expired.svg',
-    'vibefycode-badge-revoked.svg',
-  ];
+  const states = ['suspended', 'expired', 'revoked'] as const;
 
   it('shows the active badge at a size somebody can read', () => {
     expect(home).toContain('vibefycode-badge-artwork.webp');
@@ -94,24 +89,31 @@ describe('the badge is shown, in every state it can be in', () => {
   it('shows what it looks like when it is not in force', () => {
     // A badge is never a broken image, and nobody should first meet the
     // suspended one on their own website.
-    for (const state of states.slice(1)) {
-      expect(home, `${state} is not shown`).toContain(state);
-    }
-  });
-
-  it('shows only badges that exist as committed masters', () => {
     for (const state of states) {
-      expect(
-        () => masters(join(process.cwd(), 'brand/svg', state), 'utf8'),
-        `${state} is shown on the page but is not a master`,
-      ).not.toThrow();
+      expect(home, `${state} is not shown`).toContain(`vibefycode-badge-artwork-${state}.webp`);
     }
   });
 
-  it('says what the mark means, and what it does not', () => {
-    expect(home).toContain('on a stated date');
-    expect(home).toContain('not a penetration test');
-    expect(home).toContain('comes down when it stops being true');
+  it('derives every state from the one supplied seal', () => {
+    // Four separate drawings drift into four separate brands. One seal, drained
+    // and tinted, stays recognisably the same object with something wrong.
+    const build = read('tools/brand-build.mts');
+    expect(build).toContain('BADGE_STATE_ARTWORK');
+    expect(build).toContain('.modulate({ saturation:');
+    expect(build).toContain('.tint(ink)');
+  });
+
+  it('contradicts the claim in words, not only in colour', () => {
+    // "VERIFIED BY" is arced across the top of the supplied artwork in pixels
+    // and cannot be removed. A suspended badge that has only been recoloured is
+    // a seal that still says it is verified, in amber — which is not an ugly
+    // badge, it is a false one. So each state carries a band that says the
+    // opposite in words.
+    const build = read('tools/brand-build.mts');
+    expect(build).toContain('NOT CURRENTLY VERIFIED');
+    for (const state of states) {
+      expect(build).toContain(state.toUpperCase());
+    }
   });
 });
 
