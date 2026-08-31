@@ -119,3 +119,23 @@ describe('the console offers both', () => {
     expect(page).toMatch(/footer/i);
   });
 });
+
+describe('the link, before it is somebody else’s problem', () => {
+  // Whitespace-collapsed: a sentence does not change meaning because the
+  // formatter moved the line break.
+  const collapsed = page.replace(/\s+/g, ' ');
+
+  it('shows the verification URL on its own, clickable', () => {
+    // Both snippets carry it, and a snippet is the one place nobody checks a
+    // URL — it is a block of code to be copied, not a link to be followed.
+    expect(collapsed).toMatch(/Where the badge sends people/i);
+    expect(collapsed).toContain('href={`${verifyOrigin}/a/${String(badge.slug)}`}');
+  });
+
+  it('says why the badge can show while the link does not', () => {
+    // The image and the link are separate addresses. If one is altered in
+    // transit the mark still appears, and the first person to find out is a
+    // visitor who clicked it to check — the worst possible person to find out.
+    expect(collapsed).toMatch(/the two are separate addresses/i);
+  });
+});

@@ -465,6 +465,35 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                     </p>
                   )}
 
+                  {/* The link, on its own and clickable.
+
+                      Both snippets carry the verification URL, and a snippet is
+                      the one place nobody checks a URL: it is a block of code to
+                      be copied, not a link to be followed. An altered or
+                      truncated link still shows the badge — the image and the
+                      link are separate URLs — so the first person to discover it
+                      is a visitor who clicked the mark to check, which is the
+                      worst possible person to discover it.
+
+                      One click here, before it goes anywhere. */}
+                  <p className="text-sm">
+                    <span className="text-muted">Where the badge sends people:</span>{' '}
+                    <a
+                      href={`${verifyOrigin}/a/${String(badge.slug)}`}
+                      target="_blank"
+                      rel="noopener"
+                      className="break-all"
+                    >
+                      {verifyOrigin}/a/{String(badge.slug)}
+                    </a>
+                  </p>
+                  <p className="max-w-prose text-sm text-muted">
+                    Open it now, and open it again after you have embedded the badge. If the mark
+                    shows but that page does not, the link was altered somewhere between here and
+                    your site — the two are separate addresses, and only one of them is visible on
+                    the page.
+                  </p>
+
                   <h4 className="text-sm font-semibold">HTML</h4>
                   <p className="text-sm text-muted">
                     For a plain site, or any builder with a code block.
