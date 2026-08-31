@@ -226,6 +226,47 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
         </details>
       </section>
 
+      {/* The way out.
+          
+          Somebody arriving here clicked a mark on a stranger's website, which
+          means they were curious enough to check. That is the whole audience for
+          this product, and until now the page answered their question and then
+          offered them nowhere to go — every link on it led further into the
+          small print.
+          
+          The badge itself cannot point here: the licence requires it to link to
+          this page and nothing else, because a mark that sends you to a sales
+          page instead of the evidence is an advertisement wearing the clothes of
+          a check. So the route to the product is one step further along, which
+          is also the honest order — evidence first, offer second. */}
+      <section
+        aria-labelledby="what-this-is"
+        className="rounded-xl border border-line-strong p-6 space-y-3"
+      >
+        <h2 id="what-this-is" className="text-lg font-semibold">
+          What is VibefyCode?
+        </h2>
+        <p className="max-w-prose text-muted">
+          An independent assessment of applications built quickly, often with AI. We test what we
+          can reach from outside — with the owner&apos;s written authorisation and never their
+          source code — score it against a <Link href="/methodology">published rubric</Link>, and a
+          person reviews every result before anything is certified. The mark you clicked is the
+          outcome of that, and it is scope-limited: it says what was checked and when, and nothing
+          beyond it.
+        </p>
+        <p className="flex flex-wrap gap-4 text-sm">
+          <Link href="/" className="nav-cta">
+            Get your application assessed
+          </Link>
+          <Link href="/how-it-works" className="self-center">
+            What happens to your app
+          </Link>
+          <Link href="/directory" className="self-center">
+            Others with a live badge
+          </Link>
+        </p>
+      </section>
+
       <footer className="border-t border-line pt-6 text-sm text-muted">
         <p>
           Reports are prepared for the customer. No third party — including investors, acquirers or
