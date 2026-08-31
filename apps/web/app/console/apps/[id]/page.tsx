@@ -2,7 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { CHALLENGE_PATH, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisation';
-import { badgeEmbedSnippet, BADGE_USAGE } from '@vibefycode/shared';
+import {
+  badgeEmbedJsx,
+  badgeEmbedSnippet,
+  BADGE_USAGE,
+  EMBED_PLACEMENTS,
+} from '@vibefycode/shared';
 import {
   acceptBadgeLicence,
   requestAssessment,
@@ -16,6 +21,7 @@ import { assignPolicyProfile } from '../../workspace/actions';
 import { ActionForm, Checkbox, Field, Select } from '@/components/action-form';
 import { ScoreTrend, type TrendPoint } from '@/components/score-trend';
 import { currentVersionOf } from '@/lib/legal';
+import { Disclosure } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Application' };
@@ -160,6 +166,19 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     process.env.NEXT_PUBLIC_VERIFY_URL ??
     process.env.NEXT_PUBLIC_SITE_URL ??
     'https://verify.vibefycode.example';
+
+  // The facts both snippet forms share, so the HTML and the JSX can never
+  // describe two different badges.
+  const embedFacts = badge
+    ? {
+        appName: app.name as string,
+        rubricVersion: String(badge.rubric_version),
+        assessedOn: new Date(badge.assessed_at as string).toISOString().slice(0, 10),
+        verifyOrigin,
+        publicId: String(badge.public_id),
+        slug: String(badge.slug),
+      }
+    : null;
 
   return (
     <div className="max-w-3xl space-y-10">
@@ -430,22 +449,59 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                 <div className="space-y-3">
                   <h3 className="font-semibold">Embed it</h3>
                   <p className="text-sm text-muted">
-                    Paste this where you want the badge to appear. It has to stay a link to the
-                    verification page — a badge that does not link is a claim without evidence, and
+                    Most people put it in the footer, beside the copyright line — it belongs where a
+                    visitor looks to find out who is behind a site. It has to stay a link to the
+                    verification page: a badge that does not link is a claim without evidence, and
                     the licence does not permit it. Minimum size {BADGE_USAGE.minimumSizePx}px, with
                     clear space of {Math.round(BADGE_USAGE.clearSpaceRatio * 100)}% of the badge
                     width on every side.
                   </p>
+
+                  <h4 className="text-sm font-semibold">HTML</h4>
+                  <p className="text-sm text-muted">
+                    For a plain site, or any builder with a code block.
+                  </p>
                   <pre className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs">
-                    {badgeEmbedSnippet({
-                      appName: app.name as string,
-                      rubricVersion: String(badge.rubric_version),
-                      assessedOn: new Date(badge.assessed_at as string).toISOString().slice(0, 10),
-                      verifyOrigin: verifyOrigin,
-                      publicId: String(badge.public_id),
-                      slug: String(badge.slug),
-                    })}
+                    {badgeEmbedSnippet(embedFacts!)}
                   </pre>
+
+                  <h4 className="text-sm font-semibold">React or Next.js</h4>
+                  <p className="text-sm text-muted">
+                    Use this one inside a component. The HTML above will not compile in JSX —{' '}
+                    <code>style</code> takes an object and the <code>&lt;img&gt;</code> has to be
+                    closed — and a snippet that breaks your build the moment you follow the
+                    instructions is not much of an instruction.
+                  </p>
+                  <pre className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs">
+                    {badgeEmbedJsx(embedFacts!)}
+                  </pre>
+
+                  {/* "Paste this where you want the badge to appear" is only an
+                      instruction if you already know how to edit your site.
+                      Somebody who built an application by describing it to a
+                      model may never have opened a footer component. */}
+                  <Disclosure
+                    summary="Where exactly does it go?"
+                    hint="Step by step, for the tool you built your site with"
+                  >
+                    <ul className="space-y-4">
+                      {EMBED_PLACEMENTS.map((placement) => (
+                        <li key={placement.platform}>
+                          <p className="font-medium">
+                            {placement.platform}{' '}
+                            <span className="text-muted">
+                              · use the {placement.form === 'jsx' ? 'React' : 'HTML'} snippet
+                            </span>
+                          </p>
+                          <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-muted">
+                            {placement.steps.map((step) => (
+                              <li key={step}>{step}</li>
+                            ))}
+                          </ol>
+                        </li>
+                      ))}
+                    </ul>
+                  </Disclosure>
                   <p className="text-sm text-muted">
                     The image is served from VibefyCode on every load, never copied to your server.
                     That is what lets a suspension or a revocation take effect within minutes — and

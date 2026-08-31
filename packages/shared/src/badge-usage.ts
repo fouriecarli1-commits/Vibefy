@@ -77,6 +77,119 @@ export function badgeEmbedSnippet(options: BadgeEmbedOptions): string {
   ].join('\n');
 }
 
+/**
+ * The same badge, as JSX.
+ *
+ * Most of the people this product exists for built their application in React,
+ * and pasting the HTML above into a component is a syntax error: `style` takes
+ * an object, `class` is `className`, and an unclosed `<img>` will not parse.
+ * Handing somebody a snippet that breaks their build the moment they follow the
+ * instructions is a bad way to begin a relationship with a trust mark.
+ *
+ * Identical in what it renders and in what the licence requires of it: the link
+ * to the verification page, the alt text carrying the scope, the size and the
+ * clear space.
+ */
+export function badgeEmbedJsx(options: BadgeEmbedOptions): string {
+  const size = options.sizePx ?? 128;
+  // Validated by the HTML form, which refuses anything the licence does not
+  // permit. Calling it here means the two can never disagree about the rules.
+  badgeEmbedSnippet(options);
+
+  const origin = options.verifyOrigin.replace(/\/+$/, '');
+  const alt = badgeAltText(options);
+  const padding = Math.round(size * BADGE_USAGE.clearSpaceRatio);
+
+  return [
+    `<a`,
+    `  href="${origin}/a/${options.slug}"`,
+    `  rel="noopener"`,
+    `  target="_blank"`,
+    `  style={{ display: 'inline-block', padding: ${padding} }}`,
+    `>`,
+    `  <img`,
+    `    src="${origin}/badge/${options.publicId}.svg?size=${size}"`,
+    `    width={${size}}`,
+    `    height={${size}}`,
+    `    alt=${JSON.stringify(alt)}`,
+    `    loading="lazy"`,
+    `    decoding="async"`,
+    `  />`,
+    `</a>`,
+  ].join('\n');
+}
+
+/**
+ * Where the snippet goes, by the tools the people who need it actually use.
+ *
+ * "Paste this where you want the badge to appear" is only an instruction if you
+ * already know how to edit your site. Somebody who built an application by
+ * describing it to a model may never have opened a footer component.
+ */
+export interface EmbedPlacement {
+  readonly platform: string;
+  readonly steps: readonly string[];
+  /** Which form of the snippet that platform takes. */
+  readonly form: 'html' | 'jsx';
+}
+
+export const EMBED_PLACEMENTS: readonly EmbedPlacement[] = [
+  {
+    platform: 'Next.js or React',
+    form: 'jsx',
+    steps: [
+      'Open the component that renders your footer — often app/layout.tsx, components/Footer.tsx, or similar.',
+      'Paste the JSX inside it, near your copyright line.',
+      'Save, commit and deploy. On Vercel that is a push to your main branch.',
+    ],
+  },
+  {
+    platform: 'Plain HTML',
+    form: 'html',
+    steps: [
+      'Open the page you want it on, or your shared footer include.',
+      'Paste the HTML just before the closing </footer> tag, or before </body> if you have no footer.',
+      'Upload the file and reload the page.',
+    ],
+  },
+  {
+    platform: 'WordPress',
+    form: 'html',
+    steps: [
+      'Appearance → Editor → Patterns, or Appearance → Widgets on an older theme.',
+      'Add a Custom HTML block to the footer area.',
+      'Paste the HTML into it and update.',
+    ],
+  },
+  {
+    platform: 'Webflow',
+    form: 'html',
+    steps: [
+      'Drag an Embed element into your footer symbol.',
+      'Paste the HTML into it and save.',
+      'Publish the site — an Embed does not render inside the designer, only on the published page.',
+    ],
+  },
+  {
+    platform: 'Squarespace or Wix',
+    form: 'html',
+    steps: [
+      'Add a Code block (Squarespace) or an Embed HTML element (Wix) to the footer section.',
+      'Paste the HTML into the code area, replacing the placeholder markup it starts with.',
+      'Save, then publish the site so the change reaches visitors.',
+    ],
+  },
+  {
+    platform: 'Framer',
+    form: 'html',
+    steps: [
+      'Insert → Embed, and choose the HTML option rather than a URL.',
+      'Paste the HTML in, then place the component in your footer.',
+      'Publish the site — the embed does not render while you are editing.',
+    ],
+  },
+];
+
 function escapeAttribute(value: string): string {
   return value
     .replace(/&/g, '&amp;')
