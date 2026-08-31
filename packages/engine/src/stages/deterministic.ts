@@ -11,6 +11,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { ScopedHttp, type ScopedResponse } from '../runtime/http.ts';
 import { BrowserSession, MOBILE_VIEWPORT } from '../runtime/browser.ts';
+import { gameFindings, measureGame } from './game-checks.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
 /** Paths that should never be reachable, and what it means when they are. */
@@ -243,6 +244,40 @@ export const deterministicChecksStage: Stage = {
       );
     } finally {
       await session.close();
+    }
+
+    /*
+     * The measurable half of a game assessment.
+     *
+     * In its own session, because the instrumentation has to be installed
+     * before the game's script runs and this one has already navigated. It is
+     * deliberately here rather than in the model-driven game stage: time to
+     * playable, bytes before playable and whether the loop stops when nobody is
+     * looking are numbers, and a number is cheaper, repeatable, and not
+     * something anybody has to take on trust.
+     */
+    if (context.target.isGame) {
+      const gameSession = new BrowserSession(context.guard, context.evidence);
+      try {
+        await gameSession.open();
+        const measurements = await measureGame(context, gameSession, url);
+        const shot = await gameSession.screenshot('The game after a short play session');
+        const console_ = await gameSession.captureConsole(
+          'Console output while the game was played',
+        );
+        findings.push(...gameFindings(measurements, [shot, console_]));
+        notes.push(
+          measurements.becamePlayable
+            ? `The game began drawing frames ${((measurements.timeToPlayableMs ?? 0) / 1000).toFixed(1)}s after navigation, after ${Math.round(measurements.bytesBeforePlayable / 1024)} KB. Playability is measured as the first continuous run of animation frames, which is a lower bound.`
+            : 'The game never began drawing frames, so nothing beyond the start could be assessed.',
+        );
+      } catch (error) {
+        notes.push(
+          `The game pass did not complete: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      } finally {
+        await gameSession.close();
+      }
     }
 
     context.meter.recordCompute(
