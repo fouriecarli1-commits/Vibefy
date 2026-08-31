@@ -3,6 +3,9 @@
  * site, so it is the right place to make the licence rules impossible to break
  * by accident.
  */
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   BADGE_USAGE,
@@ -16,7 +19,7 @@ import {
   badgeEmbedSnippet,
   scopeStatement,
 } from '../packages/shared/src/index.ts';
-import { renderBadgeSvg } from '../packages/badge/src/index.ts';
+import { BADGE_ARTWORK, renderBadgeSvg } from '../packages/badge/src/index.ts';
 import { runBrandCheck } from '../tools/brand-check.mts';
 
 const facts = {
@@ -140,64 +143,93 @@ describe('the seal', () => {
     }
   });
 
-  it('serves the compact layout below the size the furniture stops being legible at', () => {
-    const seal = renderBadgeSvg({ status: 'active' });
-    const compact = renderBadgeSvg({ status: 'active', sizePx: 96 });
-
-    // The band legend is set one glyph per <text>, so the full seal is counted by
-    // its glyphs rather than searched for a phrase it deliberately never contains.
-    const glyphs = (svg: string) => (svg.match(/<text/g) ?? []).length;
-    expect(glyphs(seal)).toBeGreaterThan(10);
-    expect(seal).toContain(SEAL.banner);
-
-    // At 96px the arc, the stars and the folded ends are noise, so they go.
-    expect(compact).not.toContain(SEAL.banner);
-    expect(glyphs(compact)).toBeLessThan(4);
-    expect(compact.length).toBeLessThan(seal.length);
-
-    // What must survive at every size: whose mark it is, and what it claims.
-    for (const svg of [seal, compact]) {
-      expect(svg).toContain('Verified by VibefyCode');
-      expect(svg).toContain(WORDMARK_OUTLINE.strong);
-      expect(svg).toContain(WORDMARK_OUTLINE.light);
-    }
-  });
-
-  it('draws the wordmark as outlines, never as live text', () => {
-    // The wordmark is the trade mark, and it is served onto other people's
-    // websites. Set as text it would be a different drawing on every machine
-    // that happens to lack Poppins; `textLength` pinned the width and never the
-    // letterforms, which was only ever half a fix.
-    expect(`${WORDMARK.strong}${WORDMARK.light}`).toBe('VIBEFYCODE');
-
+  it('carries the supplied artwork rather than a drawing of it', () => {
+    // The badge used to be assembled in code: a traced mark, a generated
+    // wordmark, an arc of text, a struck band. It was a careful reconstruction
+    // and it was not the trade mark, which is the one thing that has to be
+    // identical everywhere. This is the assertion that keeps it that way.
     for (const sizePx of [96, 512]) {
       const svg = renderBadgeSvg({ status: 'active', sizePx });
-      expect(svg).toContain(WORDMARK_OUTLINE.strong);
-      expect(svg).toContain(WORDMARK_OUTLINE.light);
-      // No <text> element anywhere carries the letters of the wordmark.
-      for (const element of svg.match(/<text[^>]*>[^<]*<\/text>/g) ?? []) {
-        expect(element.toUpperCase()).not.toContain('VIBEFY');
-      }
+      expect(svg).toContain('<image');
+      expect(svg).toContain(BADGE_ARTWORK.active.dataUri);
     }
   });
 
-  it('scales the wordmark to its container rather than to a font size', () => {
-    // A logo that overflows its banner is worse than one set slightly small.
-    const seal = renderBadgeSvg({ status: 'active' });
-    // The transform on the group that actually holds the wordmark, not the one
-    // on the mark above it.
-    const before = seal.slice(0, seal.indexOf(WORDMARK_OUTLINE.strong));
-    const scales = before.match(/scale\(([\d.]+)\)/g) ?? [];
-    const scale = Number(/([\d.]+)/.exec(scales[scales.length - 1] ?? '')?.[1]);
-    expect(scale * WORDMARK_OUTLINE.width).toBeCloseTo(SEAL.bannerText.width, 1);
+  it('embeds the artwork rather than linking to it', () => {
+    // An `<img>` on somebody else's page will not fetch a second resource from
+    // us, and many pages forbid it outright. A badge that referenced its own
+    // artwork would be a blank frame on exactly the sites it exists to appear on.
+    const svg = renderBadgeSvg({ status: 'active' });
+    expect(svg).toContain('data:image/webp;base64,');
+    expect(svg).not.toMatch(/<image[^>]+href="https?:/);
+  });
+
+  it('was resized from the artwork in this repository, unaltered', () => {
+    // The guarantee that replaced the palette check. A raster has no colour
+    // values to read, so provenance is what stands in its place: these bytes
+    // came from that file, and if the file changes without the badge being
+    // rebuilt, this fails.
+    const files: Record<string, string> = {
+      active: 'vibefycode-badge-artwork.webp',
+      suspended: 'vibefycode-badge-artwork-suspended.webp',
+      expired: 'vibefycode-badge-artwork-expired.webp',
+      revoked: 'vibefycode-badge-artwork-revoked.webp',
+    };
+    for (const [status, file] of Object.entries(files)) {
+      const bytes = readFileSync(join(process.cwd(), 'apps/web/public/brand', file));
+      const digest = createHash('sha256').update(bytes).digest('hex');
+      expect(digest, status).toBe(BADGE_ARTWORK[status as keyof typeof BADGE_ARTWORK].sourceSha256);
+    }
+  });
+
+  it('gives each state its own image', () => {
+    // A suspended badge rendering the active seal is worse than no badge, and
+    // one careless copy away.
+    const seen = new Set(Object.values(BADGE_ARTWORK).map((artwork) => artwork.dataUri));
+    expect(seen.size).toBe(4);
+  });
+
+  it("stays small enough to sit on somebody else's page", () => {
+    // This loads on customers' websites, not ours. The full master is ~190 KB;
+    // the badge is displayed at 96 to 128, so it is served at 256.
+    for (const artwork of Object.values(BADGE_ARTWORK)) {
+      expect(artwork.bytes).toBeLessThan(60_000);
+    }
+  });
+
+  it('sets no live text at all, so no missing font can change the mark', () => {
+    expect(`${WORDMARK.strong}${WORDMARK.light}`).toBe('VIBEFYCODE');
+    for (const status of ['active', 'suspended', 'expired', 'revoked'] as const) {
+      const svg = renderBadgeSvg({ status, sizePx: 512 });
+      // The wordmark is in the artwork's pixels now, where no substitution is
+      // possible. Nothing in the document is typeset.
+      expect(svg.match(/<text[^>]*>/g) ?? []).toHaveLength(0);
+      expect(svg).not.toContain(WORDMARK_OUTLINE.strong);
+    }
+  });
+
+  it('fills its canvas without distorting the seal', () => {
+    const svg = renderBadgeSvg({ status: 'active' });
+    expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
   });
 
   it('never reads as a verification in any state that is not one', () => {
+    // The words are struck across the supplied seal in pixels by `brand:build`,
+    // so the document itself no longer carries them as text. What a screen
+    // reader announces is the accessible name, and that is what is asserted —
+    // it is also what an `<img alt>` carries on a customer's page.
     for (const status of ['suspended', 'expired', 'revoked'] as const) {
       for (const sizePx of [96, 512]) {
-        const svg = renderBadgeSvg({ status, sizePx });
-        expect(svg, `${status} at ${sizePx}px`).toContain('Not currently verified');
+        const svg = renderBadgeSvg({
+          status,
+          sizePx,
+          appName: facts.appName,
+          rubricVersion: facts.rubricVersion,
+          assessedOn: facts.assessedOn,
+        });
+        expect(svg, `${status} at ${sizePx}px`).toContain('Not currently verified by VibefyCode');
         expect(svg).not.toMatch(/aria-label="Verified by VibefyCode/);
+        expect(svg).toContain(BADGE_ARTWORK[status].dataUri);
       }
     }
   });

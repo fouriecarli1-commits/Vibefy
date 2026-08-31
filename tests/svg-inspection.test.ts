@@ -112,19 +112,38 @@ describe('a <path> element with no shape data', () => {
 });
 
 describe('the marks this product actually ships', () => {
-  it('are true vectors', () => {
+  it('are true vectors, except the badge, which carries the supplied seal', () => {
     // The generated files are the ones that go on somebody else's website at
-    // whatever size they choose. If one of them ever became a wrapped raster,
-    // it would look fine here and bad there.
+    // whatever size they choose. If one of them ever became a wrapped raster by
+    // accident, it would look fine here and bad there.
+    //
+    // The badge is the deliberate exception, and the reason is the whole point
+    // of this project: a rating whose own mark is a redrawing of itself is not
+    // one to trust with anything else. So the badge carries the supplied
+    // artwork, and what guards it is `check:brand`'s checksum rather than this
+    // gate — provenance in place of geometry.
+    //
     // The committed masters in `brand/svg/`, not the generated copies under
     // `apps/web/public/`, so this holds without a build having run.
     for (const file of readdirSync(join(process.cwd(), 'brand/svg')).filter((name) =>
       name.endsWith('.svg'),
     )) {
-      const output = execFileSync('node', ['tools/inspect-svg.mjs', join('brand/svg', file)], {
-        cwd: process.cwd(),
-        encoding: 'utf8',
-      });
+      // The inspector exits 1 on a wrapped raster, which every badge master now
+      // deliberately is, so its output has to be read off the thrown error.
+      let output: string;
+      try {
+        output = execFileSync('node', ['tools/inspect-svg.mjs', join('brand/svg', file)], {
+          cwd: process.cwd(),
+          encoding: 'utf8',
+        });
+      } catch (error) {
+        output = String((error as { stdout?: Buffer }).stdout ?? '');
+      }
+
+      if (file.includes('badge')) {
+        expect(output, file).toContain('A picture in a vector envelope');
+        continue;
+      }
       expect(output, file).toContain('A true vector');
     }
   });

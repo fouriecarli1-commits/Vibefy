@@ -33,7 +33,8 @@
     "badge:keygen": "tsx tools/generate-badge-key.mts",
     "dev:mobile": "pnpm -F @vibefycode/mobile start",
     "check:a11y": "tsx tools/a11y-scan.mts",
-    "verify:all": "pnpm verify && pnpm check:a11y"
+    "verify:all": "pnpm verify && pnpm check:a11y",
+    "badge:artwork": "tsx tools/build-badge-artwork.mts"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

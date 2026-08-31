@@ -9,12 +9,24 @@
  * wrapped raster, and the certification badge carries the wordmark unextended.
  */
 import { SEAL, SEAL_COMPACT, WORDMARK, WORDMARK_OUTLINE } from '@vibefycode/shared';
+import { BADGE_ARTWORK } from '@vibefycode/badge';
+import { createHash } from 'node:crypto';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const svgDir = join(root, 'brand/svg');
+const webBrandDir = join(root, 'apps/web/public/brand');
+
+/** The masters that carry the supplied seal rather than drawing one. */
+const BADGE_MASTERS = new Set([
+  'vibefycode-badge-verified.svg',
+  'vibefycode-badge-verified-compact.svg',
+  'vibefycode-badge-suspended.svg',
+  'vibefycode-badge-expired.svg',
+  'vibefycode-badge-revoked.svg',
+]);
 const tokens = JSON.parse(readFileSync(join(root, 'packages/shared/design/tokens.json'), 'utf8'));
 
 const REQUIRED_MASTERS = [
@@ -112,9 +124,24 @@ export function runBrandCheck() {
     if (!/<title>/.test(svg))
       failures.push(`${master} has no <title>; screen readers would announce nothing.`);
     if (!/aria-label=/.test(svg)) failures.push(`${master} has no aria-label.`);
+
+    // The badge carries the supplied artwork rather than a drawing of it, so it
+    // is the one master that is *meant* to embed a raster and it has no colour
+    // values to read. The guarantee changes shape rather than lapsing: instead
+    // of "these colours came from the palette", it becomes "these bytes are the
+    // supplied seal, unaltered", checked below against the master's checksum.
+    if (BADGE_MASTERS.has(master)) {
+      if (!/<image\b/.test(svg)) {
+        failures.push(
+          `${master} draws the seal instead of carrying the supplied artwork. The mark is not redrawn.`,
+        );
+      }
+      continue;
+    }
+
     if (/<image\b/.test(svg)) {
       failures.push(
-        `${master} embeds a raster. The badge is served as SVG at runtime and must stay vector.`,
+        `${master} embeds a raster. Every mark but the badge is drawn and must stay vector.`,
       );
     }
 
@@ -125,6 +152,40 @@ export function runBrandCheck() {
         `${master} uses ${colour}, which is neither a palette colour nor a shade of one. The marks are not recoloured.`,
       );
     }
+  }
+
+  // The badge is the supplied artwork, and this is what says so.
+  //
+  // `BADGE_ARTWORK` records the checksum of the master each state was resized
+  // from. If somebody regenerates the artwork from a different file, or edits a
+  // master by hand, these stop matching — which is the only remaining way to
+  // catch the mark being altered now that there are no colour values to read.
+  for (const [status, artwork] of Object.entries(BADGE_ARTWORK)) {
+    const file =
+      status === 'active'
+        ? 'vibefycode-badge-artwork.webp'
+        : `vibefycode-badge-artwork-${status}.webp`;
+    const path = join(webBrandDir, file);
+    if (!existsSync(path)) {
+      failures.push(`${file} is missing. Run \`pnpm brand:build\`.`);
+      continue;
+    }
+    const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+    if (actual !== artwork.sourceSha256) {
+      failures.push(
+        `The embedded ${status} badge was resized from a different ${file} than the one on disk. ` +
+          'Run `pnpm badge:artwork` so the badge served to customers is the artwork in this repository.',
+      );
+    }
+  }
+
+  // Four states, four different images. A suspended badge that renders the
+  // active seal is worse than no badge, and one `cp` away.
+  const seen = new Map();
+  for (const [status, artwork] of Object.entries(BADGE_ARTWORK)) {
+    const other = seen.get(artwork.dataUri);
+    if (other) failures.push(`The ${status} badge is byte-identical to the ${other} badge.`);
+    seen.set(artwork.dataUri, status);
   }
 
   // The wordmark, checked where it is decided rather than where it is drawn.
@@ -145,6 +206,10 @@ export function runBrandCheck() {
   if (SEAL.topArc.text !== 'VERIFIED BY') {
     failures.push(`The seal's legend reads "${SEAL.topArc.text}", not "VERIFIED BY".`);
   }
+  // Those two constants no longer draw anything — the legend is in the supplied
+  // artwork's pixels. They are still checked because they are what every other
+  // surface reads when it needs the words, and because a constant that quietly
+  // stops matching the mark is how the two drift apart again.
   if (SEAL_COMPACT.legend.text !== 'VERIFIED BY') {
     failures.push(
       `The compact badge's legend reads "${SEAL_COMPACT.legend.text}", not "VERIFIED BY".`,
@@ -154,12 +219,11 @@ export function runBrandCheck() {
   // The wordmark is drawn, not typed. Set as text it would be a different
   // drawing on every machine without Poppins — and it is the trade mark, served
   // onto other people's websites.
-  for (const master of [
-    'vibefycode-badge-verified.svg',
-    'vibefycode-badge-verified-compact.svg',
-    'vibefycode-logo-horizontal.svg',
-    'vibefycode-logo-horizontal-dark.svg',
-  ]) {
+  //
+  // The badge masters are not in this list any more: their wordmark is in the
+  // supplied artwork's pixels, where no font can substitute for it at all. The
+  // checksum above is what holds it there.
+  for (const master of ['vibefycode-logo-horizontal.svg', 'vibefycode-logo-horizontal-dark.svg']) {
     const path = join(svgDir, master);
     if (!existsSync(path)) continue;
     const svg = readFileSync(path, 'utf8');
