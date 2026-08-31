@@ -67,6 +67,7 @@ export interface ModelStageConfig {
   readonly promptId: string;
   readonly includeHttpTool: boolean;
   readonly appliesTo: (context: StageContext) => boolean;
+  readonly skipReason?: (context: StageContext) => string;
   /** The opening instruction, built from the target. */
   readonly brief: (context: StageContext) => string;
 }
@@ -75,6 +76,7 @@ export function createModelStage(config: ModelStageConfig): Stage {
   return {
     id: config.id,
     appliesTo: config.appliesTo,
+    ...(config.skipReason ? { skipReason: config.skipReason } : {}),
 
     async run(context): Promise<StageResult> {
       const url = context.target.primaryUrl;

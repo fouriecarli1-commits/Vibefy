@@ -18,6 +18,7 @@ export type StageId =
   | 'functional_exploration'
   | 'adversarial_practicality'
   | 'store_readiness'
+  | 'game_experience'
   | 'synthesis';
 
 export type AssessmentDepth = 'limited' | 'full' | 'continuous';
@@ -31,6 +32,15 @@ export interface AssessmentTarget {
   /** Local path to the checked-out repository, when the tier includes source. */
   readonly repositoryPath: string | null;
   readonly intendedForAppStore: boolean;
+  /**
+   * Whether the owner registered this as a game.
+   *
+   * Not a kind of target — a game is a web URL or a mobile build like anything
+   * else. It is a kind of product, and it changes which stage runs and what
+   * that stage is told to look for. It changes nothing about the rubric, the
+   * score or the badge.
+   */
+  readonly isGame: boolean;
   readonly hasAuthentication: boolean;
   readonly hasPayments: boolean;
   readonly processesPersonalData: boolean;
@@ -87,6 +97,16 @@ export interface Stage {
   readonly id: StageId;
   /** Stages opt out cleanly rather than half-running. */
   appliesTo(context: StageContext): boolean;
+  /**
+   * Why this stage did not run, in its own words.
+   *
+   * The pipeline's default reason talks about the app type and the depth,
+   * which was true of every stage until one opted out for a different reason
+   * entirely. "This stage does not apply to a web_url assessment at full
+   * depth" is not why the game pass was skipped, and a report that says it is
+   * has told the customer something false about their own run.
+   */
+  skipReason?(context: StageContext): string;
   run(context: StageContext): Promise<StageResult>;
 }
 

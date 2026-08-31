@@ -60,6 +60,11 @@ const GROUPS: readonly NavGroup[] = [
         label: 'What happens to your app',
         hint: 'The mechanism, the limits, and what we never see',
       },
+      {
+        href: '/games',
+        label: 'For games',
+        hint: 'The pass that plays it — and what it will not judge',
+      },
       { href: '/verify', label: 'Check a badge', hint: 'Confirm a mark you found somewhere' },
       {
         href: '/trust-check',

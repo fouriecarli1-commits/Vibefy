@@ -159,6 +159,7 @@ beforeAll(async () => {
       // Store readiness is exercised in the pipeline test; skipping it here keeps
       // the scripted transport aligned with exactly the calls this test needs.
       intendedForAppStore: false,
+      isGame: false,
       hasAuthentication: true,
       hasPayments: true,
       processesPersonalData: true,

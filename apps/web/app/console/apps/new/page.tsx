@@ -6,7 +6,16 @@ import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Submit an application' };
 
-export default async function NewAppPage() {
+export default async function NewAppPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ kind?: string }>;
+}) {
+  // Arrived from the games page, which is the whole point of that page having a
+  // button of its own: somebody who came to have a game tested should not have
+  // to know that the box halfway down the form is the one that matters.
+  const { kind } = await searchParams;
+  const isGame = kind === 'game';
   const supabase = await createClient();
   const {
     data: { user },
@@ -20,10 +29,12 @@ export default async function NewAppPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <header className="space-y-3">
-        <h1 className="text-3xl font-bold tracking-tight">Submit an application</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {isGame ? 'Submit a game' : 'Submit an application'}
+        </h1>
         <p className="text-muted">
-          Nothing is tested yet. Submitting records what the application is; the next step is
-          proving you are entitled to authorise testing of it.
+          Nothing is tested yet. Submitting records what the {isGame ? 'game' : 'application'} is;
+          the next step is proving you are entitled to authorise testing of it.
         </p>
       </header>
 
@@ -93,6 +104,12 @@ export default async function NewAppPage() {
             label="I intend to submit it to the App Store or Play"
             name="intendedForAppStore"
             hint="Adds the store-readiness pass, checked against published submission requirements."
+          />
+          <Checkbox
+            label="It is a game"
+            name="isGame"
+            defaultChecked={isGame}
+            hint="Adds a pass that plays it: whether it becomes playable at all, what it downloads before it can, whether it works on a phone, and whether progress survives a reload. It does not judge whether the game is any good — that is taste, and taste cannot be evidenced."
           />
         </fieldset>
       </ActionForm>

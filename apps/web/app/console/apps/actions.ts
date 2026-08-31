@@ -100,6 +100,10 @@ export async function createApp(_previous: ActionState, formData: FormData): Pro
       has_authentication: formData.get('hasAuthentication') === 'on',
       has_payments: formData.get('hasPayments') === 'on',
       intended_for_app_store: formData.get('intendedForAppStore') === 'on',
+      // Changes which stage runs and what it looks for. It changes nothing
+      // about the rubric, the score or the badge — a game is held to the same
+      // published criteria as everything else.
+      is_game: formData.get('isGame') === 'on',
       screening_status:
         screening.verdict === 'refused'
           ? 'refused'

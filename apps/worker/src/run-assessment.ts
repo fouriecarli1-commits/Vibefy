@@ -86,6 +86,7 @@ export async function runAssessmentJob(
     primaryUrl: appRow.primary_url,
     repositoryPath: null,
     intendedForAppStore: appRow.intended_for_app_store,
+    isGame: appRow.is_game,
     hasAuthentication: appRow.has_authentication,
     hasPayments: appRow.has_payments,
     processesPersonalData: appRow.processes_personal_data,

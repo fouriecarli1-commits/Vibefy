@@ -20,6 +20,7 @@ import { deterministicChecksStage } from './stages/deterministic.ts';
 import {
   adversarialPracticalityStage,
   functionalExplorationStage,
+  gameExperienceStage,
   storeReadinessStage,
 } from './stages/model-stages.ts';
 import { synthesise, type ReportNarrative } from './stages/synthesis.ts';
@@ -31,6 +32,7 @@ export const DEFAULT_STAGES: readonly Stage[] = [
   deterministicChecksStage,
   functionalExplorationStage,
   adversarialPracticalityStage,
+  gameExperienceStage,
   storeReadinessStage,
 ];
 
@@ -89,7 +91,10 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
         status: 'skipped',
         findings: [],
         notes: [
-          `Skipped: this stage does not apply to a ${context.target.appType} assessment at ${context.depth} depth.`,
+          `Skipped: ${
+            stage.skipReason?.(context) ??
+            `this stage does not apply to a ${context.target.appType} assessment at ${context.depth} depth`
+          }.`,
         ],
       });
       continue;

@@ -58,6 +58,7 @@ beforeAll(async () => {
       primaryUrl: app.url,
       repositoryPath: null,
       intendedForAppStore: true,
+      isGame: false,
       hasAuthentication: true,
       hasPayments: true,
       processesPersonalData: true,

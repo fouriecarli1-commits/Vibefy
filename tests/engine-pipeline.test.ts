@@ -211,6 +211,7 @@ beforeAll(async () => {
       primaryUrl: app.url,
       repositoryPath: repoPath,
       intendedForAppStore: true,
+      isGame: false,
       hasAuthentication: true,
       hasPayments: true,
       processesPersonalData: true,
@@ -234,9 +235,21 @@ describe('the run completes', () => {
       'deterministic_checks',
       'functional_exploration',
       'adversarial_practicality',
+      'game_experience',
       'store_readiness',
       'synthesis',
     ]);
+  });
+
+  it('skips the game pass for something that is not a game, and says why', () => {
+    // Every stage is accounted for in the record, including the ones that did
+    // not run. The reason matters: the pipeline's default explanation talks
+    // about the app type and the depth, which is not why this one was skipped,
+    // and a report that says otherwise has told the customer something false
+    // about their own run.
+    const game = outcome.stageResults.find((result) => result.stage === 'game_experience');
+    expect(game?.status).toBe('skipped');
+    expect(game?.notes.join(' ')).toMatch(/not registered as a game/i);
     expect(outcome.stageResults.every((result) => result.status !== 'failed')).toBe(true);
   });
 

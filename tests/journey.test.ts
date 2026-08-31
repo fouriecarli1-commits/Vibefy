@@ -726,6 +726,7 @@ async function targetRow(): Promise<StageContext['target']> {
     primaryUrl: row.primary_url,
     repositoryPath: null,
     intendedForAppStore: false,
+    isGame: false,
     hasAuthentication: true,
     hasPayments: true,
     processesPersonalData: true,
