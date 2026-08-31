@@ -11,6 +11,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { ScopedHttp, type ScopedResponse } from '../runtime/http.ts';
 import { BrowserSession, MOBILE_VIEWPORT } from '../runtime/browser.ts';
+import { designFindings, measureDesign } from './design-checks.ts';
 import { gameFindings, measureGame } from './game-checks.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
@@ -173,6 +174,32 @@ export const deterministicChecksStage: Stage = {
       } else {
         notes.push(
           'The landing page passed the automated WCAG 2.2 AA checks with no serious violations.',
+        );
+      }
+
+      /*
+       * The objective eye on how it looks.
+       *
+       * Counting rather than judging: how many type sizes are on the page, how
+       * much of the spacing falls on no scale, how many distinct button styles
+       * there are, which text nobody can read. It says nothing about whether
+       * the design is good — that is taste and cannot be evidenced — and most
+       * of what it finds is recorded at `info`, which the rubric penalises at
+       * zero, because coherence has no criterion in version 1.0.0.
+       *
+       * Here, in the pass that has already opened a browser, because it is one
+       * evaluation against a loaded page and does not deserve a stage of its
+       * own.
+       */
+      try {
+        const design = await measureDesign(session, url);
+        findings.push(...designFindings(design, [desktopShot]));
+        notes.push(
+          `Design survey: ${design.fontSizesPx.length} text sizes, ${design.fontFamilies.length} typefaces, ${design.buttonStyles.length} button styles, ${Math.round(design.spacingsOnGrid * 100)}% of spacing on a 4px grid.`,
+        );
+      } catch (error) {
+        notes.push(
+          `The design survey did not complete: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
 
