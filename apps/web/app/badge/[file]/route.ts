@@ -134,7 +134,17 @@ export async function GET(
       'x-vibefycode-status': badge.status,
       'x-vibefycode-verify': verificationUrl,
       // The image is never a document; a hostile SVG served inline is a script.
-      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      //
+      // `img-src data:` is not a loosening of that. The seal is the supplied
+      // artwork embedded as a data URI, and `default-src 'none'` forbade it —
+      // so from the moment the badge stopped being drawn, every browser loaded
+      // the document and then refused the picture inside it. An empty frame on
+      // the customer's website, and nothing in any log to say why.
+      //
+      // Only `data:`. No remote origin can be reached from inside the badge,
+      // which is the property that mattered.
+      'content-security-policy':
+        "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",
       'x-content-type-options': 'nosniff',
     },
   });
