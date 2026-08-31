@@ -23,6 +23,8 @@ import { ScoreTrend, type TrendPoint } from '@/components/score-trend';
 import { currentVersionOf } from '@/lib/legal';
 import { Disclosure } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
+import { isPlaceholderOrigin } from '@/lib/verify-origin';
+import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
 
 export const metadata: Metadata = { title: 'Application' };
 
@@ -162,10 +164,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
   const status = current?.status ?? 'none';
   const copy = STATUS_COPY[status] ?? STATUS_COPY.none!;
   const host = app.primary_url ? new URL(app.primary_url as string).hostname : '';
-  const verifyOrigin =
-    process.env.NEXT_PUBLIC_VERIFY_URL ??
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    'https://verify.vibefycode.example';
+  const verifyOrigin = await resolveVerifyOrigin();
 
   // The facts both snippet forms share, so the HTML and the JSX can never
   // describe two different badges.
@@ -456,6 +455,15 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                     clear space of {Math.round(BADGE_USAGE.clearSpaceRatio * 100)}% of the badge
                     width on every side.
                   </p>
+
+                  {isPlaceholderOrigin(verifyOrigin) && (
+                    <p role="alert" className="rounded-lg border border-line-strong p-4 text-sm">
+                      <strong className="text-bad">This snippet will not work yet.</strong> This
+                      deployment could not work out which address it is served from, so the badge
+                      URL below points at a placeholder. Set <code>NEXT_PUBLIC_SITE_URL</code> to
+                      this site&apos;s address and the snippet corrects itself.
+                    </p>
+                  )}
 
                   <h4 className="text-sm font-semibold">HTML</h4>
                   <p className="text-sm text-muted">
