@@ -2,7 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
-import { entitlementFor, type PlanTier } from '@vibefycode/billing';
+import {
+  CAPABILITIES,
+  PLAN_TIERS,
+  entitlementFor,
+  usageMeters,
+  type PlanTier,
+} from '@vibefycode/billing';
 import { startCheckout } from './actions';
 import { serviceDetailFor } from '@vibefycode/billing';
 import { ActionForm } from '@/components/action-form';
@@ -46,8 +52,35 @@ export default async function BillingPage({
   const currentPlan = (live?.plan ?? 'free') as PlanTier;
   const entitlement = entitlementFor(currentPlan);
 
+  // What has been used of it. Counted here rather than in `usageMeters` so that
+  // reading rows and deciding what they mean stay two jobs.
+  const { count: appCount } = await supabase
+    .from('apps')
+    .select('id', { count: 'exact', head: true });
+
+  const paidInvoice = (invoices ?? []).find(
+    (invoice) =>
+      String(invoice.status) === 'paid' &&
+      Number(invoice.amount_paid_cents ?? 0) > Number(invoice.amount_refunded_cents ?? 0),
+  );
+  const lastPaidAt = paidInvoice?.issued_at ? new Date(String(paidInvoice.issued_at)) : null;
+
+  const { data: sincePaid } = lastPaidAt
+    ? await supabase
+        .from('assessments')
+        .select('id, uses_retest_credit, created_at')
+        .gt('created_at', lastPaidAt.toISOString())
+    : { data: [] };
+
+  const meters = usageMeters({
+    plan: currentPlan,
+    appsInWorkspace: appCount ?? 0,
+    lastPaidAssessmentAt: lastPaidAt,
+    reTestsUsed: (sincePaid ?? []).filter((row) => row.uses_retest_credit === true).length,
+  });
+
   return (
-    <div className="max-w-3xl space-y-10">
+    <div className="max-w-5xl space-y-10">
       <header className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
         <p className="text-muted">
@@ -69,31 +102,116 @@ export default async function BillingPage({
         </p>
       )}
 
-      <section aria-labelledby="current" className="space-y-3">
+      <section aria-labelledby="current" className="space-y-4">
         <h2 id="current" className="text-xl font-semibold">
-          Current plan
+          Your plan
         </h2>
-        <div className="rounded-xl border border-line p-5">
-          <p className="font-medium capitalize">{currentPlan.replace(/_/g, ' ')}</p>
-          <ul className="mt-3 space-y-1 text-sm text-muted">
-            <li>Assessment depth: {entitlement.depth}</li>
-            <li>
-              Report:{' '}
-              {entitlement.reportTier === 'paid'
-                ? 'full, with evidence'
-                : 'headline and top three findings'}
-            </li>
-            <li>PDF export: {entitlement.pdfExport ? 'yes' : 'no'}</li>
-            <li>Badge eligible: {entitlement.badgeEligible ? 'yes' : 'no'}</li>
-            <li>
-              {entitlement.cooldownDays
-                ? `One assessment per application every ${entitlement.cooldownDays} days`
-                : 'No waiting period between assessments'}
-            </li>
-            {live?.current_period_end && (
-              <li>Renews {new Date(String(live.current_period_end)).toUTCString()}</li>
-            )}
-          </ul>
+
+        <div className="rounded-xl border border-line-strong p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <p className="text-2xl font-bold capitalize tracking-tight">
+              {currentPlan.replace(/_/g, ' ')}
+            </p>
+            <span className="chip" data-tone={live ? 'ok' : undefined}>
+              {live ? String(live.status) : 'no subscription'}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            {live?.current_period_end
+              ? `Renews ${new Date(String(live.current_period_end)).toISOString().slice(0, 10)}.`
+              : 'Nothing renews — the free tier applies until something is bought.'}
+          </p>
+        </div>
+
+        {/* What is left, not only what was bought. An allowance you cannot see
+            is one you find out about by being refused. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {meters.map((meter) => {
+            const proportion =
+              meter.limit === null
+                ? 0
+                : Math.min(1, meter.limit === 0 ? 1 : meter.used / meter.limit);
+            const spent = meter.limit !== null && meter.used >= meter.limit;
+            return (
+              <div key={meter.label} className="rounded-xl border border-line p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="font-medium">{meter.label}</h3>
+                  <p className="text-sm tabular-nums" data-numeric>
+                    {meter.limit === null
+                      ? `${meter.used} · no limit`
+                      : `${meter.used} of ${meter.limit}`}
+                  </p>
+                </div>
+                {meter.limit !== null && (
+                  /* A meter, not a chart: the number above is the fact and this
+                     only makes it glanceable. `aria-hidden` because a progress
+                     bar that repeats the sentence beside it is noise to a screen
+                     reader. */
+                  <div
+                    aria-hidden="true"
+                    className="mt-3 h-2 overflow-hidden rounded-full bg-surface-muted"
+                  >
+                    <div
+                      className={`h-full rounded-full ${spent ? 'bg-bad' : 'bg-accent'}`}
+                      style={{ width: `${Math.round(proportion * 100)}%` }}
+                    />
+                  </div>
+                )}
+                <p className="mt-2 text-sm text-muted">{meter.detail}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section aria-labelledby="compare" className="space-y-4">
+        <h2 id="compare" className="text-xl font-semibold">
+          What each plan gives you
+        </h2>
+        <p className="max-w-2xl text-sm text-muted">
+          Your plan is marked. Every row is read from the same table the engine enforces, so nothing
+          here can promise something the assessment will not do.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
+            <caption className="sr-only">
+              What each plan includes, with your current plan marked
+            </caption>
+            <thead>
+              <tr className="border-b border-line-strong">
+                <th scope="col" className="py-2 pr-4 font-semibold">
+                  &nbsp;
+                </th>
+                {PLAN_TIERS.map((plan) => (
+                  <th key={plan} scope="col" className="py-2 pr-4 font-semibold capitalize">
+                    {plan.replace(/_/g, ' ')}
+                    {plan === currentPlan && (
+                      <span className="ml-2 chip" data-tone="ok">
+                        yours
+                      </span>
+                    )}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {CAPABILITIES.map((capability) => (
+                <tr key={capability.label} className="border-b border-line">
+                  <th scope="row" className="py-3 pr-4 font-medium">
+                    {capability.label}
+                  </th>
+                  {PLAN_TIERS.map((plan) => (
+                    <td
+                      key={plan}
+                      className={`py-3 pr-4 ${plan === currentPlan ? 'font-medium' : 'text-muted'}`}
+                    >
+                      {capability.describe(entitlementFor(plan))}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 

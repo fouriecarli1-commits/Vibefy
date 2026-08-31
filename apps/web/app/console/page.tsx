@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
 import { recordSignUpConsents } from '@/lib/consent';
 
@@ -54,12 +55,35 @@ export default async function ConsolePage() {
     .select('id, name, primary_url, screening_status')
     .order('created_at', { ascending: false });
 
+  const { data: subscriptions } = await supabase.from('subscriptions').select('plan, status');
+  const live = subscriptions?.find((row) => ['active', 'trialing'].includes(String(row.status)));
+  const currentPlan = (live?.plan ?? 'free') as PlanTier;
+  const entitlement = entitlementFor(currentPlan);
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Console</h1>
         <p className="text-muted">Signed in as {user.email}</p>
       </header>
+
+      {/* The plan decides how deep an assessment runs and whether a badge can be
+          held at all, so it belongs on the front door rather than two levels
+          into a menu. A customer who cannot see which plan they are on finds out
+          when a run is refused. */}
+      <div className="bar flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm">
+          Plan: <span className="font-medium capitalize">{currentPlan.replace(/_/g, ' ')}</span>
+          <span className="text-muted">
+            {' '}
+            · {entitlement.depth} depth ·{' '}
+            {entitlement.badgeEligible ? 'badge-eligible' : 'not badge-eligible'}
+          </span>
+        </p>
+        <Link href="/console/billing" className="nav-cta">
+          Plan &amp; billing
+        </Link>
+      </div>
 
       <section aria-labelledby="applications" className="space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-3">

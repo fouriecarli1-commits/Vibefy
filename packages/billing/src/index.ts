@@ -1,4 +1,5 @@
 export * from './entitlements.ts';
+export * from './usage.ts';
 export * from './provider.ts';
 export * from './stripe.ts';
 export * from './fake.ts';
