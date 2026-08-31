@@ -1,18 +1,31 @@
 /**
  * Applying a verified provider event to our own records.
  *
- * Two rules shape everything here:
+ * Three rules shape everything here:
  *
  *   1. **Record first, act second.** Every event is written to `billing_events`
  *      before anything else changes. The unique constraint on the provider's
  *      event id is what makes the handler idempotent — not a flag we remember to
  *      check, and not the provider promising to deliver once.
  *
- *   2. **Mirror, never originate.** Stripe is the source of truth for what was
- *      charged. We copy identifiers and amounts so a customer can see their own
- *      history without a round trip; we never compute a balance ourselves.
+ *   2. **Mirror, never originate.** The provider is the source of truth for what
+ *      was charged. We copy identifiers and amounts so a customer can see their
+ *      own history without a round trip; we never compute a balance ourselves.
+ *
+ *   3. **One vocabulary.** This file reads a `BillingChange` and cannot tell
+ *      which provider produced it. Each provider translates its own payloads —
+ *      the alternative, once there were two, was a second copy of this file that
+ *      drifts from the first.
  */
-import type { BillingEvent } from './provider.ts';
+import type {
+  BillingChange,
+  BillingEvent,
+  InvoiceSettled,
+  PaymentProvider,
+  PaymentSettled,
+  RefundSettled,
+  SubscriptionChanged,
+} from './provider.ts';
 
 /** The smallest database surface this needs. `pg.PoolClient` satisfies it. */
 export interface SqlExecutor {
@@ -26,23 +39,20 @@ export interface AppliedEvent {
   readonly note: string;
 }
 
-const SUBSCRIPTION_STATUS: Readonly<Record<string, string>> = {
-  trialing: 'trialing',
-  active: 'active',
-  past_due: 'past_due',
-  paused: 'paused',
-  canceled: 'cancelled',
-  incomplete: 'incomplete',
-  incomplete_expired: 'incomplete',
-  unpaid: 'past_due',
-};
+/**
+ * The provider, as this function needs it: something that can say what one of
+ * its own events means. Narrower than `PaymentProvider` so a test can supply a
+ * translation without also supplying a checkout API.
+ */
+export type EventInterpreter = Pick<PaymentProvider, 'name' | 'interpret'>;
 
 export async function applyBillingEvent(
   sql: SqlExecutor,
+  provider: EventInterpreter,
   event: BillingEvent,
-  provider = 'stripe',
 ): Promise<AppliedEvent> {
-  const organisationId = organisationFrom(event);
+  const change = provider.interpret(event);
+  const organisationId = organisationOf(change);
 
   const recorded = await sql.query<{ id: string }>(
     `insert into public.billing_events
@@ -51,11 +61,13 @@ export async function applyBillingEvent(
      on conflict (provider, provider_event_id) do nothing
      returning id`,
     [
-      provider,
+      provider.name,
       event.id,
       event.type,
       organisationId,
       event.createdAt.toISOString(),
+      // What the provider told us, unedited. The interpretation above is ours
+      // and is not evidence of anything in a dispute.
       JSON.stringify(event.data),
     ],
   );
@@ -65,230 +77,195 @@ export async function applyBillingEvent(
   }
 
   let note: string;
-  switch (event.type) {
-    case 'checkout.session.completed':
-      note = await onCheckoutCompleted(sql, event, organisationId);
+  switch (change.kind) {
+    case 'payment_settled':
+      note = await onPaymentSettled(sql, provider.name, change);
       break;
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated':
-    case 'customer.subscription.deleted':
-      note = await onSubscriptionChanged(sql, event, organisationId);
+    case 'subscription_changed':
+      note = await onSubscriptionChanged(sql, provider.name, change);
       break;
-    case 'invoice.paid':
-    case 'invoice.payment_failed':
-      note = await onInvoice(sql, event, organisationId);
+    case 'invoice_settled':
+      note = await onInvoiceSettled(sql, provider.name, change);
       break;
-    case 'charge.refunded':
-      note = await onRefund(sql, event);
+    case 'refund_settled':
+      note = await onRefundSettled(sql, provider.name, change);
       break;
-    default:
-      note = 'Recorded; no handler for this event type.';
+    case 'ignored':
+      note = `Recorded; ${change.why}`;
+      break;
   }
 
   await sql.query(
-    `update public.billing_events set handled = true, handler_note = $2 where provider_event_id = $1`,
-    [event.id, note],
+    `update public.billing_events set handled = true, handler_note = $3
+      where provider = $1 and provider_event_id = $2`,
+    [provider.name, event.id, note],
   );
 
   return { eventId: event.id, type: event.type, duplicate: false, note };
 }
 
-function organisationFrom(event: BillingEvent): string | null {
-  const metadata = (event.data.metadata ?? {}) as Record<string, string>;
-  return metadata.organisationId ?? null;
+function organisationOf(change: BillingChange): string | null {
+  return 'organisationId' in change ? change.organisationId : null;
 }
 
-async function onCheckoutCompleted(
+async function onPaymentSettled(
   sql: SqlExecutor,
-  event: BillingEvent,
-  organisationId: string | null,
+  provider: string,
+  change: PaymentSettled,
 ): Promise<string> {
-  if (!organisationId)
-    return 'Checkout completed without an organisation in metadata; nothing applied.';
+  if (!change.organisationId)
+    return 'Payment settled without an organisation in metadata; nothing applied.';
 
-  const metadata = (event.data.metadata ?? {}) as Record<string, string>;
-  const plan = metadata.plan ?? 'one_off';
-  const mode = String(event.data.mode ?? 'payment');
-  const customerId = stringOrNull(event.data.customer);
-  const subscriptionId = stringOrNull(event.data.subscription);
-  const amountTotal = Number(event.data.amount_total ?? 0);
-  const tax = Number(
-    (event.data as { total_details?: { amount_tax?: number } }).total_details?.amount_tax ?? 0,
-  );
-  const currency = String(event.data.currency ?? 'usd').toUpperCase();
-  const country =
-    (event.data as { customer_details?: { address?: { country?: string } } }).customer_details
-      ?.address?.country ?? null;
-
-  if (mode === 'subscription' && subscriptionId) {
+  if (change.recurring && change.subscriptionId) {
     await sql.query(
-      `insert into public.subscriptions (organisation_id, plan, status, stripe_customer_id, stripe_subscription_id)
-       values ($1, $2, 'active', $3, $4)
-       on conflict (stripe_subscription_id) do update
-         set plan = excluded.plan, status = 'active', stripe_customer_id = excluded.stripe_customer_id`,
-      [organisationId, plan, customerId, subscriptionId],
+      `insert into public.subscriptions
+         (organisation_id, plan, status, provider, provider_customer_id, provider_subscription_id)
+       values ($1, $2, 'active', $3::text::public.payment_provider, $4, $5)
+       on conflict (provider, provider_subscription_id) do update
+         set plan = excluded.plan, status = 'active',
+             provider_customer_id = excluded.provider_customer_id`,
+      [change.organisationId, change.plan, provider, change.customerId, change.subscriptionId],
     );
-    return `Subscription ${subscriptionId} activated on plan ${plan}.`;
+    return `Subscription ${change.subscriptionId} activated on plan ${change.plan}.`;
   }
 
   await sql.query(
     `insert into public.invoices
-       (organisation_id, stripe_invoice_id, stripe_payment_intent_id, amount_due_cents, amount_paid_cents,
-        amount_tax_cents, currency, status, tax_country, app_id, plan, issued_at, paid_at)
-     values ($1, $2, $3, $4, $4, $5, $6, 'paid', $7, $8, $9, now(), now())
-     on conflict (stripe_invoice_id) do update
+       (organisation_id, provider, provider_invoice_id, provider_payment_reference,
+        amount_due_cents, amount_paid_cents, amount_tax_cents, currency, status,
+        tax_country, app_id, plan, issued_at, paid_at)
+     values ($1, $2::text::public.payment_provider, $3, $4, $5, $5, $6, $7, 'paid',
+             $8, $9, $10, now(), now())
+     on conflict (provider, provider_invoice_id) do update
        set amount_paid_cents = excluded.amount_paid_cents, status = 'paid', paid_at = now()`,
     [
-      organisationId,
-      stringOrNull(event.data.invoice) ?? `session_${event.data.id}`,
-      stringOrNull(event.data.payment_intent),
-      amountTotal,
-      tax,
-      currency,
-      country,
-      metadata.appId ?? null,
-      plan,
+      change.organisationId,
+      provider,
+      change.invoiceId,
+      change.paymentReference,
+      change.amountTotalCents,
+      change.amountTaxCents,
+      change.currency,
+      change.billingCountry,
+      change.appId,
+      change.plan,
     ],
   );
-  return `One-off payment of ${amountTotal} ${currency} recorded for plan ${plan}.`;
+  return `One-off payment of ${change.amountTotalCents} ${change.currency} recorded for plan ${change.plan}.`;
 }
 
 async function onSubscriptionChanged(
   sql: SqlExecutor,
-  event: BillingEvent,
-  organisationId: string | null,
+  provider: string,
+  change: SubscriptionChanged,
 ): Promise<string> {
-  const subscriptionId = String(event.data.id ?? '');
-  if (!subscriptionId) return 'Subscription event with no id; nothing applied.';
-
-  const status =
-    event.type === 'customer.subscription.deleted'
-      ? 'cancelled'
-      : (SUBSCRIPTION_STATUS[String(event.data.status ?? '')] ?? 'incomplete');
-
-  const periodStart = unixOrNull(event.data.current_period_start);
-  const periodEnd = unixOrNull(event.data.current_period_end);
-
   const updated = await sql.query(
-    // $2 is bound as text and cast, so Postgres does not have to deduce one type
+    // $3 is bound as text and cast, so Postgres does not have to deduce one type
     // for a parameter used both as an enum value and in a string comparison.
     `update public.subscriptions
-        set status = $2::text::public.subscription_status,
-            current_period_start = coalesce($3::timestamptz, current_period_start),
-            current_period_end = coalesce($4::timestamptz, current_period_end),
-            cancelled_at = case when $2::text = 'cancelled' then now() else cancelled_at end
-      where stripe_subscription_id = $1
+        set status = $3::text::public.subscription_status,
+            current_period_start = coalesce($4::timestamptz, current_period_start),
+            current_period_end = coalesce($5::timestamptz, current_period_end),
+            cancelled_at = case when $3::text = 'cancelled' then now() else cancelled_at end
+      where provider = $1::text::public.payment_provider and provider_subscription_id = $2
       returning id`,
-    [subscriptionId, status, periodStart, periodEnd],
+    [provider, change.subscriptionId, change.status, change.periodStart, change.periodEnd],
   );
 
-  if (updated.rows.length === 0 && organisationId) {
+  if (updated.rows.length === 0 && change.organisationId) {
     await sql.query(
-      `insert into public.subscriptions (organisation_id, plan, status, stripe_customer_id, stripe_subscription_id,
-                                         current_period_start, current_period_end)
-       values ($1, $2, $3, $4, $5, $6, $7)
-       on conflict (stripe_subscription_id) do nothing`,
+      `insert into public.subscriptions
+         (organisation_id, plan, status, provider, provider_customer_id, provider_subscription_id,
+          current_period_start, current_period_end)
+       values ($1, $2, $3, $4::text::public.payment_provider, $5, $6, $7, $8)
+       on conflict (provider, provider_subscription_id) do nothing`,
       [
-        organisationId,
-        ((event.data.metadata ?? {}) as Record<string, string>).plan ?? 'certified',
-        status,
-        stringOrNull(event.data.customer),
-        subscriptionId,
-        periodStart,
-        periodEnd,
+        change.organisationId,
+        change.plan ?? 'certified',
+        change.status,
+        provider,
+        change.customerId,
+        change.subscriptionId,
+        change.periodStart,
+        change.periodEnd,
       ],
     );
-    return `Subscription ${subscriptionId} created from a ${event.type} event, status ${status}.`;
+    return `Subscription ${change.subscriptionId} created from a provider event, status ${change.status}.`;
   }
 
-  return `Subscription ${subscriptionId} is now ${status}.`;
+  return `Subscription ${change.subscriptionId} is now ${change.status}.`;
 }
 
-async function onInvoice(
+async function onInvoiceSettled(
   sql: SqlExecutor,
-  event: BillingEvent,
-  organisationId: string | null,
+  provider: string,
+  change: InvoiceSettled,
 ): Promise<string> {
-  const invoiceId = String(event.data.id ?? '');
-  if (!invoiceId) return 'Invoice event with no id; nothing applied.';
-
-  const paid = event.type === 'invoice.paid';
-  const amountDue = Number(event.data.amount_due ?? 0);
-  const amountPaid = Number(event.data.amount_paid ?? 0);
-  const tax = Number(event.data.tax ?? 0);
-  const currency = String(event.data.currency ?? 'usd').toUpperCase();
+  const status = change.paid ? 'paid' : 'open';
 
   const updated = await sql.query(
     `update public.invoices
-        set amount_due_cents = $2, amount_paid_cents = $3, amount_tax_cents = $4,
-            status = $5::text::public.invoice_status,
-            hosted_invoice_url = coalesce($6, hosted_invoice_url),
-            paid_at = case when $5::text = 'paid' then now() else paid_at end
-      where stripe_invoice_id = $1
+        set amount_due_cents = $3, amount_paid_cents = $4, amount_tax_cents = $5,
+            status = $6::text::public.invoice_status,
+            hosted_invoice_url = coalesce($7, hosted_invoice_url),
+            paid_at = case when $6::text = 'paid' then now() else paid_at end
+      where provider = $1::text::public.payment_provider and provider_invoice_id = $2
       returning id`,
     [
-      invoiceId,
-      amountDue,
-      amountPaid,
-      tax,
-      paid ? 'paid' : 'open',
-      stringOrNull(event.data.hosted_invoice_url),
+      provider,
+      change.invoiceId,
+      change.amountDueCents,
+      change.amountPaidCents,
+      change.amountTaxCents,
+      status,
+      change.hostedInvoiceUrl,
     ],
   );
 
-  if (updated.rows.length === 0 && organisationId) {
+  if (updated.rows.length === 0 && change.organisationId) {
     await sql.query(
       `insert into public.invoices
-         (organisation_id, stripe_invoice_id, amount_due_cents, amount_paid_cents, amount_tax_cents,
-          currency, status, hosted_invoice_url, issued_at, paid_at)
-       values ($1, $2, $3, $4, $5, $6, $7::text::public.invoice_status, $8, now(),
-               case when $7::text = 'paid' then now() else null end)
-       on conflict (stripe_invoice_id) do nothing`,
+         (organisation_id, provider, provider_invoice_id, amount_due_cents, amount_paid_cents,
+          amount_tax_cents, currency, status, hosted_invoice_url, issued_at, paid_at)
+       values ($1, $2::text::public.payment_provider, $3, $4, $5, $6, $7,
+               $8::text::public.invoice_status, $9, now(),
+               case when $8::text = 'paid' then now() else null end)
+       on conflict (provider, provider_invoice_id) do nothing`,
       [
-        organisationId,
-        invoiceId,
-        amountDue,
-        amountPaid,
-        tax,
-        currency,
-        paid ? 'paid' : 'open',
-        stringOrNull(event.data.hosted_invoice_url),
+        change.organisationId,
+        provider,
+        change.invoiceId,
+        change.amountDueCents,
+        change.amountPaidCents,
+        change.amountTaxCents,
+        change.currency,
+        status,
+        change.hostedInvoiceUrl,
       ],
     );
   }
 
-  return `Invoice ${invoiceId} is ${paid ? 'paid' : 'unpaid'}.`;
+  return `Invoice ${change.invoiceId} is ${change.paid ? 'paid' : 'unpaid'}.`;
 }
 
-async function onRefund(sql: SqlExecutor, event: BillingEvent): Promise<string> {
-  const paymentIntent = stringOrNull(event.data.payment_intent);
-  const refunded = Number(event.data.amount_refunded ?? 0);
-  if (!paymentIntent) return 'Refund event with no payment reference; nothing applied.';
-
+async function onRefundSettled(
+  sql: SqlExecutor,
+  provider: string,
+  change: RefundSettled,
+): Promise<string> {
   // Clamped to what was actually paid, and the database refuses anything larger
   // in any case. A refund bigger than the payment is a bug, not a gesture.
   const updated = await sql.query<{ id: string }>(
     `update public.invoices
-        set amount_refunded_cents = least($2, amount_paid_cents),
-            status = case when least($2, amount_paid_cents) >= amount_paid_cents then 'refunded' else status end
-      where stripe_payment_intent_id = $1
+        set amount_refunded_cents = least($3, amount_paid_cents),
+            status = case when least($3, amount_paid_cents) >= amount_paid_cents
+                          then 'refunded' else status end
+      where provider = $1::text::public.payment_provider and provider_payment_reference = $2
       returning id`,
-    [paymentIntent, refunded],
+    [provider, change.paymentReference, change.amountRefundedCents],
   );
 
   return updated.rows.length > 0
-    ? `Refund of ${refunded} recorded against payment ${paymentIntent}.`
-    : `No invoice found for payment ${paymentIntent}; refund recorded as an event only.`;
-}
-
-function stringOrNull(value: unknown): string | null {
-  if (typeof value === 'string' && value.length > 0) return value;
-  if (value && typeof value === 'object' && 'id' in value)
-    return String((value as { id: string }).id);
-  return null;
-}
-
-function unixOrNull(value: unknown): string | null {
-  const seconds = Number(value);
-  return Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000).toISOString() : null;
+    ? `Refund of ${change.amountRefundedCents} recorded against payment ${change.paymentReference}.`
+    : `No invoice found for payment ${change.paymentReference}; refund recorded as an event only.`;
 }

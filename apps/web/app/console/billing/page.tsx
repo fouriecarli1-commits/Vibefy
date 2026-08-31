@@ -5,10 +5,13 @@ import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import {
   CAPABILITIES,
   PLAN_TIERS,
+  currencyForCountry,
   entitlementFor,
   usageMeters,
+  type Currency,
   type PlanTier,
 } from '@vibefycode/billing';
+import { headers } from 'next/headers';
 import { startCheckout } from './actions';
 import { serviceDetailFor } from '@vibefycode/billing';
 import { ActionForm } from '@/components/action-form';
@@ -23,9 +26,37 @@ const money = (cents: number, currency: string) =>
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ purchased?: string; cancelled?: string; app?: string }>;
+  searchParams: Promise<{
+    purchased?: string;
+    cancelled?: string;
+    app?: string;
+    billed?: string;
+  }>;
 }) {
-  const { purchased, cancelled, app } = await searchParams;
+  const { purchased, cancelled, app, billed } = await searchParams;
+
+  /*
+   * Where the customer is billed, which decides both the price shown and the
+   * provider that takes the money.
+   *
+   * The default is a guess from where the request came from, and it is labelled
+   * as one. Guessing is better than defaulting every South African to dollars;
+   * pretending the guess is a fact would be worse than either. The choice in
+   * the URL always wins, and it is the choice — not the guess — that is sent to
+   * the checkout.
+   */
+  const headerList = await headers();
+  const guessedCountry = headerList.get('x-vercel-ip-country');
+  const billingCountry = (billed ?? guessedCountry ?? 'US').toUpperCase();
+  const currency: Currency = currencyForCountry(billingCountry);
+  const priceOf = (tier: { priceUsd: number | null; priceZar: number | null }) =>
+    currency === 'ZAR' ? tier.priceZar : tier.priceUsd;
+  const priceLabel = (amount: number) =>
+    new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
   const supabase = await createClient();
   const {
     data: { user },
@@ -223,19 +254,54 @@ export default async function BillingPage({
           Every plan opens to the whole story: what happens after you pay, how long each step takes,
           what is <em>not</em> included, and how to stop. Read that before the price.
         </p>
+
+        {/* The rand price is not the dollar price converted. Nothing in this
+            codebase applies an exchange rate — each is a decision about what
+            this is worth in that market — so the two are set side by side in
+            config and a plan with no price in one of them is simply not sold
+            there. */}
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Where are you billed?</legend>
+          <p className="max-w-2xl text-sm text-muted">
+            This decides the currency you are charged in and who processes the payment. We have
+            guessed from where you are connecting from — change it if that is wrong, and the price
+            below is the one you will be charged.
+          </p>
+          <p className="flex flex-wrap gap-3 text-sm">
+            {[
+              { code: 'ZA', label: 'South Africa (ZAR)' },
+              { code: 'US', label: 'Everywhere else (USD)' },
+            ].map((option) => {
+              const active = currencyForCountry(option.code) === currency;
+              return (
+                <Link
+                  key={option.code}
+                  href={`/console/billing?billed=${option.code}${app ? `&app=${app}` : ''}`}
+                  aria-current={active ? 'true' : undefined}
+                  className={`rounded-lg border px-3 py-2 ${
+                    active ? 'border-line-strong font-medium' : 'border-line text-muted'
+                  }`}
+                >
+                  {option.label}
+                </Link>
+              );
+            })}
+          </p>
+        </fieldset>
         <ul className="space-y-4">
           {pricing.tiers
             .filter((tier) => tier.id !== 'free')
             .map((tier) => {
               const detail = serviceDetailFor(tier.id);
+              const price = priceOf(tier);
               return (
                 <li key={tier.id} className="panel space-y-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <h3 className="font-semibold">{tier.label}</h3>
                     <span className="chip" data-numeric>
-                      {tier.priceUsd === null
+                      {price === null
                         ? 'By quote'
-                        : `$${tier.priceUsd}${tier.billing === 'monthly' ? ' / month' : ' once'}`}
+                        : `${priceLabel(price)}${tier.billing === 'monthly' ? ' / month' : ' once'}`}
                     </span>
                   </div>
                   <p className="text-sm text-muted">{tier.contents}</p>
@@ -249,12 +315,22 @@ export default async function BillingPage({
                     </Disclosure>
                   )}
 
-                  {tier.priceUsd !== null && organisationId && (
+                  {price !== null && organisationId && (
                     <ActionForm action={startCheckout} submitLabel={`Choose ${tier.label}`}>
                       <input type="hidden" name="organisationId" value={organisationId} />
                       <input type="hidden" name="plan" value={tier.id} />
+                      <input type="hidden" name="billingCountry" value={billingCountry} />
                       {app && <input type="hidden" name="appId" value={app} />}
                     </ActionForm>
+                  )}
+                  {price === null && tier.priceUsd !== null && (
+                    // Sold elsewhere, not here. Said plainly rather than hidden,
+                    // because a plan that vanishes when you change country looks
+                    // like a bug.
+                    <p className="text-sm text-muted">
+                      Not sold in {currency} yet. It is available billed in{' '}
+                      {currency === 'ZAR' ? 'dollars' : 'rands'}.
+                    </p>
                   )}
                 </li>
               );

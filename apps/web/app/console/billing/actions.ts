@@ -2,24 +2,10 @@
 
 import { randomUUID } from 'node:crypto';
 import { redirect } from 'next/navigation';
-import { StripeProvider, type PaymentProvider, type PlanId } from '@vibefycode/billing';
+import { PriceNotSetError, currencyForCountry, type PlanId } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { PaymentsNotConfiguredError, paymentProvider } from '@/lib/payments';
 import type { ActionState } from '@/app/console/apps/actions';
-
-function provider(): PaymentProvider | null {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) return null;
-  return new StripeProvider({
-    secretKey,
-    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
-    priceIds: {
-      one_off: process.env.STRIPE_PRICE_ONE_OFF ?? '',
-      certified: process.env.STRIPE_PRICE_CERTIFIED ?? '',
-      agency: process.env.STRIPE_PRICE_AGENCY ?? '',
-      organisation: process.env.STRIPE_PRICE_ORGANISATION ?? '',
-    },
-  });
-}
 
 /**
  * Starts a hosted checkout. The customer types their card into the provider's
@@ -38,8 +24,14 @@ export async function startCheckout(
   const organisationId = String(formData.get('organisationId') ?? '');
   const plan = String(formData.get('plan') ?? '') as PlanId;
   const appId = String(formData.get('appId') ?? '') || undefined;
+  // Where the customer is billed decides the currency, and the currency decides
+  // the provider. Nothing here looks at what they can afford or at which
+  // provider costs us less: somebody quoted one price and charged another has
+  // been lied to, however small the difference.
+  const billingCountry = String(formData.get('billingCountry') ?? '').toUpperCase() || null;
 
   if (!organisationId || !plan) return { error: 'Choose a workspace and a plan.' };
+  if (!billingCountry) return { error: 'Choose the country you are billed in.' };
 
   const membership = await supabase
     .from('memberships')
@@ -51,26 +43,47 @@ export async function startCheckout(
     return { error: 'Only an owner or an admin can buy for this workspace.' };
   }
 
-  const payments = provider();
-  if (!payments) {
-    return {
-      error:
-        'Payments are not configured on this deployment yet. Set STRIPE_SECRET_KEY and the price ids — see docs/OPEN_ITEMS.md.',
-    };
+  const currency = currencyForCountry(billingCountry);
+
+  let payments;
+  try {
+    payments = paymentProvider(currency);
+  } catch (error) {
+    if (error instanceof PaymentsNotConfiguredError) {
+      return {
+        error: `Payments in ${currency} are not configured on this deployment yet. See docs/OPEN_ITEMS.md.`,
+      };
+    }
+    throw error;
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-  const session = await payments.createCheckoutSession({
-    organisationId,
-    plan,
-    customerEmail: user.email ?? '',
-    successUrl: `${origin}/console/billing?purchased=1`,
-    cancelUrl: `${origin}/console/billing?cancelled=1`,
-    ...(appId ? { appId } : {}),
-    // Deterministic per user, plan and app: a double-click must not open two
-    // checkouts and risk two charges.
-    idempotencyKey: `checkout:${user.id}:${organisationId}:${plan}:${appId ?? 'none'}:${randomUUID().slice(0, 8)}`,
-  });
+
+  let session;
+  try {
+    session = await payments.createCheckoutSession({
+      organisationId,
+      plan,
+      currency,
+      customerEmail: user.email ?? '',
+      successUrl: `${origin}/console/billing?purchased=1`,
+      cancelUrl: `${origin}/console/billing?cancelled=1`,
+      ...(appId ? { appId } : {}),
+      // One key per attempt. Paystack treats this as the transaction reference
+      // and rejects a reused one outright, so an abandoned checkout must not
+      // poison the next try. It is therefore not a guard against a double-click
+      // opening two checkouts — see docs/OPEN_ITEMS.md, which says so plainly
+      // rather than leaving a comment here claiming otherwise.
+      idempotencyKey: `checkout-${user.id.slice(0, 8)}-${plan}-${randomUUID().slice(0, 12)}`,
+    });
+  } catch (error) {
+    if (error instanceof PriceNotSetError) {
+      // Never converted, never guessed. A plan with no price in this currency
+      // is a plan we have not decided how to sell here yet.
+      return { error: `That plan is not sold in ${currency} yet.` };
+    }
+    throw error;
+  }
 
   redirect(session.url);
 }

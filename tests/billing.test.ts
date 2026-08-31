@@ -14,6 +14,7 @@ import {
   applyBillingEvent,
   decideAssessmentRequest,
   entitlementFor,
+  interpretStripeEvent,
   type AssessmentRequestContext,
 } from '../packages/billing/src/index.ts';
 import { connect } from './setup/client.ts';
@@ -186,6 +187,7 @@ describe('webhook verification', () => {
     const first = await provider.createCheckoutSession({
       organisationId: 'org',
       plan: 'one_off',
+      currency: 'USD',
       customerEmail: 'a@example.test',
       successUrl: 'https://vibefycode.example/ok',
       cancelUrl: 'https://vibefycode.example/no',
@@ -194,6 +196,7 @@ describe('webhook verification', () => {
     const second = await provider.createCheckoutSession({
       organisationId: 'org',
       plan: 'one_off',
+      currency: 'USD',
       customerEmail: 'a@example.test',
       successUrl: 'https://vibefycode.example/ok',
       cancelUrl: 'https://vibefycode.example/no',
@@ -235,11 +238,19 @@ describe('applying events to our records', () => {
     data: object,
   });
 
+  // The handler no longer reads any provider's field names: it reads a
+  // `BillingChange`, and each provider translates its own payloads into one.
+  // These events are Stripe-shaped, so Stripe's translation is what turns them
+  // into something the handler understands — which means these tests exercise
+  // that translation too, rather than a shape invented for the test.
+  const stripe = { name: 'stripe' as const, interpret: interpretStripeEvent };
+
   it('records a one-off payment as a paid invoice, with its tax', async () => {
     const client = await pool.connect();
     try {
       await applyBillingEvent(
         client,
+        stripe,
         event('checkout.session.completed', {
           id: 'cs_one_off',
           mode: 'payment',
@@ -258,7 +269,7 @@ describe('applying events to our records', () => {
 
     const { rows } = await db.query(
       `select amount_paid_cents, amount_tax_cents, currency, status, tax_country, plan
-         from public.invoices where stripe_invoice_id = 'in_one_off'`,
+         from public.invoices where provider_invoice_id = 'in_one_off'`,
     );
     expect(rows[0]).toMatchObject({
       amount_paid_cents: 7900,
@@ -286,8 +297,8 @@ describe('applying events to our records', () => {
 
     const client = await pool.connect();
     try {
-      const first = await applyBillingEvent(client, duplicate);
-      const second = await applyBillingEvent(client, duplicate);
+      const first = await applyBillingEvent(client, stripe, duplicate);
+      const second = await applyBillingEvent(client, stripe, duplicate);
       expect(first.duplicate).toBe(false);
       expect(second.duplicate).toBe(true);
     } finally {
@@ -295,7 +306,7 @@ describe('applying events to our records', () => {
     }
 
     const { rows } = await db.query(
-      `select count(*)::int as n from public.invoices where stripe_invoice_id = 'in_dupe'`,
+      `select count(*)::int as n from public.invoices where provider_invoice_id = 'in_dupe'`,
     );
     expect(rows[0].n).toBe(1);
   });
@@ -305,6 +316,7 @@ describe('applying events to our records', () => {
     try {
       await applyBillingEvent(
         client,
+        stripe,
         event('checkout.session.completed', {
           id: 'cs_sub',
           mode: 'subscription',
@@ -315,6 +327,7 @@ describe('applying events to our records', () => {
       );
       await applyBillingEvent(
         client,
+        stripe,
         event('customer.subscription.deleted', { id: 'sub_1', status: 'canceled', metadata: {} }),
       );
     } finally {
@@ -322,7 +335,7 @@ describe('applying events to our records', () => {
     }
 
     const { rows } = await db.query(
-      `select status, plan, cancelled_at from public.subscriptions where stripe_subscription_id = 'sub_1'`,
+      `select status, plan, cancelled_at from public.subscriptions where provider_subscription_id = 'sub_1'`,
     );
     expect(rows[0].status).toBe('cancelled');
     expect(rows[0].plan).toBe('certified');
@@ -334,6 +347,7 @@ describe('applying events to our records', () => {
     try {
       await applyBillingEvent(
         client,
+        stripe,
         event('checkout.session.completed', {
           id: 'cs_refund',
           mode: 'payment',
@@ -346,6 +360,7 @@ describe('applying events to our records', () => {
       );
       await applyBillingEvent(
         client,
+        stripe,
         event('charge.refunded', {
           id: 'ch_1',
           payment_intent: 'pi_refund',
@@ -357,7 +372,7 @@ describe('applying events to our records', () => {
     }
 
     const { rows } = await db.query(
-      `select amount_paid_cents, amount_refunded_cents, status from public.invoices where stripe_invoice_id = 'in_refund'`,
+      `select amount_paid_cents, amount_refunded_cents, status from public.invoices where provider_invoice_id = 'in_refund'`,
     );
     expect(rows[0].amount_refunded_cents).toBe(7900);
     expect(rows[0].status).toBe('refunded');

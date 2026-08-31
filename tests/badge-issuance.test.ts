@@ -415,7 +415,7 @@ describe('the lifecycle sweep', () => {
       [owner.organisationId],
     );
     await db.query(
-      `insert into public.invoices (organisation_id, stripe_invoice_id, amount_due_cents, amount_paid_cents,
+      `insert into public.invoices (organisation_id, provider_invoice_id, amount_due_cents, amount_paid_cents,
                                     currency, status, app_id, plan, issued_at, paid_at)
        values ($1, 'in_outright', 7900, 7900, 'USD', 'paid', $2, 'one_off', now(), now())`,
       [owner.organisationId, app.rows[0].app_id],

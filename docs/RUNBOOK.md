@@ -134,6 +134,51 @@ tampered body, an unsigned body, or one older than five minutes is refused — t
 
 With real keys set, the fake is never constructed, and production refuses to start without them.
 
+## Two providers, two countries
+
+VibefyCode sells into South Africa and the United States. Stripe takes dollars, Paystack takes
+rands, and the decision between them is made in one function — `packages/billing/src/routing.ts`:
+the country the customer says they are billed in picks the currency, and the currency picks the
+provider. Nothing else is consulted.
+
+Rand prices are **set**, in `config/pricing.json`, beside the dollar ones. Nothing in the codebase
+applies an exchange rate: a plan with no price in the currency somebody is buying in is refused
+loudly rather than charged at a rate nobody chose. Changing a price is a config edit, not a deploy.
+
+Two differences from Stripe that matter when something goes wrong:
+
+- **Paystack's webhook signature never expires.** It is an HMAC-SHA512 of the raw body keyed by
+  the secret key, with no timestamp, so a payload captured today verifies a year from now. Replay
+  protection is entirely the unique constraint on `(provider, provider_event_id)` in
+  `billing_events`, which is why the event id is synthesised from the transaction reference and
+  must stay stable for the same event.
+- **Paystack computes no tax.** Stripe Tax works out what VAT is owed where; Paystack does not, so
+  rand payments record a tax of zero. That is honest rather than complete — see `OPEN_ITEMS.md`.
+
+Webhook endpoints:
+
+| Provider | Endpoint                     | Signature header       |
+| -------- | ---------------------------- | ---------------------- |
+| Stripe   | `POST /api/stripe/webhook`   | `stripe-signature`     |
+| Paystack | `POST /api/paystack/webhook` | `x-paystack-signature` |
+
+To exercise the Paystack endpoint by hand:
+
+```bash
+node -e '
+  const { createHmac } = await import("node:crypto");
+  const body = JSON.stringify({ event: "charge.success", data: { reference: "ref_1",
+    amount: 149900, currency: "ZAR",
+    metadata: { organisationId: "<your org id>", plan: "one_off" } } });
+  console.log(body);
+  console.log(createHmac("sha512", process.env.PAYSTACK_SECRET_KEY).update(body).digest("hex"));
+'
+```
+
+Neither account is open yet, and no live key has been exercised. Both providers need a registered
+business, so this waits on the legal-entity decision in `OPEN_ITEMS.md`. Check the request and
+webhook shapes against Paystack's own documentation before the first real charge.
+
 ## Changing the rubric
 
 Rubric versions are immutable once published — the database refuses to edit one, and issued

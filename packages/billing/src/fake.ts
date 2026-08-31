@@ -8,17 +8,25 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   WebhookVerificationError,
+  type BillingChange,
   type BillingEvent,
   type CheckoutRequest,
   type CheckoutSession,
+  type Currency,
   type PaymentProvider,
+  type ProviderName,
   type RefundRequest,
   type RefundResult,
   type SettledPayment,
 } from './provider.ts';
+import { interpretStripeEvent } from './stripe.ts';
 
 export class FakePaymentProvider implements PaymentProvider {
-  readonly name = 'fake';
+  // It stands in for Stripe, so it answers to Stripe's name and speaks Stripe's
+  // vocabulary. A fake with a name of its own would be a third provider for the
+  // database to know about, and `billing_events.provider` is a closed set.
+  readonly name: ProviderName = 'stripe';
+  readonly currency: Currency = 'USD';
   readonly checkoutRequests: CheckoutRequest[] = [];
   readonly refundRequests: RefundRequest[] = [];
   private readonly settlements = new Map<string, SettledPayment>();
@@ -123,5 +131,9 @@ export class FakePaymentProvider implements PaymentProvider {
       createdAt: new Date(parsed.created * 1000),
       data: parsed.data.object,
     };
+  }
+
+  interpret(event: BillingEvent): BillingChange {
+    return interpretStripeEvent(event);
   }
 }
