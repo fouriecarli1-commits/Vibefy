@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.120.0",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",
     "@vibefycode/badge": "workspace:*",
     "@vibefycode/billing": "workspace:*",
+    "@vibefycode/copilot": "workspace:*",
     "@vibefycode/directory": "workspace:*",
     "@vibefycode/engine": "workspace:*",
     "@vibefycode/governance": "workspace:*",

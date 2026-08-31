@@ -39,6 +39,7 @@ const nextConfig: NextConfig = {
     '@vibefycode/api',
     '@vibefycode/badge',
     '@vibefycode/billing',
+    '@vibefycode/copilot',
     '@vibefycode/directory',
     '@vibefycode/engine',
     '@vibefycode/governance',

@@ -108,6 +108,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: 0.120.0
+        version: 0.120.0(zod@4.4.3)
       '@supabase/ssr':
         specifier: 0.12.4
         version: 0.12.4(@supabase/supabase-js@2.112.3)
@@ -120,6 +123,9 @@ importers:
       '@vibefycode/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@vibefycode/copilot':
+        specifier: workspace:*
+        version: link:../../packages/copilot
       '@vibefycode/directory':
         specifier: workspace:*
         version: link:../../packages/directory
@@ -293,6 +299,12 @@ importers:
       typescript:
         specifier: 7.0.2
         version: 7.0.2
+
+  packages/copilot:
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
 
   packages/directory:
     dependencies:

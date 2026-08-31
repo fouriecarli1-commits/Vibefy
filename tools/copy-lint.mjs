@@ -75,6 +75,15 @@ const SKIP_FILES = new Set([
   'tools/copy-lint.test.ts',
   'supabase/migrations/20260830110000_publish_rubric_1_0_0.sql',
   'supabase/schema.sql',
+  // A fifth, for the same reason as the first two: it is the list of phrases
+  // the assistant may not send, so it necessarily contains every one of them.
+  // Kept to the list alone — `packages/copilot/src/index.ts` holds the prose
+  // the assistant is instructed with and stays scanned, which
+  // `tests/copilot-route.test.ts` asserts.
+  'packages/copilot/src/guard.ts',
+  // And its tests, for the reason `tools/copy-lint.test.ts` is here: a test
+  // that proves a phrase is refused has to contain the phrase.
+  'packages/copilot/src/copilot.test.ts',
 ]);
 
 /** Never permitted. These extend the mark into a claim we do not make. */
