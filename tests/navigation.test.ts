@@ -22,13 +22,18 @@ describe('the row is grouped, not listed', () => {
     expect(nav).toContain("label: 'Console'");
   });
 
-  it('leaves at most four things in the top row', () => {
-    // Two group triggers, one direct link, one call to action. More than that
-    // and it is the nine-link row again with extra steps.
-    const groups = [...nav.matchAll(/^\s{4}id: '/gm)].length;
-    const direct = /const DIRECT[\s\S]*?\];/.exec(nav)![0];
-    const directCount = [...direct.matchAll(/href:/g)].length;
-    expect(groups + directCount).toBeLessThanOrEqual(4);
+  it('leaves at most four things in the top row, for every audience', () => {
+    // More than four and it is the nine-link row again with extra steps. The
+    // row is now per audience, so the cap has to hold for each of them rather
+    // than for one list nobody sees in full.
+    const map = /const GROUPS_FOR[\s\S]*?\n\};/.exec(nav)![0];
+    const rows = [...map.matchAll(/^\s{2}(\w+): \[([^\]]*)\]/gm)];
+    expect(rows.length).toBe(4);
+    for (const [, audience, entries] of rows) {
+      const count = [...(entries ?? '').matchAll(/'[^']+'/g)].length;
+      // Only the visitor is also offered a sign-in call to action.
+      expect(count + (audience === 'visitor' ? 1 : 0)).toBeLessThanOrEqual(4);
+    }
   });
 
   it('says what each destination is for', () => {

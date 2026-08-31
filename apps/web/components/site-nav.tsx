@@ -20,7 +20,18 @@ import { useEffect, useRef, useState } from 'react';
  *     finger and hostile with a trackpad, and this row has to work on a phone.
  *   · Escape closes, a click outside closes, and the trigger says whether it is
  *     open. A menu that traps you is worse than no menu.
+ *
+ * And it is filtered by who is asking. A customer was being offered the
+ * reviewer queue, and an operator was being offered the console and the public
+ * verification pages — so both were reading a menu of which most items were
+ * somebody else's. Nothing here is an access control: every one of these routes
+ * checks the caller itself, and hiding a link the caller may use would be a
+ * different and worse mistake. This only stops offering people work that is not
+ * theirs.
  */
+
+/** Who is reading the menu. Nothing more is derived from this than what to show. */
+export type Audience = 'visitor' | 'customer' | 'reviewer' | 'admin';
 
 interface NavItem {
   readonly href: string;
@@ -76,11 +87,37 @@ const GROUPS: readonly NavGroup[] = [
   },
 ];
 
-const DIRECT: readonly NavItem[] = [
-  { href: '/review', label: 'Review', hint: 'The reviewer queue' },
-];
+const ADMIN_GROUP: NavGroup = {
+  id: 'admin',
+  label: 'Admin',
+  items: [
+    { href: '/admin/accounts', label: 'Accounts', hint: 'Who owns what, and on which plan' },
+    {
+      href: '/admin/costs',
+      label: 'Unit economics',
+      hint: 'What a run costs against what it sells for',
+    },
+  ],
+};
 
-export function SiteNav() {
+const REVIEW_LINK: NavItem = { href: '/review', label: 'Review', hint: 'The reviewer queue' };
+
+/**
+ * What each audience is offered.
+ *
+ * An operator does not need the console or the public verification pages in
+ * their menu, and a customer does not need the reviewer queue. Both can still
+ * reach any of it by typing the URL — the pages decide for themselves who may
+ * see them, which is where that decision belongs.
+ */
+const GROUPS_FOR: Record<Audience, readonly string[]> = {
+  visitor: ['verify'],
+  customer: ['verify', 'console'],
+  reviewer: ['verify', 'review'],
+  admin: ['review', 'admin'],
+};
+
+export function SiteNav({ audience = 'visitor' }: { audience?: Audience }) {
   const pathname = usePathname();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -120,6 +157,10 @@ export function SiteNav() {
   const isCurrent = (href: string) =>
     href === '/console' ? pathname === '/console' : pathname.startsWith(href);
 
+  const allowed = GROUPS_FOR[audience];
+  const groups = [...GROUPS, ADMIN_GROUP].filter((group) => allowed.includes(group.id));
+  const direct = allowed.includes('review') ? [REVIEW_LINK] : [];
+
   return (
     <div ref={navRef} className="nav-shell">
       <Link href="/" className="nav-logo" aria-label="VibefyCode — home">
@@ -155,7 +196,7 @@ export function SiteNav() {
       </button>
 
       <div id="site-nav-panel" className="nav-panel" data-open={menuOpen}>
-        {GROUPS.map((group) => {
+        {groups.map((group) => {
           const open = openGroup === group.id;
           const active = group.items.some((item) => isCurrent(item.href));
           return (
@@ -190,7 +231,7 @@ export function SiteNav() {
           );
         })}
 
-        {DIRECT.map((item) => (
+        {direct.map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -202,9 +243,13 @@ export function SiteNav() {
           </Link>
         ))}
 
-        <Link href="/sign-in" className="nav-cta">
-          Sign in
-        </Link>
+        {/* Offering "Sign in" to somebody who is signed in is the smallest
+            possible way to say the page does not know who they are. */}
+        {audience === 'visitor' && (
+          <Link href="/sign-in" className="nav-cta">
+            Sign in
+          </Link>
+        )}
       </div>
     </div>
   );

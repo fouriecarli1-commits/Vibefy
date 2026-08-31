@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { JetBrains_Mono, Poppins } from 'next/font/google';
+import { Suspense } from 'react';
 import { SiteNav } from '@/components/site-nav';
+import { SiteNavForViewer } from '@/components/site-nav-viewer';
 import './globals.css';
 
 /*
@@ -61,7 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur">
           <nav aria-label="Primary">
-            <SiteNav />
+            {/* The visitor's menu paints immediately; the one that knows who is
+                reading replaces it when the session lookup lands. Without the
+                boundary every public page would wait on that query to render a
+                header none of them need it for. */}
+            <Suspense fallback={<SiteNav />}>
+              <SiteNavForViewer />
+            </Suspense>
           </nav>
         </header>
 
