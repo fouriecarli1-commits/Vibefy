@@ -8,6 +8,7 @@ import {
   REMEDIATION_CLIENT_DISCLOSURE,
 } from '@vibefycode/shared';
 import { readAsAnon } from '@/lib/sql';
+import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
 
 /**
  * The verification page.
@@ -58,10 +59,40 @@ export async function generateMetadata({
   const { slug } = await params;
   const badge = await loadBadge(slug).catch(() => null);
   if (!badge) return { title: 'Badge not found' };
+
+  const assessedOn = new Date(badge.assessed_at).toISOString().slice(0, 10);
+  const title = `${badge.app_name} — Verified by VibefyCode`;
+  const description = `${badge.app_name} was assessed against VibefyCode Rubric v${badge.rubric_version} on ${assessedOn}. Scope-limited assessment, not a security guarantee.`;
+  const origin = await resolveVerifyOrigin();
+
   return {
-    title: `${badge.app_name} — Verified by VibefyCode`,
-    description: `${badge.app_name} was assessed against VibefyCode Rubric v${badge.rubric_version} on ${new Date(badge.assessed_at).toISOString().slice(0, 10)}. Scope-limited assessment, not a security guarantee.`,
+    title,
+    description,
     robots: { index: badge.status === 'active', follow: true },
+    alternates: { canonical: `${origin}/a/${badge.slug}` },
+    // A verification URL is the one link this product has that people send to
+    // each other — an owner showing somebody their result, or somebody asking
+    // whether a mark is real. Pasted into a message it rendered as a bare
+    // address, which is the difference between a product and a URL.
+    //
+    // The card says exactly what the page says, from the same two constants. A
+    // share preview that promised more than the assessment does would be the
+    // same over-claim the wordmark is forbidden from making, committed in the
+    // place most likely to be seen and least likely to be read carefully.
+    openGraph: {
+      type: 'article',
+      siteName: 'VibefyCode',
+      url: `${origin}/a/${badge.slug}`,
+      title,
+      description,
+      images: [{ url: `${origin}/brand/icon.png`, width: 1024, height: 1024, alt: 'VibefyCode' }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [`${origin}/brand/icon.png`],
+    },
   };
 }
 
@@ -100,7 +131,13 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
 
   const assessedOn = new Date(badge.assessed_at).toISOString().slice(0, 10);
   const status = STATUS_COPY[badge.status];
-  const verifyOrigin = process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  // The same resolution the embed snippet uses. It was reading the environment
+  // directly and falling back to an empty string, so on a deployment with
+  // neither variable set this page told a sceptic to fetch our public key from
+  // "/.well-known/vibefycode-badge-key" — a path with no host in front of it.
+  // The one instruction on the page whose whole purpose is that somebody can
+  // follow it without trusting us.
+  const verifyOrigin = await resolveVerifyOrigin();
 
   return (
     <article className="max-w-3xl space-y-10">

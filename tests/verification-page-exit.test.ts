@@ -70,3 +70,62 @@ describe('what it claims on the way out', () => {
     expect(section).toContain('/methodology');
   });
 });
+
+describe('the link somebody sends to somebody else', () => {
+  // A verification URL is the one address this product has that people pass
+  // around — an owner showing a customer their result, or a sceptic asking a
+  // friend whether a mark is real. Pasted into a message it rendered as a bare
+  // address, which is the difference between a product and a URL.
+  it('renders as a card rather than as raw text', () => {
+    expect(page).toContain('openGraph');
+    expect(page).toContain('twitter');
+    expect(page).toMatch(/siteName: 'VibefyCode'/);
+  });
+
+  it('says on the card exactly what it says on the page', () => {
+    // A share preview that promised more than the assessment does would be the
+    // same over-claim as a badge reading "secure", made in the place most
+    // likely to be seen and least likely to be read carefully. One constant,
+    // used for both.
+    const meta = page.slice(page.indexOf('const assessedOn ='), page.indexOf('export default'));
+    // Written once and referenced three times — the page's own description, the
+    // card's, and the tweet's — rather than typed out again anywhere.
+    expect(meta.match(/const description =/g)).toHaveLength(1);
+    expect(meta.match(/^\s+description,$/gm)?.length).toBeGreaterThanOrEqual(3);
+    expect(meta.match(/const title =/g)).toHaveLength(1);
+  });
+
+  it('gives every shared address an absolute origin', () => {
+    // A relative image or canonical in a share card resolves against whoever is
+    // rendering it, which is never us.
+    expect(page).toContain('resolveVerifyOrigin');
+    expect(page).toMatch(/canonical: `\$\{origin\}\/a\/\$\{badge\.slug\}`/);
+  });
+
+  it('does not tell a sceptic to fetch our key from a path with no host', () => {
+    // The one instruction on the page whose entire purpose is that somebody can
+    // follow it without trusting us. It read the environment directly and fell
+    // back to an empty string.
+    expect(page).not.toContain(
+      "process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? ''",
+    );
+  });
+});
+
+describe('the way out of a failure', () => {
+  const notFound = readFileSync(join(process.cwd(), 'apps/web/app/a/not-found.tsx'), 'utf8');
+
+  it('offers one too', () => {
+    // Somebody who lands on a badge that does not resolve is the one visitor
+    // guaranteed to have wondered what VibefyCode is.
+    expect(notFound).toMatch(/What is VibefyCode/i);
+    expect(notFound).toMatch(/Get your application assessed/i);
+  });
+
+  it('puts it after the explanation, not before it', () => {
+    const reasons = notFound.indexOf('The usual reasons');
+    const offer = notFound.indexOf('What is VibefyCode');
+    expect(reasons).toBeGreaterThan(-1);
+    expect(offer).toBeGreaterThan(reasons);
+  });
+});

@@ -89,6 +89,36 @@ export default function BadgeNotFound() {
         </ul>
       </section>
 
+      {/* The same section the verification page ends with, for the same reason.
+
+          Somebody standing here clicked a trust mark on a stranger's website to
+          find out what it meant. That they landed on a failure does not make
+          them less curious — it makes them the one visitor certain to have
+          wondered what VibefyCode is, and until now this page answered by
+          offering them nowhere to go. */}
+      <section
+        aria-labelledby="what-this-is"
+        className="space-y-3 rounded-xl border border-line-strong p-6"
+      >
+        <h2 id="what-this-is" className="text-lg font-semibold">
+          What is VibefyCode?
+        </h2>
+        <p className="max-w-prose text-muted">
+          An independent assessment of applications built quickly, often with AI. We test what we
+          can reach from outside — with the owner&apos;s written authorisation and never their
+          source code — score it against a <Link href="/methodology">published rubric</Link>, and a
+          person reviews every result before anything is certified.
+        </p>
+        <p className="flex flex-wrap gap-4 text-sm">
+          <Link href="/" className="nav-cta">
+            Get your application assessed
+          </Link>
+          <Link href="/how-it-works" className="self-center">
+            What happens to your app
+          </Link>
+        </p>
+      </section>
+
       <footer className="border-t border-line pt-6 text-sm text-muted">
         <p>
           A VibefyCode assessment is scope-limited: it says what was checked and when, and nothing
