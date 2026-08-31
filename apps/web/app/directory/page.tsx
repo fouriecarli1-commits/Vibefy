@@ -11,6 +11,7 @@ import {
   type DirectoryEntry,
   type SortKey,
 } from '@vibefycode/directory';
+import { SponsorSlot } from '@/components/sponsor-slot';
 import { readAsAnon } from '@/lib/sql';
 
 export const metadata: Metadata = {
@@ -215,6 +216,11 @@ export default async function DirectoryPage({
           certified. <Link href="/methodology">How the rubric works</Link>.
         </p>
       </section>
+
+      {/* Below the list and below the explanation of how the list is ordered,
+          so a reader has been told what they are looking at before they are
+          shown something somebody paid to put there. */}
+      <SponsorSlot placement="directory" />
     </div>
   );
 }

@@ -50,6 +50,7 @@ const nextConfig: NextConfig = {
     '@vibefycode/remediation',
     '@vibefycode/rubric',
     '@vibefycode/shared',
+    '@vibefycode/sponsorship',
     '@vibefycode/trustcheck',
     '@vibefycode/workspace',
   ],

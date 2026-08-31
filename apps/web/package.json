@@ -25,6 +25,7 @@
     "@vibefycode/report": "workspace:*",
     "@vibefycode/rubric": "workspace:*",
     "@vibefycode/shared": "workspace:*",
+    "@vibefycode/sponsorship": "workspace:*",
     "@vibefycode/trustcheck": "workspace:*",
     "@vibefycode/worker": "workspace:*",
     "@vibefycode/workspace": "workspace:*",

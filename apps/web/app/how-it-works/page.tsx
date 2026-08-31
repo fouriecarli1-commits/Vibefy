@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { DEFAULT_CEILING } from '@vibefycode/engine/scope';
 import { RETENTION_DAYS } from '@vibefycode/engine/evidence';
+import { SponsorSlot } from '@/components/sponsor-slot';
 
 export const metadata: Metadata = {
   title: 'What happens to your app',
@@ -298,6 +299,7 @@ export default function HowItWorksPage() {
           The terms, in full
         </Link>
       </section>
+      <SponsorSlot placement="how_it_works" />
     </div>
   );
 }

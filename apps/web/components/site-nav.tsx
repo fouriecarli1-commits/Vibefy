@@ -73,6 +73,11 @@ const GROUPS: readonly NavGroup[] = [
       },
       { href: '/directory', label: 'Directory', hint: 'Applications with a live badge' },
       { href: '/methodology', label: 'Methodology', hint: 'The rubric, published in full' },
+      {
+        href: '/advertise',
+        label: 'Advertise',
+        hint: 'One space, on a quiet site — and what it cannot buy',
+      },
     ],
   },
   {
@@ -97,6 +102,11 @@ const ADMIN_GROUP: NavGroup = {
   label: 'Admin',
   items: [
     { href: '/admin/accounts', label: 'Accounts', hint: 'Who owns what, and on which plan' },
+    {
+      href: '/admin/sponsorships',
+      label: 'Placements',
+      hint: 'Paid placements waiting for a decision',
+    },
     {
       href: '/admin/costs',
       label: 'Unit economics',

@@ -58,5 +58,22 @@
     "globalDailySpendUsd": 200,
     "freeTierWeeklyBudgetAlertUsd": 100
   },
-  "currencies": ["USD", "ZAR"]
+  "currencies": ["USD", "ZAR"],
+  "sponsorship": {
+    "$comment": "Advertising space on VibefyCode, per 30 days. One placement per surface at a time \u2014 the scarcity is the product, and the price follows from it: the app is quiet, and quiet is what makes a space on it worth paying for. Placeholder figures awaiting Anr\u00e9\u2019s sign-off, like the rand prices above.",
+    "perThirtyDays": {
+      "directory": {
+        "usd": 1500,
+        "zar": 27500
+      },
+      "how_it_works": {
+        "usd": 750,
+        "zar": 13500
+      },
+      "methodology": {
+        "usd": 750,
+        "zar": 13500
+      }
+    }
+  }
 }

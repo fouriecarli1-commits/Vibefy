@@ -153,6 +153,9 @@ importers:
       '@vibefycode/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@vibefycode/sponsorship':
+        specifier: workspace:*
+        version: link:../../packages/sponsorship
       '@vibefycode/trustcheck':
         specifier: workspace:*
         version: link:../../packages/trustcheck
@@ -440,6 +443,19 @@ importers:
       '@types/node':
         specifier: 26.2.0
         version: 26.2.0
+
+  packages/sponsorship:
+    dependencies:
+      '@vibefycode/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
 
   packages/trustcheck:
     dependencies:

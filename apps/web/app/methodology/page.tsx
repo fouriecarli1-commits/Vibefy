@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getRubric, rubricChecksum, CURRENT_RUBRIC_VERSION } from '@vibefycode/rubric';
+import { SponsorSlot } from '@/components/sponsor-slot';
 
 export const metadata: Metadata = {
   title: 'Methodology',
@@ -143,6 +144,7 @@ export default function MethodologyPage() {
           identical. Reviewer overrides are recorded with a written reason and cannot be edited.
         </p>
       </section>
+      <SponsorSlot placement="methodology" />
     </article>
   );
 }
