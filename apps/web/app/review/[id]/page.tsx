@@ -95,6 +95,15 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           {String(assessment.rubric_version)} · {sorted.length} finding
           {sorted.length === 1 ? '' : 's'}
         </p>
+        {/* The operator's own copy. Available once the assessment has been
+            reviewed, and regardless of what the customer's plan includes —
+            keeping a record of an assessment we performed is not something the
+            customer buys. */}
+        {['approved', 'published'].includes(String(assessment.status)) && (
+          <p className="text-sm">
+            <a href={`/console/reports/${id}/pdf`}>Download the PDF for your records</a>
+          </p>
+        )}
       </header>
 
       {blockers.length > 0 && (

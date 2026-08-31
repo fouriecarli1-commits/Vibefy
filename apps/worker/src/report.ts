@@ -132,23 +132,34 @@ export async function generateReport(
   }
 
   const rendered = renderReport(source, input.tier);
+  const htmlBytes = Buffer.from(rendered.html, 'utf8');
+  // The file is written for whoever is developing locally and wants to open it.
+  // It is not where the download comes from: this process runs on Render and the
+  // console runs on Vercel, and the only thing they share is this database.
   const htmlStored = await storage.put(
     `reports/${source.assessmentId}/${input.tier}.html`,
-    Buffer.from(rendered.html, 'utf8'),
+    htmlBytes,
     'text/html; charset=utf-8',
   );
 
   await client.query(
     `insert into public.reports
        (assessment_id, organisation_id, format, storage_path, sha256, rubric_version,
-        scope_statement, non_reliance_legend)
-     select $1, a.organisation_id, 'html', $2, $3, a.rubric_version, a.scope_statement, $4
+        scope_statement, non_reliance_legend, content)
+     select $1, a.organisation_id, 'html', $2, $3, a.rubric_version, a.scope_statement, $4, $5
        from public.assessments a where a.id = $1
      on conflict (assessment_id, format) do update
        set storage_path = excluded.storage_path,
            sha256 = excluded.sha256,
+           content = excluded.content,
            generated_at = now()`,
-    [source.assessmentId, htmlStored.storagePath, htmlStored.sha256, NON_RELIANCE_LEGEND],
+    [
+      source.assessmentId,
+      htmlStored.storagePath,
+      htmlStored.sha256,
+      NON_RELIANCE_LEGEND,
+      htmlBytes,
+    ],
   );
 
   let pdfStored: StoredReport | null = null;
@@ -162,14 +173,15 @@ export async function generateReport(
     await client.query(
       `insert into public.reports
          (assessment_id, organisation_id, format, storage_path, sha256, rubric_version,
-          scope_statement, non_reliance_legend)
-       select $1, a.organisation_id, 'pdf', $2, $3, a.rubric_version, a.scope_statement, $4
+          scope_statement, non_reliance_legend, content)
+       select $1, a.organisation_id, 'pdf', $2, $3, a.rubric_version, a.scope_statement, $4, $5
          from public.assessments a where a.id = $1
        on conflict (assessment_id, format) do update
          set storage_path = excluded.storage_path,
              sha256 = excluded.sha256,
+             content = excluded.content,
              generated_at = now()`,
-      [source.assessmentId, pdfStored.storagePath, pdfStored.sha256, NON_RELIANCE_LEGEND],
+      [source.assessmentId, pdfStored.storagePath, pdfStored.sha256, NON_RELIANCE_LEGEND, pdf],
     );
   }
 

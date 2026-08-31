@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { resolvePlan } from '@vibefycode/billing';
-import { resolveReportStorage } from '@vibefycode/worker';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser } from '@/lib/sql';
 
@@ -14,6 +13,11 @@ import { readAsUser } from '@/lib/sql';
  * A downloaded PDF is a record — if the console re-rendered it on every request,
  * two copies of "the same" report could differ, and the one the customer showed
  * an investor would be the one nobody could reproduce.
+ *
+ * They come out of the `reports` row rather than off a disk. The worker runs on
+ * Render and this runs on Vercel; they share this database and nothing else, so
+ * for as long as the bytes lived in a container directory every one of these
+ * requests answered 410.
  */
 export async function GET(
   _request: NextRequest,
@@ -41,11 +45,23 @@ export async function GET(
       organisationId: row.organisation_id,
       appId: row.app_id,
     });
-    const report = await client.query<{ storage_path: string; sha256: string }>(
-      `select storage_path, sha256 from public.reports where assessment_id = $1 and format = 'pdf'`,
+    const report = await client.query<{ sha256: string; content: Buffer | null }>(
+      `select sha256, content from public.reports where assessment_id = $1 and format = 'pdf'`,
       [assessmentId],
     );
-    return { plan, status: row.status, report: report.rows[0] ?? null };
+    // Whether the caller is staff. The entitlement below governs what a customer
+    // has bought; it has nothing to say about whether we may keep a copy of an
+    // assessment we performed.
+    const staff = await client.query<{ role: string }>(
+      'select platform_role as role from public.users where id = $1',
+      [user.id],
+    );
+    return {
+      plan,
+      status: row.status,
+      report: report.rows[0] ?? null,
+      isStaff: ['reviewer', 'admin'].includes(String(staff.rows[0]?.role)),
+    };
   });
 
   if (!context) return NextResponse.json({ error: 'Not found.' }, { status: 404 });
@@ -55,7 +71,10 @@ export async function GET(
       { status: 409 },
     );
   }
-  if (!context.plan.entitlement.pdfExport) {
+  // A reviewer and an operator can always take a copy. Gating our own records
+  // on what the customer bought would mean the platform could not produce the
+  // report it wrote when somebody later disputes it.
+  if (!context.isStaff && !context.plan.entitlement.pdfExport) {
     return NextResponse.json(
       { error: 'PDF export is part of the paid report. Your score is unaffected either way.' },
       { status: 402 },
@@ -68,9 +87,15 @@ export async function GET(
     );
   }
 
-  const bytes = await resolveReportStorage().get(context.report.storage_path);
-  if (!bytes) {
-    return NextResponse.json({ error: 'The stored report could not be read.' }, { status: 410 });
+  const bytes = context.report.content;
+  if (!bytes || bytes.byteLength === 0) {
+    return NextResponse.json(
+      {
+        error:
+          'This report was generated before reports were stored in the database, and its bytes are gone. Re-running the assessment produces a new one.',
+      },
+      { status: 410 },
+    );
   }
 
   return new NextResponse(new Uint8Array(bytes), {
