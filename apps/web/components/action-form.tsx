@@ -30,7 +30,7 @@ export function ActionForm({
       <button
         type="submit"
         disabled={pending}
-        className={`rounded-lg px-4 py-2.5 font-medium disabled:opacity-60 ${
+        className={`rounded-lg px-4 py-3 font-medium disabled:opacity-60 ${
           destructive ? 'border border-line-strong text-bad' : 'bg-accent text-on-accent'
         }`}
       >
@@ -77,7 +77,7 @@ export function Field({
   };
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <label htmlFor={id} className="block text-sm font-medium">
         {label}
       </label>
@@ -112,7 +112,7 @@ export function Checkbox({
         type="checkbox"
         defaultChecked={defaultChecked}
         aria-describedby={hintId}
-        className="mt-1.5 size-4"
+        className="mt-2 size-4"
       />
       <div>
         <label htmlFor={id} className="text-sm font-medium">
@@ -144,7 +144,7 @@ export function Select({
   const id = `field-${name}`;
   const hintId = hint ? `${id}-hint` : undefined;
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <label htmlFor={id} className="block text-sm font-medium">
         {label}
       </label>

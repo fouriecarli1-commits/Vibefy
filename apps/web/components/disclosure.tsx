@@ -77,7 +77,7 @@ export function ServiceDetailBody({
       <div className="grid gap-5 sm:grid-cols-2">
         <section className="space-y-2">
           <h4 className="eyebrow">Included</h4>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {detail.included.map((item) => (
               <li key={item} className="text-sm">
                 {item}
@@ -89,7 +89,7 @@ export function ServiceDetailBody({
         {/* Stated as plainly as the inclusions, and never in smaller type. */}
         <section className="space-y-2">
           <h4 className="eyebrow">Not included</h4>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {detail.notIncluded.map((item) => (
               <li key={item} className="text-sm text-muted">
                 {item}

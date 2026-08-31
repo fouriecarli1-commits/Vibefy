@@ -41,6 +41,10 @@ const PAGES = [
   '/legal/rating-methodology-and-independence',
   '/verify',
   '/directory',
+  // Added the day they were built. A public page that ships unscanned is the
+  // credibility problem this gate exists for: we sell an accessibility score.
+  '/advertise',
+  '/games',
   '/trust-check',
   '/trust-check/traps/the-free-trial-that-was-not',
   '/sign-in',

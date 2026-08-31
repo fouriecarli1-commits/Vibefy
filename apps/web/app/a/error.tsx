@@ -45,7 +45,7 @@ export default function VerificationError({
         <button
           type="button"
           onClick={reset}
-          className="rounded-lg bg-accent px-4 py-2.5 font-medium text-on-accent"
+          className="rounded-lg bg-accent px-4 py-3 font-medium text-on-accent"
         >
           Try again
         </button>

@@ -134,7 +134,7 @@ export default function RemediationPage() {
         </h2>
         <ul className="grid-cards">
           {PRICING_BASIS.map((basis) => (
-            <li key={basis} className="panel space-y-1.5">
+            <li key={basis} className="panel space-y-2">
               <h3 className="font-semibold">
                 {basis === 'fixed_fee' ? 'A fixed fee' : 'By the hour'}
               </h3>
@@ -178,13 +178,13 @@ export default function RemediationPage() {
       <section className="flex flex-wrap gap-3">
         <Link
           href="/legal/rating-methodology-and-independence"
-          className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
+          className="rounded-lg border border-line-strong px-5 py-3 font-medium"
         >
           The independence policy
         </Link>
         <Link
           href="/how-it-works"
-          className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
+          className="rounded-lg border border-line-strong px-5 py-3 font-medium"
         >
           What an assessment does
         </Link>

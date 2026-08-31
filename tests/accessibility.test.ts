@@ -10,6 +10,8 @@
  * finds a minority of real barriers. A clean run here is a floor, not a claim,
  * and it is written down as such rather than quietly treated as a pass.
  */
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { renderReport, type ReportSource } from '../packages/report/src/index.ts';
 import { renderBadgeSvg, type BadgeStatus } from '../packages/badge/src/index.ts';
@@ -143,5 +145,103 @@ describe('the alert email', () => {
     });
     const { violations } = await auditHtml(message.html);
     expect(violations, `\n${explain(violations)}\n`).toEqual([]);
+  });
+});
+
+describe('the scan keeps up with the pages', () => {
+  /*
+   * Two public pages shipped unscanned this week, and neither was an oversight
+   * anybody could have caught: the list of pages `check:a11y` visits is written
+   * by hand, and nothing anywhere said it was supposed to match the routes that
+   * exist. The person who adds the next page will forget too.
+   *
+   * So the routes are enumerated from the filesystem and every public one has
+   * to be either scanned or excused in writing. A page cannot ship unscanned by
+   * accident any more — only on purpose, with a reason somebody wrote down.
+   */
+  const appDir = join(process.cwd(), 'apps/web/app');
+
+  /** Every route with a page, as a URL path. */
+  const routes = (() => {
+    const found: string[] = [];
+    const walk = (dir: string, prefix: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          // Route groups and private folders contribute no path segment.
+          const segment =
+            entry.name.startsWith('(') || entry.name.startsWith('_')
+              ? prefix
+              : `${prefix}/${entry.name}`;
+          walk(join(dir, entry.name), segment);
+        } else if (entry.name === 'page.tsx') {
+          found.push(prefix === '' ? '/' : prefix);
+        }
+      }
+    };
+    walk(appDir, '');
+    return found.sort();
+  })();
+
+  /** Behind a sign-in, so the scanner cannot reach them without a session. */
+  const AUTHENTICATED = /^\/(console|admin|review)(\/|$)/;
+
+  /** `/legal/[slug]` as a pattern that `/legal/badge-licence` satisfies. */
+  const asPattern = (route: string) => new RegExp(`^${route.replace(/\[[^\]]+\]/g, '[^/]+')}$`);
+
+  /**
+   * Public, reachable, and deliberately not scanned. Each one needs a reason,
+   * because a bare exemption is how a list like this fills up.
+   */
+  const EXCUSED: Readonly<Record<string, string>> = {
+    '/sign-up': 'Scanned as /sign-in, which is the same form component with a different heading.',
+    '/a/[slug]':
+      'The verification page needs a real issued badge to render, so there is no fixed URL for the scanner to visit. It is covered by the report and badge audits in this file rather than by the crawl — which is thinner than it should be for the page strangers actually land on. See docs/OPEN_ITEMS.md.',
+    '/invite/[token]':
+      'Needs a live invitation token, which does not exist outside a seeded database.',
+  };
+
+  const scanned = (() => {
+    const source = readFileSync(join(process.cwd(), 'tools/a11y-scan.mts'), 'utf8');
+    const block = /const PAGES = \[([\s\S]*?)\]/.exec(source);
+    if (!block) throw new Error('a11y-scan no longer has a PAGES list');
+    return [...block[1]!.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
+  })();
+
+  it('found the routes it is talking about', () => {
+    // If this ever returns nothing the rest of the block passes vacuously,
+    // which is the worst outcome available.
+    expect(routes.length).toBeGreaterThan(20);
+    expect(routes).toContain('/advertise');
+  });
+
+  it('scans every public page, or says in writing why not', () => {
+    // A dynamic route counts as scanned when a concrete instance of it is in
+    // the list: /legal/[slug] is covered by /legal/badge-licence.
+    const missed = routes.filter(
+      (route) =>
+        !AUTHENTICATED.test(route) &&
+        !(route in EXCUSED) &&
+        !scanned.some((page) => asPattern(route).test(page)),
+    );
+    expect(
+      missed,
+      `Public pages nobody scans: ${missed.join(', ')}. Add them to PAGES in tools/a11y-scan.mts, or excuse them in this test with a reason.`,
+    ).toEqual([]);
+  });
+
+  it('does not excuse a page without a reason', () => {
+    for (const [route, reason] of Object.entries(EXCUSED)) {
+      expect(reason.length, route).toBeGreaterThan(20);
+    }
+  });
+
+  it('does not scan a page that no longer exists', () => {
+    // The other direction, which fails quietly: a route deleted in a refactor
+    // leaves the scanner asking for a 404 and reporting it as clean.
+    const gone = scanned.filter(
+      (page) =>
+        page !== '/not-a-page-that-exists' && !routes.some((route) => asPattern(route).test(page)),
+    );
+    expect(gone, `Scanned routes with no page: ${gone.join(', ')}`).toEqual([]);
   });
 });

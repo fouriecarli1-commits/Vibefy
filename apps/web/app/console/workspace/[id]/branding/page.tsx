@@ -66,7 +66,7 @@ export default async function BrandingPage({ params }: { params: Promise<{ id: s
             multiline
             defaultValue={String(branding?.footer_note ?? '')}
           />
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <label htmlFor="field-logo" className="block text-sm font-medium">
               Logo
             </label>

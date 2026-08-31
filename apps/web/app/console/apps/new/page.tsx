@@ -39,7 +39,7 @@ export default async function NewAppPage({
       </header>
 
       <ActionForm action={createApp} submitLabel="Submit" pendingLabel="Screening…">
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <label htmlFor="field-organisationId" className="block text-sm font-medium">
             Workspace
           </label>

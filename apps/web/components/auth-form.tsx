@@ -95,7 +95,7 @@ export function AuthForm({
   return (
     <form onSubmit={onSubmit} className="max-w-sm space-y-5" noValidate>
       {mode === 'sign-up' && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <label htmlFor="full-name" className="block text-sm font-medium">
             Your name
           </label>
@@ -111,7 +111,7 @@ export function AuthForm({
         </div>
       )}
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <label htmlFor="email" className="block text-sm font-medium">
           Email
         </label>
@@ -127,7 +127,7 @@ export function AuthForm({
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <label htmlFor="password" className="block text-sm font-medium">
           Password
         </label>
@@ -160,7 +160,7 @@ export function AuthForm({
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-on-accent disabled:opacity-60"
+        className="w-full rounded-lg bg-accent px-4 py-3 font-medium text-on-accent disabled:opacity-60"
       >
         {busy ? 'Working…' : mode === 'sign-up' ? 'Create account' : 'Sign in'}
       </button>

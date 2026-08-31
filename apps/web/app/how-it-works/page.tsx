@@ -206,7 +206,7 @@ export default function HowItWorksPage() {
               body: 'A global spending cap is checked before any run is claimed. It is a row in the database rather than state in a process, so restarting the runner does not lift it.',
             },
           ].map((item) => (
-            <li key={item.title} className="panel space-y-1.5">
+            <li key={item.title} className="panel space-y-2">
               <h3 className="font-semibold">{item.title}</h3>
               <p className="text-sm text-muted">{item.body}</p>
             </li>
@@ -280,22 +280,16 @@ export default function HowItWorksPage() {
       </section>
 
       <section className="flex flex-wrap gap-3">
-        <Link
-          href="/sign-up"
-          className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
-        >
+        <Link href="/sign-up" className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent">
           Create an account
         </Link>
         <Link
           href="/methodology"
-          className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
+          className="rounded-lg border border-line-strong px-5 py-3 font-medium"
         >
           How the score is worked out
         </Link>
-        <Link
-          href="/legal"
-          className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
-        >
+        <Link href="/legal" className="rounded-lg border border-line-strong px-5 py-3 font-medium">
           The terms, in full
         </Link>
       </section>

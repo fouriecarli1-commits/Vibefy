@@ -72,10 +72,7 @@ export default async function VerifyPage({
           placeholder="Badge identifier"
           className="min-w-64 flex-1 rounded-lg border border-line-strong bg-surface px-3 py-2"
         />
-        <button
-          type="submit"
-          className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
-        >
+        <button type="submit" className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent">
           Check
         </button>
       </form>

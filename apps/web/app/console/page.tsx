@@ -152,7 +152,7 @@ export default async function ConsolePage() {
               } | null;
               if (!organisation) return null;
               return (
-                <li key={organisation.id ?? index} className="panel space-y-1.5">
+                <li key={organisation.id ?? index} className="panel space-y-2">
                   <h3 className="font-semibold">{organisation.name}</h3>
                   <p className="text-sm text-muted">
                     /{organisation.slug} · {organisation.account_type}

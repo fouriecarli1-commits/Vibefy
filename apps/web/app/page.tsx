@@ -52,19 +52,19 @@ export default function HomePage() {
         <div className="flex flex-wrap justify-center gap-3">
           <Link
             href="/sign-up"
-            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
+            className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent"
           >
             Create an account
           </Link>
           <Link
             href="/how-it-works"
-            className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
+            className="rounded-lg border border-line-strong px-5 py-3 font-medium"
           >
             What happens to your app
           </Link>
           <Link
             href="/trust-check"
-            className="rounded-lg border border-line-strong px-5 py-2.5 font-medium"
+            className="rounded-lg border border-line-strong px-5 py-3 font-medium"
           >
             Check an app before you pay
           </Link>
@@ -125,7 +125,7 @@ export default function HomePage() {
                 body: 'On a continuous plan the application is re-assessed. A material regression suspends the badge automatically, and the customer is told what changed and why.',
               },
             ].map((item) => (
-              <li key={item.title} className="panel space-y-1.5">
+              <li key={item.title} className="panel space-y-2">
                 <h3 className="font-semibold">{item.title}</h3>
                 <p className="text-sm text-muted">{item.body}</p>
               </li>

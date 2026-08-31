@@ -31,7 +31,12 @@ const SPRAWL = {
   fontSizes: 8,
   textColours: 8,
   borderRadii: 4,
-  buttonStyles: 2,
+  // Three, not two. Running this against our own pages found a primary button,
+  // a secondary button and a smaller control in the navigation — which is not
+  // sprawl, it is the minimum vocabulary any interface needs. A threshold that
+  // fires on every well-built site is noise, and noise is how a report teaches
+  // somebody to stop reading it. The fixture assembled by eye has five.
+  buttonStyles: 3,
 } as const;
 
 /** Spacings are expected to fall on this grid. Four covers 4-, 8- and 16-based. */
@@ -334,8 +339,8 @@ export function designFindings(
     findings.push(
       observation(
         `${measurements.buttonStyles.length} different button styles`,
-        'Buttons differ in height, corner radius, text size, background or border. Three or more distinct styles on one page is the most common single reason an interface reads as assembled rather than designed.',
-        'Decide on one primary and one secondary button and use nothing else. Every third style is a component that was written in isolation.',
+        'Buttons differ in height, corner radius, text size, background or border. A primary, a secondary and a compact control is a vocabulary; past that, a component arrived with its own idea of what a button is, and mixed buttons are the most common single reason an interface reads as assembled rather than designed.',
+        'Work out which of these are doing the same job and make them the same. The ones that disappear are almost always a component that was written in isolation and never compared with anything.',
       ),
     );
   }

@@ -96,7 +96,7 @@ export default async function TrustCheckPage({
               defaultValue={submitted}
               placeholder="example.com"
               aria-describedby="url-hint"
-              className="w-full rounded-lg border border-line-strong bg-surface px-3.5 py-2.5"
+              className="w-full rounded-lg border border-line-strong bg-surface px-3.5 py-3"
             />
             <p id="url-hint" className="text-sm text-muted">
               The app’s own website works best. An app store listing tells us less, because the
@@ -126,7 +126,7 @@ export default async function TrustCheckPage({
 
           <button
             type="submit"
-            className="rounded-lg bg-accent px-5 py-2.5 font-medium text-on-accent"
+            className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent"
           >
             Check this app
           </button>

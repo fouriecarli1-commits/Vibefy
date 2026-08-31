@@ -113,7 +113,7 @@ export default async function DirectoryPage({
         action="/directory"
         className="grid gap-4 rounded-xl border border-line p-5 sm:grid-cols-3"
       >
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <label htmlFor="q" className="block text-sm font-medium">
             Search
           </label>
@@ -126,7 +126,7 @@ export default async function DirectoryPage({
             className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <label htmlFor="sort" className="block text-sm font-medium">
             Order by
           </label>
@@ -145,7 +145,7 @@ export default async function DirectoryPage({
             ))}
           </select>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <label htmlFor="category" className="block text-sm font-medium">
             Category
           </label>
@@ -166,7 +166,7 @@ export default async function DirectoryPage({
         <div className="sm:col-span-3">
           <button
             type="submit"
-            className="rounded-lg bg-accent px-4 py-2.5 font-medium text-on-accent"
+            className="rounded-lg bg-accent px-4 py-3 font-medium text-on-accent"
           >
             Apply
           </button>

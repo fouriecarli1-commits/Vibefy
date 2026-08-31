@@ -182,7 +182,7 @@ export function ReportCopilot({ assessmentId }: { assessmentId: string }) {
         <button
           type="submit"
           disabled={pending || draft.trim().length === 0}
-          className="rounded-lg bg-accent px-4 py-2.5 font-medium text-on-accent disabled:opacity-60"
+          className="rounded-lg bg-accent px-4 py-3 font-medium text-on-accent disabled:opacity-60"
         >
           {pending ? 'Asking…' : 'Ask'}
         </button>
