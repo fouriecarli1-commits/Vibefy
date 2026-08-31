@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { priceFor } from '@vibefycode/engine';
 import { badgeEmbedJsx, badgeEmbedSnippet } from '@vibefycode/shared';
 import {
-  COPILOT_COST_CEILING_USD,
+  COPILOT_CEILING_REACHED,
+  COPILOT_CEILING_USD,
+  COPILOT_CEILING_WINDOW_MINUTES,
   COPILOT_MODEL,
   COPILOT_WITHHELD,
   checkCopilotReply,
@@ -150,6 +152,31 @@ export async function POST(request: NextRequest) {
     },
   };
 
+  // The ceiling, checked before the money is spent rather than after.
+  //
+  // Read with the service role because it is a fact about the workspace rather
+  // than a row the customer owns — and because a customer who could not read
+  // their own ceiling would simply never be stopped by it.
+  const spentThisHour = await writeAsService(async (client) => {
+    const { rows } = await client.query<{ spend: string }>(
+      `select public.assistant_spend_since($1, now() - ($2 || ' minutes')::interval) as spend`,
+      [row.organisation_id, String(COPILOT_CEILING_WINDOW_MINUTES)],
+    );
+    return Number(rows[0]?.spend ?? 0);
+  }).catch(() => 0);
+
+  if (spentThisHour >= COPILOT_CEILING_USD) {
+    return NextResponse.json(
+      {
+        reply: COPILOT_CEILING_REACHED,
+        ceilingReached: true,
+        spentUsd: Number(spentThisHour.toFixed(6)),
+        ceilingUsd: COPILOT_CEILING_USD,
+      },
+      { status: 429 },
+    );
+  }
+
   const anthropic = new Anthropic();
   let reply: Anthropic.Message;
   try {
@@ -198,8 +225,8 @@ export async function POST(request: NextRequest) {
     await client.query(
       `insert into public.cost_records
          (assessment_id, organisation_id, model, input_tokens, output_tokens,
-          cache_read_tokens, ai_cost_usd)
-       values (null, $1, $2, $3, $4, $5, $6)`,
+          cache_read_tokens, ai_cost_usd, purpose)
+       values (null, $1, $2, $3, $4, $5, $6, 'assistant')`,
       [
         row.organisation_id,
         COPILOT_MODEL,
@@ -224,6 +251,7 @@ export async function POST(request: NextRequest) {
     withheld: !check.allowed,
     ...(check.allowed ? {} : { reasons: check.reasons }),
     costUsd: Number(costUsd.toFixed(6)),
-    ceilingUsd: COPILOT_COST_CEILING_USD,
+    ceilingUsd: COPILOT_CEILING_USD,
+    spentUsd: Number((spentThisHour + costUsd).toFixed(6)),
   });
 }

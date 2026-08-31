@@ -98,6 +98,42 @@ describe('what it costs', () => {
   it('caches the instruction, because the findings do not change while somebody reads them', () => {
     expect(route).toContain("cache_control: { type: 'ephemeral' }");
   });
+
+  it('tags the row as the assistant’s, or the ceiling cannot find it again', () => {
+    const insert = route.slice(route.indexOf('insert into public.cost_records'));
+    expect(insert.slice(0, 400)).toContain('purpose');
+    expect(insert.slice(0, 400)).toContain("'assistant'");
+  });
+});
+
+describe('the ceiling', () => {
+  it('is checked before the money is spent, not after', () => {
+    // A limit read after the call is a receipt. The check has to sit above the
+    // line that buys the tokens or it stops nothing.
+    const check = route.indexOf('assistant_spend_since');
+    const call = route.indexOf('anthropic.messages.create');
+    expect(check).toBeGreaterThan(-1);
+    expect(call).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(call);
+  });
+
+  it('measures a window the database owns rather than the history it was handed', () => {
+    // The browser decides what conversation to send back, so a per-conversation
+    // total is a figure the spender reports about itself.
+    expect(route).toContain('COPILOT_CEILING_WINDOW_MINUTES');
+    expect(route).toContain('row.organisation_id');
+  });
+
+  it('answers with a sentence rather than a bare refusal', () => {
+    expect(route).toContain('COPILOT_CEILING_REACHED');
+    expect(route).toContain('ceilingReached: true');
+    expect(route).toContain('429');
+  });
+
+  it('renders that sentence as an answer in the panel, not as a failure', () => {
+    expect(panel).toContain('ceilingReached');
+    expect(panel).toMatch(/!response\.ok && !data\.ceilingReached/);
+  });
 });
 
 describe('the exemption is the list, not the prose', () => {
@@ -140,6 +176,14 @@ describe('what the customer is told about it', () => {
     const iframe = reportPage.indexOf('<iframe');
     expect(copilot).toBeGreaterThan(-1);
     expect(copilot).toBeLessThan(iframe);
+  });
+
+  it('says that nothing is kept, where the claim can be checked', () => {
+    // Somebody who assumes a transcript exists will ask us for it later — and
+    // for a company that rates other people's software, "we keep nothing" is a
+    // claim worth making next to the box rather than in a policy.
+    expect(panel).toMatch(/Nothing you type here is stored/i);
+    expect(panel).toMatch(/leaving the page ends it/i);
   });
 
   it('announces its own updates to a screen reader', () => {

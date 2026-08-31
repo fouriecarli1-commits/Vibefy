@@ -57,15 +57,27 @@ export function ReportCopilot({ assessmentId }: { assessmentId: string }) {
       const data = (await response.json()) as {
         reply?: string;
         withheld?: boolean;
+        ceilingReached?: boolean;
         error?: string;
       };
-      if (!response.ok || !data.reply) {
+      // A workspace that has used its hour still gets a sentence rather than an
+      // error: being told the limit is ours, not theirs, is the difference
+      // between a boundary and a fault.
+      if (!response.ok && !data.ceilingReached) {
         setError(data.error ?? 'The assistant could not answer just now.');
+        return;
+      }
+      if (!data.reply) {
+        setError('The assistant could not answer just now.');
         return;
       }
       setTurns((current) => [
         ...current,
-        { role: 'assistant', content: data.reply!, ...(data.withheld ? { withheld: true } : {}) },
+        {
+          role: 'assistant',
+          content: data.reply!,
+          ...(data.withheld || data.ceilingReached ? { withheld: true } : {}),
+        },
       ]);
     } catch {
       setError('The assistant could not be reached. Check your connection and try again.');
@@ -89,6 +101,15 @@ export function ReportCopilot({ assessmentId }: { assessmentId: string }) {
           your badge snippet. It explains what was found and helps you place the badge. It cannot
           change a finding or a score, and it will not tell you what the next assessment will say:
           that is decided by the run, not by us in conversation.
+        </p>
+        {/* Said here rather than in a policy, because somebody who assumes a
+            transcript exists will ask us for it later — and because "we keep
+            nothing" is a claim worth making where it can be checked against
+            what the page then does. */}
+        <p className="mt-2 max-w-prose text-sm text-muted">
+          Nothing you type here is stored. The conversation lives in this browser tab for as long as
+          it is open and is never written down on our side, so leaving the page ends it — copy
+          anything you want to keep.
         </p>
       </div>
 

@@ -29,14 +29,29 @@ export { checkCopilotReply, type CopilotCheck } from './guard.ts';
 export const COPILOT_MODEL = 'claude-opus-5';
 
 /**
- * What one conversation may cost us, in dollars.
+ * What one workspace's assistant may cost us in an hour, in dollars.
  *
  * A ceiling rather than a trust exercise: an assistant with no limit is a bill
- * with a chat interface. At current prices this is a long conversation — long
- * enough that nobody with a real question hits it, short enough that a script
- * pointed at it stops mattering.
+ * with a chat interface.
+ *
+ * Hourly and per organisation rather than per conversation, and the difference
+ * is not pedantry. A conversation is a client-side idea — the browser decides
+ * what history to send back, so "this conversation has cost $2" is a figure the
+ * spender reports about themselves. An hour of one workspace's assistant spend
+ * is a fact the database owns, and it is the one a script pointed at the
+ * endpoint would actually run into.
+ *
+ * At current prices this is a long afternoon of real questions and a short
+ * career for anything automated.
  */
-export const COPILOT_COST_CEILING_USD = 0.5;
+export const COPILOT_CEILING_USD = 2;
+
+/** The window that ceiling is measured over. */
+export const COPILOT_CEILING_WINDOW_MINUTES = 60;
+
+/** What a customer is told when their workspace has reached it. */
+export const COPILOT_CEILING_REACHED =
+  'This workspace has used its hour of assistant time. It resets within the hour, and nothing else about your assessment or your badge is affected — the limit is on me, not on you.';
 
 /** How much of the conversation is carried. Older turns fall away. */
 export const COPILOT_HISTORY_TURNS = 12;

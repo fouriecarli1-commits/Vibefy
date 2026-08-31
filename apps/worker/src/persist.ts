@@ -63,8 +63,9 @@ export async function recordUnattributedCost(
     await client.query(
       `insert into public.cost_records
          (assessment_id, organisation_id, model, input_tokens, output_tokens, cache_read_tokens,
-          ai_cost_usd, compute_seconds, compute_cost_usd, storage_bytes, third_party_calls, third_party_cost_usd)
-       values (null, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          ai_cost_usd, compute_seconds, compute_cost_usd, storage_bytes, third_party_calls,
+          third_party_cost_usd, purpose)
+       values (null, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'assessment')`,
       [
         input.organisationId,
         record.model,
@@ -206,8 +207,9 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
       await client.query(
         `insert into public.cost_records
            (assessment_id, organisation_id, model, input_tokens, output_tokens, cache_read_tokens,
-            ai_cost_usd, compute_seconds, compute_cost_usd, storage_bytes, third_party_calls, third_party_cost_usd)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            ai_cost_usd, compute_seconds, compute_cost_usd, storage_bytes, third_party_calls,
+            third_party_cost_usd, purpose)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'assessment')`,
         [
           assessmentId,
           input.organisationId,

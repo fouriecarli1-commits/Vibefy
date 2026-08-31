@@ -13,7 +13,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  COPILOT_COST_CEILING_USD,
+  COPILOT_CEILING_REACHED,
+  COPILOT_CEILING_USD,
+  COPILOT_CEILING_WINDOW_MINUTES,
   COPILOT_HISTORY_TURNS,
   COPILOT_MODEL,
   COPILOT_WITHHELD,
@@ -160,11 +162,28 @@ describe('what may reach the customer', () => {
   });
 });
 
-describe('what one conversation may cost', () => {
+describe('what it may cost', () => {
   it('has a ceiling at all', () => {
     // An assistant with no limit is a bill with a chat interface.
-    expect(COPILOT_COST_CEILING_USD).toBeGreaterThan(0);
-    expect(COPILOT_COST_CEILING_USD).toBeLessThanOrEqual(1);
+    expect(COPILOT_CEILING_USD).toBeGreaterThan(0);
+    expect(COPILOT_CEILING_USD).toBeLessThanOrEqual(5);
+  });
+
+  it('measures it over a window the database owns, not a conversation', () => {
+    // A conversation is a client-side idea: the browser decides what history to
+    // send back, so "this conversation has cost $2" is a figure the spender
+    // reports about itself. An hour of one workspace's spend is a fact.
+    expect(COPILOT_CEILING_WINDOW_MINUTES).toBeGreaterThan(0);
+    expect(COPILOT_CEILING_WINDOW_MINUTES).toBeLessThanOrEqual(60 * 24);
+  });
+
+  it('tells somebody who reaches it that the limit is ours', () => {
+    // The difference between a boundary and a fault is whose fault it sounds
+    // like. Nothing about their assessment or badge is affected, and the
+    // sentence says so.
+    expect(COPILOT_CEILING_REACHED).toMatch(/limit is on me/i);
+    expect(COPILOT_CEILING_REACHED).toMatch(/nothing else about your assessment/i);
+    expect(COPILOT_CEILING_REACHED).toMatch(/resets/i);
   });
 
   it('carries a bounded slice of the conversation', () => {
