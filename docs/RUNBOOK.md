@@ -134,6 +134,35 @@ tampered body, an unsigned body, or one older than five minutes is refused — t
 
 With real keys set, the fake is never constructed, and production refuses to start without them.
 
+## Which migrations a database already has
+
+Migrations are applied by hand in the Supabase SQL editor, and nothing records
+which have been run. The first sign of a gap is a paste failing with something
+that looks like a fault in the migration being pasted and is not:
+
+```
+ERROR: 42883: function public.app_has_remediation(uuid) does not exist
+```
+
+That is what a database three migrations behind says when you run the fourth.
+
+```bash
+node tools/migration-audit.mjs > audit.sql
+```
+
+Paste the result into the SQL editor. It reads the catalogue for one durable
+object per migration — a table, a type, a function, a column, a view, an enum
+value — and prints `ok` or `>>> MISSING` for each. It writes nothing and locks
+nothing, so it is safe on production. Then run the missing ones **in filename
+order**: they build on each other, and the order is the whole reason a gap
+produces an error four migrations later rather than at the gap.
+
+It is a diagnostic, not a ledger. A migration whose marker exists could still
+have been applied partly, and one whose object was later dropped reads as
+missing. It answers "roughly where am I", which is the question somebody
+actually has when a paste fails. `tests/migration-audit.test.ts` fails if a
+migration ever stops being covered.
+
 ## Two providers, two countries
 
 VibefyCode sells into South Africa and the United States. Stripe takes dollars, Paystack takes
