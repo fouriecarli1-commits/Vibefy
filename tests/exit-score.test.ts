@@ -163,3 +163,58 @@ describe('what the number is not', () => {
     expect(source).toMatch(/walks to the exit and stops/i);
   });
 });
+
+describe('where it is kept, and where it is shown', () => {
+  const read = (path: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    (require('node:fs') as typeof import('node:fs')).readFileSync(path, 'utf8');
+
+  it('lives on the assessment, not on the badge', () => {
+    // A badge is a claim about an assessment against a published rubric. This
+    // is not part of that rubric, so the schema keeps it where nothing reading
+    // a badge's score can reach it by accident.
+    const migration = read('supabase/migrations/20260918110000_exit_measurement.sql');
+    expect(migration).toContain('alter table public.assessments');
+    expect(migration).toContain('exit_measurement jsonb');
+    expect(migration).not.toMatch(/alter table public\.badges/);
+  });
+
+  it('is carried out of the pipeline beside the score, never inside it', () => {
+    const pipeline = read('packages/engine/src/pipeline.ts');
+    expect(pipeline).toContain('exitMeasurement');
+    // The scoring input is the thing that must stay clean: it has no field for
+    // this, and packages/rubric would not compile if it did.
+    const scoringInput = pipeline.slice(
+      pipeline.indexOf('const scoringInput'),
+      pipeline.indexOf('const score = scoreAssessment'),
+    );
+    expect(scoringInput).not.toMatch(/exit/i);
+  });
+
+  it('is shown on the verification page after the score and apart from it', () => {
+    const page = read('apps/web/app/a/[slug]/page.tsx');
+    const facts = page.indexOf('The assessment');
+    const exit = page.indexOf('<ExitPanel');
+    expect(exit).toBeGreaterThan(facts);
+  });
+
+  it('says on the panel that it is not part of the score above', () => {
+    const panel = read('apps/web/components/exit-panel.tsx').replace(/\s+/g, ' ');
+    expect(panel).toMatch(/not part of the score above/i);
+    expect(panel).toContain('EXIT_LEGEND');
+  });
+
+  it('shows its working, so a customer can see what to change', () => {
+    const panel = read('apps/web/components/exit-panel.tsx');
+    expect(panel).toMatch(/score\.components\.map/);
+    expect(panel).toMatch(/\{component\.earned\}\/\{component\.weight\}/);
+  });
+
+  it('is shown whether it flatters or not', () => {
+    // A measurement that only appears when it is good is an advertisement.
+    const page = read('apps/web/app/a/[slug]/page.tsx');
+    const guard = page.slice(page.indexOf('badge.exit_measurement'), page.indexOf('<ExitPanel'));
+    expect(guard).not.toMatch(/percentage\s*[>≥]/);
+    expect(guard).not.toMatch(/band\s*===/);
+  });
+});

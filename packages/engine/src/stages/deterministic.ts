@@ -13,6 +13,8 @@ import { ScopedHttp, type ScopedResponse } from '../runtime/http.ts';
 import { BrowserSession, MOBILE_VIEWPORT } from '../runtime/browser.ts';
 import { designFindings, measureDesign } from './design-checks.ts';
 import { measureTrust, trustFindings } from './trust-checks.ts';
+import { crawlForTheExit } from './exit-checks.ts';
+import { scoreExit } from '@vibefycode/trustcheck';
 import { gameFindings, measureGame } from './game-checks.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
@@ -342,7 +344,38 @@ export const deterministicChecksStage: Stage = {
       context.guard.requestsMade,
     );
 
-    return { stage: 'deterministic_checks', status: 'succeeded', findings, notes };
+    /*
+     * How hard it is to leave.
+     *
+     * Last, and outside the browser pass, because it is an HTTP walk of the
+     * site rather than anything the page does — and because it produces a
+     * measurement rather than findings. A route that is hard to find is not a
+     * defect against a published criterion; it is a fact about the site, with
+     * its own published weights, and it moves no score.
+     */
+    let exitMeasurement: unknown = undefined;
+    try {
+      const crawl = await crawlForTheExit(http, url);
+      const score = scoreExit(crawl);
+      exitMeasurement = { ...crawl, score };
+      notes.push(
+        crawl.routeFound
+          ? `Way out: found ${crawl.clicksToCancel} click(s) from the front door, ${score.percentage}% (${score.band}).`
+          : 'Way out: no route to cancelling was found on the pages we could reach. It may exist behind a sign-in.',
+      );
+    } catch (error) {
+      notes.push(
+        `The walk to the exit did not complete: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return {
+      stage: 'deterministic_checks',
+      status: 'succeeded',
+      findings,
+      notes,
+      ...(exitMeasurement === undefined ? {} : { exitMeasurement }),
+    };
   },
 };
 

@@ -10,6 +10,7 @@ import {
 import { getRubric } from '@vibefycode/rubric';
 import { type AssuranceInput } from '@vibefycode/assurance';
 import { AssuranceList, VerificationSteps } from '@/components/assurance-list';
+import { ExitPanel, type ExitMeasurement } from '@/components/exit-panel';
 import { readAsAnon, writeAsService } from '@/lib/sql';
 import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
 
@@ -39,6 +40,7 @@ interface BadgeRecord {
   owner_name: string;
   owner_is_marketing_client: boolean;
   owner_has_remediation: boolean;
+  exit_measurement: ExitMeasurement | null;
 }
 
 /**
@@ -124,7 +126,7 @@ async function loadBadge(slug: string): Promise<BadgeRecord | null> {
     const { rows } = await client.query<BadgeRecord>(
       `select public_id, slug, status, score, rubric_version, assessed_at, issued_at, expires_at,
               certified_origin, signature, signing_key_id, app_name, owner_name,
-              owner_is_marketing_client, owner_has_remediation
+              owner_is_marketing_client, owner_has_remediation, exit_measurement
          from public.badge_verification where slug = $1`,
       [slug],
     );
@@ -323,6 +325,15 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           regardless of arithmetic.
         </p>
       </section>
+
+      {/* After the score and clearly apart from it.
+
+          A second number beside the first is how both come to mean less, so
+          this one carries its own heading, its own explanation of where it
+          comes from, and a legend saying it is not part of the rubric. It is
+          shown whether it flatters or not — a measurement that only appears
+          when it is good is an advertisement. */}
+      {badge.exit_measurement?.score && <ExitPanel measurement={badge.exit_measurement} />}
 
       <section aria-labelledby="verify" className="space-y-4">
         <h2 id="verify" className="text-2xl font-bold tracking-tight">

@@ -137,7 +137,7 @@ export async function crawlForTheExit(http: ScopedHttp, startUrl: string): Promi
    * destination: it is followed, and it only counts once the page it reaches
    * actually offers a way out.
    */
-  const candidates: { url: string; plain: boolean }[] = [];
+  const candidates: { url: string; plain: boolean; depth: number }[] = [];
   let subscribe: { url: string; depth: number } | null = null;
   let visited = 0;
 
@@ -164,8 +164,16 @@ export async function crawlForTheExit(http: ScopedHttp, startUrl: string): Promi
       if (!link.href.startsWith(origin)) continue;
       const clean = link.href;
 
-      if (CANCEL_LINK.test(link.text)) candidates.push({ url: clean, plain: true });
-      else if (EUPHEMISM.test(link.text)) candidates.push({ url: clean, plain: false });
+      // The depth of the page that linked here, plus one: the number of clicks
+      // from the front door, which is what somebody actually counts. Path
+      // segments were standing in for this and are not the same thing — a site
+      // can bury /cancel behind four pages, or link it from the footer of every
+      // one.
+      if (CANCEL_LINK.test(link.text)) {
+        candidates.push({ url: clean, plain: true, depth: next.depth + 1 });
+      } else if (EUPHEMISM.test(link.text)) {
+        candidates.push({ url: clean, plain: false, depth: next.depth + 1 });
+      }
 
       if (!subscribe && SUBSCRIBE_LINK.test(link.text)) {
         subscribe = { url: clean, depth: next.depth + 1 };
@@ -178,17 +186,16 @@ export async function crawlForTheExit(http: ScopedHttp, startUrl: string): Promi
     }
   }
 
-  // Confirm, shallowest first. The depth recorded is the depth of the page that
-  // actually offers a way out, which is the number somebody would count.
-  const depthOf = (url: string) => {
-    const path = new URL(url).pathname.replace(/\/+$/, '');
-    return path === '' ? 0 : path.split('/').filter(Boolean).length;
-  };
+  // Confirm, shallowest first. The depth recorded is that of the page which
+  // actually offers a way out, reached by the shortest path we saw.
+  const shallowest = new Map<string, { url: string; plain: boolean; depth: number }>();
+  for (const candidate of candidates) {
+    const existing = shallowest.get(candidate.url);
+    if (!existing || candidate.depth < existing.depth) shallowest.set(candidate.url, candidate);
+  }
 
   let confirmed: { url: string; depth: number; plain: boolean; selfService: boolean } | null = null;
-  const ordered = [...new Map(candidates.map((c) => [c.url, c])).values()].sort(
-    (a, b) => depthOf(a.url) - depthOf(b.url),
-  );
+  const ordered = [...shallowest.values()].sort((a, b) => a.depth - b.depth);
 
   for (const candidate of ordered) {
     let html = fetched.get(candidate.url);
@@ -208,7 +215,7 @@ export async function crawlForTheExit(http: ScopedHttp, startUrl: string): Promi
     if (!verdict.offers) continue;
     confirmed = {
       url: candidate.url,
-      depth: depthOf(candidate.url),
+      depth: candidate.depth,
       plain: candidate.plain,
       selfService: verdict.selfService,
     };
@@ -231,7 +238,7 @@ export async function crawlForTheExit(http: ScopedHttp, startUrl: string): Promi
     selfService: confirmed?.selfService ?? false,
     plainlyNamed: confirmed?.plain ?? false,
     clicksToCancel: confirmed?.depth ?? null,
-    clicksToSubscribe: subscribe ? depthOf(subscribe.url) : null,
+    clicksToSubscribe: subscribe?.depth ?? null,
     cancelUrl: confirmed?.url ?? null,
     subscribeUrl: subscribe?.url ?? null,
     pagesVisited: visited,

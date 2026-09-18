@@ -55,6 +55,14 @@ export interface AssessmentOutcome {
   readonly nonRelianceLegend: string;
   readonly aiDisclosure: string;
   readonly notes: readonly string[];
+  /**
+   * How hard it was to find the way out, or null where nothing measured it.
+   *
+   * Deliberately beside the score rather than inside it. A rubric score is what
+   * an assessment found against published criteria; this has its own published
+   * weights, and mixing them would make both mean less.
+   */
+  readonly exitMeasurement: unknown | null;
 }
 
 export interface RunPipelineOptions {
@@ -181,6 +189,8 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     nonRelianceLegend: NON_RELIANCE_LEGEND,
     aiDisclosure: AI_DISCLOSURE,
     notes,
+    exitMeasurement:
+      stageResults.find((result) => result.exitMeasurement !== undefined)?.exitMeasurement ?? null,
   };
 }
 

@@ -89,6 +89,15 @@ export interface StageResult {
   readonly notes: readonly string[];
   /** False when the authorised scope did not permit exercising the core flows. */
   readonly coreFlowsReached?: boolean;
+  /**
+   * How hard the way out was to find, where a stage measured it.
+   *
+   * Carried out of the stage rather than turned into findings, because it is
+   * not a defect against a published criterion — it is a separate measurement
+   * with its own weights, and the schema keeps it away from anything that
+   * reads a score.
+   */
+  readonly exitMeasurement?: unknown;
   readonly error?: string;
   readonly promptSha256?: string;
 }
