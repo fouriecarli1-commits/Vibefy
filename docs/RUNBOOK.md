@@ -163,6 +163,35 @@ missing. It answers "roughly where am I", which is the question somebody
 actually has when a paste fails. `tests/migration-audit.test.ts` fails if a
 migration ever stops being covered.
 
+### When a paste failed halfway
+
+A migration applied by hand can stop in the middle, and what it leaves behind is
+a state no migration expects — the first type created, the table after it not.
+Running the same file again then says
+
+```
+ERROR: 42710: type "engagement_status" already exists
+```
+
+which names something nobody asked about and offers no way forward.
+
+```bash
+node tools/idempotent-catch-up.mjs 20260826120000 > catch-up.sql
+```
+
+That rewrites every migration from the given one onward into a form that is safe
+to run more than once: each object is created only if it is not already there,
+and anything already applied is skipped in silence. Paste the whole thing; a
+database that is already up to date is left alone.
+
+The migrations themselves are deliberately **not** written this way. They assume
+a database that does not have them yet, which is the only assumption that keeps
+them readable — a migration that guards every statement is one nobody can see
+the shape of. `tests/idempotent-catch-up.test.ts` applies the generated script to
+a database three times and asserts the schema it builds is identical to the one
+the real migrations build, because a repair script that is safe to re-run and
+produces a _different_ schema is worse than the error it replaces.
+
 ## Two providers, two countries
 
 VibefyCode sells into South Africa and the United States. Stripe takes dollars, Paystack takes

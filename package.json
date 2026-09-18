@@ -35,7 +35,8 @@
     "check:a11y": "tsx tools/a11y-scan.mts",
     "verify:all": "pnpm verify && pnpm check:a11y",
     "badge:artwork": "tsx tools/build-badge-artwork.mts",
-    "db:audit": "node tools/migration-audit.mjs"
+    "db:audit": "node tools/migration-audit.mjs",
+    "db:catch-up": "node tools/idempotent-catch-up.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
