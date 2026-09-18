@@ -30,7 +30,11 @@ describe('the migration audit', () => {
   it('covers every migration, with none silently skipped', () => {
     // The failure mode that matters: a migration with no marker is dropped from
     // the query, and a database missing it reports itself as complete.
-    const named = [...audit.matchAll(/\('(\d{14}_[a-z0-9_]+)'/g)].map((match) => match[1]!);
+    // Deduplicated: the audit asks the same question twice, once as a table to
+    // read and once as a line to copy back, so every name appears in both.
+    const named = [
+      ...new Set([...audit.matchAll(/\('(\d{14}_[a-z0-9_]+)'/g)].map((match) => match[1]!)),
+    ];
     expect(named.sort()).toEqual(MIGRATIONS);
   });
 
@@ -38,7 +42,20 @@ describe('the migration audit', () => {
     // It is meant to be pasted into a production console by somebody who is
     // already having a bad afternoon.
     expect(audit).not.toMatch(/\b(insert|update|delete|drop|alter|create|truncate)\b/i);
-    expect(audit.trim().startsWith('select')).toBe(true);
+
+    // Every statement, not just the first: the audit grew a second query and a
+    // test that only looked at the opening word would not have noticed.
+    const statements = audit
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n')
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+    expect(statements.length).toBeGreaterThan(1);
+    for (const statement of statements) {
+      expect(statement.toLowerCase(), statement.slice(0, 40)).toMatch(/^(select|with)\b/);
+    }
   });
 
   it('marks a missing migration in a way nobody skims past', () => {
@@ -49,5 +66,12 @@ describe('the migration audit', () => {
     // Every check is a visible predicate rather than an opaque call: somebody
     // who thinks the audit is wrong can read the line and see why.
     expect(audit).toMatch(/to_regclass|information_schema\.columns|pg_proc|pg_type|enum_range/);
+  });
+
+  it('hands back a line somebody can copy rather than thirty rows to read off a screen', () => {
+    // Reading a long table off a console and retyping the gaps is how a
+    // migration gets missed — which is the failure this whole tool exists for.
+    expect(audit).toMatch(/string_agg\(migration/);
+    expect(audit).toContain('nothing missing');
   });
 });

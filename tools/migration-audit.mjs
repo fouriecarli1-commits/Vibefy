@@ -72,9 +72,21 @@ for (const file of readdirSync(dir).sort()) {
   rows.push(`    ('${name}', ${check})`);
 }
 
-console.log(`select migration, case when present then 'ok' else '>>> MISSING' end as state
-from (
-  values
-${rows.join(',\n')}
-) as t(migration, present)
-order by migration;`);
+const VALUES = `  values\n${rows.join(',\n')}`;
+
+console.log(`-- 1. Where this database is, one line per migration.
+with state as (
+${VALUES}
+)
+select migration, case when present then 'ok' else '>>> MISSING' end as state
+  from state as t(migration, present)
+ order by migration;
+
+-- 2. The same answer as one line you can copy back, because reading thirty
+--    rows off a screen and retyping the gaps is how a migration gets missed.
+with state as (
+${VALUES}
+)
+select coalesce(string_agg(migration, ', ' order by migration), 'nothing missing') as missing
+  from state as t(migration, present)
+ where not present;`);
