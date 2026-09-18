@@ -332,7 +332,9 @@ export function gameFindings(
 
   if (weighable && (measurements.timeToPlayableMs ?? 0) > SLOW_START_MS) {
     findings.push({
-      ruleId: 'PRD-01',
+      // PRD-06 since 1.1.0: time and weight before something is usable, which
+      // is a measurement, rather than PRD-01's Lighthouse performance band.
+      ruleId: 'PRD-06',
       dimension: 'production_readiness',
       severity: 'medium',
       confidence: 'high',
@@ -346,7 +348,7 @@ export function gameFindings(
 
   if (weighable && measurements.bytesBeforePlayable > HEAVY_START_BYTES) {
     findings.push({
-      ruleId: 'PRD-01',
+      ruleId: 'PRD-06',
       dimension: 'production_readiness',
       severity: 'medium',
       confidence: 'high',
@@ -360,8 +362,11 @@ export function gameFindings(
 
   if (!measurements.acceptsTouch) {
     findings.push({
-      ruleId: 'UX-02',
-      dimension: 'practicality_ux',
+      // FI-08 rather than UX-02 since rubric 1.1.0. UX-02 is about a layout
+      // fitting a narrow screen; this is about an input method the device does
+      // not have, which is a different failure and now has its own criterion.
+      ruleId: 'FI-08',
+      dimension: 'functional_integrity',
       severity: 'high',
       confidence: 'high',
       title: 'The game cannot be played by touch',

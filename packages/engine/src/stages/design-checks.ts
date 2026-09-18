@@ -283,9 +283,18 @@ export function designFindings(
   const findings: RawFinding[] = [];
   const evidence = [...evidenceIds];
 
-  /** Coherence has no criterion in rubric 1.0.0, so it is recorded and scored at zero. */
+  /**
+   * Coherence has its own criterion since rubric 1.1.0, and still scores
+   * nothing.
+   *
+   * The severity is what decides whether a finding moves a score, not whether
+   * a criterion exists — and tightening what a badge requires is a separate
+   * decision from giving an observation somewhere to be recorded. Until
+   * somebody takes that decision, these appear in the report and change no
+   * number.
+   */
   const observation = (title: string, description: string, remediation: string): RawFinding => ({
-    ruleId: 'UX-01',
+    ruleId: 'UX-07',
     dimension: 'practicality_ux',
     severity: 'info',
     confidence: 'high',

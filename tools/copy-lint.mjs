@@ -74,6 +74,11 @@ const SKIP_FILES = new Set([
   'tools/copy-lint.mjs',
   'tools/copy-lint.test.ts',
   'supabase/migrations/20260830110000_publish_rubric_1_0_0.sql',
+  // And 1.1.0's, for the identical reason: it embeds the same rubric JSON, and
+  // `tests/rubric-published.test.ts` pins every published version's payload to
+  // the definition the scoring code loads, so prose smuggled in here fails that
+  // test instead of this gate.
+  'supabase/migrations/20260918100000_publish_rubric_1_1_0.sql',
   'supabase/schema.sql',
   // A fifth, for the same reason as the first two: it is the list of phrases
   // the assistant may not send, so it necessarily contains every one of them.

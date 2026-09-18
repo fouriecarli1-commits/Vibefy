@@ -395,7 +395,16 @@ describe('when the standard moves on', () => {
     const raised = (await alertsFor(space)).filter((alert) => alert.kind === 'rubric_superseded');
     expect(raised).toHaveLength(1);
     expect(raised[0]!.body).toMatch(/earned its badge against Rubric v1\.0\.0/);
-    expect(raised[0]!.body).toMatch(/v1\.1\.0 is now in force/);
+
+    // Against whatever the sweep considers current rather than a literal.
+    // 1.1.0 is a real published version now, so a hard-coded successor here is
+    // a test that passes or fails on which other suite ran first.
+    const { rows } = await db.query<{ version: string }>(
+      `select version from public.rubric_versions
+        where superseded_at is null and effective_from is not null and effective_from <= now()
+        order by effective_from desc limit 1`,
+    );
+    expect(raised[0]!.body).toContain(`v${rows[0]!.version} is now in force`);
   });
 
   it('says plainly that the badge is unaffected', () => {

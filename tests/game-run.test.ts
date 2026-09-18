@@ -92,7 +92,9 @@ describe('the game was really played', () => {
 describe('the five defects, found', () => {
   it('sees the download that blocks the start', () => {
     expect(shipped.bytesBeforePlayable).toBeGreaterThan(500_000);
-    expect(ruleIdsOf(shipped)).toContain('PRD-01');
+    // PRD-06 since rubric 1.1.0: time and weight before something is usable
+    // is a measurement, and PRD-01 is a Lighthouse performance band.
+    expect(ruleIdsOf(shipped)).toContain('PRD-06');
   });
 
   it('sees that no finger can play it', () => {
@@ -101,7 +103,9 @@ describe('the five defects, found', () => {
     // measured the harness.
     expect(shipped.listenerTypes).toEqual(['keydown', 'keyup']);
     expect(shipped.acceptsTouch).toBe(false);
-    expect(ruleIdsOf(shipped)).toContain('UX-02');
+    // FI-08 since 1.1.0. UX-02 is about a layout fitting a narrow screen;
+    // this is about an input method the device does not have.
+    expect(ruleIdsOf(shipped)).toContain('FI-08');
   });
 
   it('sees the loop still running when nobody is looking', () => {
@@ -154,7 +158,7 @@ describe('what the findings are allowed to say', () => {
   });
 
   it('carries the connection into the text, because the number is meaningless without it', () => {
-    const weight = findings().find((finding) => finding.ruleId === 'PRD-01');
+    const weight = findings().find((finding) => finding.ruleId === 'PRD-06');
     expect(weight?.description).toMatch(/4G/);
   });
 

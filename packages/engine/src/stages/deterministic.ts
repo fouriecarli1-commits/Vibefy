@@ -12,6 +12,7 @@ import { AxeBuilder } from '@axe-core/playwright';
 import { ScopedHttp, type ScopedResponse } from '../runtime/http.ts';
 import { BrowserSession, MOBILE_VIEWPORT } from '../runtime/browser.ts';
 import { designFindings, measureDesign } from './design-checks.ts';
+import { measureTrust, trustFindings } from './trust-checks.ts';
 import { gameFindings, measureGame } from './game-checks.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
@@ -174,6 +175,33 @@ export const deterministicChecksStage: Stage = {
       } else {
         notes.push(
           'The landing page passed the automated WCAG 2.2 AA checks with no serious violations.',
+        );
+      }
+
+      /*
+       * The three questions the verification page asks a visitor's way.
+       *
+       * Where a card number goes, whether anything known to be hostile is
+       * loaded, and whether a person can be reached. They run here rather than
+       * in a stage of their own because the browser is already open and the
+       * page is already loaded, and because all three are read from one
+       * document rather than judged.
+       */
+      try {
+        const trust = await measureTrust(session, root.body, url);
+        findings.push(
+          ...trustFindings(trust, { payments: context.target.hasPayments }, [desktopShot]),
+        );
+        notes.push(
+          `Trust survey: ${trust.scriptHosts.length} script origin(s), ${
+            trust.processorsPresent.length > 0
+              ? `payment processor(s) present (${trust.processorsPresent.join(', ')})`
+              : 'no recognised payment processor on the page'
+          }, contact route ${trust.contactOutcome.replace('_', ' ')}.`,
+        );
+      } catch (error) {
+        notes.push(
+          `The trust survey did not complete: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
 

@@ -56,9 +56,12 @@ not invent a rule id. A game that never becomes playable is **FI-01**, not "GAME
 what the score is computed from, and a report citing a rule that does not exist is a score nobody
 can check.
 
-If you observe something real that fits no criterion you were given — an age rating that is absent,
-a purchase that is not disclosed — record it as an observation at `info` severity and say plainly
-that the published rubric has no criterion for it. Do not force it into the nearest one.
+Age ratings and in-app purchase disclosure now have a criterion of their own, **STR-08**, added in
+rubric 1.1.0. Cite it when the store the owner is aiming at requires one and it is absent.
+
+If you observe something real that fits no criterion you were given, record it as an observation at
+`info` severity and say plainly that the published rubric has no criterion for it. Do not force it
+into the nearest one.
 
 ## Evidence
 

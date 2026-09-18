@@ -7,6 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 import rubricV1 from '../versions/1.0.0.json' with { type: 'json' };
+import rubricV11 from '../versions/1.1.0.json' with { type: 'json' };
 import type { FindingSeverity, ConfidenceLevel, RubricDimensionId } from './types.ts';
 
 export interface RubricBand {
@@ -63,9 +64,18 @@ export interface RubricDefinition {
 
 const REGISTRY: Readonly<Record<string, RubricDefinition>> = {
   '1.0.0': rubricV1 as unknown as RubricDefinition,
+  '1.1.0': rubricV11 as unknown as RubricDefinition,
 };
 
-export const CURRENT_RUBRIC_VERSION = '1.0.0';
+/**
+ * What a new assessment is scored against.
+ *
+ * Published versions stay in the registry for ever. A badge issued against
+ * 1.0.0 is verified against 1.0.0 until it expires, and the page that displays
+ * it says which version it was — a score recomputed against a rubric that did
+ * not exist when it was earned is not the score anybody agreed to.
+ */
+export const CURRENT_RUBRIC_VERSION = '1.1.0';
 
 export function listRubricVersions(): readonly string[] {
   return Object.keys(REGISTRY);
