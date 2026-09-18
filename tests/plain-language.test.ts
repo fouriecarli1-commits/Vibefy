@@ -218,3 +218,46 @@ describe('the component itself', () => {
     expect(component).toContain('In short');
   });
 });
+
+describe('a word too specialised for a summary is a word we owe a definition', () => {
+  /*
+   * Banning these from the summaries is only half an answer. They are still
+   * used in the body of those pages, and they have to be: "the list of checks,
+   * each of which has a weight" is not a phrase anybody can write eleven times
+   * on one page. So the ban and the glossary are the same list, and a word
+   * added to one without the other is how a glossary comes to be missing
+   * exactly the term somebody looked up.
+   */
+  const glossary = read('apps/web/app/glossary/page.tsx');
+  const defined = [...glossary.matchAll(/term: '([^']+)'/g)].map((match) =>
+    match[1]!.toLowerCase(),
+  );
+
+  it('found the glossary it is talking about', () => {
+    expect(defined.length).toBeGreaterThan(15);
+  });
+
+  it.each(JARGON)('explains "%s"', (word) => {
+    expect(defined).toContain(word.toLowerCase());
+  });
+
+  it('explains each word without leaning on the others', () => {
+    // A glossary whose entries need each other is a glossary that is no use to
+    // the person who actually needs one.
+    const entries = [
+      ...glossary.matchAll(/term: '([^']+)',\s*\n\s*plain:\s*\n?\s*'([\s\S]*?)',\n/g),
+    ];
+    expect(entries.length).toBeGreaterThan(15);
+    for (const [, term, plain] of entries) {
+      const others = defined.filter((word) => word !== term!.toLowerCase() && word.length > 6);
+      const leaned = others.filter((word) => plain!.toLowerCase().includes(word));
+      // One is a cross-reference. Three is a definition that defers.
+      expect(leaned.length, `${term}: leans on ${leaned.join(', ')}`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('is reachable from every page', () => {
+    const layout = read('apps/web/app/layout.tsx');
+    expect(layout).toContain('href="/glossary"');
+  });
+});

@@ -87,6 +87,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </p>
             <p className="mt-4 flex flex-wrap gap-4">
               <Link href="/directory">Directory</Link>
+              <Link href="/services">What we do</Link>
+              <Link href="/glossary">What the words mean</Link>
               <Link href="/methodology">Methodology</Link>
               <Link href="/legal">Legal</Link>
               <Link href="/legal/rating-methodology-and-independence">Independence policy</Link>

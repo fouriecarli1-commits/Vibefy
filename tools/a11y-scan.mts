@@ -36,6 +36,7 @@ const PAGES = [
   '/',
   '/how-it-works',
   '/services',
+  '/glossary',
   '/services/remediation',
   '/methodology',
   '/legal',

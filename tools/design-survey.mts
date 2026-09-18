@@ -46,6 +46,7 @@ const PAGES = [
   '/advertise',
   '/games',
   '/services',
+  '/glossary',
   '/services/remediation',
   '/legal',
   '/sign-in',
