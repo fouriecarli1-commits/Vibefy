@@ -241,3 +241,86 @@ export async function issueBadge(
 }
 
 export { sha256 };
+
+/**
+ * An application with a live badge, ready to have its verification page opened.
+ *
+ * Exists because the page a stranger actually lands on could not be
+ * accessibility-scanned: it needs a real issued badge to render, so the crawl
+ * had no URL to visit and the one page the whole product points outsiders at
+ * was the one page nobody checked.
+ *
+ * It seeds the harder version of the page on purpose — a published finding so
+ * the assurance list renders its "something was found" branch, and an exit
+ * measurement so that panel renders too. A scan of the emptiest possible page
+ * proves the least.
+ */
+export async function seedBadgedApp(
+  client: Client,
+  label = 'a11y',
+): Promise<{ slug: string; appId: string; assessmentId: string }> {
+  const owner = await seedAccount(client, label);
+  const reviewer = await seedAccount(client, `${label}-reviewer`);
+  await makeReviewer(client, reviewer.userId);
+
+  const { assessmentId, appId } = await seedAssessment(client, owner, { depth: 'full' });
+  await seedFinding(client, owner, assessmentId, {
+    dimension: 'practicality_ux',
+    ruleId: 'UX-02',
+    severity: 'medium',
+  });
+  await client.query(`update public.assessments set exit_measurement = $2 where id = $1`, [
+    assessmentId,
+    JSON.stringify({
+      routeFound: true,
+      selfService: false,
+      plainlyNamed: false,
+      clicksToCancel: 3,
+      clicksToSubscribe: 1,
+      score: {
+        percentage: 50,
+        band: 'Hard',
+        components: [
+          {
+            id: 'routeFound',
+            label: 'There is a way to cancel that a visitor can find',
+            weight: 40,
+            earned: 40,
+            detail: 'A route to cancelling was found on the public site.',
+          },
+          {
+            id: 'selfService',
+            label: 'You can do it yourself',
+            weight: 25,
+            earned: 0,
+            detail: 'The route ends in asking a person to cancel for you.',
+          },
+          {
+            id: 'symmetry',
+            label: 'Leaving is no harder to reach than joining',
+            weight: 20,
+            earned: 10,
+            detail: '1 click to join and 3 to reach the way out.',
+          },
+          {
+            id: 'plainlyNamed',
+            label: 'It is called what it is',
+            weight: 15,
+            earned: 0,
+            detail: 'The route is named something other than cancelling.',
+          },
+        ],
+      },
+    }),
+  ]);
+
+  await approveAssessment(client, owner, assessmentId, reviewer.userId, { score: 82.4 });
+  const consentId = await acceptBadgeLicence(client, owner);
+  await issueBadge(client, owner, { appId, assessmentId, consentId });
+
+  const { rows } = await client.query<{ slug: string }>(
+    `select slug from public.badges where app_id = $1 order by issued_at desc limit 1`,
+    [appId],
+  );
+  return { slug: rows[0]!.slug, appId, assessmentId };
+}

@@ -15,9 +15,11 @@
  *   pnpm check:a11y --url <origin>  scan something already running
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { Client } from 'pg';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { auditUrl, closeAxeBrowser, describe as explain } from '../tests/setup/axe.ts';
+import { MUST_CONTAIN, scannedTheWrongPage, seedVerificationPage } from './a11y-contract.mts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 3123;
@@ -65,6 +67,17 @@ const ENVIRONMENT: Record<string, string> = {
     `postgresql://postgres@localhost/vibefycode_test?host=${join(root, '.tmp/pg/socket')}`,
 };
 
+/** Opens the local test database for one piece of work and closes it again. */
+async function withDatabase<T>(work: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client({ connectionString: ENVIRONMENT.SUPABASE_DB_URL });
+  await client.connect();
+  try {
+    return await work(client);
+  } finally {
+    await client.end();
+  }
+}
+
 function run(command: string, args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -97,6 +110,15 @@ async function main(): Promise<void> {
   const origin = external ?? `http://127.0.0.1:${PORT}`;
   const web = join(root, 'apps/web');
 
+  if (external) {
+    // Said out loud. A page dropped from the scan without a word is how the
+    // verification page came to be unscanned in the first place.
+    console.warn(
+      '! Scanning an external origin, so no badge was seeded and the verification\n' +
+        '  page (/a/<slug>) is NOT part of this run.',
+    );
+  }
+
   let server: ChildProcess | undefined;
   if (!external) {
     // The pages that read the database need a *current* one. Three times now a
@@ -109,6 +131,9 @@ async function main(): Promise<void> {
       console.log('· Bringing the local test database up to date…');
       await run('bash', ['scripts/test-db.sh', 'reset'], root);
     }
+
+    console.log('· Seeding a badge, so the verification page can be opened…');
+    PAGES.push(await withDatabase(seedVerificationPage));
 
     console.log('· Building the app…');
     await run('pnpm', ['exec', 'next', 'build'], web);
@@ -124,6 +149,12 @@ async function main(): Promise<void> {
   let scanned = 0;
   try {
     for (const page of PAGES) {
+      const wrongPage = await scannedTheWrongPage(origin, page, MUST_CONTAIN[page]);
+      if (wrongPage) {
+        failures.push(wrongPage);
+        continue;
+      }
+
       const { violations, passes } = await auditUrl(`${origin}${page}`);
       // A green gate that is green because the scan silently did nothing is
       // worse than no gate at all.

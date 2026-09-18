@@ -12,11 +12,20 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import type { Client } from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { renderReport, type ReportSource } from '../packages/report/src/index.ts';
 import { renderBadgeSvg, type BadgeStatus } from '../packages/badge/src/index.ts';
 import { renderAlertEmail } from '../packages/notify/src/index.ts';
 import { auditHtml, closeAxeBrowser, describe as explain } from './setup/axe.ts';
+import {
+  MUST_CONTAIN,
+  SEEDED_ROUTES,
+  matchesSeededRoute,
+  scannedTheWrongPage,
+  seedVerificationPage,
+} from '../tools/a11y-contract.mts';
+import { connect } from './setup/client.ts';
 
 afterAll(async () => {
   await closeAxeBrowser();
@@ -148,6 +157,105 @@ describe('the alert email', () => {
   });
 });
 
+describe('the guard that says we scanned the right page', () => {
+  /*
+   * The scan visits addresses and trusts what comes back. That is fine until an
+   * address stops being the page it was: a slug that no longer resolves renders
+   * the not-found page, which is deliberately accessible and passes cleanly. The
+   * run goes green, the count stays the same, and the page a stranger actually
+   * lands on has not been looked at for weeks.
+   *
+   * So the guard is watched failing here rather than trusted. It has never once
+   * fired in a real run, which is exactly the problem with it.
+   */
+  const stub = (status: number, body: string): typeof fetch =>
+    (async () => new Response(body, { status })) as unknown as typeof fetch;
+
+  it('is quiet when the page carries what it should', async () => {
+    const complaint = await scannedTheWrongPage(
+      'http://x',
+      '/a/abc',
+      'What was checked',
+      stub(200, '<h2>What was checked</h2>'),
+    );
+    expect(complaint).toBeNull();
+  });
+
+  it('complains when the page is fine but is the wrong page', async () => {
+    // The whole point: HTTP 200, valid HTML, accessible — and not our page.
+    const complaint = await scannedTheWrongPage(
+      'http://x',
+      '/a/abc',
+      'What was checked',
+      stub(200, '<h1>We could not find that</h1>'),
+    );
+    expect(complaint).toContain('/a/abc');
+    expect(complaint).toContain('wrong page');
+  });
+
+  it('complains when the page is missing, rather than scanning a 404 body', async () => {
+    const complaint = await scannedTheWrongPage(
+      'http://x',
+      '/a/abc',
+      'What was checked',
+      stub(404, 'What was checked'),
+    );
+    expect(complaint).toContain('404');
+  });
+
+  it('complains when the page could not be reached at all', async () => {
+    const refuse = (async () => {
+      throw new Error('ECONNREFUSED');
+    }) as unknown as typeof fetch;
+    const complaint = await scannedTheWrongPage('http://x', '/a/abc', 'What was checked', refuse);
+    expect(complaint).toContain('ECONNREFUSED');
+  });
+
+  it('stays out of the way of pages that declared nothing to look for', async () => {
+    const never = (() => {
+      throw new Error('should not have been fetched');
+    }) as unknown as typeof fetch;
+    expect(await scannedTheWrongPage('http://x', '/how-it-works', undefined, never)).toBeNull();
+  });
+
+  it('is asked for on the pages whose absence would be invisible', () => {
+    // The directory renders its error page when the database is behind, and an
+    // error page has no heading — two violations about a page that was never
+    // the point. The guard turns that into the truth: we scanned the wrong thing.
+    expect(Object.keys(MUST_CONTAIN)).toContain('/directory');
+  });
+});
+
+describe('the verification page is really in the scan', () => {
+  let db: Client;
+
+  beforeAll(async () => {
+    db = await connect();
+  });
+
+  afterAll(async () => {
+    await db?.end();
+  });
+
+  it('seeds a badge whose page matches the route the coverage test counts', async () => {
+    /*
+     * `SEEDED_ROUTES` is how the coverage test above believes /a/[slug] is
+     * scanned, and nothing else checks that belief. Change the slug column or
+     * move the page, and the scan carries on seeding something while the
+     * coverage test carries on excusing the route — both halves correct, the
+     * page unscanned and nobody told.
+     */
+    const page = await seedVerificationPage(db);
+    expect(
+      matchesSeededRoute(page),
+      `${page} is not an instance of ${SEEDED_ROUTES.join(', ')}`,
+    ).toBe(true);
+    // And it must arrive with something to check for, or the scan would accept
+    // the not-found page as proof it had looked at the real one.
+    expect(MUST_CONTAIN[page]).toBeTruthy();
+  });
+});
+
 describe('the scan keeps up with the pages', () => {
   /*
    * Two public pages shipped unscanned this week, and neither was an oversight
@@ -194,8 +302,6 @@ describe('the scan keeps up with the pages', () => {
    */
   const EXCUSED: Readonly<Record<string, string>> = {
     '/sign-up': 'Scanned as /sign-in, which is the same form component with a different heading.',
-    '/a/[slug]':
-      'The verification page needs a real issued badge to render, so there is no fixed URL for the scanner to visit. It is covered by the report and badge audits in this file rather than by the crawl — which is thinner than it should be for the page strangers actually land on. See docs/OPEN_ITEMS.md.',
     '/invite/[token]':
       'Needs a live invitation token, which does not exist outside a seeded database.',
   };
@@ -204,7 +310,12 @@ describe('the scan keeps up with the pages', () => {
     const source = readFileSync(join(process.cwd(), 'tools/a11y-scan.mts'), 'utf8');
     const block = /const PAGES = \[([\s\S]*?)\]/.exec(source);
     if (!block) throw new Error('a11y-scan no longer has a PAGES list');
-    return [...block[1]!.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
+    const literal = [...block[1]!.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
+    // The verification page has no literal URL — it exists only once a badge is
+    // seeded — so the scan pushes it onto the list at run time. Counting it here
+    // is the point of SEEDED_ROUTES: a route scanned by a mechanism this test
+    // knows nothing about is a route that can stop being scanned in silence.
+    return [...literal, ...SEEDED_ROUTES];
   })();
 
   it('found the routes it is talking about', () => {
