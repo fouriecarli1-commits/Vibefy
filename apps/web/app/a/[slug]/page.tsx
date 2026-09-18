@@ -7,7 +7,10 @@ import {
   MARKETING_CLIENT_DISCLOSURE,
   REMEDIATION_CLIENT_DISCLOSURE,
 } from '@vibefycode/shared';
-import { readAsAnon } from '@/lib/sql';
+import { getRubric } from '@vibefycode/rubric';
+import { type AssuranceInput } from '@vibefycode/assurance';
+import { AssuranceList, VerificationSteps } from '@/components/assurance-list';
+import { readAsAnon, writeAsService } from '@/lib/sql';
 import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
 
 /**
@@ -36,6 +39,84 @@ interface BadgeRecord {
   owner_name: string;
   owner_is_marketing_client: boolean;
   owner_has_remediation: boolean;
+}
+
+/**
+ * Everything the tick list needs, read with the service role.
+ *
+ * Deliberately not exposed to `anon`. A view granted to the anonymous role is
+ * public data through PostgREST whatever any page chooses to render, and this
+ * query carries the rule ids of a customer's published findings — which is a
+ * map of a stranger's weaknesses, not a disclosure. The page turns it into one
+ * word per question and the detail never leaves this process.
+ *
+ * It is a read, inside a function named for writes, for the same reason the
+ * assistant's spend ceiling is: this is a fact about the assessment rather than
+ * a row the reader owns, and a reader who could only see what they own could
+ * not see this at all.
+ */
+async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
+  return writeAsService(async (client) => {
+    const { rows } = await client.query<{
+      app_name: string;
+      rubric_version: string;
+      assessed_on: string;
+      depth: string;
+      gate_failures: string[];
+      has_authentication: boolean;
+      has_payments: boolean;
+      processes_personal_data: boolean;
+    }>(
+      `select app.name as app_name, a.rubric_version, a.depth::text as depth,
+              a.gate_failures, app.has_authentication, app.has_payments,
+              app.processes_personal_data,
+              coalesce(a.completed_at, a.created_at)::date::text as assessed_on
+         from public.badges b
+         join public.assessments a on a.id = b.assessment_id
+         join public.apps app on app.id = b.app_id
+        where b.slug = $1`,
+      [slug],
+    );
+    const row = rows[0];
+    if (!row) return null;
+
+    const findings = await client.query<{ rubric_rule_id: string; severity: string }>(
+      `select f.rubric_rule_id, f.severity::text as severity
+         from public.findings f
+         join public.badges b on b.assessment_id = f.assessment_id
+        where b.slug = $1 and f.is_published`,
+      [slug],
+    );
+
+    // What the rubric this was scored against actually defines. A question
+    // whose criteria are absent reads as "not tested", never as a pass.
+    let rubricCriteria: string[] = [];
+    try {
+      rubricCriteria = getRubric(row.rubric_version).dimensions.flatMap((dimension) =>
+        dimension.criteria.map((criterion) => criterion.id),
+      );
+    } catch {
+      rubricCriteria = [];
+    }
+
+    return {
+      appName: row.app_name,
+      assessedOn: row.assessed_on,
+      rubricVersion: row.rubric_version,
+      depth: row.depth as AssuranceInput['depth'],
+      gateFailures: row.gate_failures ?? [],
+      findings: findings.rows.map((finding) => ({
+        ruleId: finding.rubric_rule_id,
+        severity: finding.severity as AssuranceInput['findings'][number]['severity'],
+      })),
+      rubricCriteria,
+      declared: {
+        authentication: row.has_authentication,
+        payments: row.has_payments,
+        personalData: row.processes_personal_data,
+      },
+    };
+  }).catch(() => null);
 }
 
 async function loadBadge(slug: string): Promise<BadgeRecord | null> {
@@ -128,6 +209,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
   const { slug } = await params;
   const badge = await loadBadge(slug);
   if (!badge) notFound();
+  const assurance = await loadAssurance(slug);
 
   const assessedOn = new Date(badge.assessed_at).toISOString().slice(0, 10);
   const status = STATUS_COPY[badge.status];
@@ -176,6 +258,15 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
         </p>
         <p className="mt-3 text-sm text-muted">{AI_DISCLOSURE}</p>
       </section>
+
+      {/* The tick list, high on the page and before the score.
+
+          Everything below this point is written for the owner of an
+          application: dimensions, criteria, a number out of a hundred. The
+          person who clicked a mark on a stranger's website is not that person.
+          They have one question — is this all right? — and a score of 88.6 does
+          not answer it. */}
+      {assurance && <AssuranceList input={assurance} />}
 
       {badge.owner_has_remediation && (
         <section role="note" className="rounded-xl border border-line p-5">
@@ -276,6 +367,8 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           page instead of the evidence is an advertisement wearing the clothes of
           a check. So the route to the product is one step further along, which
           is also the honest order — evidence first, offer second. */}
+      <VerificationSteps />
+
       <section
         aria-labelledby="what-this-is"
         className="rounded-xl border border-line-strong p-6 space-y-3"

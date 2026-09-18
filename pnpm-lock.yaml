@@ -117,6 +117,9 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.112.3
         version: 2.112.3
+      '@vibefycode/assurance':
+        specifier: workspace:*
+        version: link:../../packages/assurance
       '@vibefycode/badge':
         specifier: workspace:*
         version: link:../../packages/badge
@@ -269,6 +272,19 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.112.3
         version: 2.112.3
+    devDependencies:
+      '@types/node':
+        specifier: 26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/assurance:
+    dependencies:
+      '@vibefycode/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: 26.2.0

@@ -37,6 +37,7 @@ const nextConfig: NextConfig = {
   // added.
   transpilePackages: [
     '@vibefycode/api',
+    '@vibefycode/assurance',
     '@vibefycode/badge',
     '@vibefycode/billing',
     '@vibefycode/copilot',
