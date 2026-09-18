@@ -221,9 +221,12 @@ export const deterministicChecksStage: Stage = {
        * evaluation against a loaded page and does not deserve a stage of its
        * own.
        */
+      const designTitles = new Set<string>();
       try {
         const design = await measureDesign(session, url);
-        findings.push(...designFindings(design, [desktopShot]));
+        const found = designFindings(design, [desktopShot]);
+        for (const finding of found) designTitles.add(finding.title);
+        findings.push(...found);
         notes.push(
           `Design survey: ${design.fontSizesPx.length} text sizes, ${design.fontFamilies.length} typefaces, ${design.buttonStyles.length} button styles, ${Math.round(design.spacingsOnGrid * 100)}% of spacing on a 4px grid.`,
         );
@@ -236,6 +239,35 @@ export const deterministicChecksStage: Stage = {
       await session.setViewport(MOBILE_VIEWPORT);
       await session.goto(url, 'networkidle');
       const mobileShot = await session.screenshot('Landing page, 390px mobile viewport');
+
+      /*
+       * The same survey again, at the width most people will actually use.
+       *
+       * Nearly free — the browser is already here and the page is already
+       * loaded at this size — and it finds a different class of problem: a
+       * type scale that gains three sizes below a breakpoint, a spacing grid
+       * that dissolves into whatever a clamp resolves to. Running it against
+       * our own site found a fifth of the spacing off the grid at this width
+       * and nothing at all at the other one.
+       *
+       * Only what is new here is reported. A page with nine type sizes has
+       * nine at both widths, and saying so twice is how a report teaches
+       * somebody to stop reading it.
+       */
+      try {
+        const mobileDesign = await measureDesign(session, url);
+        const newAtThisWidth = designFindings(mobileDesign, [mobileShot], {
+          at: 'at phone width, 390 pixels across',
+        }).filter((finding) => !designTitles.has(finding.title));
+        findings.push(...newAtThisWidth);
+        notes.push(
+          `Design survey at phone width: ${mobileDesign.fontSizesPx.length} text sizes, ${Math.round(mobileDesign.spacingsOnGrid * 100)}% of spacing on a 4px grid, ${newAtThisWidth.length} observation(s) that the desktop pass did not already make.`,
+        );
+      } catch (error) {
+        notes.push(
+          `The design survey at phone width did not complete: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       const overflow = await session.page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth + 2,
       );

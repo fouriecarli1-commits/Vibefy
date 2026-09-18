@@ -13,6 +13,8 @@
  * mean anything: one that finds sprawl on every page has not been shown to
  * distinguish.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BrowserSession } from '../packages/engine/src/runtime/browser.ts';
 import { EvidenceStore } from '../packages/engine/src/runtime/evidence.ts';
@@ -232,5 +234,60 @@ describe('close together is not the same as wrong', () => {
   it('is beside the point on a page with no repeated gap at all', () => {
     // Far apart is a different gap doing a different job, not a botched one.
     expect(readRhythm([8, 40, 96]).misses).toEqual([]);
+  });
+});
+
+describe('the survey says which width it was looking at', () => {
+  /*
+   * A page is built at the width its author had open, and a finding somebody
+   * cannot reproduce is a finding they will decide is wrong. Our own site had a
+   * fifth of its spacing off the grid at phone width and none of it at desktop,
+   * which is the whole reason the assessment now runs both.
+   */
+  it('says so, in a sentence a report can carry', () => {
+    const findings = designFindings(messy, ['e'], { at: 'at phone width, 390 pixels across' });
+    expect(findings.length).toBeGreaterThan(0);
+    for (const finding of findings) {
+      if (finding.severity !== 'info') continue;
+      expect(finding.description).toContain('Seen at phone width, 390 pixels across.');
+    }
+  });
+
+  it('says nothing about a width when it was the ordinary one', () => {
+    // Every report until now came from one width, and saying "seen at desktop"
+    // on all of them would be noise dressed as precision.
+    for (const finding of designFindings(messy, ['e'])) {
+      expect(finding.description).not.toContain('Seen at');
+    }
+  });
+
+  it('keeps the titles identical, so the same problem can be recognised at both', () => {
+    // The stage reports only what is new at the second width, and it matches on
+    // the title. A title that carried the width would never match.
+    expect(titles(messy)).toEqual(
+      designFindings(messy, ['e'], { at: 'at phone width' }).map((finding) => finding.title),
+    );
+  });
+});
+
+describe('the assessment runs it at both widths', () => {
+  const stage = readFileSync(
+    join(process.cwd(), 'packages/engine/src/stages/deterministic.ts'),
+    'utf8',
+  );
+
+  it('surveys the phone viewport as well as the desktop one', () => {
+    expect(stage).toMatch(/measureDesign\(session, url\)[\s\S]*measureDesign\(session, url\)/);
+    expect(stage).toContain('at phone width, 390 pixels across');
+  });
+
+  it('reports only what the first pass did not already say', () => {
+    // A page with nine type sizes has nine at both widths, and saying so twice
+    // is how a report teaches somebody to stop reading it.
+    expect(stage).toContain('designTitles.has(finding.title)');
+  });
+
+  it('attaches the evidence from the width it was looking at', () => {
+    expect(stage).toMatch(/designFindings\(mobileDesign, \[mobileShot\]/);
   });
 });

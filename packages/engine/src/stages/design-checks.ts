@@ -505,12 +505,28 @@ export function unreadableText(measurements: DesignMeasurements): ColourPair[] {
   });
 }
 
+/**
+ * Where the page was being looked at, when it was not the ordinary width.
+ *
+ * A page is built at the width its author had open, and the breakpoints
+ * underneath it are where a type scale quietly acquires three more sizes and a
+ * spacing grid dissolves into whatever a clamp resolves to. Saying which width
+ * a finding came from is the difference between somebody being able to go and
+ * look at it and somebody reading a number they cannot reproduce.
+ */
+export interface DesignSurveyContext {
+  /** In words a report can put in a sentence: "at phone width (390px wide)". */
+  readonly at?: string;
+}
+
 export function designFindings(
   measurements: DesignMeasurements,
   evidenceIds: readonly string[],
+  context: DesignSurveyContext = {},
 ): RawFinding[] {
   const findings: RawFinding[] = [];
   const evidence = [...evidenceIds];
+  const where = context.at ? `Seen ${context.at}. ` : '';
 
   /**
    * Coherence has its own criterion since rubric 1.1.0, and still scores
@@ -528,7 +544,7 @@ export function designFindings(
     severity: 'info',
     confidence: 'high',
     title,
-    description: `${description} This is recorded as an observation: the published rubric has no criterion for visual consistency, so it does not affect the score.`,
+    description: `${where}${description} This is recorded as an observation: the published rubric has no criterion for visual consistency, so it does not affect the score.`,
     remediation,
     evidenceIds: evidence,
   });
