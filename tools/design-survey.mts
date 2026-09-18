@@ -24,7 +24,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { BrowserSession } from '../packages/engine/src/runtime/browser.ts';
+import {
+  BrowserSession,
+  DESKTOP_VIEWPORT,
+  MOBILE_VIEWPORT,
+} from '../packages/engine/src/runtime/browser.ts';
 import { EvidenceStore } from '../packages/engine/src/runtime/evidence.ts';
 import { DEFAULT_CEILING, ScopeGuard } from '../packages/engine/src/runtime/scope.ts';
 import { designFindings, measureDesign } from '../packages/engine/src/stages/design-checks.ts';
@@ -111,28 +115,42 @@ async function main(): Promise<void> {
     allowPrivateNetworkForTesting: true,
   });
 
+  // Both widths. A page is built at the width its author had open, and the
+  // breakpoints underneath it are where a type scale quietly acquires three
+  // more sizes. Most people will see the narrow one.
+  const WIDTHS = [
+    { label: 'desktop', viewport: DESKTOP_VIEWPORT },
+    { label: 'phone', viewport: MOBILE_VIEWPORT },
+  ];
+
   let clean = 0;
+  let surveyed = 0;
   try {
     for (const page of PAGES) {
-      const session = new BrowserSession(guard, new EvidenceStore(page));
-      await session.open();
-      try {
-        const measurements = await measureDesign(session, `${origin}${page}`);
-        const findings = designFindings(measurements, ['survey']);
-        if (findings.length === 0) {
-          clean += 1;
-          console.log(`\n✓ ${page}`);
-          continue;
+      for (const width of WIDTHS) {
+        const session = new BrowserSession(guard, new EvidenceStore(page), {
+          viewport: width.viewport,
+        });
+        await session.open();
+        try {
+          const measurements = await measureDesign(session, `${origin}${page}`);
+          const findings = designFindings(measurements, ['survey']);
+          surveyed += 1;
+          if (findings.length === 0) {
+            clean += 1;
+            console.log(`\n✓ ${page} at ${width.label}`);
+            continue;
+          }
+          console.log(`\n${page} at ${width.label}`);
+          for (const finding of findings) {
+            console.log(`  · ${finding.title}`);
+            // The numbers are the whole point of an objective eye — a title
+            // alone says a page is wrong and leaves somebody hunting for where.
+            if (why) console.log(`    ${finding.description}\n`);
+          }
+        } finally {
+          await session.close();
         }
-        console.log(`\n${page}`);
-        for (const finding of findings) {
-          console.log(`  · ${finding.title}`);
-          // The numbers are the whole point of an objective eye — a title alone
-          // says a page is wrong and leaves somebody hunting for where.
-          if (why) console.log(`    ${finding.description}\n`);
-        }
-      } finally {
-        await session.close();
       }
     }
   } finally {
@@ -140,7 +158,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n${clean} of ${PAGES.length} pages had nothing to say about them.\n` +
+    `\n${clean} of ${surveyed} page-widths had nothing to say about them.\n` +
       '  This counts pieces. It says nothing about whether the result is good.',
   );
 }

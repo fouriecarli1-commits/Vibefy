@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getRubric, rubricChecksum, CURRENT_RUBRIC_VERSION } from '@vibefycode/rubric';
 import { SponsorSlot } from '@/components/sponsor-slot';
 import { InShort } from '@/components/in-short';
+import { WideTable } from '@/components/wide-table';
 
 export const metadata: Metadata = {
   title: 'Methodology',
@@ -42,7 +43,7 @@ export default function MethodologyPage() {
         <h2 id="dimensions" className="text-2xl font-bold tracking-tight">
           Dimensions and weights
         </h2>
-        <div className="overflow-x-auto">
+        <WideTable label="Rubric dimensions, their weights and what they measure">
           <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
             <caption className="sr-only">
               Rubric dimensions, their weights and what they measure
@@ -72,7 +73,7 @@ export default function MethodologyPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </WideTable>
       </section>
 
       <section aria-labelledby="scoring" className="space-y-4">

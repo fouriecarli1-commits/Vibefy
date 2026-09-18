@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { CEILINGS } from '@vibefycode/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { createClient } from '@/lib/supabase/server';
+import { WideTable } from '@/components/wide-table';
 
 export const metadata: Metadata = { title: 'Unit economics' };
 
@@ -153,7 +154,7 @@ export default async function CostsPage() {
         <h2 id="margin" className="text-xl font-semibold">
           Cost per run, by depth
         </h2>
-        <div className="overflow-x-auto">
+        <WideTable label="Average cost per assessment run against the price of the tier it serves">
           <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
             <caption className="sr-only">
               Average cost per assessment run against the price of the tier it serves
@@ -217,7 +218,7 @@ export default async function CostsPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </WideTable>
       </section>
 
       <section aria-labelledby="daily" className="space-y-4">

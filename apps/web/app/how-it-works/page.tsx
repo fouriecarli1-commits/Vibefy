@@ -4,6 +4,7 @@ import { DEFAULT_CEILING } from '@vibefycode/engine/scope';
 import { RETENTION_DAYS } from '@vibefycode/engine/evidence';
 import { SponsorSlot } from '@/components/sponsor-slot';
 import { InShort } from '@/components/in-short';
+import { WideTable } from '@/components/wide-table';
 
 export const metadata: Metadata = {
   title: 'What happens to your app',
@@ -238,7 +239,7 @@ export default function HowItWorksPage() {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+        <WideTable label="Evidence kinds and how many days each is retained">
           <table className="w-full text-sm">
             <caption className="sr-only">Evidence kinds and how many days each is retained</caption>
             <thead>
@@ -262,7 +263,7 @@ export default function HowItWorksPage() {
                 ))}
             </tbody>
           </table>
-        </div>
+        </WideTable>
 
         <div className="bar">
           <p className="max-w-3xl text-sm">

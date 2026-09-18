@@ -274,7 +274,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
 
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Option 1 — a DNS TXT record</h4>
-              <pre className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm">
+              <pre
+                className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm"
+                tabIndex={0}
+                role="region"
+                aria-label="The DNS TXT record to publish"
+              >
                 {DNS_RECORD_PREFIX}
                 {current.verification_token}
               </pre>
@@ -284,7 +289,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
               <h4 className="text-sm font-medium">
                 Option 2 — this exact text, and nothing else, at {CHALLENGE_PATH}
               </h4>
-              <pre className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm">
+              <pre
+                className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm"
+                tabIndex={0}
+                role="region"
+                aria-label="The text to serve at the challenge path"
+              >
                 {current.verification_token}
               </pre>
               <p className="text-sm text-muted">
@@ -516,7 +526,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                   <p className="text-sm text-muted">
                     For a plain site, or any builder with a code block.
                   </p>
-                  <pre className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs">
+                  <pre
+                    className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs"
+                    tabIndex={0}
+                    role="region"
+                    aria-label="The badge embed code, as HTML"
+                  >
                     {badgeEmbedSnippet(embedFacts!)}
                   </pre>
 
@@ -527,7 +542,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                     closed — and a snippet that breaks your build the moment you follow the
                     instructions is not much of an instruction.
                   </p>
-                  <pre className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs">
+                  <pre
+                    className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs"
+                    tabIndex={0}
+                    role="region"
+                    aria-label="The badge embed code, for React or Next.js"
+                  >
                     {badgeEmbedJsx(embedFacts!)}
                   </pre>
 

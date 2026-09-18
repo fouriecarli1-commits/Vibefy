@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { marked } from 'marked';
 import { getLegalDocument, listLegalDocuments } from '@/lib/legal';
+import { makeTablesReachable } from '@/lib/reachable-tables';
 
 export function generateStaticParams() {
   return listLegalDocuments().map((document) => ({ slug: document.slug }));
@@ -25,7 +26,7 @@ export default async function LegalDocumentPage({ params }: { params: Promise<{ 
   // The markdown is our own versioned content, not user input, and the hash
   // below lets any reader confirm they are looking at the same bytes their
   // consent record points at.
-  const html = await marked.parse(document.markdown);
+  const html = makeTablesReachable(await marked.parse(document.markdown));
 
   return (
     <article className="space-y-6">

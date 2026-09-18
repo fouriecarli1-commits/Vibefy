@@ -19,6 +19,7 @@ import { Client } from 'pg';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { auditUrl, closeAxeBrowser, describe as explain } from '../tests/setup/axe.ts';
+import { DESKTOP_VIEWPORT, MOBILE_VIEWPORT } from '../packages/engine/src/runtime/browser.ts';
 import { MUST_CONTAIN, scannedTheWrongPage, seedVerificationPage } from './a11y-contract.mts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -146,6 +147,15 @@ async function main(): Promise<void> {
     await waitForServer(origin);
   }
 
+  // Both widths, every page. Reflow and target size are WCAG 2.2 AA criteria
+  // that only fail on a narrow screen, and a scan that only runs at desktop
+  // width has been reporting a pass on two things it never looked at. Most
+  // people who open these pages will do it on a phone.
+  const WIDTHS = [
+    { label: 'desktop', viewport: DESKTOP_VIEWPORT },
+    { label: 'phone', viewport: MOBILE_VIEWPORT },
+  ];
+
   const failures: string[] = [];
   let scanned = 0;
   try {
@@ -156,16 +166,20 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const { violations, passes } = await auditUrl(`${origin}${page}`);
-      // A green gate that is green because the scan silently did nothing is
-      // worse than no gate at all.
-      if (passes === 0) {
-        failures.push(`${page}: no rules ran. The scan did not happen.`);
-        continue;
-      }
-      scanned += 1;
-      if (violations.length > 0) {
-        failures.push(`${page} — ${violations.length} violation(s)\n${explain(violations)}`);
+      for (const width of WIDTHS) {
+        const { violations, passes } = await auditUrl(`${origin}${page}`, width.viewport);
+        // A green gate that is green because the scan silently did nothing is
+        // worse than no gate at all.
+        if (passes === 0) {
+          failures.push(`${page} at ${width.label}: no rules ran. The scan did not happen.`);
+          continue;
+        }
+        scanned += 1;
+        if (violations.length > 0) {
+          failures.push(
+            `${page} at ${width.label} — ${violations.length} violation(s)\n${explain(violations)}`,
+          );
+        }
       }
     }
   } finally {
@@ -180,7 +194,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\n✓ Accessibility scan passed — ${scanned} pages, no WCAG 2.2 AA violations.\n` +
+    `\n✓ Accessibility scan passed — ${scanned} page-widths, no WCAG 2.2 AA violations.\n` +
       '  An automated scan finds a minority of real barriers. This is a floor, not a claim.',
   );
 }

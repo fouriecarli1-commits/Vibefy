@@ -110,9 +110,19 @@ export async function auditHtml(html: string): Promise<AxeRun> {
   }
 }
 
-/** Scans a page served over HTTP. */
-export async function auditUrl(url: string): Promise<AxeRun> {
-  const context = await (await axeBrowser()).newContext();
+/**
+ * Scans a page served over HTTP, at a stated viewport.
+ *
+ * The width matters more than it looks. Two of the WCAG 2.2 criteria we claim
+ * to meet only fail at a narrow one — reflow, and a target too small for a
+ * finger — and a scan that only ever runs at desktop width cannot see either.
+ * Most people who open these pages will do it on a phone.
+ */
+export async function auditUrl(
+  url: string,
+  viewport?: { width: number; height: number },
+): Promise<AxeRun> {
+  const context = await (await axeBrowser()).newContext(viewport ? { viewport } : {});
   const page = await context.newPage();
   try {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });

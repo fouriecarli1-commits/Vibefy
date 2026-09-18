@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import pricing from '../../../../config/pricing.json' with { type: 'json' };
 import { InShort } from '@/components/in-short';
+import { WideTable } from '@/components/wide-table';
 import {
   FORBIDDEN_SURFACES,
   PERMITTED_PLACEMENTS,
@@ -111,7 +112,7 @@ export default function AdvertisePage() {
         <h2 id="where" className="text-2xl font-bold tracking-tight">
           Where it appears, and what it costs
         </h2>
-        <div className="overflow-x-auto">
+        <WideTable label="Placements and their rates per thirty days">
           <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
             <caption className="sr-only">Placements and their rates per thirty days</caption>
             <thead>
@@ -135,7 +136,7 @@ export default function AdvertisePage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </WideTable>
         <p className="max-w-prose text-sm text-muted">
           Sold in periods of up to twelve months. A placement is a headline, a sentence and a link —
           no images, no scripts, nothing that follows anybody around. The limits are enforced by the

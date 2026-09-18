@@ -54,7 +54,12 @@ export default async function SsoPage({ params }: { params: Promise<{ id: string
           {!connection.domain_verified_at && (
             <div className="text-sm">
               <p className="text-muted">Publish this TXT record at the domain root, then verify:</p>
-              <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-surface-muted p-3">
+              <pre
+                className="mt-2 overflow-x-auto rounded-lg border border-line bg-surface-muted p-3"
+                tabIndex={0}
+                role="region"
+                aria-label="The DNS TXT record to publish"
+              >
                 <code>
                   {String(connection.email_domain)}. IN TXT &quot;
                   {String(connection.domain_challenge)}&quot;

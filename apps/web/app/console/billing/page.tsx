@@ -17,6 +17,7 @@ import { serviceDetailFor } from '@vibefycode/billing';
 import { ActionForm } from '@/components/action-form';
 import { Disclosure, ServiceDetailBody } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
+import { WideTable } from '@/components/wide-table';
 
 export const metadata: Metadata = { title: 'Billing' };
 
@@ -203,7 +204,7 @@ export default async function BillingPage({
           Your plan is marked. Every row is read from the same table the engine enforces, so nothing
           here can promise something the assessment will not do.
         </p>
-        <div className="overflow-x-auto">
+        <WideTable label="What each plan includes, with your current plan marked">
           <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
             <caption className="sr-only">
               What each plan includes, with your current plan marked
@@ -243,7 +244,7 @@ export default async function BillingPage({
               ))}
             </tbody>
           </table>
-        </div>
+        </WideTable>
       </section>
 
       <section aria-labelledby="plans" className="space-y-4">
@@ -343,7 +344,7 @@ export default async function BillingPage({
           Invoices
         </h2>
         {invoices && invoices.length > 0 ? (
-          <div className="overflow-x-auto">
+          <WideTable label="Your invoices">
             <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
               <caption className="sr-only">Your invoices</caption>
               <thead>
@@ -409,7 +410,7 @@ export default async function BillingPage({
                 })}
               </tbody>
             </table>
-          </div>
+          </WideTable>
         ) : (
           <p className="rounded-xl border border-line bg-surface-muted p-5 text-sm text-muted">
             Nothing billed yet.

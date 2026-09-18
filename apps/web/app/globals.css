@@ -484,7 +484,19 @@ body::before {
   background: var(--vibefycode-surface-muted);
   border: 1px solid var(--vibefycode-border);
   border-radius: var(--radius-lg);
-  padding: clamp(1.1rem, var(--space-4) + 0.8vw, 1.5rem);
+  /* Two steps of the scale, chosen at a breakpoint, rather than a clamp.
+     A clamp is a smooth line between two sizes, and every point on that line
+     except the two ends is off the grid — so a panel that is 24px on a laptop
+     is 19.4px on a phone, and our own design survey reported a fifth of the
+     spacing on this site as falling on no scale the first time it ran at
+     phone width. The scale has to survive the breakpoints or it is not one. */
+  padding: var(--space-4);
+}
+
+@media (min-width: 40rem) {
+  .panel {
+    padding: var(--space-6);
+  }
 }
 
 /* A bar is a panel that reports one thing: a state, a total, a warning. */
