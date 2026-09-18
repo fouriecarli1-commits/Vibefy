@@ -12,8 +12,8 @@
  */
 import { scoreAssessment, type ScoringInput, type ScoringResult } from '@vibefycode/rubric';
 import { scopeStatement, NON_RELIANCE_LEGEND, AI_DISCLOSURE } from '@vibefycode/shared';
-import { CostCeilingExceededError, type CostRecord } from './runtime/cost.ts';
-import { CeilingExceededError, ScopeViolationError } from './runtime/scope.ts';
+import type { CostRecord } from './runtime/cost.ts';
+import { classifyStop, stopNote, STOP_LABEL, type StopReason } from './runtime/stop.ts';
 import { promptBundleSha256 } from './model/prompts.ts';
 import { staticIntakeStage } from './stages/static-intake.ts';
 import { deterministicChecksStage } from './stages/deterministic.ts';
@@ -41,6 +41,16 @@ export type AssessmentStatus = 'completed' | 'aborted' | 'failed';
 export interface AssessmentOutcome {
   readonly assessmentId: string;
   readonly status: AssessmentStatus;
+  /**
+   * Why the run stopped, on an aborted run, and null on every other.
+   *
+   * An aborted run used to be written down as a failed one, which told the
+   * customer their application had broken something when in fact the run had
+   * reached a limit and stopped on purpose. The three limits are not
+   * interchangeable either: one is our spending cap, one is the intensity they
+   * authorised, and one is the scope boundary refusing to go somewhere.
+   */
+  readonly stopReason: StopReason | null;
   readonly rubricVersion: string;
   readonly promptBundleSha256: string;
   readonly stageResults: readonly StageResult[];
@@ -81,15 +91,15 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
 
   const stageResults: StageResult[] = [];
   const withheld: { title: string; reason: string }[] = [];
-  let aborted = false;
+  let stopped: StopReason | null = null;
 
   for (const stage of stages) {
-    if (aborted) {
+    if (stopped) {
       stageResults.push({
         stage: stage.id,
         status: 'skipped',
         findings: [],
-        notes: ['Skipped: an earlier stage reached a ceiling and the run stopped.'],
+        notes: [`Skipped: the run ${STOP_LABEL[stopped]} at an earlier stage and stopped.`],
       });
       continue;
     }
@@ -110,7 +120,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
 
     const result = await runStageWithRetry(stage, context, maxAttempts);
     stageResults.push(result);
-    if (result.status === 'aborted') aborted = true;
+    if (result.status === 'aborted') stopped = result.stopReason;
   }
 
   const findings = stageResults.flatMap((result) => result.findings);
@@ -138,7 +148,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
   const score = scoreAssessment(scoringInput);
 
   let narrative: ReportNarrative | null = null;
-  if (!aborted) {
+  if (!stopped) {
     try {
       const synthesis = await synthesise(context, stageResults);
       narrative = synthesis.narrative;
@@ -162,7 +172,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     }
   }
 
-  const status: AssessmentStatus = aborted
+  const status: AssessmentStatus = stopped
     ? 'aborted'
     : stageResults.every((result) => result.status === 'failed')
       ? 'failed'
@@ -171,6 +181,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
   return {
     assessmentId: context.assessmentId,
     status,
+    stopReason: stopped,
     rubricVersion,
     promptBundleSha256: promptBundleSha256(),
     stageResults,
@@ -217,17 +228,20 @@ async function runStageWithRetry(
       }
       last = result;
     } catch (error) {
-      if (
-        error instanceof CostCeilingExceededError ||
-        error instanceof CeilingExceededError ||
-        error instanceof ScopeViolationError
-      ) {
+      // Three different events, and until now one word for all of them. A run
+      // that reached its spending limit, one that used up the intensity the
+      // customer authorised, and one that was turned back at the scope boundary
+      // each need a different answer from whoever reads this afterwards.
+      const stopReason = classifyStop(error);
+      if (stopReason) {
+        const message = error instanceof Error ? error.message : String(error);
         return {
           stage: stage.id,
           status: 'aborted',
+          stopReason,
           findings: [],
-          notes: [`The run stopped at a ceiling during ${stage.id}: ${error.message}`],
-          error: error.message,
+          notes: [stopNote(stopReason, stage.id, message)],
+          error: message,
         };
       }
       last = {

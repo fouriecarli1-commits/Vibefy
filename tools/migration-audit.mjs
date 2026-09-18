@@ -56,13 +56,15 @@ for (const file of readdirSync(dir).sort()) {
     const v = /values \(\s*'([\d.]+)'/.exec(sql);
     check = `exists (select 1 from public.rubric_versions where version='${v?.[1]}')`;
   }
-  // Two migrations only add a value to an enum, which no create statement
+  // Some migrations only add a value to an enum, which no create statement
   // catches. Named rather than skipped: a gap in this list is a migration
-  // nobody is checking.
+  // nobody is checking. Written against any enum rather than the one that
+  // happened to need it first — the next one will be a different type, and a
+  // marker that only knows `alert_kind` would quietly stop covering it.
   if (!check) {
-    const value = /alter type public\.alert_kind add value '(\w+)'/.exec(sql);
+    const value = /alter type public\.(\w+) add value (?:if not exists )?'(\w+)'/i.exec(sql);
     if (value) {
-      check = `'${value[1]}' = any(enum_range(null::public.alert_kind)::text[])`;
+      check = `'${value[2]}' = any(enum_range(null::public.${value[1]})::text[])`;
     }
   }
   if (!check) {

@@ -9,6 +9,7 @@
 import type { RubricDimensionId, FindingSeverity, ConfidenceLevel } from '@vibefycode/rubric';
 import type { ScopeGuard } from '../runtime/scope.ts';
 import type { CostMeter } from '../runtime/cost.ts';
+import type { StopReason } from '../runtime/stop.ts';
 import type { ModelClient } from '../model/client.ts';
 import type { EvidenceStore } from '../runtime/evidence.ts';
 
@@ -82,9 +83,8 @@ export interface RawFinding {
 
 export type StageStatus = 'succeeded' | 'skipped' | 'failed' | 'aborted';
 
-export interface StageResult {
+interface StageResultFields {
   readonly stage: StageId;
-  readonly status: StageStatus;
   readonly findings: readonly RawFinding[];
   readonly notes: readonly string[];
   /** False when the authorised scope did not permit exercising the core flows. */
@@ -101,6 +101,19 @@ export interface StageResult {
   readonly error?: string;
   readonly promptSha256?: string;
 }
+
+/**
+ * A stage outcome, where an abort cannot happen without saying why.
+ *
+ * The union is the point. A spending limit, the intensity the customer
+ * authorised and the scope boundary are three different events with three
+ * different answers, and they were all recorded as the same word — so a stage
+ * can no longer stop without naming which one it was, and the compiler is what
+ * enforces it rather than a convention somebody has to remember.
+ */
+export type StageResult =
+  | (StageResultFields & { readonly status: 'succeeded' | 'skipped' | 'failed' })
+  | (StageResultFields & { readonly status: 'aborted'; readonly stopReason: StopReason });
 
 export interface Stage {
   readonly id: StageId;

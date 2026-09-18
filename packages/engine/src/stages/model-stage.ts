@@ -10,8 +10,7 @@
 import { z } from 'zod';
 import { BrowserSession } from '../runtime/browser.ts';
 import { ScopedHttp } from '../runtime/http.ts';
-import { CostCeilingExceededError } from '../runtime/cost.ts';
-import { CeilingExceededError, ScopeViolationError } from '../runtime/scope.ts';
+import { classifyStop, stopNote } from '../runtime/stop.ts';
 import type { ToolDefinition } from '../model/client.ts';
 import { browserTools, httpTool } from './tools.ts';
 import type { RawFinding, Stage, StageContext, StageId, StageResult } from './types.ts';
@@ -177,22 +176,31 @@ export function createModelStage(config: ModelStageConfig): Stage {
           promptSha256: extraction.promptSha256,
         };
       } catch (error) {
-        // A ceiling breach is a controlled stop, not a crash: the run aborts with
-        // what it has, and the report says so rather than pretending it finished.
-        const aborted =
-          error instanceof CostCeilingExceededError ||
-          error instanceof CeilingExceededError ||
-          error instanceof ScopeViolationError;
+        // A controlled stop is not a crash: the run aborts with what it has, and
+        // the report says so rather than pretending it finished. Which stop it
+        // was travels with the result, because a scope stop and a spending limit
+        // read identically once they are both called 'a ceiling'.
+        const stopReason = classifyStop(error);
+        const message = error instanceof Error ? error.message : String(error);
+        if (stopReason) {
+          return {
+            stage: config.id,
+            status: 'aborted',
+            stopReason,
+            findings: [],
+            notes: [
+              `${stopNote(stopReason, config.id, message)}. Everything assessed before that ` +
+                'point still stands; what came after was not assessed.',
+            ],
+            error: message,
+          };
+        }
         return {
           stage: config.id,
-          status: aborted ? 'aborted' : 'failed',
+          status: 'failed',
           findings: [],
-          notes: [
-            aborted
-              ? `The stage stopped at a ceiling: ${error instanceof Error ? error.message : String(error)}. Everything assessed before that point still stands; what came after was not assessed.`
-              : 'The stage did not complete.',
-          ],
-          error: error instanceof Error ? error.message : String(error),
+          notes: ['The stage did not complete.'],
+          error: message,
         };
       } finally {
         await session.close();

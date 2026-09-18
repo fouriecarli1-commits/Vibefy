@@ -82,6 +82,15 @@ function idempotent(sql) {
     'alter table $1 add column if not exists ',
   );
   out = out.replace(/drop constraint (?!if exists)/gi, 'drop constraint if exists ');
+  // There is no `add constraint if not exists`, so a second run fails with
+  // "constraint ... already exists" — found by running the output twice, like
+  // everything else in this file. Guarded on the constraint name against the
+  // table it belongs to, because two tables may each carry one of that name.
+  out = out.replace(
+    /alter table (public\.(\w+))\s+add constraint (\w+)([\s\S]*?);/gi,
+    (_m, table, bare, name, body) =>
+      `do $guard$ begin\n  if not exists (select 1 from pg_constraint where conname = '${name}' and conrelid = 'public.${bare}'::regclass) then\n    alter table ${table} add constraint ${name}${body};\n  end if;\nend $guard$;`,
+  );
   // `alter table ... rename column a to b` fails once b exists. Guarded on the
   // old name still being there, which is the only way to ask "has this run".
   out = out.replace(
@@ -119,11 +128,21 @@ const parts = [
 ];
 
 for (const file of files) {
-  parts.push(
-    `\n-- ▼ ${file.replace(/\.sql$/, '')}\n`,
-    idempotent(readFileSync(`${dir}/${file}`, 'utf8')).trimEnd(),
-    '\n',
-  );
+  const sql = readFileSync(`${dir}/${file}`, 'utf8');
+  parts.push(`\n-- ▼ ${file.replace(/\.sql$/, '')}\n`, idempotent(sql).trimEnd(), '\n');
+
+  // A new enum value cannot be *used* in the transaction that added it —
+  // Postgres refuses with "unsafe use of new value", naming the value and not
+  // the reason. A pasted script runs as one transaction, so a migration that
+  // adds a label and a later one that writes it would fail here for a reason
+  // that has nothing to do with either of them being applied twice.
+  //
+  // Stopping the transaction at this point is harmless precisely because of
+  // what this script is: everything above is safe to run again, so a run that
+  // stops after the commit and a run that stops before it are the same run.
+  if (/alter type public\.\w+ add value/i.test(sql)) {
+    parts.push('-- A new enum value has to be committed before anything can use it.', 'commit;\n');
+  }
 }
 
 console.log(parts.join('\n'));

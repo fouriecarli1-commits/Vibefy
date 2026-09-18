@@ -1,6 +1,7 @@
 export * from './runtime/addresses.ts';
 export * from './runtime/scope.ts';
 export * from './runtime/cost.ts';
+export * from './runtime/stop.ts';
 export * from './runtime/evidence.ts';
 export * from './runtime/http.ts';
 export * from './runtime/browser.ts';

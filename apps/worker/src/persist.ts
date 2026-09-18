@@ -15,7 +15,7 @@
  *     that requires a human, and the database refuses the transition without one.
  */
 import type { PoolClient } from 'pg';
-import type { AssessmentOutcome } from '@vibefycode/engine';
+import { STOP_LABEL, type AssessmentOutcome } from '@vibefycode/engine';
 
 export interface PersistInput {
   readonly outcome: AssessmentOutcome;
@@ -232,27 +232,37 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
     // The last step, and the only status this code is allowed to set. Approval
     // needs a human, and the database refuses the transition without a logged
     // review action.
-    await client.query('update public.assessments set status = $2 where id = $1', [
-      assessmentId,
-      outcome.status === 'completed' ? 'awaiting_review' : 'failed',
-    ]);
+    //
+    // Three outcomes, three words. A run that stopped at a limit used to be
+    // written down as a failure, which told the customer their application had
+    // broken something when what had actually happened was a limit working.
+    // The reason travels with it, and the database refuses an aborted row that
+    // does not carry one.
+    await client.query(
+      'update public.assessments set status = $2, stop_reason = $3 where id = $1',
+      [assessmentId, assessmentStatus(outcome), outcome.stopReason],
+    );
 
     await client.query(
       `insert into public.audit_log
          (organisation_id, actor_id, action, entity_type, entity_id, summary, after_state)
-       values ($1, $2, 'assessment.completed', 'assessment', $3, $4, $5)`,
+       values ($1, $2, $6, 'assessment', $3, $4, $5)`,
       [
         input.organisationId,
         input.requestedBy,
         assessmentId,
-        `Assessment ${outcome.status}: ${outcome.findings.length} finding(s), score ${outcome.score.overallScore}, cost $${outcome.totalCostUsd.toFixed(4)}.`,
+        summariseOutcome(outcome),
         JSON.stringify({
           status: outcome.status,
+          stopReason: outcome.stopReason,
           score: outcome.score.overallScore,
           certificationEligible: outcome.score.certificationEligible,
           blockers: outcome.score.certificationBlockers,
           promptBundleSha256: outcome.promptBundleSha256,
         }),
+        // An aborted run filed under `assessment.completed` is a log that has
+        // to be read with the summary to be believed, which is not a log.
+        `assessment.${outcome.status}`,
       ],
     );
 
@@ -262,6 +272,30 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
     await client.query('rollback');
     throw error;
   }
+}
+
+/**
+ * The status this run is written down as.
+ *
+ * `aborted` is not a failure and must not be recorded as one: it means the run
+ * reached its spending limit, used up the intensity the customer authorised, or
+ * was turned back at the scope boundary. What was assessed before the stop
+ * still stands, which is why the findings and the score are written either way.
+ * It does not go to a reviewer, because a stopped run is not a complete one.
+ */
+function assessmentStatus(outcome: AssessmentOutcome): string {
+  if (outcome.status === 'completed') return 'awaiting_review';
+  return outcome.status === 'aborted' ? 'aborted' : 'failed';
+}
+
+/** The audit line, in words somebody reading it a year later can act on. */
+function summariseOutcome(outcome: AssessmentOutcome): string {
+  const money = `cost $${outcome.totalCostUsd.toFixed(4)}`;
+  const counted = `${outcome.findings.length} finding(s), score ${outcome.score.overallScore}`;
+  if (outcome.stopReason) {
+    return `Assessment stopped — it ${STOP_LABEL[outcome.stopReason]}. What ran first stands: ${counted}, ${money}.`;
+  }
+  return `Assessment ${outcome.status}: ${counted}, ${money}.`;
 }
 
 function mapStageStatus(status: string): string {

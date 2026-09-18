@@ -7,6 +7,9 @@ import {
   badgeEmbedSnippet,
   BADGE_USAGE,
   EMBED_PLACEMENTS,
+  STOP_EXPLANATION,
+  STOP_HEADLINE,
+  type StopReason,
 } from '@vibefycode/shared';
 import {
   acceptBadgeLicence,
@@ -77,7 +80,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
 
   const { data: assessments } = await supabase
     .from('assessments')
-    .select('id, status, overall_score, rubric_version, reviewed_at, created_at')
+    .select('id, status, stop_reason, overall_score, rubric_version, reviewed_at, created_at')
     .eq('app_id', id)
     .order('created_at', { ascending: false })
     .limit(10);
@@ -392,6 +395,21 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                   <p className="mt-1 text-sm text-muted">
                     {new Date(assessment.created_at as string).toUTCString()}
                   </p>
+                  {/*
+                   * A run that stopped is not a run that broke. It was recorded
+                   * as 'failed' until now, and the word sent people looking at
+                   * their own application for a fault that was never there.
+                   */}
+                  {assessment.stop_reason !== null && assessment.stop_reason !== undefined && (
+                    <div className="mt-3 rounded-xl border border-line bg-surface-muted p-4">
+                      <p className="font-medium">
+                        {STOP_HEADLINE[assessment.stop_reason as StopReason]}
+                      </p>
+                      <p className="mt-1 text-sm text-muted">
+                        {STOP_EXPLANATION[assessment.stop_reason as StopReason]}
+                      </p>
+                    </div>
+                  )}
                   {['approved', 'published'].includes(String(assessment.status)) && (
                     <p className="mt-3 text-sm">
                       <Link href={`/console/reports/${assessment.id}`}>Read the report</Link>
