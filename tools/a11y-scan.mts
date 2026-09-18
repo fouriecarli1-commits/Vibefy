@@ -34,6 +34,7 @@ const PORT = 3123;
 const PAGES = [
   '/',
   '/how-it-works',
+  '/services',
   '/services/remediation',
   '/methodology',
   '/legal',

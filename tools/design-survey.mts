@@ -41,6 +41,7 @@ const PAGES = [
   '/trust-check',
   '/advertise',
   '/games',
+  '/services',
   '/services/remediation',
   '/legal',
   '/sign-in',

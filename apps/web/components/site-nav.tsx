@@ -118,6 +118,28 @@ const ADMIN_GROUP: NavGroup = {
 const REVIEW_LINK: NavItem = { href: '/review', label: 'Review', hint: 'The reviewer queue' };
 
 /**
+ * The one link that answers "what do you actually do".
+ *
+ * It sits outside the groups, on its own, because it is the question somebody
+ * arriving from a badge or a search has first — and it was being answered by a
+ * menu of eight links, each of which assumed the reader already knew which one
+ * was theirs.
+ */
+const SERVICES_LINK: NavItem = {
+  href: '/services',
+  label: 'What we do',
+  hint: 'Every service, in plain words',
+};
+
+/** Links that stand on their own rather than inside a group. */
+const DIRECT_FOR: Record<Audience, readonly NavItem[]> = {
+  visitor: [SERVICES_LINK],
+  customer: [SERVICES_LINK],
+  reviewer: [REVIEW_LINK],
+  admin: [REVIEW_LINK],
+};
+
+/**
  * What each audience is offered.
  *
  * An operator does not need the console or the public verification pages in
@@ -174,7 +196,7 @@ export function SiteNav({ audience = 'visitor' }: { audience?: Audience }) {
 
   const allowed = GROUPS_FOR[audience];
   const groups = [...GROUPS, ADMIN_GROUP].filter((group) => allowed.includes(group.id));
-  const direct = allowed.includes('review') ? [REVIEW_LINK] : [];
+  const direct = DIRECT_FOR[audience];
 
   return (
     <div ref={navRef} className="nav-shell">
@@ -211,6 +233,18 @@ export function SiteNav({ audience = 'visitor' }: { audience?: Audience }) {
       </button>
 
       <div id="site-nav-panel" className="nav-panel" data-open={menuOpen}>
+        {direct.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="nav-direct"
+            data-active={isCurrent(item.href)}
+            aria-current={isCurrent(item.href) ? 'page' : undefined}
+          >
+            {item.label}
+          </Link>
+        ))}
+
         {groups.map((group) => {
           const open = openGroup === group.id;
           const active = group.items.some((item) => isCurrent(item.href));
@@ -245,18 +279,6 @@ export function SiteNav({ audience = 'visitor' }: { audience?: Audience }) {
             </div>
           );
         })}
-
-        {direct.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="nav-direct"
-            data-active={isCurrent(item.href)}
-            aria-current={isCurrent(item.href) ? 'page' : undefined}
-          >
-            {item.label}
-          </Link>
-        ))}
 
         {/* Offering "Sign in" to somebody who is signed in is the smallest
             possible way to say the page does not know who they are. */}
