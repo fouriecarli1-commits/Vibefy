@@ -39,6 +39,41 @@ const SPRAWL = {
   buttonStyles: 3,
 } as const;
 
+/**
+ * How close two values have to be before one of them is the other, mistyped.
+ *
+ * The first version of this used a window alone — anything within eight pixels
+ * — and running it against our own pages showed what is wrong with that. It
+ * reported a block starting at 477px where the page usually starts at 485px.
+ * Eight pixels is not a near-miss on a four-pixel scale; it is two steps of it,
+ * and somebody chose it.
+ *
+ * So closeness is not enough. A difference that is a whole step of the spacing
+ * grid is a decision, whatever its size; a difference that is not is the same
+ * value typed twice. Four pixels apart is an indent. Three is a mistake, and it
+ * is the kind somebody sees without being able to name it, because every block
+ * looked right on its own.
+ */
+const NEAR_MISS_WINDOW_PX = 12;
+
+/**
+ * How often a value has to appear before it counts as the one that was meant.
+ *
+ * Without this the report chains: one edge a few pixels off the column drags in
+ * its neighbour, and a legitimate indent gets reported because it is close to
+ * the mistake rather than to anything anybody chose. A value used once is not a
+ * pattern to be off. A page where nothing repeats has a different problem, and
+ * the spacing-on-a-grid check is the one that finds it.
+ */
+const MIN_INTENDED_OCCURRENCES = 2;
+
+/** Below this many blocks, there is not enough on the page to read a column. */
+const EDGE_MIN_BLOCKS = 8;
+/** One near-miss can be a rounded border. Two is the page being set by eye. */
+const EDGE_MISS_COUNT = 2;
+/** One near-miss can be a one-off. Two is the page being set by eye. */
+const RHYTHM_MISS_COUNT = 2;
+
 /** Spacings are expected to fall on this grid. Four covers 4-, 8- and 16-based. */
 const SPACING_GRID_PX = 4;
 /** Below this share on the grid, the spacing is being chosen by eye each time. */
@@ -67,6 +102,21 @@ export interface ColourPair {
   readonly sample: string;
 }
 
+/** A left edge that is nearly, but not quite, another left edge on the page. */
+export interface EdgeMiss {
+  readonly edgePx: number;
+  readonly nearestPx: number;
+  readonly occurrences: number;
+  readonly sample: string;
+}
+
+/** A gap that is nearly, but not quite, one the page already uses. */
+export interface RhythmMiss {
+  readonly gapPx: number;
+  readonly nearestPx: number;
+  readonly occurrences: number;
+}
+
 export interface DesignMeasurements {
   readonly fontFamilies: readonly string[];
   readonly fontSizesPx: readonly number[];
@@ -81,6 +131,14 @@ export interface DesignMeasurements {
   readonly colourPairs: readonly ColourPair[];
   readonly placeholderCopy: readonly string[];
   readonly smallTapTargets: readonly { label: string; width: number; height: number }[];
+  /** The left edge most of the page's blocks start at, or null if there is none. */
+  readonly dominantLeftEdgePx: number | null;
+  /** How many blocks were measured against it. */
+  readonly measuredBlocks: number;
+  readonly edgeMisses: readonly EdgeMiss[];
+  /** Every distinct vertical gap between stacked blocks, most common first. */
+  readonly verticalGapsPx: readonly number[];
+  readonly rhythmMisses: readonly RhythmMiss[];
 }
 
 /**
@@ -94,8 +152,15 @@ const SURVEY = `(() => {
   const visible = (element) => {
     const style = getComputedStyle(element);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+    // Text that exists only for a screen reader is not on the page a sighted
+    // person sees, and it was being counted: its font size, its colour and its
+    // left edge all went into the survey. The standard way of hiding it leaves
+    // a one-pixel box that is clipped away, which passes a width test and fails
+    // every other kind of test a human would apply.
+    if (style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)') return false;
     const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
+    if (rect.width <= 1 || rect.height <= 1) return false;
+    return true;
   };
 
   const opaqueBackground = (element) => {
@@ -121,6 +186,16 @@ const SURVEY = `(() => {
   const pairs = [];
   const headings = {};
   const smallTargets = [];
+  const leftEdges = [];
+  const gaps = [];
+
+  // Only a block participates in a column or in a rhythm. An inline element
+  // starts wherever the sentence around it left off, and counting it would
+  // report every second word as misaligned.
+  const isBlock = (element) => {
+    const display = getComputedStyle(element).display;
+    return display === 'block' || display === 'flex' || display === 'grid' || display === 'list-item';
+  };
 
   for (const element of document.body.querySelectorAll('*')) {
     if (!visible(element)) continue;
@@ -191,6 +266,44 @@ const SURVEY = `(() => {
     }
   }
 
+  // One pass over every container, for both rhythm and alignment.
+  //
+  // Only a stack is read. A row of chips, a wrapping footer, a grid of cards
+  // laid out side by side — in all of those a child's left edge is decided by
+  // how wide its neighbour happens to be, not by a column anybody chose, and
+  // reading those edges reported our own centred status chips as misaligned.
+  // A row has no vertical rhythm to read either, for the same reason.
+  for (const parent of [document.body, ...document.body.querySelectorAll('*')]) {
+    const children = [...parent.children].filter((child) => visible(child) && isBlock(child));
+    if (children.length === 0) continue;
+
+    let stacked = true;
+    for (let index = 1; index < children.length; index += 1) {
+      const above = children[index - 1].getBoundingClientRect();
+      const below = children[index].getBoundingClientRect();
+      if (below.top + 1 < above.bottom) {
+        stacked = false;
+        break;
+      }
+    }
+    if (!stacked) continue;
+
+    for (let index = 0; index < children.length; index += 1) {
+      const child = children[index];
+      const rect = child.getBoundingClientRect();
+      if (hasOwnText(child)) {
+        leftEdges.push({
+          left: Math.round(rect.left),
+          sample: (child.textContent || '').trim().slice(0, 60),
+        });
+      }
+      if (index === 0) continue;
+      const above = children[index - 1].getBoundingClientRect();
+      const gap = Math.round(rect.top - above.bottom);
+      if (gap > 0 && gap <= 200) gaps.push(gap);
+    }
+  }
+
   return {
     families: [...families],
     sizes: [...sizes].sort((a, b) => a - b),
@@ -202,6 +315,8 @@ const SURVEY = `(() => {
     headings,
     pairs,
     smallTargets,
+    leftEdges,
+    gaps,
     bodyText: document.body.innerText.slice(0, 20000),
   };
 })();`;
@@ -213,6 +328,110 @@ function toHex(colour: string): string | null {
   // guessing at the result would produce a contrast figure nobody could check.
   if (match[4] !== undefined && Number(match[4]) < 0.95) return null;
   return `#${[1, 2, 3].map((index) => Number(match[index]).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * Left edges that are nearly, but not quite, each other.
+ *
+ * Deliberately not a count of distinct edges. A page has as many legitimate
+ * indents as it has nesting — a list inside a card inside a section is three
+ * edges and nothing is wrong — so counting them would fire on every well-built
+ * page. What is never on purpose is two edges a few pixels apart: three stacked
+ * cards whose headings start at 48, 53 and 49 look ragged, and each card looked
+ * right on its own, which is exactly why the person who built it cannot see it.
+ */
+export function readAlignment(edges: readonly { left: number; sample: string }[]): {
+  dominant: number | null;
+  measured: number;
+  misses: EdgeMiss[];
+} {
+  if (edges.length < EDGE_MIN_BLOCKS) return { dominant: null, measured: edges.length, misses: [] };
+
+  const counts = new Map<number, number>();
+  const sample = new Map<number, string>();
+  for (const edge of edges) {
+    counts.set(edge.left, (counts.get(edge.left) ?? 0) + 1);
+    if (!sample.has(edge.left)) sample.set(edge.left, edge.sample);
+  }
+
+  let dominant = edges[0]!.left;
+  for (const [left, count] of counts) {
+    if (count > (counts.get(dominant) ?? 0)) dominant = left;
+  }
+
+  const misses: EdgeMiss[] = [];
+  for (const [left, occurrences] of counts) {
+    // Compared against an edge the page uses *more* often, so a pair is
+    // reported once, against the one that looks like the intended column.
+    const nearest = nearestIntended(counts, left, occurrences);
+    if (nearest !== null) {
+      misses.push({
+        edgePx: left,
+        nearestPx: nearest,
+        occurrences,
+        sample: sample.get(left) ?? '',
+      });
+    }
+  }
+
+  return {
+    dominant,
+    measured: edges.length,
+    misses: misses.sort((a, b) => b.occurrences - a.occurrences || a.edgePx - b.edgePx),
+  };
+}
+
+/**
+ * The value this one was probably meant to be, or null if there is no such value.
+ *
+ * "Probably meant" is the value the page uses more often, so a pair of
+ * near-misses is reported once rather than each accusing the other. Ties go to
+ * the smaller value, which is arbitrary and only has to be stable.
+ */
+function nearestIntended(
+  counts: ReadonlyMap<number, number>,
+  value: number,
+  occurrences: number,
+): number | null {
+  let nearest: number | null = null;
+  for (const [other, otherCount] of counts) {
+    if (other === value) continue;
+    if (otherCount < MIN_INTENDED_OCCURRENCES) continue;
+    const distance = Math.abs(other - value);
+    if (distance > NEAR_MISS_WINDOW_PX) continue;
+    // A whole step of the scale is a decision. Anything else is a slip.
+    if (distance % SPACING_GRID_PX === 0) continue;
+    const looksIntended = otherCount > occurrences || (otherCount === occurrences && other < value);
+    if (!looksIntended) continue;
+    if (nearest === null || distance < Math.abs(nearest - value)) nearest = other;
+  }
+  return nearest;
+}
+
+/**
+ * Gaps that are nearly, but not quite, a gap the page already uses.
+ *
+ * No threshold on how many distinct gaps a page may have, because a page is
+ * entitled to as many as it has jobs. What is measured is repetition failing:
+ * a twenty-one where everything else is a twenty-four is the same gap, retyped.
+ */
+export function readRhythm(gaps: readonly number[]): { distinct: number[]; misses: RhythmMiss[] } {
+  const counts = new Map<number, number>();
+  for (const gap of gaps) counts.set(gap, (counts.get(gap) ?? 0) + 1);
+  const distinct = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    .map(([gap]) => gap);
+
+  const misses: RhythmMiss[] = [];
+  for (const [gap, occurrences] of counts) {
+    const nearest = nearestIntended(counts, gap, occurrences);
+    if (nearest !== null) misses.push({ gapPx: gap, nearestPx: nearest, occurrences });
+  }
+
+  return {
+    distinct,
+    misses: misses.sort((a, b) => b.occurrences - a.occurrences || a.gapPx - b.gapPx),
+  };
 }
 
 export async function measureDesign(
@@ -231,8 +450,13 @@ export async function measureDesign(
     headings: Record<string, number>;
     pairs: ColourPair[];
     smallTargets: { label: string; width: number; height: number }[];
+    leftEdges: { left: number; sample: string }[];
+    gaps: number[];
     bodyText: string;
   };
+
+  const alignment = readAlignment(survey.leftEdges);
+  const rhythm = readRhythm(survey.gaps);
 
   const distinctSpacings = [...new Set(survey.spacings)].sort((a, b) => a - b);
   const onGrid = survey.spacings.filter((value) => value % SPACING_GRID_PX === 0).length;
@@ -262,6 +486,11 @@ export async function measureDesign(
       return found ? [found[0]] : [];
     }),
     smallTapTargets: survey.smallTargets,
+    dominantLeftEdgePx: alignment.dominant,
+    measuredBlocks: alignment.measured,
+    edgeMisses: alignment.misses,
+    verticalGapsPx: rhythm.distinct,
+    rhythmMisses: rhythm.misses,
   };
 }
 
@@ -340,6 +569,28 @@ export function designFindings(
         `${Math.round((1 - measurements.spacingsOnGrid) * 100)}% of the spacing falls on no scale`,
         `Margins, padding and gaps are set to ${measurements.spacingsPx.length} distinct values, and only ${Math.round(measurements.spacingsOnGrid * 100)}% of them are multiples of ${SPACING_GRID_PX}px. Inconsistent spacing is the thing people notice most and name least: it reads as "something is off" rather than as a spacing problem.`,
         `Round every spacing to a multiple of ${SPACING_GRID_PX}px. It is a mechanical change and it is usually the single biggest visible improvement available.`,
+      ),
+    );
+  }
+
+  if (measurements.edgeMisses.length >= EDGE_MISS_COUNT) {
+    const worst = measurements.edgeMisses[0]!;
+    findings.push(
+      observation(
+        `${measurements.edgeMisses.length} left edges are nearly the same as another`,
+        `Blocks start at ${measurements.edgeMisses.length} positions that are within a few pixels of another position the page uses more often, and not a whole step of the ${SPACING_GRID_PX}px scale away from it — ${worst.edgePx}px where the page more usually starts at ${worst.nearestPx}px, at “${worst.sample}”. An indent of ${SPACING_GRID_PX * 2}px reads as a decision. ${SPACING_GRID_PX * 2 - 1}px reads as a mistake, and it is the kind somebody sees without being able to name, because each block looked right on its own.`,
+        'Give the page one left edge per level of nesting, and let anything that indents do so by a whole step of the spacing scale. Most of these are an extra pixel of border, padding set on one card and not its neighbour, or a margin that was nudged once and never put back.',
+      ),
+    );
+  }
+
+  if (measurements.rhythmMisses.length >= RHYTHM_MISS_COUNT) {
+    const worst = measurements.rhythmMisses[0]!;
+    findings.push(
+      observation(
+        `${measurements.rhythmMisses.length} vertical gaps are nearly the same as another`,
+        `The gaps between stacked blocks take ${measurements.verticalGapsPx.length} distinct values. ${measurements.rhythmMisses.length} of them are within a few pixels of a gap the page uses more often, and not a whole step of the ${SPACING_GRID_PX}px scale away from it — ${worst.gapPx}px where it more usually uses ${worst.nearestPx}px, ${worst.occurrences} time${worst.occurrences === 1 ? '' : 's'}. A page is entitled to as many different gaps as it has jobs; what it cannot carry is one gap typed three slightly different ways, which is rhythm failing rather than spacing being wrong.`,
+        'Round each of these to the value the page already uses more often. Nothing moves more than a few pixels, and it is the change that most reliably makes a page look finished.',
       ),
     );
   }

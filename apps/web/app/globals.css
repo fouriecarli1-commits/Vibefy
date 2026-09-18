@@ -497,7 +497,12 @@ body::before {
   border: 1px solid var(--vibefycode-border);
   border-left: 3px solid var(--vibefycode-accent);
   border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
+  /* Two pixels off the left padding, to pay for the two extra pixels of accent
+     border. Without it the text in a bar starts two pixels right of the text in
+     every card beside it — which our own design survey found on four pages, and
+     which nobody could see and everybody could feel. The border is the thing
+     that should stand out; the words behind it should stay in the column. */
+  padding: var(--space-3) var(--space-4) var(--space-3) calc(var(--space-4) - 2px);
 }
 
 .bar[data-tone='warn'] {

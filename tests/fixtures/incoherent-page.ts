@@ -70,19 +70,32 @@ const COHERENT = `<!doctype html>
   :root { --space: 8px; --radius: 8px; --radius-sm: 4px; }
   body { font-family: system-ui, sans-serif; margin: 0; background: #ffffff; color: #1a1a1a; }
   .wrap { padding: 32px; }
-  h1 { font-size: 40px; margin-bottom: 16px; }
-  h2 { font-size: 24px; margin-top: 32px; }
-  h3 { font-size: 18px; }
-  .lede { font-size: 20px; color: #444444; margin-bottom: 16px; }
+  /* Every vertical margin is set, and set from the scale.
+     Left to the browser, they come out proportional to the font size — a 20px
+     lede gets a 20px margin, an 18px heading an 18px one — which is how a page
+     that is otherwise on a grid ends up with gaps of 16, 18 and 20. That is
+     rhythm failing, our own survey found it here first, and the fixture is
+     supposed to be the page with nothing to find. */
+  h1 { font-size: 40px; margin: 0 0 16px; }
+  h2 { font-size: 24px; margin: 32px 0 16px; }
+  h3 { font-size: 18px; margin: 0 0 8px; }
+  p { margin: 0 0 16px; }
+  .lede { font-size: 20px; color: #444444; margin: 0 0 16px; }
   .body, .small { font-size: 16px; color: #1a1a1a; }
   .card, .panel, .box, .note {
     padding: 24px; border-radius: var(--radius); border: 1px solid #d4d4d4; margin-bottom: 16px;
   }
+  /* Text for a screen reader only, hidden the standard way. It is deliberately
+     set to a size and a colour nothing else on the page uses: if the survey
+     counts it, the coherent page looks like it has a stray type size and an
+     unreadable colour, which is what was happening. */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; font-size: 7px; color: #fdfdfd; }
   .btn-a { font-size: 16px; padding: 12px 24px; border-radius: var(--radius-sm); background: #1a4f8a; color: #fff; border: none; }
   .btn-d { font-size: 16px; padding: 12px 24px; border-radius: var(--radius-sm); background: #fff; color: #1a4f8a; border: 1px solid #1a4f8a; }
   .icon { font-size: 16px; padding: 12px; background: #fff; color: #1a4f8a; border: 1px solid #1a4f8a; border-radius: var(--radius-sm); }
 </style></head>
 <body><div class="wrap">
+  <p class="sr-only">Kettle, the online shop</p>
   <h1>Kettle</h1>
   <p class="lede">The fastest way to buy a kettle.</p>
   <h2>Why Kettle</h2>
