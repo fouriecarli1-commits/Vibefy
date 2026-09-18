@@ -1,12 +1,21 @@
 import type { Metadata } from 'next';
 import { getRubric, rubricChecksum, CURRENT_RUBRIC_VERSION } from '@vibefycode/rubric';
 import { SponsorSlot } from '@/components/sponsor-slot';
+import { InShort } from '@/components/in-short';
 
 export const metadata: Metadata = {
   title: 'Methodology',
   description:
     'The VibefyCode rubric in full: dimensions, weights, gates, the certification threshold and the scoring method.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'This page is the full list of checks we score an app against.',
+  'Each check has a weight, and every weight is published here.',
+  'A mark keeps the version of the list it was earned under.',
+  'Nothing you pay us can change any of it.',
+];
 
 /**
  * The methodology page is a product, not a footnote. It is the source of the
@@ -26,6 +35,8 @@ export default function MethodologyPage() {
         </p>
         <p className="max-w-3xl">{rubric.changelog}</p>
       </header>
+
+      <InShort lines={IN_SHORT} />
 
       <section aria-labelledby="dimensions" className="space-y-4">
         <h2 id="dimensions" className="text-2xl font-bold tracking-tight">

@@ -1,11 +1,20 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { InShort } from '@/components/in-short';
 
 export const metadata: Metadata = {
   title: 'Get your game tested',
   description:
     'A VibefyCode assessment for games: whether it becomes playable, what it downloads first, whether it works on a phone, and whether progress survives. Scope-limited, and it does not judge whether the game is any good.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'The same check as any app, plus a pass that plays your game.',
+  'We look at whether it starts, what it downloads first, and how it runs on a phone.',
+  'We reload it while playing, to see whether your progress survives.',
+  'We never say whether a game is any good. That is a matter of taste.',
+];
 
 /**
  * The way in for games.
@@ -82,6 +91,8 @@ export default function GamesPage() {
           </Link>
         </p>
       </header>
+
+      <InShort lines={IN_SHORT} />
 
       {/* Second, and before the list of what we do check. Somebody hoping for a
           verdict on their design should find that out here rather than after

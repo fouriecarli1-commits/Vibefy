@@ -13,12 +13,20 @@ import {
 } from '@vibefycode/directory';
 import { SponsorSlot } from '@/components/sponsor-slot';
 import { readAsAnon } from '@/lib/sql';
+import { InShort } from '@/components/in-short';
 
 export const metadata: Metadata = {
   title: 'Directory',
   description:
     'Applications with a live Verified by VibefyCode badge, ordered by the published rubric. Placement is not for sale.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'Every app listed here has a mark that is live today.',
+  'The order comes from the checks alone. It cannot be bought.',
+  'If a mark is suspended or runs out, the listing goes at the same moment.',
+];
 
 export const dynamic = 'force-dynamic';
 
@@ -107,6 +115,8 @@ export default async function DirectoryPage({
         </p>
         <p className="text-sm text-muted">{DIRECTORY_SCOPE}</p>
       </header>
+
+      <InShort lines={IN_SHORT} />
 
       <form
         method="get"

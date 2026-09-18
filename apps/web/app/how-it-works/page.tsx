@@ -3,12 +3,21 @@ import Link from 'next/link';
 import { DEFAULT_CEILING } from '@vibefycode/engine/scope';
 import { RETENTION_DAYS } from '@vibefycode/engine/evidence';
 import { SponsorSlot } from '@/components/sponsor-slot';
+import { InShort } from '@/components/in-short';
 
 export const metadata: Metadata = {
   title: 'What happens to your app',
   description:
     'Step by step: what a VibefyCode assessment does, what it is structurally unable to do, and how long anything is kept.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'Nothing is opened until you have proved the app is yours.',
+  'We then use the app from outside, the way any other visitor would.',
+  'A person reads what the software found before anything is published.',
+  "We never ask for your users' logins or for anyone's personal data.",
+];
 
 /**
  * The page that has to be true before anybody will use this product.
@@ -49,6 +58,8 @@ export default function HowItWorksPage() {
           limits stated as what the code cannot do rather than as what we promise not to.
         </p>
       </header>
+
+      <InShort lines={IN_SHORT} />
 
       {/* --- The question everybody actually has ---------------------------- */}
       <section aria-labelledby="code-heading" className="space-y-5">

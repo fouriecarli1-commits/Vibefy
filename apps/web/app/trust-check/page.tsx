@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { InShort } from '@/components/in-short';
 import {
   TRAP_ARTICLES,
   TRUST_CHECK_LEGEND,
@@ -15,6 +16,14 @@ export const metadata: Metadata = {
   description:
     'Paste the web address of an app you are about to pay for. VibefyCode reports what its public page does and does not say — whether it can be cancelled, whether there is anyone to contact, and who the company is.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'Paste the address of an app you are thinking of paying for.',
+  'We read its public page and tell you what it says about cancelling.',
+  'We also look for a real way to reach a person there.',
+  'This is one page, from outside, at one moment. It is not a full check.',
+];
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +84,8 @@ export default async function TrustCheckPage({
           and who the company actually is.
         </p>
       </section>
+
+      <InShort lines={IN_SHORT} />
 
       <section aria-labelledby="form-heading" className="panel space-y-5">
         <h2 id="form-heading" className="text-lg font-semibold">

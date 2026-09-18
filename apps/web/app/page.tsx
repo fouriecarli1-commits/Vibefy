@@ -1,5 +1,14 @@
 import Link from 'next/link';
 import { getRubric } from '@vibefycode/rubric';
+import { InShort } from '@/components/in-short';
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'VibefyCode checks apps that were built fast, and writes down what it found.',
+  'An app that passes gets a mark it can show on its own site.',
+  'Click a mark and you can read what was checked, and what was not.',
+  'We never say an app is safe. We say what we found, on a date.',
+];
 
 /**
  * The first page anybody sees.
@@ -70,6 +79,8 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      <InShort lines={IN_SHORT} />
 
       {/* --- What you actually get ------------------------------------------ */}
       <section aria-labelledby="badge-heading" className="space-y-6">

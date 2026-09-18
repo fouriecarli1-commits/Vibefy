@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { InShort } from '@/components/in-short';
 
 export const metadata: Metadata = {
   title: 'What we do',
   description:
     'Everything VibefyCode offers, in plain words: get an application assessed, get a game tested, keep a badge watched, get help fixing what was found, check a badge or an app before you pay, and advertise on a quiet site.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'Some of what we do is for the person who built an app.',
+  'The rest is for the person who is about to use one.',
+  'Each service below says what it is for, and what it will not do.',
+];
 
 /**
  * The page that says what we sell.
@@ -192,6 +200,8 @@ export default function ServicesPage() {
           </Link>
         </p>
       </header>
+
+      <InShort lines={IN_SHORT} />
 
       <section aria-labelledby="builders" className="space-y-5">
         <h2 id="builders" className="text-2xl font-bold tracking-tight">

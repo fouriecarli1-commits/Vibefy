@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import pricing from '../../../../config/pricing.json' with { type: 'json' };
+import { InShort } from '@/components/in-short';
 import {
   FORBIDDEN_SURFACES,
   PERMITTED_PLACEMENTS,
@@ -14,6 +15,14 @@ export const metadata: Metadata = {
   description:
     'One paid placement per surface, on three surfaces, reviewed by a person before it appears. What it costs, and the rules that make the space worth buying.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'Three pages carry one advert each. There is none anywhere else.',
+  'Every advert is marked as paid, where the reader can see it.',
+  'Buying one cannot change a score, a mark, or a place in the directory.',
+  'The rate is on this page, and it is high on purpose.',
+];
 
 /**
  * The page that sells advertising space.
@@ -78,6 +87,8 @@ export default function AdvertisePage() {
           moment there are nine of them nobody believes the page and nobody wants the ninth.
         </p>
       </header>
+
+      <InShort lines={IN_SHORT} />
 
       {/* Before the price, deliberately. Somebody who reads these and leaves
           wanted something we cannot sell, and this page is a better place to

@@ -871,3 +871,38 @@ body::before {
   padding-top: 1rem;
   border-top: 1px solid var(--vibefycode-border);
 }
+
+/* The plain-language summary at the top of a long page.
+
+   Quiet rather than loud. It is the first thing on the page, so it does not
+   need to compete for attention — it needs to be easy to take at speed and
+   easy to skip once it has been read. The left rule marks it as an aside
+   without turning it into a warning. */
+.in-short {
+  border-left: 3px solid var(--vibefycode-accent);
+  /* Two pixels off, to pay for the two extra pixels of rule, so the words stay
+     in the same column as the words below them. */
+  padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) - 2px);
+  background: var(--vibefycode-surface-muted);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.in-short ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 60ch;
+}
+
+.in-short li {
+  /* 1.125rem because the pages already use it, not because it looked right.
+     The first version of this was 1.05rem, which is a perfectly reasonable
+     size and was a ninth one — our own design survey reported it on four pages
+     before the change was five minutes old. */
+  font-size: 1.125rem;
+  line-height: 1.5;
+}

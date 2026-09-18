@@ -2,12 +2,21 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PRICING_BASIS, REMEDIATION_OFFER } from '@vibefycode/remediation';
 import { REMEDIATION_CLIENT_DISCLOSURE } from '@vibefycode/shared';
+import { InShort } from '@/components/in-short';
 
 export const metadata: Metadata = {
   title: 'Help fixing what the report found',
   description:
     'We can help you fix what an assessment found — and the conflict that creates, stated plainly, with what stops it mattering.',
 };
+
+/** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
+const IN_SHORT = [
+  'We can fix what a check found, for a price agreed before we start.',
+  'We rate apps and we also sell repairs. That is a conflict, and it is on this page.',
+  'The check afterwards is done by someone who had nothing to do with the repair.',
+  'Paying us cannot change a score.',
+];
 
 /**
  * The page that sells the service, and argues against itself first.
@@ -34,6 +43,8 @@ export default function RemediationPage() {
         <h1 className="text-4xl font-bold">{REMEDIATION_OFFER.headline}</h1>
         <p className="max-w-2xl text-lg text-muted">{REMEDIATION_OFFER.plainly}</p>
       </header>
+
+      <InShort lines={IN_SHORT} />
 
       {/* --- The objection, before the offer --------------------------------- */}
       <section aria-labelledby="conflict-heading" className="space-y-5">
