@@ -49,7 +49,9 @@ function replaceTriggersAndPolicies(sql) {
         `drop trigger if exists ${name} on ${table};\ncreate trigger ${name}${middle} on ${table}`,
     )
     .replace(
-      /create policy (\w+) on (public\.\w+)/gi,
+      // `on` is often on the next line, and was for the first policy written
+      // that way — which the output then failed to guard on its second run.
+      /create policy\s+(\w+)\s+on\s+(public\.\w+)/gi,
       (_match, name, table) =>
         `drop policy if exists ${name} on ${table};\ncreate policy ${name} on ${table}`,
     );

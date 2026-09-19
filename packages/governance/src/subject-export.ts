@@ -50,6 +50,15 @@ export interface SubjectExport {
   readonly memberships: readonly Record<string, unknown>[];
   readonly consents: readonly Record<string, unknown>[];
   readonly applications: readonly Record<string, unknown>[];
+  /**
+   * Decisions this person took to show an application on a public page.
+   *
+   * Each row is a moment somebody chose to publish something about their own
+   * work, with their name against it. That is a record of an act by this
+   * person, which makes it theirs to receive — the same reasoning that puts
+   * consents in this export rather than leaving them to the workspace.
+   */
+  readonly publicationDecisions: readonly Record<string, unknown>[];
   readonly dataRequests: readonly Record<string, unknown>[];
   readonly notIncluded: readonly OmittedCategory[];
   /** Written to be read by the person, not by us. */
@@ -84,6 +93,11 @@ export const NOT_INCLUDED: readonly OmittedCategory[] = [
       'Held by the authentication service as hashes and never in a readable form. Exporting a hash would give you nothing you can use and one more copy of something worth stealing.',
   },
   {
+    category: 'The contents of a public page — a builder profile, or a trust page',
+    reason:
+      'The handle, the name shown, the line about the team and the contact details on a verification page belong to the workspace that publishes them, and every one of them is already public at its own address. The record of *who chose* to put an application on such a page is in this export, because that is an act by a person rather than a property of the page.',
+  },
+  {
     category: 'Analytics and behavioural records',
     reason: 'Not held. We do not record which pages you opened, which emails you read, or when.',
   },
@@ -97,6 +111,10 @@ const READ_ME = [
   '`consents` is the important one: each row names the document you agreed to, its',
   'version, and the SHA-256 hash of the exact text as it stood at that moment. That',
   'hash is how you can prove what you agreed to, rather than taking our word for it.',
+  '',
+  '`publicationDecisions` is each time you chose to show one of your applications on',
+  'a public page. The page itself is not here — it belongs to the workspace and it is',
+  'already public — but the decision, with your name against it, is yours.',
   '',
   '`notIncluded` lists what was considered and left out, and why. Read it. An export',
   'that silently omits a category looks complete, and leaves you with no way to know',
@@ -160,6 +178,17 @@ export async function assembleSubjectExport(
     [subjectId],
   );
 
+  const publicationDecisions = await sql.query<Record<string, unknown>>(
+    // Not the page, which is the workspace's and is public anyway — the
+    // decision, which is this person's and is not recorded anywhere else.
+    `select c.organisation_id, c.app_id, a.name as app_name, c.consented_at
+       from public.builder_profile_apps c
+       join public.apps a on a.id = c.app_id
+      where c.consented_by = $1
+      order by c.consented_at`,
+    [subjectId],
+  );
+
   const dataRequests = await sql.query<Record<string, unknown>>(
     `select id, request_type, status, details, response, refusal_basis,
             due_at, completed_at, created_at
@@ -176,6 +205,7 @@ export async function assembleSubjectExport(
     memberships: memberships.rows,
     consents: consents.rows,
     applications: applications.rows,
+    publicationDecisions: publicationDecisions.rows,
     dataRequests: dataRequests.rows,
     notIncluded: NOT_INCLUDED,
     readMe: READ_ME,

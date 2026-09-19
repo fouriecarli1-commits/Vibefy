@@ -209,3 +209,61 @@ describe('a reviewer', () => {
     });
   });
 });
+
+describe('a table with policies and no grants is a table nobody can reach', () => {
+  /*
+   * Three tables shipped with row-level security, careful policies, and no
+   * grants at all. No policy was ever consulted: Postgres refuses at the
+   * privilege check first, and every page that read or wrote them would have
+   * answered "permission denied for table" the first time somebody opened it.
+   *
+   * It survived the whole suite because these fixtures connect as the database
+   * owner, who is subject to neither check. A missing grant is invisible to a
+   * test that never asks as the customer — so this one asks the catalogue
+   * instead, about every table at once, and will fail on the next one.
+   */
+  it('gives the authenticated role something to do on every table it secures', async () => {
+    const { rows } = await db.query<{ table_name: string }>(
+      `select c.relname as table_name
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public'
+          and c.relkind = 'r'
+          and c.relrowsecurity
+          and not exists (
+            select 1
+              from information_schema.role_table_grants g
+             where g.table_schema = 'public'
+               and g.table_name = c.relname
+               and g.grantee in ('authenticated', 'anon')
+          )
+        order by c.relname`,
+    );
+    const unreachable = rows.map((row) => row.table_name);
+    expect(
+      unreachable,
+      `Tables with row-level security that no customer role may touch:\n  ${unreachable.join('\n  ')}\n` +
+        'Add a grant, or say in the migration why the table is service-role only.',
+    ).toEqual([]);
+  });
+
+  it('gives every policy on those tables something to filter', async () => {
+    // The other direction, and the quieter failure: a grant with no policy on a
+    // forced-RLS table means every row is hidden and nothing says why.
+    const { rows } = await db.query<{ table_name: string }>(
+      `select c.relname as table_name
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public'
+          and c.relkind = 'r'
+          and c.relrowsecurity
+          and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+        order by c.relname`,
+    );
+    const silent = rows.map((row) => row.table_name);
+    expect(
+      silent,
+      `Tables with row-level security and no policy at all: ${silent.join(', ')}`,
+    ).toEqual([]);
+  });
+});

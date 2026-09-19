@@ -61,6 +61,15 @@ for (const file of readdirSync(dir).sort()) {
   // nobody is checking. Written against any enum rather than the one that
   // happened to need it first — the next one will be a different type, and a
   // marker that only knows `alert_kind` would quietly stop covering it.
+  // A migration whose first durable object is a policy or a grant. Both are
+  // real objects the catalogue can be asked about, and a migration that only
+  // fixes permissions is exactly the kind nobody thinks to check for.
+  if (!check) {
+    const policy = /create policy\s+(\w+)\s+on\s+public\.(\w+)/i.exec(sql);
+    if (policy) {
+      check = `exists (select 1 from pg_policy p join pg_class c on c.oid = p.polrelid where p.polname='${policy[1]}' and c.relname='${policy[2]}')`;
+    }
+  }
   if (!check) {
     const value = /alter type public\.(\w+) add value (?:if not exists )?'(\w+)'/i.exec(sql);
     if (value) {

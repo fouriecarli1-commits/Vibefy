@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
-import { connect, expectRefusal } from './setup/client.ts';
+import { actingAs, connect, expectRefusal } from './setup/client.ts';
 import { seedAccount, seedBadgedApp, seedApp, type SeededAccount } from './setup/seed.ts';
 
 let db: Client;
@@ -245,5 +245,85 @@ describe('which workspace the console page is about', () => {
     // A page that showed an error because a stale link named a workspace
     // somebody has since left would be worse than quietly showing theirs.
     expect(page).toMatch(/workspaces\.find\(\(row\) => row\.id === asked\) \?\? workspaces\[0\]/);
+  });
+});
+
+describe('reachable as a customer, not only as the database owner', () => {
+  /*
+   * These fixtures connect as the database owner, who is subject to neither
+   * the privilege check nor row-level security — which is how three tables
+   * shipped with policies, no grants, and a passing test suite. Nothing in
+   * here would have worked the first time somebody opened the page.
+   *
+   * So this asks as the customer, through the same role Supabase uses.
+   */
+  it('lets an owner create and publish their own profile', async () => {
+    const account = await seedAccount(db, 'profile-as-customer');
+    const name = handle();
+
+    await actingAs(db, { userId: account.userId }, async (client) => {
+      await client.query(
+        `insert into public.builder_profiles (organisation_id, handle, display_name)
+         values ($1, $2, 'A Builder')`,
+        [account.organisationId, name],
+      );
+      await client.query(
+        `update public.builder_profiles set published = true where organisation_id = $1`,
+        [account.organisationId],
+      );
+      const { rows } = await client.query(
+        'select handle, published from public.builder_profiles where organisation_id = $1',
+        [account.organisationId],
+      );
+      expect(rows[0]).toMatchObject({ handle: name, published: true });
+    });
+  });
+
+  it('does not let somebody else read or change it', async () => {
+    const account = await seedAccount(db, 'profile-owner-2');
+    const outsider = await seedAccount(db, 'profile-outsider');
+    const name = handle();
+    await db.query(
+      `insert into public.builder_profiles (organisation_id, handle, display_name)
+       values ($1, $2, 'A Builder')`,
+      [account.organisationId, name],
+    );
+
+    await actingAs(db, { userId: outsider.userId }, async (client) => {
+      const { rows } = await client.query(
+        'select handle from public.builder_profiles where organisation_id = $1',
+        [account.organisationId],
+      );
+      expect(rows).toEqual([]);
+
+      const changed = await client.query(
+        `update public.builder_profiles set published = true where organisation_id = $1`,
+        [account.organisationId],
+      );
+      expect(changed.rowCount).toBe(0);
+    });
+  });
+
+  it('lets an owner put one of their own applications on it and take it off', async () => {
+    const account = await seedAccount(db, 'profile-consent-customer');
+    const appId = await seedApp(db, account, 'Mine');
+    await db.query(
+      `insert into public.builder_profiles (organisation_id, handle, display_name)
+       values ($1, $2, 'A Builder')`,
+      [account.organisationId, handle()],
+    );
+
+    await actingAs(db, { userId: account.userId }, async (client) => {
+      await client.query(
+        `insert into public.builder_profile_apps (organisation_id, app_id, consented_by)
+         values ($1, $2, $3)`,
+        [account.organisationId, appId, account.userId],
+      );
+      const removed = await client.query(
+        'delete from public.builder_profile_apps where organisation_id = $1 and app_id = $2',
+        [account.organisationId, appId],
+      );
+      expect(removed.rowCount).toBe(1);
+    });
   });
 });
