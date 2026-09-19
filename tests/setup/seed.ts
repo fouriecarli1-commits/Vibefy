@@ -357,3 +357,29 @@ export async function seedBuilderProfile(
 
   return { handle, appId };
 }
+
+/**
+ * A published trust page for a seeded badge.
+ *
+ * The verification page renders the owner's own section only when one exists,
+ * so without this the branch is never loaded by anything — and a section that
+ * has never been rendered is a section nobody has checked for contrast, for a
+ * heading level, or for whether it reads as ours.
+ */
+export async function seedTrustPage(client: Client, appId: string): Promise<void> {
+  const { rows } = await client.query<{ organisation_id: string }>(
+    'select organisation_id from public.apps where id = $1',
+    [appId],
+  );
+  await client.query(
+    `insert into public.trust_pages
+       (app_id, organisation_id, contact_email, security_contact, status_url,
+        privacy_url, terms_url, note, published)
+     values ($1, $2, 'help@kettle.example', 'security@kettle.example',
+             'https://status.kettle.example', 'https://kettle.example/privacy',
+             'https://kettle.example/terms',
+             'We answer within one working day, and we are a team of two.', true)
+     on conflict (app_id) do update set published = true`,
+    [appId, rows[0]!.organisation_id],
+  );
+}

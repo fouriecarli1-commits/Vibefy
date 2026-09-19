@@ -50,7 +50,15 @@ export function AssuranceList({ input }: { input: AssuranceInput }) {
           return (
             <li key={line.claim.id} className="rounded-xl border border-line p-5">
               <div className="flex gap-4">
-                <span aria-hidden="true" className={`text-xl font-bold ${state.tone}`}>
+                {/* A fixed width, because a tick, an exclamation mark and a
+                    dash are three different widths, and without it the nine
+                    questions do not line up with each other. Three pixels of
+                    raggedness, on the page a stranger lands on — found by our
+                    own design survey the first time it was pointed here. */}
+                <span
+                  aria-hidden="true"
+                  className={`w-6 shrink-0 text-center text-xl font-bold ${state.tone}`}
+                >
                   {state.mark}
                 </span>
                 <div className="space-y-2">

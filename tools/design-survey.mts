@@ -22,6 +22,7 @@
  *   pnpm check:design --why            print the measurements, not only the titles
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { Client } from 'pg';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
@@ -32,6 +33,7 @@ import {
 import { EvidenceStore } from '../packages/engine/src/runtime/evidence.ts';
 import { DEFAULT_CEILING, ScopeGuard } from '../packages/engine/src/runtime/scope.ts';
 import { designFindings, measureDesign } from '../packages/engine/src/stages/design-checks.ts';
+import { seedProfilePage, seedVerificationPage } from './a11y-contract.mts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 3124;
@@ -63,6 +65,17 @@ const ENVIRONMENT: Record<string, string> = {
     process.env.VIBEFYCODE_TEST_DSN ??
     `postgresql://postgres@localhost/vibefycode_test?host=${join(root, '.tmp/pg/socket')}`,
 };
+
+/** Opens the local test database for one piece of work and closes it again. */
+async function withDatabase<T>(work: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client({ connectionString: ENVIRONMENT.SUPABASE_DB_URL });
+  await client.connect();
+  try {
+    return await work(client);
+  } finally {
+    await client.end();
+  }
+}
 
 function run(command: string, args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -100,6 +113,16 @@ async function main(): Promise<void> {
   let server: ChildProcess | undefined;
   if (!external) {
     if (!process.env.SUPABASE_DB_URL) await run('bash', ['scripts/test-db.sh', 'reset'], root);
+
+    // The two pages a stranger actually lands on, which have never been in
+    // this survey because neither has an address until something is seeded.
+    // The seeding is the accessibility scan's, reused: it also registers a
+    // content guard in a map this tool does not read, which costs nothing and
+    // is cheaper than a second copy of the seeding.
+    console.log('· Seeding a badge and a profile, so those pages exist…');
+    PAGES.push(await withDatabase(seedVerificationPage));
+    PAGES.push(await withDatabase(seedProfilePage));
+
     console.log('· Building the app…');
     await run('pnpm', ['exec', 'next', 'build'], web);
     server = spawn('pnpm', ['exec', 'next', 'start', '-p', String(PORT)], {

@@ -9,7 +9,7 @@
  */
 
 import type { Client } from 'pg';
-import { seedBadgedApp, seedBuilderProfile } from '../tests/setup/seed.ts';
+import { seedBadgedApp, seedBuilderProfile, seedTrustPage } from '../tests/setup/seed.ts';
 
 /**
  * Routes scanned only after something is seeded for them.
@@ -86,7 +86,10 @@ export async function scannedTheWrongPage(
  * and would sail through the scan having proved nothing.
  */
 export async function seedVerificationPage(client: Client): Promise<string> {
-  const { slug } = await seedBadgedApp(client, 'a11y-scan');
+  const { slug, appId } = await seedBadgedApp(client, 'a11y-scan');
+  // With the owner's own section published, so that branch is scanned too. A
+  // section nobody has rendered is a section nobody has checked.
+  await seedTrustPage(client, appId);
   const page = `/a/${slug}`;
   // The tick list only renders for a badge that resolved, so it is the right
   // thing to insist on: the not-found page does not carry it.
