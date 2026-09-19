@@ -148,6 +148,15 @@ const FOR_EVERYONE_ELSE: readonly Service[] = [
     cta: 'Read the rubric',
   },
   {
+    href: '/verify',
+    name: 'A browser extension that checks a site for you',
+    what: 'A button in your toolbar. Click it on any site and it says whether that site carries a live mark, and links to what was checked.',
+    who: 'You look at a lot of new software and you would rather not open a tab to check each one.',
+    get: 'One click, one answer, and no account.',
+    not: 'It does not light up by itself, and that is the point: an icon that lights up on its own has to watch every page you open. It downloads the list of live marks once an hour and answers from the copy on your own computer, so nothing about the page you are on is ever sent to us.',
+    cta: 'How badge checking works',
+  },
+  {
     href: '/advertise',
     name: 'Reach people who build things',
     what: 'One advertising space, on a deliberately quiet site, read by people who are shipping software.',

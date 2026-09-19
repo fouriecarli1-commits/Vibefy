@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VibefyCode badge check</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        width: 320px;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1rem;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 12px;
+        font-size: 0.875rem;
+      }
+      .quiet {
+        opacity: 0.75;
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="headline">Checking…</h1>
+    <p id="detail"></p>
+    <p id="link"></p>
+    <p class="quiet" id="how"></p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

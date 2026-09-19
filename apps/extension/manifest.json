@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "VibefyCode badge check",
+  "version": "0.1.0",
+  "description": "Ask whether the site you are on carries a live VibefyCode badge, without telling anybody which site that is.",
+  "permissions": ["storage", "alarms", "activeTab"],
+  "host_permissions": ["https://verify.vibefycode.app/*"],
+  "background": { "service_worker": "src/background.js", "type": "module" },
+  "action": {
+    "default_title": "Check this site for a VibefyCode badge",
+    "default_popup": "src/popup.html"
+  }
+}

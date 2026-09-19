@@ -1,0 +1,13 @@
+{
+  "name": "@vibefycode/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.1.29",
+    "typescript": "7.0.2"
+  }
+}
