@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { verifyDnsTxt, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisation';
 import { canAccept, createInvitationToken, hashInvitationToken } from '@vibefycode/workspace';
 import { renderInvitationEmail, resendFromEnvironment } from '@vibefycode/notify';
+import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -440,6 +441,15 @@ export async function saveBranding(
     }
     const bytes = Buffer.from(await logo.arrayBuffer());
     logoDataUri = `data:${logo.type};base64,${bytes.toString('base64')}`;
+  }
+
+  // Branding puts an agency's words on a report that carries our rubric and our
+  // score. A footer note saying what the mark means is exactly the sentence
+  // somebody would add, and exactly the one that cannot be there.
+  for (const field of ['displayName', 'contactLine', 'footerNote'] as const) {
+    const verdict = checkClaim(String(formData.get(field) ?? ''));
+    if (!verdict.ok)
+      return { error: `${verdict.reason} (in ${field.replace(/([A-Z])/g, ' $1').toLowerCase()})` };
   }
 
   const { error } = await supabase.from('workspace_branding').upsert(

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -48,6 +49,17 @@ export async function saveBuilderProfile(
     };
   }
   if (displayName.length < 2) return { error: 'Give the page a name to show at the top.' };
+
+  // The same gate the rest of the site is held to. This page sits under a list
+  // of badges, which is exactly where a sentence claiming the badge means more
+  // than it does would be most believed.
+  for (const [what, value] of [
+    ['name', displayName],
+    ['line about you', tagline],
+  ] as const) {
+    const verdict = checkClaim(value);
+    if (!verdict.ok) return { error: `${verdict.reason} (in the ${what})` };
+  }
 
   const { error } = await supabase.from('builder_profiles').upsert(
     {

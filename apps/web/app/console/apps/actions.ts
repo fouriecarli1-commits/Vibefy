@@ -13,6 +13,7 @@ import {
   verifyOwnership,
 } from '@vibefycode/engine/authorisation';
 import { decideAssessmentRequest, resolvePlan } from '@vibefycode/billing';
+import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser } from '@/lib/sql';
 
@@ -567,6 +568,16 @@ export async function setDirectoryListing(
 
   if (tagline && (tagline.length < 10 || tagline.length > 160)) {
     return { error: 'A tagline is between 10 and 160 characters, or leave it blank.' };
+  }
+
+  // A directory entry is a rating of ours with the owner's own words beside it,
+  // which is the most persuasive place on the site for a claim we do not make.
+  for (const [what, value] of [
+    ['tagline', tagline],
+    ['category', category],
+  ] as const) {
+    const verdict = checkClaim(value);
+    if (!verdict.ok) return { error: `${verdict.reason} (in the ${what})` };
   }
 
   const { data: app } = await supabase

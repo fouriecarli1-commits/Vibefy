@@ -15,6 +15,8 @@
  * build-time list have to be the same list. Two would disagree within a
  * release, and the one facing the public would be the one nobody maintained.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   FORBIDDEN_CLAIMS,
@@ -94,5 +96,58 @@ describe('one list, not two', () => {
 
   it('has the same idea of what extends the mark', () => {
     expect(String(MARK_EXTENSION)).toBe(String(MARK_EXTENSION_PATTERN));
+  });
+});
+
+describe('everywhere a customer’s words reach a surface carrying our mark', () => {
+  /*
+   * The trust page was the first of these and, for a day, the only one that was
+   * checked. That is the wrong shape for a rule: a sentence claiming the badge
+   * means more than it does simply goes in whichever box is not guarded, and
+   * three others were not.
+   *
+   * These are source assertions rather than behaviour, because each of these
+   * writes goes through a server action against a live Supabase session that
+   * the test suite has no way to stand up. The property they hold is the one
+   * that matters: nothing that ends up beside our mark is written without
+   * passing the gate.
+   */
+  const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
+
+  const GUARDED: readonly { readonly path: string; readonly why: string }[] = [
+    {
+      path: 'apps/web/app/console/apps/[id]/trust/actions.ts',
+      why: 'The owner’s own words on their verification page, under our seal.',
+    },
+    {
+      path: 'apps/web/app/console/profile/actions.ts',
+      why: 'A public page whose heading sits above a list of live badges.',
+    },
+    {
+      path: 'apps/web/app/console/apps/actions.ts',
+      why: 'A directory entry is our rating with the owner’s words beside it.',
+    },
+    {
+      path: 'apps/web/app/console/workspace/actions.ts',
+      why: 'Agency branding goes on a report carrying our rubric and our score.',
+    },
+  ];
+
+  it.each(GUARDED.map((entry) => [entry.path, entry.why] as const))(
+    '%s runs the gate — %s',
+    (path) => {
+      expect(source(path)).toMatch(/checkClaim\(/);
+    },
+  );
+
+  it('refuses rather than silently stripping', () => {
+    // Removing the offending words and saving anyway would leave somebody
+    // believing they had published a sentence they had not, which is a worse
+    // outcome than being told no.
+    for (const { path } of GUARDED) {
+      const text = source(path);
+      expect(text, path).toMatch(/return \{ error:/);
+      expect(text, path).not.toMatch(/\.replace\([^)]*checkClaim/);
+    }
   });
 });
