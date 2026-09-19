@@ -3,7 +3,7 @@ import { liveBadgeList, type BadgeRow } from '@vibefycode/badge';
 import { readAsAnon } from '@/lib/sql';
 
 /**
- * Every badge that is live, in one document.
+ * Every badge whose owner chose to be listed, in one document.
  *
  * This exists so that nobody has to tell us what they are looking at. A browser
  * extension that asks our server "does this site have a badge" is an extension
@@ -14,6 +14,13 @@ import { readAsAnon } from '@/lib/sql';
  *
  * It is also the answer for a marketplace with a lot of listings: one request
  * rather than ten thousand.
+ *
+ * It is not every live badge, and the first version of it was. A customer may
+ * opt out of the public directory and stay certified — the independence policy
+ * promises it in those words — and a machine-readable document of every badged
+ * origin republished, in the most reusable form available, exactly what they
+ * asked us not to publish. The rule now lives in `public.listed_badges`, where
+ * it can be tested rather than remembered.
  *
  * Cached for an hour. A badge suspended in that hour still reads as live in a
  * stale copy, which is why the document says in its own body that anything
@@ -26,8 +33,7 @@ export async function GET() {
     const { rows: found } = await client.query<BadgeRow>(
       `select public_id, slug, status, app_name, certified_origin,
               rubric_version, assessed_at, expires_at
-         from public.badge_verification
-        where status = 'active'
+         from public.listed_badges
         order by public_id`,
     );
     return found;

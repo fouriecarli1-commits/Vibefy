@@ -20,7 +20,10 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Client } from 'pg';
+import { connect } from './setup/client.ts';
+import { seedAccount, seedBadgedApp, type SeededAccount } from './setup/seed.ts';
 import {
   BADGE_LIMITS,
   BADGE_MEANING,
@@ -149,5 +152,105 @@ describe('what is deliberately not here', () => {
 
   it('says why, where somebody about to add one would read it', () => {
     expect(source).toMatch(/no "does this domain have a badge" lookup/i);
+  });
+});
+
+describe('what a published list may contain', () => {
+  /*
+   * A bug of mine, found by reading my own work a day later.
+   *
+   * The list was built so that anybody checking a lot of sites could do it
+   * locally instead of asking us about each one. The privacy argument was
+   * sound; the query was not. It published every live badge — including the
+   * ones whose owners had opted out of the public directory and stayed
+   * certified, which the independence policy promises in those words.
+   *
+   * A machine-readable document of every badged origin is the most reusable
+   * form a listing can take, so it undid that promise more thoroughly than the
+   * directory ever could have.
+   */
+  let db: Client;
+  let owner: SeededAccount;
+
+  beforeAll(async () => {
+    db = await connect();
+    owner = await seedAccount(db, 'listed-owner');
+  });
+
+  afterAll(async () => {
+    await db?.end();
+  });
+
+  async function listed(slug: string): Promise<boolean> {
+    const { rows } = await db.query('select 1 from public.listed_badges where slug = $1', [slug]);
+    return rows.length > 0;
+  }
+
+  async function choose(appId: string, state: 'listed' | 'opted_out'): Promise<void> {
+    const { rows } = await db.query<{ organisation_id: string }>(
+      'select organisation_id from public.apps where id = $1',
+      [appId],
+    );
+    await db.query(
+      `insert into public.directory_listings (app_id, organisation_id, state, opted_out_at)
+       values ($1, $2, $3::public.listing_state, $4)
+       on conflict (app_id) do update
+         set state = excluded.state, opted_out_at = excluded.opted_out_at`,
+      [appId, rows[0]!.organisation_id, state, state === 'opted_out' ? new Date() : null],
+    );
+  }
+
+  it('includes a badge whose owner chose to be listed', async () => {
+    const seeded = await seedBadgedApp(db, 'listed-yes');
+    await choose(seeded.appId, 'listed');
+    expect(await listed(seeded.slug)).toBe(true);
+  });
+
+  it('leaves out a badge whose owner opted out, though it is still live', async () => {
+    const seeded = await seedBadgedApp(db, 'listed-no');
+    await choose(seeded.appId, 'opted_out');
+    expect(await listed(seeded.slug)).toBe(false);
+
+    // Still certified, and its own page is unaffected. That is the promise.
+    const { rows } = await db.query(
+      `select 1 from public.badge_verification where slug = $1 and status = 'active'`,
+      [seeded.slug],
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('leaves out a badge whose owner has never chosen', async () => {
+    // No row is no choice, and no choice is not consent.
+    const seeded = await seedBadgedApp(db, 'listed-never-asked');
+    expect(await listed(seeded.slug)).toBe(false);
+  });
+
+  it('leaves out a suspended badge even when its owner is listed', async () => {
+    const seeded = await seedBadgedApp(db, 'listed-suspended');
+    await choose(seeded.appId, 'listed');
+    await db.query(
+      `update public.badges
+          set status = 'suspended', suspension_reason = 'Suspended by this test, to watch it disappear'
+        where app_id = $1`,
+      [seeded.appId],
+    );
+    expect(await listed(seeded.slug)).toBe(false);
+  });
+
+  it('is the only thing the published list reads from', async () => {
+    // The rule lives in the view so it can be tested rather than remembered.
+    // A route that went back to the unfiltered one would undo all of this.
+    const route = readFileSync(
+      join(process.cwd(), 'apps/web/app/api/badges/live/route.ts'),
+      'utf8',
+    );
+    expect(route).toContain('public.listed_badges');
+    expect(route).not.toContain('badge_verification');
+  });
+
+  it('says in the document itself what absence from it means', async () => {
+    const list = liveBadgeList([], 'https://verify.test');
+    expect(list.completeness).toMatch(/not every live badge/i);
+    expect(list.completeness).toMatch(/asked not to be listed/i);
   });
 });

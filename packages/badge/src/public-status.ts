@@ -13,10 +13,12 @@
  *   · `badgeStatus`   — one badge, asked for by its identifier. The caller
  *                       already holds the identifier, so asking tells us
  *                       nothing we did not already give them.
- *   · `liveBadgeList` — every live badge, in one cacheable document. Anybody
- *                       who wants to know whether a site has a badge can
- *                       download this and check locally, without telling us
- *                       which site they are looking at.
+ *   · `liveBadgeList` — the live badges whose owners chose to be listed, in
+ *                       one cacheable document. Anybody who wants to know
+ *                       whether a site has a badge can download this and check
+ *                       locally, without telling us which site. It is not every
+ *                       live badge: opting out of the public directory has to
+ *                       mean something here too, or it means nothing.
  *
  * There is deliberately no "does this domain have a badge" lookup. It is the
  * obvious third shape and it is the one that would let somebody build a browser
@@ -115,6 +117,8 @@ export interface LiveBadgeList {
   readonly meaning: string;
   readonly limits: string;
   readonly staleness: string;
+  /** What absence from this list does and does not mean. */
+  readonly completeness: string;
 }
 
 /**
@@ -144,6 +148,8 @@ export function liveBadgeList(
     })),
     meaning: BADGE_MEANING,
     limits: BADGE_LIMITS,
+    completeness:
+      'This is not every live badge. A badge holder may ask not to appear in any public listing while staying certified, and this document honours that. A site missing from here may have no badge, or may have one and have asked not to be listed — those two are not distinguishable from this document, and saying otherwise about somebody would be a claim we cannot support.',
     staleness:
       'This list is a snapshot. A badge can be suspended or revoked a minute after it was built, and suspension is the mechanism by which a mark stops meaning anything. Anything making a decision that matters should ask about the one badge it cares about rather than trusting a copy of this document.',
   };

@@ -105,7 +105,7 @@ export function answerFor(list, url, now = new Date()) {
     return {
       kind: 'none',
       origin,
-      detail: `No live VibefyCode badge was issued for ${origin}. That is not a finding about this site — most sites have never asked for one.${staleness}`,
+      detail: `${origin} is not in the list of badged sites on this computer. That is not a finding about it: most sites have never asked for a badge, and a site that has one can ask not to be listed publicly. Both look the same from here.${staleness}`,
     };
   }
 

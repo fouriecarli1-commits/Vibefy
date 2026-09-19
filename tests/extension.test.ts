@@ -85,7 +85,11 @@ describe('the answer', () => {
     // finding is an extension that defames every site it does not know.
     const answer = answerFor(list('https://kettle.example'), 'https://other.example/', now);
     expect(answer.kind).toBe('none');
-    expect(answer.detail).toMatch(/not a finding about this site/i);
+    expect(answer.detail).toMatch(/not a finding about it/i);
+    // And it does not claim there is no badge. A holder can be certified and
+    // ask not to be listed, and from here those two look identical.
+    expect(answer.detail).toMatch(/can ask not to be listed publicly/i);
+    expect(answer.detail).not.toMatch(/no live VibefyCode badge was issued/i);
   });
 
   it('says so when there is no list yet, rather than saying no', () => {

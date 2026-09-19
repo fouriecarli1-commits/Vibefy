@@ -47,6 +47,14 @@ Publishing it to the Chrome Web Store and to Firefox Add-ons needs a developer
 account in the company's name, which is one of the open items waiting on the
 legal entity. The code is ready; the listings are not something code can do.
 
+## What a grey answer does not mean
+
+That the site has no badge. A badge holder can ask not to appear in any public
+listing while staying certified, and the list this extension downloads honours
+that — so "not in the list" covers both "never asked for a badge" and "has one
+and asked not to be listed". The extension says so rather than guessing, because
+the guess would be a claim about somebody's application that we cannot support.
+
 ## What a green answer means
 
 That a badge was issued for this exact origin and is live today. It does not
