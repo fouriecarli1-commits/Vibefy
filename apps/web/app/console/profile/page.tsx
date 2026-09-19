@@ -20,7 +20,12 @@ export const metadata: Metadata = { title: 'Your public page' };
  * list and invisible to a reader, and somebody who does not know that will
  * think the page is broken.
  */
-export default async function BuilderProfilePage() {
+export default async function BuilderProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -32,9 +37,20 @@ export default async function BuilderProfilePage() {
     .select('role, organisations (id, name, is_personal)')
     .in('role', ['owner', 'admin']);
 
-  const organisation = (memberships ?? [])
+  const workspaces = (memberships ?? [])
     .map((membership) => membership.organisations as unknown as { id: string; name: string })
-    .find(Boolean);
+    .filter(Boolean);
+
+  /*
+   * Which workspace this page is about.
+   *
+   * The first version silently took whichever came back first, which is fine
+   * for the common case of one workspace and wrong for everybody else: a
+   * person who belongs to three would have configured one of them without ever
+   * being told which, and would have had no way to reach the other two.
+   */
+  const asked = typeof params.workspace === 'string' ? params.workspace : null;
+  const organisation = workspaces.find((row) => row.id === asked) ?? workspaces[0];
 
   if (!organisation) {
     return (
@@ -79,6 +95,21 @@ export default async function BuilderProfilePage() {
           <Link href="/console">Console</Link> · Your public page
         </p>
         <h1 className="text-3xl font-bold tracking-tight">Your public page</h1>
+        <p className="text-sm text-muted">
+          For <strong>{organisation.name}</strong>. A page belongs to one workspace, because the
+          applications on it do.
+        </p>
+        {workspaces.length > 1 && (
+          <p className="flex flex-wrap gap-3 text-sm">
+            {workspaces
+              .filter((row) => row.id !== organisation.id)
+              .map((row) => (
+                <Link key={row.id} href={`/console/profile?workspace=${row.id}`}>
+                  Switch to {row.name}
+                </Link>
+              ))}
+          </p>
+        )}
         <p className="max-w-prose text-muted">
           A page listing the applications you have had assessed, for a proposal or the bottom of a
           CV. Nothing appears on it until you put it there, one application at a time, and taking

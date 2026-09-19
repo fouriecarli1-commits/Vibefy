@@ -14,6 +14,8 @@
  *   · an organisation can only list its own work,
  *   · and an application with no live mark does not appear at all.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
 import { connect, expectRefusal } from './setup/client.ts';
@@ -220,3 +222,28 @@ async function accountOwning(appId: string): Promise<SeededAccount> {
   const row = rows[0]!;
   return { organisationId: row.organisation_id, userId: row.created_by, email: '' };
 }
+
+describe('which workspace the console page is about', () => {
+  /*
+   * The first version took whichever membership came back first, which is fine
+   * for the common case of one workspace and wrong for everybody else: a person
+   * who belongs to three would have configured one without ever being told
+   * which, and would have had no way to reach the other two.
+   */
+  const page = readFileSync(join(process.cwd(), 'apps/web/app/console/profile/page.tsx'), 'utf8');
+
+  it('says which workspace it is editing', () => {
+    expect(page).toMatch(/For <strong>\{organisation\.name\}<\/strong>/);
+  });
+
+  it('lets somebody in more than one switch between them', () => {
+    expect(page).toMatch(/workspaces\.length > 1/);
+    expect(page).toMatch(/\/console\/profile\?workspace=/);
+  });
+
+  it('falls back to the first rather than to nothing', () => {
+    // A page that showed an error because a stale link named a workspace
+    // somebody has since left would be worse than quietly showing theirs.
+    expect(page).toMatch(/workspaces\.find\(\(row\) => row\.id === asked\) \?\? workspaces\[0\]/);
+  });
+});
