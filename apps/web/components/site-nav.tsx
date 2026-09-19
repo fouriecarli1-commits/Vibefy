@@ -71,6 +71,11 @@ const GROUPS: readonly NavGroup[] = [
         label: 'Check an app',
         hint: 'Before you pay: can it be cancelled, is anyone there',
       },
+      {
+        href: '/pre-flight',
+        label: 'Check your own app',
+        hint: 'Free, no account: what a stranger sees in ten seconds',
+      },
       { href: '/directory', label: 'Directory', hint: 'Applications with a live badge' },
       { href: '/methodology', label: 'Methodology', hint: 'The rubric, published in full' },
       {

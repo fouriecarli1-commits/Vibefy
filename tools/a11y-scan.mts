@@ -51,6 +51,7 @@ const PAGES = [
   '/advertise',
   '/games',
   '/trust-check',
+  '/pre-flight',
   '/trust-check/traps/the-free-trial-that-was-not',
   '/sign-in',
   '/sign-up',

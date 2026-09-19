@@ -4,3 +4,4 @@ export * from './checks.ts';
 export * from './run.ts';
 export * from './articles.ts';
 export * from './exit.ts';
+export * from './preflight.ts';

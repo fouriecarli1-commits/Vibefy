@@ -46,6 +46,15 @@ interface Service {
 
 const FOR_BUILDERS: readonly Service[] = [
   {
+    href: '/pre-flight',
+    name: 'Check your own app, free',
+    what: 'Paste your own address and see what a stranger would find in ten seconds: whether it is encrypted, whether it works on a phone, whether anything is in the page source that should not be, whether anybody can reach you.',
+    who: 'You are about to show somebody what you built, and you would rather find the obvious things yourself.',
+    get: 'A list of what to go and fix, each with the evidence and a next step. No account, and nothing kept afterwards.',
+    not: 'It is not an assessment and it earns no badge. It loads one page, once, exactly as a browser would, and there is no score at the end on purpose.',
+    cta: 'Check your own app',
+  },
+  {
     href: '/how-it-works',
     name: 'Get your application assessed',
     what: 'We open your application from outside, the way a stranger would, and work through it against a rubric we publish in full. A person reviews what came back before anything is issued.',

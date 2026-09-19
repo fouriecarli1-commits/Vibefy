@@ -43,6 +43,7 @@ const PAGES = [
   '/methodology',
   '/directory',
   '/trust-check',
+  '/pre-flight',
   '/advertise',
   '/games',
   '/services',
@@ -109,12 +110,22 @@ async function main(): Promise<void> {
     await waitForServer(origin);
   }
 
-  const guard = new ScopeGuard({
-    allowedHosts: [new URL(origin).hostname],
-    exclusions: [],
-    ceiling: { ...DEFAULT_CEILING, maxRequestsPerMinute: 600, maxTotalRequests: 2000 },
-    allowPrivateNetworkForTesting: true,
-  });
+  /*
+   * A guard per page, not one for the whole run.
+   *
+   * A ceiling is per-run state — requests in the last minute, requests in
+   * total — and surveying thirteen pages at two widths through one guard hit
+   * the rate limit partway down the list. Each page survey is its own piece of
+   * work and gets its own ceiling, which is also what happens in a real
+   * assessment: one guard, one application.
+   */
+  const guardFor = () =>
+    new ScopeGuard({
+      allowedHosts: [new URL(origin).hostname],
+      exclusions: [],
+      ceiling: { ...DEFAULT_CEILING, maxRequestsPerMinute: 600, maxTotalRequests: 2000 },
+      allowPrivateNetworkForTesting: true,
+    });
 
   // Both widths. A page is built at the width its author had open, and the
   // breakpoints underneath it are where a type scale quietly acquires three
@@ -129,7 +140,7 @@ async function main(): Promise<void> {
   try {
     for (const page of PAGES) {
       for (const width of WIDTHS) {
-        const session = new BrowserSession(guard, new EvidenceStore(page), {
+        const session = new BrowserSession(guardFor(), new EvidenceStore(page), {
           viewport: width.viewport,
         });
         await session.open();
