@@ -70,13 +70,20 @@ export function compareToPeers(input: ComparisonInput): Comparison {
   }
 
   if (input.peerScores.length < MIN_PEERS_FOR_A_PERCENTILE) {
+    // The nought case gets its own sentence. "There are 0 other assessed
+    // applications" is arithmetic where a reader wants an explanation, and it
+    // is the sentence most reports will carry for a while yet.
+    const count =
+      input.peerScores.length === 0
+        ? 'Nothing else in this category has been assessed yet, so there is nothing to compare this with.'
+        : `There ${input.peerScores.length === 1 ? 'is 1 other' : `are ${input.peerScores.length} other`} assessed application${
+            input.peerScores.length === 1 ? '' : 's'
+          } in this category.`;
     return {
       kind: 'too_few',
       have: input.peerScores.length,
       need: MIN_PEERS_FOR_A_PERCENTILE,
-      explanation: `There are ${input.peerScores.length} other assessed application${
-        input.peerScores.length === 1 ? '' : 's'
-      } in this category, and a percentile needs at least ${MIN_PEERS_FOR_A_PERCENTILE} before it means anything: with fewer, one of them being re-assessed moves the figure by more than five points. No number is given rather than one that would swing on a stranger.`,
+      explanation: `${count} A percentile needs at least ${MIN_PEERS_FOR_A_PERCENTILE} before it means anything: with fewer, one of them being re-assessed moves the figure by more than five points. No number is given rather than one that would swing on a stranger.`,
     };
   }
 

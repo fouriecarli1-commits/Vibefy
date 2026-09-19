@@ -790,16 +790,26 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
               nothing that is not already on your verification page.
             </p>
             <p className="mt-2 text-muted">
-              You can remove the listing at any time and stay certified. Listings are ordered by the
-              rubric alone; placement is not for sale.
+              It is also what puts you in the public list of badged sites that anyone can download —
+              the one our browser extension reads, and the one a marketplace would. Saying no here
+              keeps you out of all of it. Your badge and your verification page are unaffected
+              either way: you stay certified, and anybody holding your badge can still check it.
+            </p>
+            <p className="mt-2 text-muted">
+              You can change your mind at any time. Listings are ordered by the rubric alone;
+              placement is not for sale.
             </p>
             <div className="mt-5">
               <ActionForm action={setDirectoryListing} submitLabel="Save listing">
                 <input type="hidden" name="appId" value={id} />
+                {/* Unticked until somebody ticks it. It used to default to
+                    ticked when no choice had been recorded, which told a
+                    customer they were listed while the directory — which needs
+                    a row saying so — was leaving them out. */}
                 <Checkbox
                   name="listed"
-                  label="List this application in the public directory"
-                  defaultChecked={String(listing?.state ?? 'listed') === 'listed'}
+                  label="List this application in the public directory, and in the public list of badged sites"
+                  defaultChecked={listing?.state === 'listed'}
                 />
                 <Field
                   label="Tagline"

@@ -336,3 +336,21 @@ describe('what the database hands over', () => {
     expect(await peerScores(owner.userId, myAssessment)).toEqual([]);
   });
 });
+
+describe('the sentence most reports will carry for a while', () => {
+  it('explains an empty category rather than printing a nought', () => {
+    // "There are 0 other assessed applications" is arithmetic where a reader
+    // wants a reason, and it is what almost every report says today.
+    const answer = compareToPeers({ score: 71, category: 'Games', peerScores: [] });
+    expect(answer.kind).toBe('too_few');
+    if (answer.kind !== 'too_few') return;
+    expect(answer.explanation).toMatch(/Nothing else in this category has been assessed yet/);
+    expect(answer.explanation).not.toMatch(/\b0 other\b/);
+  });
+
+  it('counts one correctly, because "1 others" is how software sounds', () => {
+    const answer = compareToPeers({ score: 71, category: 'Games', peerScores: [50] });
+    if (answer.kind !== 'too_few') throw new Error('expected a refusal');
+    expect(answer.explanation).toMatch(/is 1 other assessed application\b/);
+  });
+});
