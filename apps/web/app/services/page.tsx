@@ -155,6 +155,10 @@ const ALSO_INCLUDED: readonly { title: string; body: string }[] = [
     body: 'An automated accessibility pass against WCAG 2.2 AA. We run the same one against our own pages on every build, because it is hard to sell an accessibility score from an inaccessible site.',
   },
   {
+    title: 'A draft accessibility statement, written from what was found',
+    body: 'Every larger company publishes one and every small one knows it should. Most are written from a template, which is why so many claim conformance with a standard nobody checked them against. Yours is assembled from the barriers an assessment actually found, with the sections only you can answer — how somebody reports a problem, what happens if you do not answer, when you will fix things — left visibly empty rather than invented.',
+  },
+  {
     title: 'Where a card number goes',
     body: 'Whether payment details are typed into a page the merchant controls or handed to a processor. Whether the application asks for more personal data than it explains. Whether anything on the page is a known cryptominer.',
   },
@@ -225,7 +229,7 @@ export default function ServicesPage() {
 
       <section aria-labelledby="also" className="max-w-3xl space-y-5">
         <h2 id="also" className="text-2xl font-bold tracking-tight">
-          Four things in every assessment that people do not expect
+          {ALSO_INCLUDED.length} things in every assessment that people do not expect
         </h2>
         <p className="text-muted">
           These are part of an assessment rather than separate products. They are listed because

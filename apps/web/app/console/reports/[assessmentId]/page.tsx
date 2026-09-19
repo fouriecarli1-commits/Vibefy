@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { assembleReportSource, renderReport } from '@vibefycode/report';
+import {
+  assembleReportSource,
+  draftAccessibilityStatement,
+  renderReport,
+} from '@vibefycode/report';
 import { resolvePlan } from '@vibefycode/billing';
 import { ActionForm, Field } from '@/components/action-form';
 import { submitAppeal } from '@/app/console/privacy/actions';
@@ -49,6 +53,15 @@ export default async function ReportPage({
   });
 
   if (!page) notFound();
+
+  const statement = draftAccessibilityStatement({
+    appName: page.source.appName,
+    organisationName: page.source.organisationName,
+    assessedOn: page.source.assessedOn,
+    rubricVersion: page.source.rubricVersion,
+    findings: page.source.findings,
+    scopeStatement: page.source.scopeStatement,
+  });
 
   const { data: appeals } = await supabase
     .from('appeals')
@@ -115,6 +128,46 @@ export default async function ReportPage({
           </p>
         </section>
       )}
+
+      {/*
+       * The accessibility statement, drafted from what was found.
+       *
+       * Offered here rather than as a separate product because it is the same
+       * findings in a different shape. The gaps are listed beside the draft
+       * rather than only marked inside it: somebody who copies the text into
+       * their site without scrolling is exactly the person this is for, and
+       * the count is the thing they will notice.
+       */}
+      <section aria-labelledby="statement" className="rounded-xl border border-line p-5">
+        <h2 id="statement" className="font-semibold">
+          A draft accessibility statement for {page.source.appName}
+        </h2>
+        <p className="mt-2 max-w-prose text-sm text-muted">{statement.disclaimer}</p>
+        <p className="mt-3 max-w-prose text-sm">
+          <strong>
+            {statement.gaps.length} section{statement.gaps.length === 1 ? '' : 's'} still need
+            {statement.gaps.length === 1 ? 's' : ''} you:
+          </strong>
+        </p>
+        <ul className="mt-2 space-y-2 text-sm text-muted">
+          {statement.gaps.map((gap) => (
+            <li key={gap.placeholder}>
+              <code>{gap.placeholder}</code> — {gap.why}
+            </li>
+          ))}
+        </ul>
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm font-medium">Read the draft</summary>
+          <pre
+            className="mt-3 overflow-x-auto rounded-lg border border-line bg-surface-muted p-4 text-xs"
+            tabIndex={0}
+            role="region"
+            aria-label="The draft accessibility statement, as text"
+          >
+            {statement.markdown}
+          </pre>
+        </details>
+      </section>
 
       <section aria-labelledby="appeal" className="rounded-xl border border-line p-5">
         <h2 id="appeal" className="font-semibold">
