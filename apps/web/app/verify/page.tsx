@@ -151,6 +151,25 @@ export default async function VerifyPage({
           canonicalisation, because two implementations must produce identical bytes or the
           signature check is meaningless.
         </p>
+        <h2 className="mt-5 font-semibold text-ink">Building something that shows our mark</h2>
+        <p className="mt-2">
+          A signature says an assessment happened. It does not say the badge is still live, and
+          suspension is how a mark stops meaning anything — so there are two more addresses, both
+          public, both open to any origin, neither needing a key or an account.
+        </p>
+        <ul className="mt-2 space-y-2">
+          <li>
+            <code>/api/badge/&lt;identifier&gt;/status</code> — is this one live, what was it
+            measured against, when, and when does it stop being current. Cached five minutes.
+          </li>
+          <li>
+            <code>/api/badges/live</code> — every live badge in one document, cached an hour, so
+            that anything checking a lot of sites can do it locally. There is deliberately no
+            &ldquo;does this domain have a badge&rdquo; lookup: it would let a browser extension
+            report every page its user visits to us, and this list does the same job without being
+            able to.
+          </li>
+        </ul>
       </section>
     </div>
   );

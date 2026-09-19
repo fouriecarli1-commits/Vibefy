@@ -1,4 +1,5 @@
 export * from './payload.ts';
+export * from './public-status.ts';
 export * from './keys.ts';
 export * from './sign.ts';
 export * from './render.ts';
