@@ -144,10 +144,11 @@ describe('what a visitor is not shown', () => {
     // A view granted to `anon` is public data whatever a page chooses to
     // render.
     const page = readFileSync(join(process.cwd(), 'apps/web/app/a/[slug]/page.tsx'), 'utf8');
-    const loader = page.slice(
-      page.indexOf('async function loadAssurance'),
-      page.indexOf('async function loadBadge'),
-    );
+    // This one function, not everything between it and the next landmark: the
+    // page has since grown another loader that reads genuinely public data as
+    // `anon`, which is correct for that one and would have failed this.
+    const start = page.indexOf('async function loadAssurance');
+    const loader = page.slice(start, page.indexOf('\n}', start));
     expect(loader).toContain('writeAsService');
     expect(loader).not.toContain('readAsAnon');
   });

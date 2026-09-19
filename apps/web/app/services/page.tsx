@@ -100,6 +100,15 @@ const FOR_BUILDERS: readonly Service[] = [
     cta: 'Set one up',
   },
   {
+    href: '/verify',
+    name: 'A trust page we host for you',
+    what: 'Your verification page can carry your own details as well as ours: where somebody writes when something goes wrong, who to tell about a vulnerability, whether the service is up, and your policies.',
+    who: 'You have a badge, and people keep asking you questions the badge does not answer.',
+    get: 'One address to link from your own footer, with the assessment and your own details on it, kept visibly apart.',
+    not: 'We do not check what you write there, and the page says so under your name. It cannot say a badge means more than it does — the same wording rules we hold ourselves to are applied to your text when you save it.',
+    cta: 'See what a verification page looks like',
+  },
+  {
     href: '/directory',
     name: 'Be listed where people are looking',
     what: 'Applications with a live badge appear in a public directory, ordered by what the rubric found and nothing else.',

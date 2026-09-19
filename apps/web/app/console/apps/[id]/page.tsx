@@ -362,6 +362,26 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
       </section>
 
       {status === 'verified' && (
+        <section
+          aria-labelledby="trust-page"
+          className="space-y-3 rounded-xl border border-line p-6"
+        >
+          <h2 id="trust-page" className="text-lg font-semibold">
+            What you say about yourself
+          </h2>
+          <p className="max-w-prose text-sm text-muted">
+            Somebody who has just checked your mark usually wants something the assessment cannot
+            tell them — where to write when something goes wrong, who to tell about a security
+            problem, whether the service is up. You can put those on your verification page, in your
+            own section, under your own name.
+          </p>
+          <p className="text-sm">
+            <Link href={`/console/apps/${id}/trust`}>Add or change it</Link>
+          </p>
+        </section>
+      )}
+
+      {status === 'verified' && (
         <section aria-labelledby="assess" className="space-y-4">
           <h2 id="assess" className="text-2xl font-bold tracking-tight">
             Assessments

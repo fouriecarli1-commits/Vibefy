@@ -121,6 +121,37 @@ async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
   }).catch(() => null);
 }
 
+interface TrustPage {
+  owner_name: string;
+  contact_email: string | null;
+  security_contact: string | null;
+  status_url: string | null;
+  privacy_url: string | null;
+  terms_url: string | null;
+  note: string | null;
+  updated_at: string;
+}
+
+/**
+ * The owner's own words, which are theirs and not ours.
+ *
+ * Loaded separately and rendered in its own section on purpose. The moment a
+ * customer can type onto a page carrying our mark, a reader has to be able to
+ * tell which half is which — and the only reliable way to do that is to keep
+ * the two apart everywhere, including in the code that fetches them.
+ */
+async function loadTrustPage(slug: string): Promise<TrustPage | null> {
+  return readAsAnon(async (client) => {
+    const { rows } = await client.query<TrustPage>(
+      `select owner_name, contact_email, security_contact, status_url,
+              privacy_url, terms_url, note, updated_at
+         from public.trust_page_public where badge_slug = $1`,
+      [slug],
+    );
+    return rows[0] ?? null;
+  }).catch(() => null);
+}
+
 async function loadBadge(slug: string): Promise<BadgeRecord | null> {
   return readAsAnon(async (client) => {
     const { rows } = await client.query<BadgeRecord>(
@@ -212,6 +243,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
   const badge = await loadBadge(slug);
   if (!badge) notFound();
   const assurance = await loadAssurance(slug);
+  const trustPage = await loadTrustPage(slug);
 
   const assessedOn = new Date(badge.assessed_at).toISOString().slice(0, 10);
   const status = STATUS_COPY[badge.status];
@@ -334,6 +366,86 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           shown whether it flatters or not — a measurement that only appears
           when it is good is an advertisement. */}
       {badge.exit_measurement?.score && <ExitPanel measurement={badge.exit_measurement} />}
+
+      {/* The owner's own words.
+          
+          Everything above this line is what an assessment found. Everything in
+          here is what the application's owner says about themselves, and a
+          reader who cannot tell the difference has been misled by the layout
+          rather than by anything either of us wrote. So: their name in the
+          heading, a sentence saying we did not check it, and a visible edge. */}
+      {trustPage && (
+        <section
+          aria-labelledby="owner-says"
+          className="space-y-4 rounded-xl border border-line-strong p-6"
+        >
+          <div className="space-y-1">
+            <p className="eyebrow">Not checked by us</p>
+            <h2 id="owner-says" className="text-2xl font-bold tracking-tight">
+              What {trustPage.owner_name} says about itself
+            </h2>
+            <p className="max-w-prose text-sm text-muted">
+              Written by the application’s owner, not by VibefyCode. We have not verified any of it,
+              and none of it was part of the assessment above. It is here because a reader who has
+              just checked a mark usually wants to know where to write if something goes wrong, and
+              only the owner can answer that.
+            </p>
+          </div>
+
+          <dl className="grid gap-4 sm:grid-cols-2">
+            {trustPage.contact_email && (
+              <div className="space-y-1">
+                <dt className="font-medium">If something goes wrong</dt>
+                <dd className="text-sm text-muted">
+                  <a href={`mailto:${trustPage.contact_email}`}>{trustPage.contact_email}</a>
+                </dd>
+              </div>
+            )}
+            {trustPage.security_contact && (
+              <div className="space-y-1">
+                <dt className="font-medium">Reporting a vulnerability</dt>
+                <dd className="text-sm text-muted">{trustPage.security_contact}</dd>
+              </div>
+            )}
+            {trustPage.status_url && (
+              <div className="space-y-1">
+                <dt className="font-medium">Whether it is up</dt>
+                <dd className="text-sm text-muted">
+                  <a href={trustPage.status_url} rel="nofollow noopener">
+                    {trustPage.status_url}
+                  </a>
+                </dd>
+              </div>
+            )}
+            {trustPage.privacy_url && (
+              <div className="space-y-1">
+                <dt className="font-medium">What they do with your data</dt>
+                <dd className="text-sm text-muted">
+                  <a href={trustPage.privacy_url} rel="nofollow noopener">
+                    {trustPage.privacy_url}
+                  </a>
+                </dd>
+              </div>
+            )}
+            {trustPage.terms_url && (
+              <div className="space-y-1">
+                <dt className="font-medium">Their terms</dt>
+                <dd className="text-sm text-muted">
+                  <a href={trustPage.terms_url} rel="nofollow noopener">
+                    {trustPage.terms_url}
+                  </a>
+                </dd>
+              </div>
+            )}
+          </dl>
+
+          {trustPage.note && <p className="max-w-prose text-sm">{trustPage.note}</p>}
+
+          <p className="text-sm text-muted">
+            Last changed by them on {new Date(trustPage.updated_at).toISOString().slice(0, 10)}.
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="verify" className="space-y-4">
         <h2 id="verify" className="text-2xl font-bold tracking-tight">

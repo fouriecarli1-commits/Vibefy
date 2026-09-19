@@ -4,5 +4,6 @@ export * from './mark-outline.generated.ts';
 export * from './tokens.ts';
 export * from './legal.ts';
 export * from './stops.ts';
+export * from './claim-check.ts';
 export * from './badge-usage.ts';
 export * from './contrast.ts';

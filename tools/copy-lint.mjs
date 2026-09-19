@@ -73,6 +73,12 @@ const SKIP_DIRS = new Set([
 const SKIP_FILES = new Set([
   'tools/copy-lint.mjs',
   'tools/copy-lint.test.ts',
+  // The run-time half of this gate, which necessarily contains every phrase it
+  // refuses. Skipping it is safe only because `tests/claim-check.test.ts` pins
+  // its list to the one in this file: prose smuggled in there fails that test
+  // instead, and two lists that could drift would be worse than one skipped
+  // file — the drifting one would be the one facing the public.
+  'packages/shared/src/claim-check.ts',
   'supabase/migrations/20260830110000_publish_rubric_1_0_0.sql',
   // And 1.1.0's, for the identical reason: it embeds the same rubric JSON, and
   // `tests/rubric-published.test.ts` pins every published version's payload to
