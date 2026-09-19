@@ -201,3 +201,37 @@ describe('what it must never be mistaken for', () => {
     expect(source).toMatch(/Nothing is probed/);
   });
 });
+
+describe('the header check and the fetcher agree on case', () => {
+  /*
+   * The headers this reads are looked up in lower case, and the fixture pair
+   * supplies them that way — so a fetcher that handed over `Content-Security-
+   * Policy` would make the check report all four as missing on every page on
+   * the internet, and both halves of the fixture would still pass.
+   *
+   * It is the kind of mistake that is invisible in a test and obvious in
+   * production, so the contract is pinned rather than assumed.
+   */
+  it('the fetcher lowercases what it hands over', () => {
+    const fetcher = readFileSync(join(process.cwd(), 'packages/trustcheck/src/fetch.ts'), 'utf8');
+    expect(fetcher).toMatch(/headers\[key\.toLowerCase\(\)\] = value/);
+  });
+
+  it('the check looks them up the same way', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'packages/trustcheck/src/preflight.ts'),
+      'utf8',
+    );
+    expect(source).toMatch(/page\.headers\[name\.toLowerCase\(\)\]/);
+  });
+
+  it('reports a header as present when it is there under that name', () => {
+    const withOne = preflightItems(
+      { ...readyPage, headers: { 'content-security-policy': "default-src 'self'" } },
+      'https://kettle.example/',
+    );
+    const headers = withOne.find((item) => item.id === 'headers')!;
+    expect(headers.detail).toContain('3 of the four');
+    expect(headers.evidence).not.toContain('content-security-policy');
+  });
+});
