@@ -265,3 +265,56 @@ describe('what a report shows never changes what it scored', () => {
     expect(fingerprint(free.html)).toBe(fingerprint(paid.html));
   });
 });
+
+describe('when somebody else pays for the assessment', () => {
+  /*
+   * A platform paying for every application it lists is a reasonable thing to
+   * want, and it changes two things at once: the person paying is no longer the
+   * person being assessed, and one customer can become a large share of our
+   * income. The policy has to answer both before the first conversation rather
+   * than after it — afterwards, every answer looks like it was written to suit
+   * the deal that was already signed.
+   *
+   * These read the published policy, because the policy is the artefact. Code
+   * enforces the first of them; the rest are commitments, and a commitment
+   * nobody wrote down is not one.
+   */
+  const policy = readFileSync(
+    join(process.cwd(), 'legal/rating-methodology-and-independence.md'),
+    'utf8',
+  );
+
+  it('says only the owner may authorise testing, whoever is paying', () => {
+    expect(policy).toMatch(/Authorisation is never transferable/);
+    expect(policy).toMatch(/no payment creates one/i);
+  });
+
+  it('says payment may never depend on the answer', () => {
+    // The arrangement that would end this company: paid only for the ones that
+    // pass. An assessor whose income moves with the result is not an assessor.
+    expect(policy).toMatch(/Payment may never depend on the answer/);
+    expect(policy).toMatch(
+      /paid only for\s+applications that pass|paid only for applications that pass/,
+    );
+  });
+
+  it('says a platform cannot have somebody else’s badge removed', () => {
+    expect(policy).toMatch(/cannot have somebody else's badge removed/i);
+  });
+
+  it('commits to disclosing revenue concentration, with a number', () => {
+    // Written down so it cannot be quietly revised upward by whoever is
+    // negotiating the deal it would apply to.
+    expect(policy).toMatch(/\*\*20%\*\* of\s*\n?\s*revenue|more than \*\*20%\*\*/);
+    expect(policy).toMatch(/Concentration is disclosed/);
+  });
+
+  it('says badges survive the platform that paid for them', () => {
+    expect(policy).toMatch(/Termination is not leverage/);
+    expect(policy).toMatch(/belongs to the application's owner/i);
+  });
+
+  it('is still a draft, and still says so at the top', () => {
+    expect(policy.split('\n').slice(0, 5).join(' ')).toMatch(/DRAFT/);
+  });
+});

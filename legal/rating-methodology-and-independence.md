@@ -4,7 +4,7 @@
 > Not legal advice. Not a substitute for a lawyer. Unlike the other documents here, this one is
 > intended to be **published in full** — it is the source of the mark's credibility.
 
-**Version:** 1.0.0-draft · **Status:** not in force · **Baseline:** GDPR-grade
+**Version:** 1.1.0-draft · **Status:** not in force · **Baseline:** GDPR-grade
 
 ---
 
@@ -56,13 +56,44 @@ rating appears**, including on the verification page and, from the point the dir
 on their listing. If paid placement is ever introduced in the directory, it will be visually
 and textually labelled as advertising and will never alter organic ordering.
 
-## 6. What a customer may do
+## 6. When somebody else pays for the assessment
+
+A platform, marketplace or app store may want every application it lists to be assessed, and may
+want to pay for that itself. It is a reasonable thing to want and it changes two things at once:
+the person paying is no longer the person being assessed, and one customer can become a large
+share of our income. Both have to be answered before the first conversation, not after it.
+
+- **Authorisation is never transferable.** Only the owner of an application may authorise testing
+  of it. A platform's terms with its own sellers are between them and their sellers; they are not
+  an authorisation to us, and no payment creates one. This is enforced in the database rather
+  than promised here: an assessment row cannot exist without pointing at a verified authorisation
+  record for that application.
+- **The subject sees it first.** Results go to the application's owner. A platform that pays does
+  not receive an unpublished assessment of somebody else's application before its owner has it,
+  and receives nothing at all about an application whose owner has not agreed to share it.
+- **Payment may never depend on the answer.** No arrangement in which we are paid only for
+  applications that pass, paid more for a higher score, paid less for a failure, or repaid when a
+  listing is refused. An assessor whose income moves with the result is not an assessor.
+- **A platform cannot have somebody else's badge removed.** A badge is suspended by drift, by
+  expiry, by its owner, or by us with a stated reason and the appeals policy in force. That a
+  platform stopped paying, or delisted a seller, is not one of those.
+- **Concentration is disclosed.** Where any single customer accounts for more than **20%** of
+  revenue in a financial year, that fact is published on the methodology page for as long as it
+  remains true. Twenty is a judgement rather than a rule anybody has set for us, and it is written
+  down so that it cannot be quietly revised upward by whoever is negotiating.
+- **Recusal covers the relationship, not only the application.** Anybody who negotiates or manages
+  a platform relationship may not review assessments of applications listed on that platform.
+- **Termination is not leverage.** If a platform stops paying, badges already issued stand for
+  their term. The mark belongs to the application's owner, who earned it, and not to whoever paid
+  the invoice.
+
+## 7. What a customer may do
 
 You may decline to publish a report, appeal a finding, request a re-test after remediation, and
 opt out of any public listing entirely while remaining certified. You may not purchase a change
 to a score.
 
-## 7. Refusal and revocation
+## 8. Refusal and revocation
 
 We may refuse to assess or decline to certify. We may revoke a badge. In each case we state a
 reason and the Appeals & Corrections Policy applies.

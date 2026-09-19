@@ -83,12 +83,12 @@
       "sha256": "e050af724d9f4887c7190c88160a01785660c44bbb161a0a70e50efdb125bac3"
     },
     "rating-methodology-and-independence.md": {
-      "version": "1.0.0-draft",
+      "version": "1.1.0-draft",
       "status": "not in force",
       "requiresConsent": false,
       "consentDocumentType": null,
       "isDraft": true,
-      "sha256": "4f16847a01bcf2abc76215725aa290b1667dbaa6c85d9c6108cac78bcbbea247"
+      "sha256": "7e86fe581eedbbf787bbf756dcc5de63f9f6ef44a8bee620ad7ff55c28484cfc"
     },
     "refund-and-cancellation.md": {
       "version": "1.0.0-draft",
