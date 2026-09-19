@@ -91,6 +91,11 @@ const GROUPS: readonly NavGroup[] = [
     items: [
       { href: '/console', label: 'Overview', hint: 'Your applications and their state' },
       { href: '/console/portfolio', label: 'Portfolio', hint: 'Every application, one page' },
+      {
+        href: '/console/profile',
+        label: 'Your public page',
+        hint: 'A page of your assessed work, if you want one',
+      },
       { href: '/console/alerts', label: 'Alerts', hint: 'What changed, and what it costs you' },
       { href: '/console/billing', label: 'Billing', hint: 'Plan, invoices and receipts' },
       {

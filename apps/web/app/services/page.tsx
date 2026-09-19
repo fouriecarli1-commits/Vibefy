@@ -91,6 +91,15 @@ const FOR_BUILDERS: readonly Service[] = [
     cta: 'The service, and its conflict',
   },
   {
+    href: '/console/profile',
+    name: 'A page of your own work',
+    what: 'A public page listing the applications you have had assessed, with the marks that are live today, at an address you choose.',
+    who: 'You build quickly, you would like to be taken seriously, and you have nothing to link to from a proposal or the bottom of a CV.',
+    get: 'One page, one address, and a link for each application to the evidence behind it.',
+    not: 'Nothing appears on it until you put it there, one application at a time, and taking any of it down is one action that needs nobody’s agreement but yours. It is a list of assessments, not a rating of you.',
+    cta: 'Set one up',
+  },
+  {
     href: '/directory',
     name: 'Be listed where people are looking',
     what: 'Applications with a live badge appear in a public directory, ordered by what the rubric found and nothing else.',

@@ -9,7 +9,7 @@
  */
 
 import type { Client } from 'pg';
-import { seedBadgedApp } from '../tests/setup/seed.ts';
+import { seedBadgedApp, seedBuilderProfile } from '../tests/setup/seed.ts';
 
 /**
  * Routes scanned only after something is seeded for them.
@@ -20,7 +20,7 @@ import { seedBadgedApp } from '../tests/setup/seed.ts';
  * silently stops being scanned, which is how the verification page came to be
  * missing in the first place.
  */
-export const SEEDED_ROUTES: readonly string[] = ['/a/[slug]'];
+export const SEEDED_ROUTES: readonly string[] = ['/a/[slug]', '/b/[handle]'];
 
 /**
  * Words that must appear on a page, or the scan was not of the page it thinks.
@@ -99,4 +99,20 @@ export function matchesSeededRoute(page: string): boolean {
   return SEEDED_ROUTES.some((route) =>
     new RegExp(`^${route.replace(/\[[^\]]+\]/g, '[^/]+')}$`).test(page),
   );
+}
+
+/**
+ * Seeds a published builder profile and returns the page that now exists.
+ *
+ * The same problem as the verification page, and the same answer: the address
+ * does not exist until somebody has published one, so the scan makes one. The
+ * content guard insists on a sentence only the real page carries, because an
+ * unpublished handle renders the not-found page, which is accessible and would
+ * pass the scan having proved nothing.
+ */
+export async function seedProfilePage(client: Client): Promise<string> {
+  const { handle } = await seedBuilderProfile(client, 'a11y-profile');
+  const page = `/b/${handle}`;
+  MUST_CONTAIN[page] = 'What this page is';
+  return page;
 }

@@ -324,3 +324,36 @@ export async function seedBadgedApp(
   );
   return { slug: rows[0]!.slug, appId, assessmentId };
 }
+
+/**
+ * A published builder profile with one badged application on it.
+ *
+ * Used by the accessibility scan, which cannot visit `/b/<handle>` until a
+ * profile exists — the same problem the verification page has, and the same
+ * answer. Returns the handle so the scanner can build the address.
+ */
+export async function seedBuilderProfile(
+  client: Client,
+  label = 'a11y-profile',
+): Promise<{ handle: string; appId: string }> {
+  const { appId } = await seedBadgedApp(client, label);
+  const { rows } = await client.query<{ organisation_id: string; created_by: string }>(
+    'select organisation_id, created_by from public.apps where id = $1',
+    [appId],
+  );
+  const app = rows[0]!;
+  const handle = `builder-${randomUUID().slice(0, 8)}`;
+
+  await client.query(
+    `insert into public.builder_profiles (organisation_id, handle, display_name, tagline, published)
+     values ($1, $2, 'A Builder', 'Builds things, has them checked.', true)`,
+    [app.organisation_id, handle],
+  );
+  await client.query(
+    `insert into public.builder_profile_apps (organisation_id, app_id, consented_by)
+     values ($1, $2, $3)`,
+    [app.organisation_id, appId, app.created_by],
+  );
+
+  return { handle, appId };
+}

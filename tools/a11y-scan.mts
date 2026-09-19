@@ -20,7 +20,12 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { auditUrl, closeAxeBrowser, describe as explain } from '../tests/setup/axe.ts';
 import { DESKTOP_VIEWPORT, MOBILE_VIEWPORT } from '../packages/engine/src/runtime/browser.ts';
-import { MUST_CONTAIN, scannedTheWrongPage, seedVerificationPage } from './a11y-contract.mts';
+import {
+  MUST_CONTAIN,
+  scannedTheWrongPage,
+  seedProfilePage,
+  seedVerificationPage,
+} from './a11y-contract.mts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 3123;
@@ -136,8 +141,9 @@ async function main(): Promise<void> {
       await run('bash', ['scripts/test-db.sh', 'reset'], root);
     }
 
-    console.log('· Seeding a badge, so the verification page can be opened…');
+    console.log('· Seeding a badge and a profile, so those pages can be opened…');
     PAGES.push(await withDatabase(seedVerificationPage));
+    PAGES.push(await withDatabase(seedProfilePage));
 
     console.log('· Building the app…');
     await run('pnpm', ['exec', 'next', 'build'], web);
