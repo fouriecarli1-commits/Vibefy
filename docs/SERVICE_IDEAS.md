@@ -3,14 +3,27 @@
 Anré asked, on the night of 18 September 2026, for creative thinking about what more
 this product could offer. This is that thinking, written down rather than built.
 
-**Nothing here is built.** PART 11 of the brief says not to add a feature that is not in
-the brief without asking first, and asking first is the point of this file. Each entry
-is written so that the answer can be yes, no, or not yet, without a conversation first:
-what it is, who pays, what it needs that we do not already have, what could go wrong,
-and roughly how big it is.
+**All eight of these are now built.** Anré's answer, on 19 September 2026, was to build
+them all — so this file is no longer a proposal, it is the reasoning behind eight things
+that exist. Each entry is left exactly as it was written, including the sizes I guessed
+at, because a proposal edited after the fact stops being evidence of what was decided.
 
-The order is my recommendation, best first. Three of them I would build next week; the
-rest are here because the reasoning is worth keeping even where the answer is no.
+What actually shipped differs from the proposal in three places, and each difference is
+recorded in `DECISIONS.md` with its reason: the percentile is shown at both tiers rather
+than only the paid one, there is no per-domain lookup behind the badge endpoint, and the
+extension does not light up by itself. All three went the more conservative way.
+
+The section at the end — the ideas that fail — was **not** part of that yes, and stays
+refused.
+
+PART 11 of the brief says not to add a feature that is not in the brief without asking
+first, and asking first was the point of this file. Each entry is written so that the
+answer could be yes, no, or not yet, without a conversation first: what it is, who pays,
+what it needs that we do not already have, what could go wrong, and roughly how big it
+is.
+
+The order was my recommendation, best first. It is also the order they were built in,
+except that the independence policy was written before the two largest.
 
 A note that applies to every line below. We sell an opinion about other people's
 software, and the only reason anybody should care about that opinion is that nothing
