@@ -9,6 +9,8 @@
 import type { RubricDimensionId, FindingSeverity, ConfidenceLevel } from '@vibefycode/rubric';
 
 /** What the customer is entitled to see. Never what they were scored. */
+import type { Comparison } from './comparison.ts';
+
 export type ReportTier = 'free' | 'paid';
 
 export interface ReportFinding {
@@ -85,6 +87,15 @@ export interface ReportSource {
   readonly branding?: ReportBranding | null;
   /** The organisation's own bar, and whether this assessment cleared it. */
   readonly policy?: ReportPolicy | null;
+  /**
+   * Where this score stands among other assessed applications of the same kind.
+   *
+   * Optional because a report can be produced before there is anything to
+   * compare against, and because the answer is sometimes "not enough of them
+   * yet" — which is printed rather than left out, so that nobody wonders
+   * whether the comparison was omitted because it was unflattering.
+   */
+  readonly comparison?: Comparison | null;
 }
 
 export interface ReportBranding {

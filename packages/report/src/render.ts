@@ -172,6 +172,27 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
       </aside>`
     : '';
 
+  /*
+   * Where this score stands among other applications of the same kind.
+   *
+   * Printed whatever it says, including "there are not enough of them yet".
+   * A comparison that only appears when it flatters is an advertisement, and
+   * a reader who has seen one once will wonder about every report that leaves
+   * it out.
+   */
+  const comparison = source.comparison ?? null;
+  const comparisonHtml = comparison
+    ? `<section>
+  <h2>Where this stands</h2>
+  ${
+    comparison.kind === 'percentile'
+      ? `<p><strong>${escapeHtml(comparison.sentence)}</strong></p>
+     <p class="muted">${escapeHtml(comparison.limits)}</p>`
+      : `<p class="muted">${escapeHtml(comparison.explanation)}</p>`
+  }
+</section>`
+    : '';
+
   const policy = source.policy ?? null;
   const policyHtml = policy
     ? `<section class="callout">
@@ -257,6 +278,8 @@ ${
       : `<p class="muted">This assessment met the published certification threshold on the date above.</p>`
   }
 </section>
+
+${comparisonHtml}
 
 <section>
   <h2>Findings${view.hiddenFindingCount > 0 ? ` — the ${view.findings.length} most serious` : ''}</h2>

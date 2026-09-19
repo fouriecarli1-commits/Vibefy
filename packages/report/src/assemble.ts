@@ -11,6 +11,7 @@
  */
 import { getRubric } from '@vibefycode/rubric';
 import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefycode/policy';
+import { compareToPeers } from './comparison.ts';
 import type { ReportSource } from './types.ts';
 
 /** The smallest database surface this needs. `pg.PoolClient` satisfies it. */
@@ -25,6 +26,7 @@ interface AssessmentRow {
   app_name: string;
   primary_url: string | null;
   intended_for_app_store: boolean;
+  category: string | null;
   policy_profile_id: string | null;
   organisation_name: string;
   rubric_version: string;
@@ -83,7 +85,7 @@ export async function assembleReportSource(
 ): Promise<ReportSource> {
   const assessment = await client.query<AssessmentRow>(
     `select a.*, app.name as app_name, app.primary_url, app.intended_for_app_store,
-            o.name as organisation_name
+            app.category, o.name as organisation_name
        from public.assessments a
        join public.apps app on app.id = a.app_id
        join public.organisations o on o.id = a.organisation_id
@@ -137,6 +139,28 @@ export async function assembleReportSource(
         )
       ).rows[0]
     : undefined;
+
+  /*
+   * Where this score stands among other applications of the same kind.
+   *
+   * A `security definer` function, because a customer may not read another
+   * organisation's assessments and nothing here changes that: what comes back
+   * is a bare array of numbers, with no names, no identifiers and nothing that
+   * could be joined back to an application.
+   *
+   * Best-effort. A report that fails to render because a comparison could not
+   * be computed is a worse report than one without a comparison.
+   */
+  let peerScores: number[] = [];
+  try {
+    const peers = await client.query<{ scores: string[] | null }>(
+      'select public.category_peer_scores($1) as scores',
+      [assessmentId],
+    );
+    peerScores = (peers.rows[0]?.scores ?? []).map(Number).filter(Number.isFinite);
+  } catch {
+    peerScores = [];
+  }
 
   const rubric = getRubric(row.rubric_version);
   const labelFor = (id: string) => rubric.dimensions.find((d) => d.id === id)?.label ?? id;
@@ -215,6 +239,11 @@ export async function assembleReportSource(
       evidence: finding.evidence,
     })),
     narrative,
+    comparison: compareToPeers({
+      score: Number(row.overall_score ?? 0),
+      category: row.category ?? null,
+      peerScores,
+    }),
     stages: runs.rows.map((run) => ({
       stage: run.stage,
       status: run.status,
