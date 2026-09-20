@@ -4,6 +4,8 @@
  * a product and a breach, so it is asserted against a real database with the
  * real policies, for every table that carries customer data.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
 import { actingAs, connect, expectRefusal } from './setup/client.ts';
@@ -265,5 +267,121 @@ describe('a table with policies and no grants is a table nobody can reach', () =
       silent,
       `Tables with row-level security and no policy at all: ${silent.join(', ')}`,
     ).toEqual([]);
+  });
+});
+
+describe('the invariants this schema rests on, asked of the catalogue', () => {
+  /*
+   * Three properties that are true today, that nothing enforces, and whose
+   * failure would be silent. The grant bug was found by asking the catalogue a
+   * question rather than by reading a migration, and these are the other
+   * questions worth asking about a schema shaped like this one.
+   */
+
+  it('pins the search path on every function that runs as its definer', async () => {
+    /*
+     * A `security definer` function without a pinned `search_path` is the
+     * textbook Postgres privilege escalation: the caller controls which schema
+     * a bare name resolves to, so they choose the code the function runs. Ours
+     * all pin it. Nothing made them, until now.
+     */
+    const { rows } = await db.query<{ proname: string }>(
+      `select p.proname
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.prosecdef
+          and not coalesce(p.proconfig, '{}') @> array['search_path=public, pg_temp']
+        order by p.proname`,
+    );
+    const unpinned = rows.map((row) => row.proname);
+    expect(
+      unpinned,
+      `Definer functions with no pinned search path:\n  ${unpinned.join('\n  ')}\n` +
+        'Add `set search_path = public, pg_temp`. Without it the caller chooses which schema a bare name resolves to, which means the caller chooses the code.',
+    ).toEqual([]);
+  });
+
+  it('turns row-level security on for every table in public', async () => {
+    // A table without it is readable by anybody the grant reaches, which for
+    // `authenticated` is every customer at once.
+    const { rows } = await db.query<{ relname: string }>(
+      `select c.relname
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+        order by c.relname`,
+    );
+    const open = rows.map((row) => row.relname);
+    expect(open, `Tables with no row-level security: ${open.join(', ')}`).toEqual([]);
+  });
+
+  it('knows every view a stranger can read, and why it bypasses those policies', async () => {
+    /*
+     * A view declared `security_invoker = false` runs with its owner's rights,
+     * so the policies on the tables underneath it do not apply. That is correct
+     * for the handful of things we publish deliberately, and it is a data leak
+     * for anything else — and the difference is a single option nobody would
+     * notice in review.
+     *
+     * So each one is named here with the reason it is public. A new view
+     * readable by `anon` fails this test until somebody writes that reason
+     * down, which is the only moment anybody will think about it.
+     */
+    const PUBLISHED: Readonly<Record<string, string>> = {
+      badge_verification:
+        'The verification page. A badge nobody can check is not a badge, so this is public by design.',
+      directory:
+        'The public directory, which shows only applications whose owner chose to be listed.',
+      listed_badges:
+        'The list published in bulk, which honours the same choice the directory does.',
+      builder_profile_public:
+        'A builder page, published only when its owner publishes it, holding only applications they consented to one at a time.',
+      trust_page_public:
+        'The owner’s own words on their verification page, published only when they publish them.',
+      live_sponsorships:
+        'The paid placements currently running. An advertisement nobody can see is not one, and it is labelled as paid wherever it appears.',
+    };
+
+    const { rows } = await db.query<{ relname: string }>(
+      `select c.relname
+         from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public'
+          and c.relkind = 'v'
+          and has_table_privilege('anon', c.oid, 'select')
+          and coalesce(
+                (select option_value from pg_options_to_table(c.reloptions)
+                  where option_name = 'security_invoker'),
+                'false'
+              ) = 'false'
+        order by c.relname`,
+    );
+
+    const found = rows.map((row) => row.relname);
+    const undeclared = found.filter((name) => !(name in PUBLISHED));
+    expect(
+      undeclared,
+      `Views a stranger can read that bypass row-level security, with no reason recorded:\n  ${undeclared.join('\n  ')}\n` +
+        'Add it to PUBLISHED with why it is public, or make it security_invoker.',
+    ).toEqual([]);
+
+    // And the other direction: a name left here after its view was deleted is
+    // a reason nobody is holding anybody to.
+    const gone = Object.keys(PUBLISHED).filter((name) => !found.includes(name));
+    expect(gone, `Declared public views that no longer exist: ${gone.join(', ')}`).toEqual([]);
+  });
+
+  it('does not excuse a public view without a reason', () => {
+    // A bare name on that list would defeat the point of the list.
+    const source = readFileSync(join(process.cwd(), 'tests/rls-isolation.test.ts'), 'utf8');
+    const block = /const PUBLISHED: Readonly<Record<string, string>> = \{([\s\S]*?)\n    \};/.exec(
+      source,
+    );
+    expect(block).not.toBeNull();
+    for (const reason of [...block![1]!.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]!)) {
+      if (reason.endsWith('_public') || !reason.includes(' ')) continue;
+      expect(reason.length).toBeGreaterThan(40);
+    }
   });
 });
