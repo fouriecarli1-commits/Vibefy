@@ -21,6 +21,7 @@ import {
 } from '../packages/badge/src/index.ts';
 import {
   BADGE_LICENCE_VERSION,
+  VALIDITY_MONTHS,
   findIssuanceCandidates,
   issueBadgeFor,
   sweepBadgeIssuance,
@@ -155,6 +156,124 @@ describe('the three gates', () => {
       expect(
         (await findIssuanceCandidates(client)).some((c) => c.assessmentId === assessmentId),
       ).toBe(false);
+    } finally {
+      client.release();
+    }
+  });
+});
+
+describe('what the candidate window can be jammed with', () => {
+  /** An application with no URL, which the schema allows for a repository. */
+  async function urllessApp(): Promise<string> {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.apps (organisation_id, name, slug, app_type, repository_url, created_by)
+       values ($1, 'Library', $2, 'repository', 'https://example.test/repo', $3)
+       returning id`,
+      [owner.organisationId, `lib-${Date.now().toString(36)}`, owner.userId],
+    );
+    return rows[0]!.id;
+  }
+
+  it('does not spend a slot on an application that can never have a badge', async () => {
+    // A badge asserts a certified origin, so an application with no URL cannot
+    // carry one — and it is never going to acquire one by waiting. Discarded in
+    // code after the limit, it is fetched again every sweep for ever, sitting at
+    // the front of the window because it is ordered oldest-review-first. Enough
+    // of them and badge issuance stops completely, for everybody, in silence.
+    const appId = await urllessApp();
+    const seeded = await seedAssessment(db, owner, { appId });
+    await seedFinding(db, owner, seeded.assessmentId, { severity: 'low' });
+    await approveAssessment(db, owner, seeded.assessmentId, reviewer.userId, {
+      certificationEligible: true,
+      score: 84.5,
+    });
+    await acceptLicence(owner);
+    const usable = await approvedAssessment();
+
+    // Both backdated ahead of everything else in the shared test database, the
+    // unusable one oldest. The window is ordered by review date, so this puts
+    // these two at the front of it deterministically — without that, whichever
+    // rows other tests in this file happened to leave behind decide the result.
+    await db.query(`update public.assessments set reviewed_at = $2 where id = $1`, [
+      seeded.assessmentId,
+      '2000-01-01T00:00:00Z',
+    ]);
+    await db.query(`update public.assessments set reviewed_at = $2 where id = $1`, [
+      usable.assessmentId,
+      '2000-01-02T00:00:00Z',
+    ]);
+
+    const client = await pool.connect();
+    try {
+      // A window of one. The unusable row is older, so while it is still being
+      // fetched it takes the only slot and the real candidate is never reached
+      // — which is the whole defect, and is invisible from the returned list
+      // alone because the discarded row does not appear there either way.
+      const candidates = await findIssuanceCandidates(client, 1);
+      expect(candidates.map((candidate) => candidate.appId)).toEqual([usable.appId]);
+    } finally {
+      client.release();
+    }
+  });
+});
+
+describe('what the free tier does not include', () => {
+  it('does not offer a badge to an organisation on the free plan', async () => {
+    // Said in as many words on the pricing page: "A badge. A free assessment
+    // never leads to one, at any score." Nothing but that sentence stood behind
+    // it — the three gates are about approval, findings and the licence, and
+    // none of them asks what anyone is on.
+    const { assessmentId } = await approvedAssessment();
+    await acceptLicence(owner);
+    await db.query(
+      `insert into public.subscriptions (organisation_id, plan, status) values ($1, 'free', 'active')`,
+      [owner.organisationId],
+    );
+
+    const client = await pool.connect();
+    try {
+      const candidates = await findIssuanceCandidates(client);
+      expect(candidates.some((candidate) => candidate.assessmentId === assessmentId)).toBe(false);
+    } finally {
+      client.release();
+    }
+  });
+
+  // There is no test here for a free row sitting alongside a paid one, or for
+  // an active subscription alongside a trial: `subscriptions_one_live_per_org`
+  // is a unique index over every live status, so an organisation cannot hold
+  // two at once and the state does not exist to test.
+});
+
+describe('how long a badge lasts', () => {
+  it('has an answer for every plan tier the database knows', async () => {
+    // Asked of the catalogue, because the gap is between a SQL enum and a
+    // TypeScript object that never mention each other. A tier added to one and
+    // forgotten in the other used to mean a twelve-month badge — the longest
+    // term we offer, handed out by a fallback.
+    const { rows } = await db.query<{ label: string }>(
+      `select e.enumlabel as label
+         from pg_enum e join pg_type t on t.oid = e.enumtypid
+        where t.typname = 'plan_tier'
+        order by e.enumsortorder`,
+    );
+    const unanswered = rows
+      .map((row) => row.label)
+      .filter((label) => VALIDITY_MONTHS[label] === undefined);
+    expect(unanswered, 'plan tiers with no badge validity defined').toEqual([]);
+  });
+
+  it('refuses to issue rather than guess at a term nobody decided', async () => {
+    const seeded = await approvedAssessment();
+    await acceptLicence(owner);
+    const client = await pool.connect();
+    try {
+      const candidate = (await findIssuanceCandidates(client)).find(
+        (c) => c.appId === seeded.appId,
+      );
+      await expect(
+        issueBadgeFor(client, { ...candidate!, plan: 'enterprise_2027' }, key),
+      ).rejects.toThrow(/no badge validity is defined/i);
     } finally {
       client.release();
     }
@@ -361,6 +480,34 @@ describe('telling the customer their badge exists', () => {
   });
 });
 
+describe('when this process holds no signing key', () => {
+  it('says so, once, rather than issuing nothing in silence', async () => {
+    // A deployment that only serves and verifies badges is right not to hold
+    // the key, so this is not an error. But on the deployment that is supposed
+    // to sign, it is every paying customer's badge quietly not arriving — and
+    // the code claimed in a comment to say so while saying nothing at all.
+    const previous = {
+      b64: process.env.VIBEFYCODE_BADGE_SIGNING_KEY_B64,
+      kid: process.env.VIBEFYCODE_BADGE_KEY_ID,
+    };
+    delete process.env.VIBEFYCODE_BADGE_SIGNING_KEY_B64;
+    delete process.env.VIBEFYCODE_BADGE_KEY_ID;
+    const said: string[] = [];
+    try {
+      expect(await sweepBadgeIssuance(pool, (message) => said.push(message))).toBe(0);
+      expect(said.join(' ')).toMatch(/no badge signing key/i);
+      // And then not again, because this runs every thirty seconds and a line
+      // every thirty seconds is a line nobody reads.
+      const again: string[] = [];
+      await sweepBadgeIssuance(pool, (message) => again.push(message));
+      expect(again).toEqual([]);
+    } finally {
+      if (previous.b64) process.env.VIBEFYCODE_BADGE_SIGNING_KEY_B64 = previous.b64;
+      if (previous.kid) process.env.VIBEFYCODE_BADGE_KEY_ID = previous.kid;
+    }
+  });
+});
+
 describe('the lifecycle sweep', () => {
   async function issueOne(): Promise<string> {
     const seeded = await approvedAssessment();
@@ -405,6 +552,42 @@ describe('the lifecycle sweep', () => {
     );
     expect(rows[0].status).toBe('suspended');
     expect(rows[0].suspended_at).not.toBeNull();
+  });
+
+  it('tells the owner when a lapsed subscription takes their badge down', async () => {
+    // The identical event from a liveness failure raises `badge_suspended`.
+    // This one raised nothing: the mark came off the verification page, the
+    // licence obliged the customer to take it off their own site too, and the
+    // only way to learn any of that was to open the console and look.
+    const badgeId = await issueOne();
+    await db.query(
+      `insert into public.subscriptions (organisation_id, plan, status) values ($1, 'certified', 'past_due')`,
+      [owner.organisationId],
+    );
+
+    await sweepBadgeLifecycle(pool);
+
+    const { rows } = await db.query<{ kind: string; body: string }>(
+      `select kind::text as kind, body from public.alerts
+        where organisation_id = $1 and kind = 'badge_suspended'`,
+      [owner.organisationId],
+    );
+    expect(rows).toHaveLength(1);
+    // The notice and the verification page must give the same reason, or the
+    // customer is reading two different accounts of the same event.
+    const badge = await db.query<{ suspension_reason: string }>(
+      'select suspension_reason from public.badges where id = $1',
+      [badgeId],
+    );
+    expect(rows[0]!.body).toContain(badge.rows[0]!.suspension_reason);
+
+    // And exactly one, however often the sweep runs.
+    await sweepBadgeLifecycle(pool);
+    const again = await db.query(
+      `select 1 from public.alerts where organisation_id = $1 and kind = 'badge_suspended'`,
+      [owner.organisationId],
+    );
+    expect(again.rowCount).toBe(1);
   });
 
   it('leaves a one-off purchase alone — it was bought outright, not rented', async () => {

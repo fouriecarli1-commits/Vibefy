@@ -722,9 +722,11 @@ export async function sweepLiveness(
          join lateral (
            select s.plan::text as plan from public.subscriptions s
             where s.organisation_id = app.organisation_id and s.status in ('active', 'trialing')
-            -- A paid-up subscription outranks a trial when an organisation has
-            -- both, so the cadence is the one they bought and not whichever row
-            -- the planner reached first.
+            -- At most one live subscription exists per organisation today, so
+            -- this tiebreak should never fire. It matches the re-assessment
+            -- sweep's version on purpose: two sweeps resolving the same
+            -- question differently is a difference nobody would think to look
+            -- for on the day the unique index is relaxed.
             order by case s.status when 'active' then 0 else 1 end
             limit 1
          ) sub on true

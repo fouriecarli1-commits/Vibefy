@@ -13,14 +13,30 @@
  */
 import { randomBytes } from 'node:crypto';
 import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefycode/badge';
-import { badgeIssuedAlert, isMonitored, type MonitoredPlan } from '@vibefycode/monitoring';
+import {
+  badgeIssuedAlert,
+  badgeSuspendedAlert,
+  isMonitored,
+  type MonitoredPlan,
+} from '@vibefycode/monitoring';
 import { badgeEmbedSnippet } from '@vibefycode/shared';
 import { raiseAlert } from './monitoring.ts';
 import registry from '../../../legal/registry.json' with { type: 'json' };
 import type { PoolClient } from 'pg';
 
-/** Twelve months is the outside limit; continuous plans get less. */
-const VALIDITY_MONTHS: Readonly<Record<string, number>> = {
+/**
+ * How long a badge lasts, by plan. Twelve months is the outside limit; a
+ * continuous plan gets less, because it is re-checked.
+ *
+ * `free` is here at zero rather than absent, and the difference matters. A
+ * missing entry used to fall through to twelve months — the longest term we
+ * offer — so the plan we know least about got the most generous answer. A new
+ * tier added to the enum and forgotten here would have issued year-long badges
+ * and nothing would have said a word. `tests/badge-issuance.test.ts` asks
+ * `pg_enum` for every plan tier and insists this map has an answer for each.
+ */
+export const VALIDITY_MONTHS: Readonly<Record<string, number>> = {
+  free: 0,
   one_off: 12,
   certified: 3,
   agency: 3,
@@ -79,8 +95,16 @@ function addMonths(from: Date, months: number): Date {
  * Everything that must be true before a badge exists, expressed as one query.
  *
  * Each clause is a rule we sell: a human approved it, the rubric gate passed,
- * the owner accepted the current Badge Licence, and no badge is already live for
- * this application.
+ * the owner accepted the current Badge Licence, somebody paid for it, and no
+ * badge is already live for this application.
+ *
+ * Every one of them is asked in SQL, and the reason is the page. This reads a
+ * limited number of rows ordered oldest-review-first, so a row that is fetched
+ * and then discarded in code is not merely wasted — it is fetched and discarded
+ * *again on the next sweep*, for ever, because nothing about it ever changes.
+ * A handful of those sit at the front of the window and quietly eat the budget;
+ * twenty of them stop badge issuance completely, for every customer, with
+ * nothing in the log to say so.
  */
 export async function findIssuanceCandidates(
   client: PoolClient,
@@ -127,14 +151,48 @@ export async function findIssuanceCandidates(
          select s.plan from public.subscriptions s
           where s.organisation_id = a.organisation_id
             and s.status in ('active', 'trialing')
+            -- The free tier is not a plan that carries a badge. The pricing page
+            -- says so in as many words — "a free assessment never leads to one,
+            -- at any score" — and until this clause existed nothing but that
+            -- sentence stood behind it.
+            and s.plan <> 'free'
+          -- A tiebreak that should never be needed: subscriptions_one_live_per_org
+          -- is unique over every live status, so there is at most one row to
+          -- pick. It is written down anyway because this decides how long a
+          -- badge lasts, and a limit 1 with no order is a coin toss waiting for
+          -- the day that index is relaxed.
+          order by case s.status when 'active' then 0 else 1 end
           limit 1
        ) sub on true
       where a.status = 'approved'
         and a.certification_eligible
         and a.overall_score is not null
+        -- A badge asserts a certified origin, so an application with no URL
+        -- cannot carry one. Repositories and mobile builds are allowed to have
+        -- no primary_url by constraint, which is why this is a real row and
+        -- not a defensive nicety — and why it belongs here rather than in a
+        -- filter after the limit, where it would jam the window for ever.
+        and app.primary_url is not null
         -- The app id, not the assessment id: a badge must not issue for an
         -- application whose authorisation has since been withdrawn.
         and public.app_is_authorised_for_testing(a.app_id)
+        -- The free tier does not carry a badge. The lateral above declines to
+        -- pick a free plan, so this says: either a plan that is not free is in
+        -- force, or no subscription is in force at all — which is what a one-off
+        -- purchase looks like from here and is left exactly as it was.
+        --
+        -- Deliberately not a fourth gate. Whether an organisation with no
+        -- subscription and no paid invoice should be issued a badge is a
+        -- question about what we sell, not a defect, and it is recorded in
+        -- docs/OPEN_ITEMS.md rather than decided here.
+        and (
+          sub.plan is not null
+          or not exists (
+            select 1 from public.subscriptions s
+             where s.organisation_id = a.organisation_id
+               and s.status in ('active', 'trialing')
+          )
+        )
         and not exists (
           select 1 from public.badges b
            where b.app_id = a.app_id and b.status in ('active', 'suspended')
@@ -144,21 +202,21 @@ export async function findIssuanceCandidates(
     [limit, BADGE_LICENCE_VERSION],
   );
 
-  return rows
-    .filter((row) => Boolean(row.primary_url))
-    .map((row) => ({
-      assessmentId: row.assessment_id,
-      appId: row.app_id,
-      organisationId: row.organisation_id,
-      appName: row.app_name,
-      primaryUrl: row.primary_url,
-      rubricVersion: row.rubric_version,
-      score: Number(row.overall_score),
-      assessedOn: row.assessed_on,
-      plan: row.plan ?? 'one_off',
-      consentId: row.consent_id,
-      isMarketingClient: row.is_marketing_client,
-    }));
+  return rows.map((row) => ({
+    assessmentId: row.assessment_id,
+    appId: row.app_id,
+    organisationId: row.organisation_id,
+    appName: row.app_name,
+    primaryUrl: row.primary_url,
+    rubricVersion: row.rubric_version,
+    score: Number(row.overall_score),
+    assessedOn: row.assessed_on,
+    // No subscription but a paid invoice for this application is what a one-off
+    // purchase looks like: a photograph, twelve months, not monitored.
+    plan: row.plan ?? 'one_off',
+    consentId: row.consent_id,
+    isMarketingClient: row.is_marketing_client,
+  }));
 }
 
 export async function issueBadgeFor(
@@ -169,7 +227,15 @@ export async function issueBadgeFor(
 ): Promise<{ badgeId: string; slug: string; publicId: string }> {
   const publicId = randomBytes(16).toString('base64url');
   const slug = slugify(candidate.appName);
-  const months = VALIDITY_MONTHS[candidate.plan] ?? 12;
+  const months = VALIDITY_MONTHS[candidate.plan];
+  // Refusing beats guessing. A plan this file has never heard of is a plan
+  // whose terms nobody has decided, and the old fallback decided them in the
+  // customer's favour by twelve months at a time, silently.
+  if (months === undefined || months <= 0) {
+    throw new Error(
+      `No badge validity is defined for the plan "${candidate.plan}", so no badge was issued.`,
+    );
+  }
   const expiresAt = addMonths(now, months);
 
   const payload: BadgePayload = {
@@ -263,7 +329,16 @@ async function announceIssuedBadge(
     [result.badgeId],
   );
   const expiresAt = rows[0]?.expires_at;
-  if (!expiresAt) return;
+  if (!expiresAt) {
+    // The badge was written a moment ago on this same connection, so this is
+    // unreachable — which is exactly why it gets a line rather than a bare
+    // return. An unreachable branch that is silently reached is the worst
+    // possible combination.
+    log('badge issued but its expiry could not be read back, so it was not announced', {
+      badgeId: result.badgeId,
+    });
+    return;
+  }
 
   const draft = badgeIssuedAlert({
     appName: candidate.appName,
@@ -286,6 +361,15 @@ async function announceIssuedBadge(
   await raiseAlert(client, candidate.organisationId, draft);
 }
 
+/**
+ * Whether the missing-key notice has already been given.
+ *
+ * Module scope on purpose: the sweep is called afresh every thirty seconds, so
+ * anything narrower would say it every thirty seconds and thereby say nothing.
+ * Reset when a key appears, so the notice returns if the key goes away again.
+ */
+let saidTheKeyIsMissing = false;
+
 export async function sweepBadgeIssuance(
   pool: { connect(): Promise<PoolClient> },
   log: (message: string, detail?: Record<string, unknown>) => void = () => undefined,
@@ -293,10 +377,21 @@ export async function sweepBadgeIssuance(
   const key = loadSigningKey();
   if (!key) {
     // Not an error. A deployment that only serves and verifies badges should not
-    // hold a signing key, and saying so once is more useful than failing loudly
-    // every thirty seconds.
+    // hold a signing key. But it is not nothing either: on the deployment that
+    // is *supposed* to sign, this is every paying customer's badge silently not
+    // arriving, for as long as nobody notices. So it is said — once, because
+    // this runs every thirty seconds and a line every thirty seconds is a line
+    // nobody reads.
+    if (!saidTheKeyIsMissing) {
+      saidTheKeyIsMissing = true;
+      log('no badge signing key in this process, so no badge can be issued here', {
+        needs: 'VIBEFYCODE_BADGE_SIGNING_KEY_B64 and VIBEFYCODE_BADGE_KEY_ID',
+        expected: 'only on a deployment that does not issue badges',
+      });
+    }
     return 0;
   }
+  saidTheKeyIsMissing = false;
 
   const client = await pool.connect();
   try {
@@ -342,6 +437,17 @@ export async function sweepBadgeIssuance(
  * badge as expired whatever the column says, so a missed sweep cannot leave a
  * stale mark reading as active on someone else's website.
  */
+/**
+ * Why a badge went down when the subscription that maintained it stopped.
+ *
+ * One constant, used as the column value and as the alert's wording, so the
+ * customer reads in their inbox exactly what the verification page shows a
+ * stranger. Two sentences that drift apart is a support conversation nobody
+ * can win.
+ */
+const LAPSED_SUSPENSION_REASON =
+  'The subscription that maintains this verification is no longer active, so monitoring has stopped.';
+
 export async function sweepBadgeLifecycle(
   pool: { connect(): Promise<PoolClient> },
   log: (message: string, detail?: Record<string, unknown>) => void = () => undefined,
@@ -357,11 +463,18 @@ export async function sweepBadgeLifecycle(
 
     // A badge on a continuous plan is maintained by that plan. When it lapses the
     // monitoring stops, and a badge whose monitoring has stopped is a stale stamp.
-    const suspended = await client.query(
+    const suspended = await client.query<{
+      id: string;
+      app_id: string;
+      organisation_id: string;
+      name: string;
+    }>(
       `update public.badges b
           set status = 'suspended', suspended_at = now(),
-              suspension_reason = 'The subscription that maintains this verification is no longer active, so monitoring has stopped.'
-        where b.status = 'active'
+              suspension_reason = $1
+         from public.apps app
+        where app.id = b.app_id
+          and b.status = 'active'
           and exists (
             select 1 from public.subscriptions s
              where s.organisation_id = b.organisation_id
@@ -377,8 +490,29 @@ export async function sweepBadgeLifecycle(
              where i.app_id = b.app_id and i.status = 'paid'
                and i.amount_paid_cents > i.amount_refunded_cents
           )
-        returning id`,
+        returning b.id, b.app_id, b.organisation_id, app.name`,
+      [LAPSED_SUSPENSION_REASON],
     );
+
+    // The same event from a liveness failure raises `badge_suspended`; this one
+    // raised nothing. A customer's mark came down on their own website — which
+    // the licence obliges them to then remove — and the only way to find out was
+    // to open the console and look. The alert is deduplicated per badge, so a
+    // sweep that runs every thirty seconds still writes exactly one.
+    for (const row of suspended.rows) {
+      try {
+        await raiseAlert(
+          client,
+          row.organisation_id,
+          badgeSuspendedAlert(row.name, row.app_id, row.id, LAPSED_SUSPENSION_REASON),
+        );
+      } catch (error) {
+        log('lapse suspension raised no notice', {
+          badgeId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     if (expired.rowCount || suspended.rowCount) {
       log('badge lifecycle applied', { expired: expired.rowCount, suspended: suspended.rowCount });
