@@ -10,6 +10,8 @@
  * scattered through the code — when Anthropic changes them, one table changes.
  */
 
+import type { AssessmentDepth } from '../stages/types.ts';
+
 export interface ModelPricing {
   /** USD per million input tokens. */
   readonly input: number;
@@ -23,10 +25,20 @@ export interface ModelPricing {
 
 const STANDARD_CACHE = { cacheWriteMultiplier: 1.25, cacheReadMultiplier: 0.1 } as const;
 
-/** Verified against the published Anthropic price list on 2026-08-22. */
+/**
+ * Verified against the published Anthropic price list, per row.
+ *
+ * Opus 5 and Haiku 4.5 on 2026-08-22; Sonnet 5 corrected on 2026-09-20, where
+ * it had been carrying Sonnet 4.6's rates of $3 and $15. Nothing used it, so
+ * nothing was billed wrongly — but the ledger is the whole point of this file
+ * ("make the number visible from day one"), and a number that is visible and
+ * fifty per cent high is worse than one nobody is looking at. Dated per row on
+ * purpose: one date over the whole table says every row was checked on the day
+ * any row was, which is what let that one sit there.
+ */
 export const MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
   'claude-opus-5': { input: 5, output: 25, ...STANDARD_CACHE },
-  'claude-sonnet-5': { input: 3, output: 15, ...STANDARD_CACHE },
+  'claude-sonnet-5': { input: 2, output: 10, ...STANDARD_CACHE },
   'claude-haiku-4-5': { input: 1, output: 5, ...STANDARD_CACHE },
 };
 
@@ -199,8 +211,16 @@ export class CostMeter {
   }
 }
 
-/** Ceilings by assessment depth. Free runs cost us the least, by design. */
-export const COST_CEILING_BY_DEPTH: Readonly<Record<string, number>> = {
+/**
+ * Ceilings by assessment depth. Free runs cost us the least, by design.
+ *
+ * Keyed by the depth union rather than by `string`, so a depth added to the
+ * union without a ceiling here fails to compile. It used to be a `string` map
+ * read as `COST_CEILING_BY_DEPTH[depth] ?? 1`, which gave a new depth a dollar
+ * — a number nobody chose, sitting between the cheapest and the dearest of the
+ * ones somebody did.
+ */
+export const COST_CEILING_BY_DEPTH: Readonly<Record<AssessmentDepth, number>> = {
   limited: 0.5,
   full: 4,
   continuous: 2,

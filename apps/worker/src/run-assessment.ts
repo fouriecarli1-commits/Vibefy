@@ -74,7 +74,7 @@ export async function runAssessmentJob(
   if (!record) throw new NotAuthorisedError(`App ${job.appId} has no authorisation record.`);
 
   const guard = new ScopeGuard(policyFromAuthorisation(record));
-  const meter = new CostMeter({ maxRunCostUsd: COST_CEILING_BY_DEPTH[job.depth] ?? 1 });
+  const meter = new CostMeter({ maxRunCostUsd: COST_CEILING_BY_DEPTH[job.depth] });
   const assessmentId = randomUUID();
   const evidence = new EvidenceStore(assessmentId);
 
