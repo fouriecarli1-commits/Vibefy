@@ -34,6 +34,7 @@ interface Poolish {
 
 interface PendingRow {
   alert_id: string;
+  created_at: string;
   app_id: string | null;
   severity: PushableAlert['severity'];
   title: string;
@@ -53,7 +54,8 @@ interface PendingRow {
  */
 export async function findPendingPushes(client: PoolClient, limit = 200): Promise<PendingRow[]> {
   const { rows } = await client.query<PendingRow>(
-    `select al.id as alert_id, al.app_id, al.severity::text as severity, al.title, al.body,
+    `select al.id as alert_id, al.created_at, al.app_id, al.severity::text as severity,
+            al.title, al.body,
             dt.id as device_token_id, dt.token
        from public.alerts al
        join public.memberships m on m.organisation_id = al.organisation_id
@@ -76,15 +78,41 @@ export interface PushSweepResult {
   readonly delivered: number;
   readonly failed: number;
   readonly tokensDisabled: number;
+  /** In a batch the sender could not take, to be tried again next sweep. */
+  readonly deferred: number;
+  /** Written off, because trying again has run out of again. */
+  readonly abandoned: number;
 }
+
+/**
+ * How long a push may keep being deferred before it is written down as failed.
+ *
+ * A day inside the seven-day window the query uses, and the gap is the whole
+ * point. A sender that throws records nothing, deliberately, so an outage does
+ * not become a permanent loss. But recording nothing also meant that on the
+ * eighth day the alert dropped out of the query having never reached the phone
+ * and having left no trace of not reaching it — and this file's own docstring
+ * calls the delivery table the record of what we sent and when. It held neither
+ * a success nor a failure, so "never attempted" and "attempted and lost" were
+ * the same thing to anyone reading it afterwards, and both looked like success.
+ */
+export const PUSH_GIVE_UP_AFTER_DAYS = 6;
 
 export async function sweepAlertPush(
   pool: Poolish,
   send: PushSender = expoPushSender,
   log: Logger = noop,
+  now: Date = new Date(),
 ): Promise<PushSweepResult> {
   const client = await pool.connect();
-  const result = { attempted: 0, delivered: 0, failed: 0, tokensDisabled: 0 };
+  const result = {
+    attempted: 0,
+    delivered: 0,
+    failed: 0,
+    tokensDisabled: 0,
+    deferred: 0,
+    abandoned: 0,
+  };
   try {
     const pending = await findPendingPushes(client);
     if (pending.length === 0) return result;
@@ -109,8 +137,26 @@ export async function sweepAlertPush(
       try {
         tickets = await send(messages);
       } catch (error) {
-        // The batch is simply not recorded, so the next sweep tries it again.
-        log('push send failed', { error: error instanceof Error ? error.message : String(error) });
+        // The batch is simply not recorded, so the next sweep tries it again —
+        // except for the rows that have been waiting so long they are about to
+        // age out of the query, which are written down as the failures they
+        // have become rather than allowed to vanish unaccounted for.
+        const detail = error instanceof Error ? error.message : String(error);
+        for (const row of chunk) {
+          const age = now.getTime() - new Date(row.created_at).getTime();
+          if (age < PUSH_GIVE_UP_AFTER_DAYS * 86_400_000) {
+            result.deferred += 1;
+            continue;
+          }
+          result.abandoned += 1;
+          await client.query(
+            `insert into public.alert_deliveries (alert_id, channel, target_id, status, detail)
+             values ($1, 'push', $2, 'failed', $3)
+             on conflict (alert_id, channel, target_id) do nothing`,
+            [row.alert_id, row.device_token_id, `Never sent: ${detail}`.slice(0, 500)],
+          );
+          log('push given up on', { alertId: row.alert_id, error: detail });
+        }
         continue;
       }
 
@@ -153,7 +199,10 @@ export async function sweepAlertPush(
       }
     }
 
-    if (result.attempted > 0) log('alert push sweep', { ...result });
+    // Deferrals count as something having happened. Gating this on `attempted`
+    // meant a sweep in which the sender was down throughout said nothing about
+    // itself at all.
+    if (result.attempted > 0 || result.deferred > 0) log('alert push sweep', { ...result });
     return result;
   } finally {
     client.release();

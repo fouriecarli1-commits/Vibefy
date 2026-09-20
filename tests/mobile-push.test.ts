@@ -16,7 +16,11 @@ import {
   type ExpoMessage,
   type PushTicket,
 } from '../packages/api/src/index.ts';
-import { findPendingPushes, sweepAlertPush } from '../apps/worker/src/push.ts';
+import {
+  findPendingPushes,
+  PUSH_GIVE_UP_AFTER_DAYS,
+  sweepAlertPush,
+} from '../apps/worker/src/push.ts';
 import { connect } from './setup/client.ts';
 import { seedAccount, seedApp, type SeededAccount } from './setup/seed.ts';
 
@@ -182,6 +186,42 @@ describe('the delivery sweep', () => {
     expect(first.delivered).toBeGreaterThanOrEqual(1);
     const second = await sweepAlertPush(pool, sender);
     expect(second.attempted).toBe(0);
+  });
+
+  it('writes down a push it never managed, rather than letting it age out', async () => {
+    // A sender that throws records nothing so the next sweep retries, which is
+    // right. But the query only looks back seven days, so an alert that kept
+    // being deferred used to fall out of it having never reached the phone and
+    // having left no trace of not reaching it — and this file's delivery table
+    // is supposed to be the record of what we sent and when.
+    const owner = await seedAccount(db, 'push-aged-out');
+    const appId = await seedApp(db, owner, 'Kettle');
+    await registerDevice(owner, 'aged-1');
+    const alertId = await raise(owner, appId, 'critical', `push-aged-${Date.now()}`);
+    const broken = async () => {
+      throw new Error('the push service is not answering');
+    };
+
+    const fresh = await sweepAlertPush(pool, broken, undefined, new Date());
+    expect(fresh.deferred).toBeGreaterThanOrEqual(1);
+    expect(fresh.abandoned).toBe(0);
+    let delivery = await db.query(
+      `select status from public.alert_deliveries where alert_id = $1 and channel = 'push'`,
+      [alertId],
+    );
+    expect(delivery.rowCount, 'an outage is not a verdict').toBe(0);
+
+    const later = new Date(Date.now() + (PUSH_GIVE_UP_AFTER_DAYS + 0.5) * 86_400_000);
+    const gave = await sweepAlertPush(pool, broken, undefined, later);
+    expect(gave.abandoned).toBeGreaterThanOrEqual(1);
+
+    delivery = await db.query(
+      `select status, detail from public.alert_deliveries where alert_id = $1 and channel = 'push'`,
+      [alertId],
+    );
+    expect(delivery.rowCount).toBe(1);
+    expect(delivery.rows[0]!.status).toBe('failed');
+    expect(String(delivery.rows[0]!.detail)).toContain('not answering');
   });
 
   it('stamps the alert as delivered so the console can say how', async () => {

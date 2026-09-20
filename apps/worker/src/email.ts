@@ -32,6 +32,7 @@ interface Poolish {
 
 interface PendingRow {
   alert_id: string;
+  created_at: string;
   kind: string;
   severity: AlertSeverity;
   title: string;
@@ -54,7 +55,7 @@ interface PendingRow {
  */
 export async function findPendingEmails(client: PoolClient, limit = 200): Promise<PendingRow[]> {
   const { rows } = await client.query<PendingRow>(
-    `select al.id as alert_id, al.kind::text as kind, al.severity::text as severity,
+    `select al.id as alert_id, al.created_at, al.kind::text as kind, al.severity::text as severity,
             al.title, al.body, al.assessment_id, al.app_id,
             app.name as app_name,
             u.id as user_id, u.email::text as email
@@ -100,19 +101,44 @@ export interface EmailSweepResult {
   readonly sent: number;
   readonly failed: number;
   readonly suppressed: number;
+  /** Put off until the next sweep, because the provider said to try later. */
+  readonly deferred: number;
+  /** Written off, because trying later has run out of later. */
+  readonly abandoned: number;
 }
+
+/**
+ * How long an alert may keep deferring before the attempt is written down as a
+ * failure instead.
+ *
+ * A day inside the seven-day window above, and the gap is the point. A send
+ * that kept coming back retryable recorded nothing at all, by design — an
+ * outage must not become a permanent loss. But nothing also meant that on the
+ * eighth day the alert simply dropped out of the query, having never reached
+ * the customer and having left no trace of not reaching them. The append-only
+ * delivery log, which this file's own docstring calls the record of what we
+ * sent and when, had no row either way: "never attempted" and "attempted and
+ * lost" looked identical, and both looked like success.
+ *
+ * So the last day is spent saying so. One `failed` row with the provider's
+ * reason, which also takes the alert out of the window and lets everything
+ * behind it move up.
+ */
+export const EMAIL_GIVE_UP_AFTER_DAYS = 6;
 
 export async function sweepAlertEmail(
   pool: Poolish,
   provider: EmailProvider | null,
   log: Logger = noop,
   consoleUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '',
+  now: Date = new Date(),
 ): Promise<EmailSweepResult> {
-  const result = { attempted: 0, sent: 0, failed: 0, suppressed: 0 };
+  const result = { attempted: 0, sent: 0, failed: 0, suppressed: 0, deferred: 0, abandoned: 0 };
   if (!provider) {
-    // Not an error. A deployment that runs assessments and sends no email is a
-    // legitimate deployment; saying so once beats failing a sweep every five
-    // minutes.
+    // Not an error, and not silent either: `main.ts` says once at startup that
+    // email is not configured. A deployment that runs assessments and sends no
+    // email is a legitimate deployment, and failing a sweep about it every five
+    // minutes would say nothing that line has not already said.
     return result;
   }
 
@@ -142,12 +168,26 @@ export async function sweepAlertEmail(
       // A provider outage or a full mailbox records nothing, so the next sweep
       // tries again. Recording a failure we never really attempted would turn an
       // outage into a permanent silent loss.
+      //
+      // Until the retries run out of runway. Past that point the alert is about
+      // to age out of the query above and disappear having never been sent and
+      // never been recorded as unsent, so the attempt is written down as the
+      // failure it has become. Counted rather than logged line by line: a
+      // provider outage defers every row in the window, and two hundred
+      // identical sentences every five minutes is not a clearer account of an
+      // outage than one number.
       if (isRetryable(outcome)) {
-        log('alert email deferred', {
+        const age = now.getTime() - new Date(row.created_at).getTime();
+        if (age < EMAIL_GIVE_UP_AFTER_DAYS * 86_400_000) {
+          result.deferred += 1;
+          continue;
+        }
+        result.abandoned += 1;
+        log('alert email given up on', {
           alertId: row.alert_id,
+          userId: row.user_id,
           reason: outcome.sent ? '' : outcome.detail,
         });
-        continue;
       }
 
       result.attempted += 1;
@@ -188,7 +228,10 @@ export async function sweepAlertEmail(
       }
     }
 
-    if (result.attempted > 0) log('alert email sweep', { ...result });
+    // Reported whenever anything happened, deferrals included. Gating this on
+    // `attempted` meant a sweep in which every single send deferred said
+    // nothing at all about itself.
+    if (result.attempted > 0 || result.deferred > 0) log('alert email sweep', { ...result });
     return result;
   } finally {
     client.release();

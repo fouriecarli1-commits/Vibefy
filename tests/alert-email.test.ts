@@ -21,7 +21,11 @@ import {
 } from '../packages/notify/src/index.ts';
 import { NON_RELIANCE_LEGEND } from '../packages/shared/src/index.ts';
 import { lintText } from '../tools/copy-lint.mjs';
-import { findPendingEmails, sweepAlertEmail } from '../apps/worker/src/email.ts';
+import {
+  EMAIL_GIVE_UP_AFTER_DAYS,
+  findPendingEmails,
+  sweepAlertEmail,
+} from '../apps/worker/src/email.ts';
 import { connect } from './setup/client.ts';
 import { seedAccount, seedApp, type SeededAccount } from './setup/seed.ts';
 
@@ -314,9 +318,59 @@ describe('the delivery sweep', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('writes down a send it never managed, rather than letting it age out', async () => {
+    // A retryable failure records nothing so the next sweep tries again, which
+    // is right — an outage must not become a permanent loss. But the query only
+    // looks back seven days, so an alert that kept deferring used to fall out of
+    // it having never reached anyone and having left no trace of not reaching
+    // them. The delivery log held neither a success nor a failure, so "never
+    // attempted" and "attempted and lost" read the same, and both read as fine.
+    const owner = await seedAccount(db, 'email-aged-out');
+    const appId = await seedApp(db, owner, 'Kettle');
+    const alertId = await raise(owner, appId, 'critical', `email-aged-${Date.now()}`);
+    const provider = new FakeEmailProvider({ failEverything: true });
+
+    // Still inside the runway: deferred, and nothing written down.
+    const fresh = await sweepAlertEmail(pool, provider, undefined, CONSOLE, new Date());
+    expect(fresh.deferred).toBeGreaterThanOrEqual(1);
+    expect(fresh.abandoned).toBe(0);
+    let delivery = await db.query(
+      `select status from public.alert_deliveries where alert_id = $1 and channel = 'email'`,
+      [alertId],
+    );
+    expect(delivery.rowCount, 'an outage is not a verdict').toBe(0);
+
+    // A day before it would drop out of the window: said, and recorded.
+    const later = new Date(Date.now() + (EMAIL_GIVE_UP_AFTER_DAYS + 0.5) * 86_400_000);
+    const gave = await sweepAlertEmail(pool, provider, undefined, CONSOLE, later);
+    expect(gave.abandoned).toBeGreaterThanOrEqual(1);
+
+    delivery = await db.query(
+      `select status, detail from public.alert_deliveries where alert_id = $1 and channel = 'email'`,
+      [alertId],
+    );
+    expect(delivery.rowCount).toBe(1);
+    expect(delivery.rows[0]!.status).toBe('failed');
+    expect(String(delivery.rows[0]!.detail)).toContain('Fake provider');
+
+    // And it stops being tried, which is what lets everything behind it move up.
+    const after = await sweepAlertEmail(pool, provider, undefined, CONSOLE, later);
+    expect(
+      after.abandoned + after.deferred,
+      'nothing of this alert is left in the window',
+    ).toBeLessThan(gave.abandoned + gave.deferred);
+  });
+
   it('does nothing, quietly, when email is not configured', async () => {
     const result = await sweepAlertEmail(pool, null, undefined, CONSOLE);
-    expect(result).toEqual({ attempted: 0, sent: 0, failed: 0, suppressed: 0 });
+    expect(result).toEqual({
+      attempted: 0,
+      sent: 0,
+      failed: 0,
+      suppressed: 0,
+      deferred: 0,
+      abandoned: 0,
+    });
   });
 
   it('stamps the alert as delivered so the console can say we told them', async () => {
