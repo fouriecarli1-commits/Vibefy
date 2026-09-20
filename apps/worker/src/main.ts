@@ -85,6 +85,31 @@ async function withClient<T>(pool: Pool, work: (client: PoolClient) => Promise<T
  */
 let saidSpendingIsPaused = false;
 
+/**
+ * Says the pause started, or that it ended, and nothing while it merely
+ * continues.
+ *
+ * Its own function so it can be tested for what it is — a state machine with
+ * one bit — rather than by driving the worker's claim path, which would have
+ * to be run *unpaused* to see the lift and would then claim real work out of a
+ * shared database. The first version of its test did exactly that and quietly
+ * stole another suite's queued request.
+ */
+export function announceSpendPause(paused: boolean, logger: typeof log = log): void {
+  if (paused === saidSpendingIsPaused) return;
+  saidSpendingIsPaused = paused;
+  logger(
+    paused
+      ? 'spending paused — claiming nothing new until a person lifts it'
+      : 'spending resumed — claiming work again',
+  );
+}
+
+/** Forgets whether a pause has been announced. For tests, which share a process. */
+export function resetSpendPauseNotice(): void {
+  saidSpendingIsPaused = false;
+}
+
 /** Runs one queued request, if there is one. Returns whether it did any work. */
 export async function processNextRequest(pool: Pool, logger: typeof log = log): Promise<boolean> {
   const claimClient = await pool.connect();
@@ -96,18 +121,11 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
     // morning. A pause is a row in the database, not state in this process, so
     // restarting the worker does not lift it.
     const paused = await spendingIsPaused(claimClient);
-    if (paused !== saidSpendingIsPaused) {
-      // The transition, not the state. This is checked every five seconds, so
-      // saying it unconditionally was seventeen thousand identical lines a day
-      // — and the lift, which is the line somebody is actually waiting for,
-      // would have arrived indistinguishable from all of them.
-      saidSpendingIsPaused = paused;
-      logger(
-        paused
-          ? 'spending paused — claiming nothing new until a person lifts it'
-          : 'spending resumed — claiming work again',
-      );
-    }
+    // The transition, not the state. This is checked every five seconds, so
+    // saying it unconditionally was seventeen thousand identical lines a day —
+    // and the lift, which is the line somebody is actually waiting for, would
+    // have arrived indistinguishable from all of them.
+    announceSpendPause(paused, logger);
     if (paused) return false;
     claimed = await claimNextRequest(claimClient);
   } finally {

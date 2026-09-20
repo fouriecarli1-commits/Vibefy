@@ -7,4 +7,9 @@ export * from './monitoring.ts';
 export * from './push.ts';
 export * from './email.ts';
 export * from './governance.ts';
-export { processNextRequest, POLL_INTERVAL_MS } from './main.ts';
+export {
+  announceSpendPause,
+  POLL_INTERVAL_MS,
+  processNextRequest,
+  resetSpendPauseNotice,
+} from './main.ts';

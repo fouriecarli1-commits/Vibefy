@@ -33,7 +33,11 @@ import {
   sweepSpendCap,
   resetSpendNotices,
 } from '../apps/worker/src/governance.ts';
-import { processNextRequest } from '../apps/worker/src/index.ts';
+import {
+  announceSpendPause,
+  processNextRequest,
+  resetSpendPauseNotice,
+} from '../apps/worker/src/index.ts';
 import { actingAs, connect, expectRefusal } from './setup/client.ts';
 import {
   makeReviewer,
@@ -187,36 +191,50 @@ describe('the spend ceiling', () => {
     expect(result.freeTierThisWeekUsd).toBeGreaterThanOrEqual(0);
   });
 
-  it('announces the pause and the lift, not the state, every five seconds', async () => {
+  it('announces the pause and the lift, not the state, every five seconds', () => {
     // The claim check runs every five seconds, so a line per poll was seventeen
     // thousand identical sentences a day — and the lift, which is the one line
     // somebody is waiting for, would have arrived looking exactly like them.
-    await db.query(`update public.spend_pauses set lifted_at = now(),
-                      lift_reason = 'Cleared before this test, so it starts from unpaused.'
-                    where lifted_at is null`);
+    //
+    // Driven directly rather than through `processNextRequest`, because seeing
+    // the lift means running that unpaused, which claims the oldest queued
+    // request in the database. The first version of this test did exactly that
+    // and stole `journey.test.ts`'s request out from under it — twelve failures
+    // in a file that had not changed.
+    resetSpendPauseNotice();
     const said: string[] = [];
     const log = (message: string) => said.push(message);
 
-    // Unpaused first, so the transition into the pause is a real transition.
-    await processNextRequest(pool, log);
-    said.length = 0;
-
-    await db.query(
-      `insert into public.spend_pauses (reason, observed_usd, ceiling_usd)
-       values ('Paused so this test can watch what gets said about it.', 999, 200)`,
-    );
-    expect(await processNextRequest(pool, log)).toBe(false);
-    expect(await processNextRequest(pool, log)).toBe(false);
-    expect(await processNextRequest(pool, log)).toBe(false);
+    announceSpendPause(true, log);
+    announceSpendPause(true, log);
+    announceSpendPause(true, log);
     expect(said.filter((line) => line.startsWith('spending paused'))).toHaveLength(1);
 
-    await db.query(`update public.spend_pauses set lifted_at = now(),
-                      lift_reason = 'Lifted by hand, which is how a pause is meant to end.'
-                    where lifted_at is null`);
-    await processNextRequest(pool, log);
-    await processNextRequest(pool, log);
-    const resumed = said.filter((line) => line.startsWith('spending resumed'));
-    expect(resumed, 'and the lift is said exactly once too').toHaveLength(1);
+    announceSpendPause(false, log);
+    announceSpendPause(false, log);
+    expect(
+      said.filter((line) => line.startsWith('spending resumed')),
+      'and the lift is said exactly once too',
+    ).toHaveLength(1);
+
+    // And a pause that comes back is a new event, not a repeat of the old one.
+    announceSpendPause(true, log);
+    expect(said.filter((line) => line.startsWith('spending paused'))).toHaveLength(2);
+    resetSpendPauseNotice();
+  });
+
+  it('says it through the worker, not only in the helper', async () => {
+    // The wiring, checked once. Only ever called while a pause is live, so this
+    // cannot claim anything: `processNextRequest` returns before it tries.
+    resetSpendPauseNotice();
+    await db.query(
+      `insert into public.spend_pauses (reason, observed_usd, ceiling_usd)
+       values ('Paused so this test can watch what the worker says about it.', 999, 200)`,
+    );
+    const said: string[] = [];
+    expect(await processNextRequest(pool, (message) => said.push(message))).toBe(false);
+    expect(said.filter((line) => line.startsWith('spending paused'))).toHaveLength(1);
+    resetSpendPauseNotice();
   });
 
   it('says a standing spend condition once a day, not every five minutes', async () => {
