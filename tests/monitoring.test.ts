@@ -22,6 +22,7 @@ import {
   livenessPolicy,
 } from '../apps/worker/src/monitoring.ts';
 import { isReassessmentDue } from '../packages/monitoring/src/index.ts';
+import { CURRENT_RUBRIC_VERSION } from '../packages/rubric/src/rubric.ts';
 import { KIND_LABEL } from '../apps/web/lib/alert-kinds.ts';
 import { connect } from './setup/client.ts';
 import {
@@ -388,28 +389,33 @@ describe('when the standard moves on', () => {
   //
   // Both halves of the answer were already in the database. Nobody had asked
   // them together.
-  const supersede = async (from: string, to: string) => {
-    await db.query(
-      `insert into public.rubric_versions (version, definition, checksum, changelog, published_at, effective_from)
-       values ($1, '{}'::jsonb, repeat('a', 64), 'test', now(), now())
-       on conflict (version) do nothing`,
-      [to],
-    );
-    await db.query(`update public.rubric_versions set superseded_at = now() where version = $1`, [
-      from,
-    ]);
-  };
+  //
+  // This used to supersede 1.0.0 by hand before checking the sweep, which is a
+  // fair test of the sweep and no test at all of whether the condition it
+  // depends on ever arises. It did not: publishing 1.1.0 left 1.0.0 looking
+  // current, `superseded_at` was null on every row in the database, and the
+  // sweep — whose condition is `superseded_at is not null` — had never once
+  // fired in its life while reporting zero notices raised and looking healthy.
+  // So the fixture is gone and these run against the real state.
 
-  it('tells a badge holder their rubric version was superseded, once', async () => {
-    const space = await workspace('rubric-superseded');
-    const assessmentId = await assess(space, { score: 80 });
+  it('says nothing about a badge earned against the version in force', async () => {
+    const space = await workspace('rubric-current');
+    const assessmentId = await assess(space, { score: 80, rubricVersion: CURRENT_RUBRIC_VERSION });
     const consentId = await acceptBadgeLicence(db, space.owner);
     await issueBadge(db, space.owner, { appId: space.appId, assessmentId, consentId });
 
-    // Nothing to say while the rubric it was earned against is still current.
-    expect(await sweepSupersededRubric(pool)).toBe(0);
+    await sweepSupersededRubric(pool);
+    expect((await alertsFor(space)).map((alert) => alert.kind)).not.toContain('rubric_superseded');
+  });
 
-    await supersede('1.0.0', '1.1.0');
+  it('tells a badge holder their rubric version was superseded, once', async () => {
+    // Earned against 1.0.0, which the migrations mark superseded because the
+    // engine stopped scoring against it — the production condition, not one
+    // this test arranged for itself.
+    const space = await workspace('rubric-superseded');
+    const assessmentId = await assess(space, { score: 80, rubricVersion: '1.0.0' });
+    const consentId = await acceptBadgeLicence(db, space.owner);
+    await issueBadge(db, space.owner, { appId: space.appId, assessmentId, consentId });
 
     expect(await sweepSupersededRubric(pool)).toBeGreaterThanOrEqual(1);
     expect(await sweepSupersededRubric(pool)).toBe(0);
@@ -417,16 +423,40 @@ describe('when the standard moves on', () => {
     const raised = (await alertsFor(space)).filter((alert) => alert.kind === 'rubric_superseded');
     expect(raised).toHaveLength(1);
     expect(raised[0]!.body).toMatch(/earned its badge against Rubric v1\.0\.0/);
+    expect(raised[0]!.body).toContain(`v${CURRENT_RUBRIC_VERSION} is now in force`);
+  });
 
-    // Against whatever the sweep considers current rather than a literal.
-    // 1.1.0 is a real published version now, so a hard-coded successor here is
-    // a test that passes or fails on which other suite ran first.
-    const { rows } = await db.query<{ version: string }>(
-      `select version from public.rubric_versions
-        where superseded_at is null and effective_from is not null and effective_from <= now()
-        order by effective_from desc limit 1`,
+  it('raises nothing while the database and the engine disagree about what is current', async () => {
+    // The window that opens every time a rubric is published: the migration
+    // that inserts the new version and the deploy that teaches the engine to
+    // score against it are two acts on two machines. Whichever lands first, a
+    // notice sent in between names a successor that nothing is scoring against
+    // yet — a false statement to a paying customer about their own badge.
+    const space = await workspace('rubric-disagree');
+    const assessmentId = await assess(space, { score: 80, rubricVersion: '1.0.0' });
+    const consentId = await acceptBadgeLicence(db, space.owner);
+    await issueBadge(db, space.owner, { appId: space.appId, assessmentId, consentId });
+
+    const ahead = '99.0.0';
+    await db.query(
+      `insert into public.rubric_versions
+         (version, definition, checksum, changelog, published_at, effective_from)
+       values ($1, '{}'::jsonb, repeat('a', 64), 'Published ahead of the deploy.', now(), now())
+       on conflict (version) do nothing`,
+      [ahead],
     );
-    expect(raised[0]!.body).toContain(`v${rows[0]!.version} is now in force`);
+    try {
+      const said: string[] = [];
+      expect(await sweepSupersededRubric(pool, (message) => said.push(message))).toBe(0);
+      expect(said.join(' ')).toMatch(/disagreement/i);
+      expect((await alertsFor(space)).map((alert) => alert.kind)).not.toContain(
+        'rubric_superseded',
+      );
+    } finally {
+      // Put back, because every other file shares this database and the version
+      // in force is a fact about all of them.
+      await db.query('delete from public.rubric_versions where version = $1', [ahead]);
+    }
   });
 
   it('says plainly that the badge is unaffected', () => {

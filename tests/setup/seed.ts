@@ -17,10 +17,26 @@ export interface SeededAccount {
   readonly email: string;
 }
 
+/**
+ * A rubric version for a fixture to point at.
+ *
+ * The real ones — the versions the scoring code knows — come from migrations,
+ * and `on conflict do nothing` leaves those exactly as published. Anything else
+ * is invented by a test, and is inserted as a *historical* version: dated well
+ * in the past and already superseded.
+ *
+ * That is not tidiness. "Which rubric is in force" is a single global fact
+ * computed as the latest effective version that is not superseded, and this
+ * used to insert fixtures as effective *now* — so one test reaching for a
+ * throwaway version like 9.9.9 silently made it the standard in force for every
+ * other test in the run, in every other file. A test-only version is by
+ * definition not what the engine scores against, and now it cannot claim to be.
+ */
 export async function seedRubric(client: Client, version = '1.0.0'): Promise<void> {
   await client.query(
-    `insert into public.rubric_versions (version, definition, checksum, changelog, published_at, effective_from)
-     values ($1, $2, $3, $4, now(), now())
+    `insert into public.rubric_versions (version, definition, checksum, changelog, published_at, effective_from, superseded_at)
+     values ($1, $2, $3, $4, now() - interval '10 years', now() - interval '10 years',
+             now() - interval '10 years')
      on conflict (version) do nothing`,
     [version, JSON.stringify({ version }), sha256(version), 'Test fixture'],
   );
@@ -221,7 +237,13 @@ export async function issueBadge(
        app_id, organisation_id, assessment_id, slug, public_id, rubric_version, score,
        assessed_at, certified_origin, payload, signature, signing_key_id,
        licence_consent_id, expires_at
-     ) values ($1, $2, $3, $4, $5, '1.0.0', 82.5, now(), $6, $7, $8, 'key-2026-01',
+     ) values ($1, $2, $3, $4, $5,
+       -- Read from the assessment rather than written here: the database
+       -- refuses a badge whose rubric version differs from the one the
+       -- assessment was scored against, and a literal is a fixture that breaks
+       -- the first time a test needs a different version.
+       (select rubric_version from public.assessments where id = $3),
+       82.5, now(), $6, $7, $8, 'key-2026-01',
        $9, now() + make_interval(months => $10))
      returning id`,
     [

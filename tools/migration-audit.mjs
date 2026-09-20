@@ -36,7 +36,20 @@ for (const file of readdirSync(dir).sort()) {
   // The first durable object each migration creates, as a catalogue check.
   let check = null;
   let m;
-  if ((m = /create table (?:if not exists )?public\.(\w+)/i.exec(sql))) {
+
+  // A migration may name its own marker, and one that changes data rather than
+  // creating anything has to. Every shape below is a guess at what a migration
+  // left behind; this is the migration saying so itself, which is both more
+  // reliable and the only option when what it left behind is a column value.
+  //
+  //   -- audit-marker: exists (select 1 from public.t where ...)
+  //
+  // Checked first, so a migration can always overrule a guess that is wrong
+  // about it — five of the patterns below were added one at a time, each after
+  // a migration shape nobody had written before, and this is how that stops.
+  if ((m = /^\s*--\s*audit-marker:\s*(.+?)\s*$/im.exec(sql))) {
+    check = m[1];
+  } else if ((m = /create table (?:if not exists )?public\.(\w+)/i.exec(sql))) {
     check = `to_regclass('public.${m[1]}') is not null`;
   } else if ((m = /create type public\.(\w+)/i.exec(sql))) {
     check = `exists (select 1 from pg_type where typname='${m[1]}')`;

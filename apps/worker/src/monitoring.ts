@@ -41,6 +41,7 @@ import {
   type MonitoringCadence,
 } from '@vibefycode/monitoring';
 import { entitlementFor } from '@vibefycode/billing';
+import { CURRENT_RUBRIC_VERSION } from '@vibefycode/rubric';
 // `fetch` from undici, not the global one: Node bundles its own copy of undici
 // for the global, and it does not recognise a dispatcher built by this one.
 import { fetch } from 'undici';
@@ -879,6 +880,16 @@ export async function sweepLiveness(
  * The current version is whichever is effective and not itself superseded. If
  * that query returns nothing — a database with no rubric published yet — the
  * sweep does nothing rather than inventing a version to compare against.
+ *
+ * It also does nothing when the database's answer and the engine's disagree,
+ * which is a window that opens every time a rubric is published. The migration
+ * that inserts the new version and the deploy that teaches the engine to score
+ * against it are two separate acts, and here they are two separate machines: a
+ * SQL console and a container. Whichever lands first, the notice this sweep
+ * sends in between says a version is in force when it is not. Telling a paying
+ * customer their badge was measured against a superseded standard, and naming
+ * a successor nothing is actually scoring against yet, is worse than telling
+ * them nothing for the hour it takes the other half to land.
  */
 export async function sweepSupersededRubric(pool: Poolish, log: Logger = noop): Promise<number> {
   const client = await pool.connect();
@@ -916,6 +927,16 @@ export async function sweepSupersededRubric(pool: Poolish, log: Logger = noop): 
           and earned.superseded_at is not null
           and earned.version <> current.version`,
     );
+
+    const disagreement = rows.find((row) => row.current_version !== CURRENT_RUBRIC_VERSION);
+    if (disagreement) {
+      log('rubric version disagreement — no superseded notices raised this sweep', {
+        databaseSaysCurrent: disagreement.current_version,
+        engineScoresAgainst: CURRENT_RUBRIC_VERSION,
+        note: 'a publish migration and a deploy have not both landed yet',
+      });
+      return 0;
+    }
 
     let raised = 0;
     for (const row of rows) {

@@ -115,6 +115,45 @@ describe.each(listRubricVersions())('published rubric %s', (version) => {
   });
 });
 
+describe('which version is in force', () => {
+  it('is the same one in the database as in the scoring code', async () => {
+    // Two sources of truth for one fact, and they are updated by two different
+    // acts on two different machines: a migration pasted into a SQL console,
+    // and a deploy. Between them the database can say one version is in force
+    // while every new assessment is still scored against another — and the
+    // superseded-rubric sweep would, in that window, tell paying customers
+    // their badge was measured against an out-of-date standard and name a
+    // successor that nothing is actually scoring against yet.
+    //
+    // Asked of the catalogue, the same way the alert labels are, because the
+    // gap is between a SQL file and a TypeScript constant that never mention
+    // each other.
+    const { rows } = await db.query<{ version: string }>(
+      `select version
+         from public.rubric_versions
+        where superseded_at is null
+          and effective_from is not null
+          and effective_from <= now()
+        order by effective_from desc
+        limit 1`,
+    );
+    expect(rows, 'no rubric is in force at all').toHaveLength(1);
+    expect(rows[0]!.version).toBe(CURRENT_RUBRIC_VERSION);
+  });
+
+  it('has superseded everything the scoring code no longer scores against', async () => {
+    // The other half of the same fact. A version the code has moved past but
+    // the database still calls live is what makes the query above ambiguous.
+    const { rows } = await db.query<{ version: string; superseded_at: string | null }>(
+      'select version, superseded_at from public.rubric_versions order by version',
+    );
+    const liveButNotCurrent = rows
+      .filter((row) => row.superseded_at === null && row.version !== CURRENT_RUBRIC_VERSION)
+      .map((row) => row.version);
+    expect(liveButNotCurrent, 'versions the database still calls live').toEqual([]);
+  });
+});
+
 describe('publishing a new version', () => {
   it('has a migration for every version the scoring code knows', () => {
     // A version in the registry with no migration is a foreign key waiting to
