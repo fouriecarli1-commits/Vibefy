@@ -11,11 +11,27 @@
  * scope, and nothing else. It is not an assessment.
  */
 
-export type LivenessOutcome = 'up' | 'down';
+/**
+ * A check ends three ways, not two.
+ *
+ * `refused` is the one that is easy to lose: we declined to make the request,
+ * because the certified origin now resolves somewhere the authorisation does
+ * not cover. That is a fact about us, not about the application, and folding it
+ * into `down` produces the worst artefact in this system after a badge on a
+ * dead site — a suspension notice that tells a customer their application
+ * stopped responding when it never stopped.
+ */
+export type LivenessOutcome = 'up' | 'down' | 'refused';
 
 export interface LivenessProbe {
   readonly status: number | null;
   readonly error?: string | undefined;
+  /**
+   * Why we did not make the request. Present only for a refusal, and the reason
+   * `refused` cannot be silently treated as `down`: a probe that carries one has
+   * no status to classify, because nothing was ever sent.
+   */
+  readonly refusedReason?: string | undefined;
 }
 
 /**
@@ -24,6 +40,7 @@ export interface LivenessProbe {
  * path exists is an assessment question, not a liveness one.
  */
 export function classifyProbe(probe: LivenessProbe): LivenessOutcome {
+  if (probe.refusedReason) return 'refused';
   if (probe.status === null) return 'down';
   if (probe.status >= 500) return 'down';
   return 'up';
@@ -55,6 +72,20 @@ export function applyProbe(
   failuresBeforeSuspension: number,
 ): LivenessDecision {
   const outcome = classifyProbe(probe);
+
+  if (outcome === 'refused') {
+    // The counter is evidence about the application, and a refusal is not
+    // evidence about the application. It is left exactly where it was: neither
+    // advanced towards a suspension the customer has not earned, nor reset,
+    // which would quietly forgive a genuine outage that is still going on.
+    return {
+      outcome,
+      consecutiveFailures: state.consecutiveFailures,
+      suspendBadge: false,
+      restoreBadge: false,
+      reason: probe.refusedReason ?? 'The check was not made.',
+    };
+  }
 
   if (outcome === 'up') {
     return {

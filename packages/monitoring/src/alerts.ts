@@ -24,6 +24,7 @@ export type AlertKind =
   | 'rubric_superseded'
   | 'application_unreachable'
   | 'application_recovered'
+  | 'monitoring_blocked'
   | 'subscription_problem';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
@@ -128,6 +129,39 @@ export function unreachableAlert(
     // Per app per day. A site that is down for a week should produce seven
     // alerts, not two thousand.
     dedupeKey: `unreachable:${appId}:${day(at)}`,
+  };
+}
+
+/**
+ * We stopped looking, and it is our job to say so.
+ *
+ * Distinct from `unreachableAlert` on purpose. That one says the application did
+ * not answer; this one says we never asked, and why. Sending the first when the
+ * second is true is a false statement about a customer's application, and the
+ * customer would have no way to find out it was false.
+ *
+ * Per app per day, like the unreachable notice: a certified origin that stays
+ * out of scope for a week is seven notices, not two thousand.
+ */
+export function monitoringBlockedAlert(
+  appName: string,
+  appId: string,
+  reason: string,
+  at: Date,
+): AlertDraft {
+  return {
+    kind: 'monitoring_blocked',
+    severity: 'warning',
+    title: `${appName}: we could not run the liveness check`,
+    body:
+      `We did not make a liveness request to ${appName}, so we cannot say whether it is ` +
+      `answering. Reason: ${reason} This is a limit on what we are permitted to check, not a ` +
+      `finding about the application — the badge is untouched and no check has been counted ` +
+      `against it. The usual cause is the certified origin now resolving somewhere the ` +
+      `authorisation does not cover. Checking resumes by itself once the origin is back inside ` +
+      `the authorised scope.`,
+    appId,
+    dedupeKey: `monitoring-blocked:${appId}:${day(at)}`,
   };
 }
 

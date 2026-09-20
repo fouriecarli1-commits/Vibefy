@@ -24,6 +24,8 @@ import {
   badgeExpiringAlert,
   rubricSupersededAlert,
   badgeSuspendedAlert,
+  CADENCE,
+  monitoringBlockedAlert,
   cadenceFor,
   computeDrift,
   driftAlert,
@@ -36,12 +38,18 @@ import {
   type ComparableDimension,
   type ComparableFinding,
   type MonitoredPlan,
+  type MonitoringCadence,
 } from '@vibefycode/monitoring';
 import { entitlementFor } from '@vibefycode/billing';
 // `fetch` from undici, not the global one: Node bundles its own copy of undici
 // for the global, and it does not recognise a dispatcher built by this one.
 import { fetch } from 'undici';
-import { createScopedDispatcher, ScopeGuard, type ScopePolicy } from '@vibefycode/engine';
+import {
+  createScopedDispatcher,
+  ScopeGuard,
+  ScopeViolationError,
+  type ScopePolicy,
+} from '@vibefycode/engine';
 import type { PoolClient } from 'pg';
 
 type Logger = (message: string, detail?: Record<string, unknown>) => void;
@@ -52,9 +60,11 @@ interface Poolish {
 }
 
 /** A liveness check is one GET to the certified origin. Injectable so tests never touch a network. */
-export type LivenessProbeFn = (
-  url: string,
-) => Promise<{ status: number | null; error?: string | undefined }>;
+export type LivenessProbeFn = (url: string) => Promise<{
+  status: number | null;
+  error?: string | undefined;
+  refusedReason?: string | undefined;
+}>;
 
 export const LIVENESS_TIMEOUT_MS = 10_000;
 
@@ -94,12 +104,33 @@ export function livenessPolicy(origin: string): ScopePolicy {
  */
 export const LIVENESS_MAX_REDIRECTS = 3;
 
+/**
+ * The scope guard's complaint, if this error is one, however deeply wrapped.
+ *
+ * `fetch` reports a connector failure as a bland "fetch failed" with the real
+ * error on `cause`, so the thing that distinguishes "we refused to look" from
+ * "nobody answered" is one property down a chain nobody would think to check.
+ */
+function scopeRefusal(error: unknown): string | null {
+  for (let current = error, depth = 0; current && depth < 5; depth += 1) {
+    if (current instanceof ScopeViolationError)
+      return `Refused by the scope guard: ${current.message}`;
+    current = current instanceof Error ? current.cause : null;
+  }
+  return null;
+}
+
 export const httpLivenessProbe: LivenessProbeFn = async (url) => {
   let guard: ScopeGuard;
   try {
     guard = new ScopeGuard(livenessPolicy(url));
   } catch (error) {
-    return { status: null, error: error instanceof Error ? error.message : String(error) };
+    // No policy could be built for this origin, so no request was made. That is
+    // a refusal, not an outage, for exactly the same reason as the guard's own.
+    return {
+      status: null,
+      refusedReason: `No scope could be built for the certified origin: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 
   const dispatcher = createScopedDispatcher(guard);
@@ -112,8 +143,9 @@ export const httpLivenessProbe: LivenessProbeFn = async (url) => {
       const decision = guard.check(current, 'GET');
       if (!decision.allowed) {
         // Refused, not failed. The application may be perfectly healthy; we are
-        // simply not permitted to look where it is pointing us.
-        return { status: null, error: `Refused by the scope guard: ${decision.reason}` };
+        // simply not permitted to look where it is pointing us — and the field
+        // this is returned in is what keeps the two apart downstream.
+        return { status: null, refusedReason: `Refused by the scope guard: ${decision.reason}` };
       }
 
       const response = await fetch(current, {
@@ -135,6 +167,14 @@ export const httpLivenessProbe: LivenessProbeFn = async (url) => {
     }
     return { status: null, error: `More than ${LIVENESS_MAX_REDIRECTS} redirects.` };
   } catch (error) {
+    // The guard refuses twice: once on the URL, above, and once on the address
+    // the host actually resolves to, which happens inside the dispatcher and
+    // therefore arrives here as a thrown error rather than a decision. That
+    // second refusal is the one the doc comment above is about, and it is the
+    // one that most looks like an outage — a certified origin repointed at a
+    // private address answers nothing, for ever. It is still not an outage.
+    const refusal = scopeRefusal(error);
+    if (refusal) return { status: null, refusedReason: refusal };
     return { status: null, error: error instanceof Error ? error.message : String(error) };
   } finally {
     clearTimeout(timer);
@@ -471,17 +511,47 @@ interface MonitoredAppRow {
   organisation_id: string;
   name: string;
   primary_url: string;
-  plan: MonitoredPlan | null;
-  last_assessed_at: string | null;
+  plan: MonitoredPlan;
+  last_assessed_at: string;
+}
+
+/**
+ * The cadence table as two arrays a query can join against.
+ *
+ * The alternative is writing `interval '30 days'` into the SQL, which is how
+ * one rule becomes two: `CADENCE` would go on being the documented answer while
+ * the sweep quietly used a different one. Plans with no cadence are left out,
+ * so the join that uses this is also the filter for "is this plan monitored at
+ * all" — one less thing decided after the row has already been fetched.
+ */
+function cadenceColumns(every: (cadence: MonitoringCadence) => number | null): {
+  plans: string[];
+  intervals: number[];
+} {
+  const plans: string[] = [];
+  const intervals: number[] = [];
+  for (const plan of Object.keys(CADENCE) as MonitoredPlan[]) {
+    const value = every(cadenceFor(plan));
+    if (value === null) continue;
+    plans.push(plan);
+    intervals.push(value);
+  }
+  return { plans, intervals };
 }
 
 /**
  * Queues a re-assessment for every monitored application whose cadence is up.
  *
- * Two conditions are checked in SQL rather than in code, because getting either
- * wrong costs real money or breaks a promise: the application must still have a
- * live authorisation to test, and there must not already be a request in flight
- * for it.
+ * Every condition is checked in SQL, and that matters more than it looks.
+ * Getting two of them wrong costs real money or breaks a promise: the
+ * application must still have a live authorisation to test, and there must not
+ * already be a request in flight for it. The third — is it actually due — used
+ * to be applied in JavaScript, after the limit had already been spent. With
+ * more monitored applications than the limit, Postgres was free to return the
+ * same arbitrary twenty every sweep, and an application that *was* due could
+ * sit behind them for ever while the log said "0 queued" and everything looked
+ * well. Filtering and ordering in SQL is what makes the window advance: the
+ * most overdue is always at the front of it.
  */
 export async function sweepScheduledReassessments(
   pool: Poolish,
@@ -490,17 +560,18 @@ export async function sweepScheduledReassessments(
   limit = 20,
 ): Promise<number> {
   const client = await pool.connect();
+  const { plans, intervals } = cadenceColumns((cadence) => cadence.reassessEveryDays);
   try {
     const { rows } = await client.query<MonitoredAppRow>(
-      `select app.id            as app_id,
+      `with cadence as (
+         select * from unnest($2::text[], $3::int[]) as t(plan, every_days)
+       )
+       select app.id            as app_id,
               app.organisation_id,
               app.name,
               app.primary_url,
-              sub.plan::text    as plan,
-              greatest(
-                coalesce(app.last_reassessed_at, to_timestamp(0)),
-                coalesce(last_assessment.assessed_at, to_timestamp(0))
-              )                 as last_assessed_at
+              sub.plan,
+              last_assessed.at  as last_assessed_at
          from public.apps app
          join lateral (
            select s.plan::text as plan
@@ -510,6 +581,9 @@ export async function sweepScheduledReassessments(
             order by case s.status when 'active' then 0 else 1 end
             limit 1
          ) sub on true
+         -- Inner, so a plan with no scheduled re-assessment drops out here
+         -- rather than being fetched and then discarded in code.
+         join cadence on cadence.plan = sub.plan
          left join lateral (
            select coalesce(a.completed_at, a.created_at) as assessed_at
              from public.assessments a
@@ -517,6 +591,15 @@ export async function sweepScheduledReassessments(
             order by coalesce(a.completed_at, a.created_at) desc
             limit 1
          ) last_assessment on true
+         join lateral (
+           select greatest(
+                    coalesce(app.last_reassessed_at, to_timestamp(0)),
+                    coalesce(last_assessment.assessed_at, to_timestamp(0))
+                  ) as at
+         ) last_assessed on true
+         join lateral (
+           select last_assessed.at + make_interval(days => cadence.every_days) as at
+         ) due on true
         where app.monitoring_enabled
           -- Never re-test something we are no longer permitted to test.
           and public.app_is_authorised_for_testing(app.id)
@@ -524,22 +607,32 @@ export async function sweepScheduledReassessments(
             select 1 from public.assessment_requests r
              where r.app_id = app.id and r.status in ('queued', 'claimed')
           )
+          -- An application nobody has ever assessed is not overdue; it is
+          -- un-started, and its owner asks for the first run themselves.
+          and last_assessed.at > to_timestamp(0)
+          and due.at <= $4::timestamptz
+        order by due.at
         limit $1`,
-      [limit],
+      [limit, plans, intervals, now.toISOString()],
     );
 
     let queued = 0;
     for (const row of rows) {
       const plan = row.plan;
-      if (!plan) continue;
-      const lastAssessedAt =
-        row.last_assessed_at && new Date(row.last_assessed_at).getTime() > 0
-          ? new Date(row.last_assessed_at)
-          : null;
-      if (!isReassessmentDue(plan, lastAssessedAt, now)) continue;
-
-      const cadence = cadenceFor(plan);
-      if (cadence.reassessEveryDays === null) continue;
+      const lastAssessedAt = new Date(row.last_assessed_at);
+      // The query has already applied this. It is asked again here because the
+      // version of the rule a person reads is `isReassessmentDue`, and two
+      // expressions of one rule is exactly how a rule forks. A disagreement is
+      // a defect in the predicate above, so it is said out loud rather than
+      // shrugged off — an unexplained skip is the thing this sweep is for.
+      if (!isReassessmentDue(plan, lastAssessedAt, now)) {
+        log('cadence disagreement: the query selected an application the rule says is not due', {
+          appId: row.app_id,
+          plan,
+          lastAssessedAt: lastAssessedAt.toISOString(),
+        });
+        continue;
+      }
 
       try {
         // `last_reassessed_at` is stamped in the same transaction as the insert,
@@ -581,6 +674,8 @@ export interface LivenessSweepResult {
   readonly down: number;
   readonly suspended: number;
   readonly restored: number;
+  /** Checks we declined to make. Counted separately because they are not outages. */
+  readonly refused: number;
 }
 
 /**
@@ -598,7 +693,8 @@ export async function sweepLiveness(
   limit = 50,
 ): Promise<LivenessSweepResult> {
   const client = await pool.connect();
-  const result = { checked: 0, down: 0, suspended: 0, restored: 0 };
+  const result = { checked: 0, down: 0, suspended: 0, restored: 0, refused: 0 };
+  const { plans, intervals } = cadenceColumns((cadence) => cadence.livenessEveryMinutes);
   try {
     const { rows } = await client.query<{
       app_id: string;
@@ -608,41 +704,49 @@ export async function sweepLiveness(
       badge_id: string;
       badge_status: 'active' | 'suspended' | 'expired' | 'revoked';
       consecutive_liveness_failures: number;
-      plan: MonitoredPlan | null;
-      last_checked_minutes: number | null;
+      plan: MonitoredPlan;
     }>(
-      `select app.id as app_id,
+      `with cadence as (
+         select * from unnest($2::text[], $3::int[]) as t(plan, every_minutes)
+       )
+       select app.id as app_id,
               app.organisation_id,
               app.name,
               b.certified_origin,
               b.id as badge_id,
               b.status::text as badge_status,
               app.consecutive_liveness_failures,
-              sub.plan::text as plan,
-              extract(epoch from (now() - app.last_seen_at)) / 60 as last_checked_minutes
+              sub.plan
          from public.apps app
          join public.badges b on b.app_id = app.id and b.status in ('active', 'suspended')
-         left join lateral (
+         join lateral (
            select s.plan::text as plan from public.subscriptions s
             where s.organisation_id = app.organisation_id and s.status in ('active', 'trialing')
+            -- A paid-up subscription outranks a trial when an organisation has
+            -- both, so the cadence is the one they bought and not whichever row
+            -- the planner reached first.
+            order by case s.status when 'active' then 0 else 1 end
             limit 1
          ) sub on true
+         join cadence on cadence.plan = sub.plan
         where app.monitoring_enabled
+          -- Due, in SQL, so the limit is spent on the applications actually owed
+          -- a check. Measured against the database's clock and not the injected
+          -- one, because last_seen_at is written by the database: two clocks
+          -- compared against each other is a check that never comes round.
+          and (app.last_seen_at is null
+               or app.last_seen_at + make_interval(mins => cadence.every_minutes) <= now())
+        -- Longest unseen first. Without an order the same arbitrary page comes
+        -- back every sweep, and an application past the end of it is never
+        -- pinged again while the sweep reports itself healthy.
+        order by app.last_seen_at asc nulls first
         limit $1`,
-      [limit],
+      [limit, plans, intervals],
     );
 
     for (const row of rows) {
       const plan = row.plan;
-      if (!plan) continue;
       const cadence = cadenceFor(plan);
-      if (cadence.livenessEveryMinutes === null) continue;
-      if (
-        row.last_checked_minutes !== null &&
-        Number(row.last_checked_minutes) < cadence.livenessEveryMinutes
-      ) {
-        continue;
-      }
 
       const outcome = await probe(row.certified_origin);
       result.checked += 1;
@@ -676,6 +780,25 @@ export async function sweepLiveness(
               unreachableAlert(row.name, row.app_id, decision, now),
             );
           }
+        }
+
+        if (decision.outcome === 'refused') {
+          // Said out loud rather than counted as an outage. A refusal used to be
+          // indistinguishable from silence: it drove the same counter and, six
+          // sweeps later, suspended the badge with a notice saying the
+          // application had stopped responding — which was not true, and which
+          // the customer had no way to discover was not true.
+          result.refused += 1;
+          await raiseAlert(
+            client,
+            row.organisation_id,
+            monitoringBlockedAlert(
+              row.name,
+              row.app_id,
+              decision.reason ?? 'The check was not made.',
+              now,
+            ),
+          );
         }
 
         if (decision.suspendBadge) {
@@ -794,16 +917,27 @@ export async function sweepSupersededRubric(pool: Poolish, log: Logger = noop): 
 
     let raised = 0;
     for (const row of rows) {
-      const draft = rubricSupersededAlert({
-        appName: row.name,
-        appId: row.app_id,
-        badgeId: row.badge_id,
-        earnedVersion: row.earned_version,
-        currentVersion: row.current_version,
-        supersededAt: new Date(row.superseded_at),
-        expiresAt: new Date(row.expires_at),
-      });
-      if (await raiseAlert(client, row.organisation_id, draft)) raised += 1;
+      // Per row, because these alerts are the only warning a customer gets that
+      // their badge is about to measure against a standard that has moved. One
+      // organisation with a broken row must not cost every organisation after
+      // it in the list its notice.
+      try {
+        const draft = rubricSupersededAlert({
+          appName: row.name,
+          appId: row.app_id,
+          badgeId: row.badge_id,
+          earnedVersion: row.earned_version,
+          currentVersion: row.current_version,
+          supersededAt: new Date(row.superseded_at),
+          expiresAt: new Date(row.expires_at),
+        });
+        if (await raiseAlert(client, row.organisation_id, draft)) raised += 1;
+      } catch (error) {
+        log('superseded-rubric notice failed', {
+          badgeId: row.badge_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
     if (raised > 0) log('superseded-rubric notices raised', { raised });
     return raised;
@@ -840,15 +974,25 @@ export async function sweepBadgeExpiryWarnings(
 
     let raised = 0;
     for (const row of rows) {
-      const days = Math.max(1, row.days_remaining);
-      const draft = badgeExpiringAlert(
-        row.name,
-        row.app_id,
-        row.badge_id,
-        new Date(row.expires_at),
-        days,
-      );
-      if (await raiseAlert(client, row.organisation_id, draft)) raised += 1;
+      // Same reason as the sweep above: a badge quietly expiring under a
+      // customer is the outcome this exists to prevent, and one unusable row
+      // must not take the rest of the list down with it.
+      try {
+        const days = Math.max(1, row.days_remaining);
+        const draft = badgeExpiringAlert(
+          row.name,
+          row.app_id,
+          row.badge_id,
+          new Date(row.expires_at),
+          days,
+        );
+        if (await raiseAlert(client, row.organisation_id, draft)) raised += 1;
+      } catch (error) {
+        log('badge expiry warning failed', {
+          badgeId: row.badge_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
     if (raised > 0) log('badge expiry warnings raised', { raised });
     return raised;

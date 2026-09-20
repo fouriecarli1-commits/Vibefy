@@ -21,6 +21,8 @@ import {
   httpLivenessProbe,
   livenessPolicy,
 } from '../apps/worker/src/monitoring.ts';
+import { isReassessmentDue } from '../packages/monitoring/src/index.ts';
+import { KIND_LABEL } from '../apps/web/lib/alert-kinds.ts';
 import { connect } from './setup/client.ts';
 import {
   acceptBadgeLicence,
@@ -124,6 +126,26 @@ async function subscribe(space: Workspace, plan: string): Promise<void> {
  */
 async function isolate(space: Workspace): Promise<void> {
   await db.query('update public.apps set monitoring_enabled = (id = $1)', [space.appId]);
+}
+
+/**
+ * Turns monitoring on without issuing a badge.
+ *
+ * The re-assessment sweep does not look at badges at all — it needs monitoring
+ * on, a live authorisation, a plan with a cadence and something already
+ * assessed. Saying so here keeps these tests honest about what they depend on,
+ * and keeps them from littering a shared test database with badges that the
+ * badge sweeps in other files then have to wade through.
+ */
+async function monitor(space: Workspace): Promise<void> {
+  await db.query('update public.apps set monitoring_enabled = true where id = $1', [space.appId]);
+}
+
+/** The same as `isolate`, for a test that needs more monitored applications than the sweep's limit. */
+async function isolateAll(spaces: readonly Workspace[]): Promise<void> {
+  await db.query('update public.apps set monitoring_enabled = (id = any($1::uuid[]))', [
+    spaces.map((space) => space.appId),
+  ]);
 }
 
 async function alertsFor(
@@ -506,6 +528,88 @@ describe('scheduled re-assessment', () => {
       await sweepScheduledReassessments(pool, undefined, new Date('2026-08-01T00:00:00Z')),
     ).toBe(0);
   });
+
+  it('reaches the due application even when the page is full of ones that are not', async () => {
+    // The sweep reads a page of applications, not all of them. If that page is
+    // unordered, the due one can sit behind a crowd of not-due ones for ever —
+    // and every sweep reports "0 queued" and looks perfectly healthy. So: more
+    // monitored applications than the limit, exactly one of them due.
+    const crowd: Workspace[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      const space = await workspace(`schedule-crowd-${index}`);
+      await subscribe(space, 'certified');
+      await assess(space, { score: 80, assessedAt: '2026-07-31T00:00:00Z' });
+      await monitor(space);
+      crowd.push(space);
+    }
+    const due = await workspace('schedule-crowd-due');
+    await subscribe(due, 'certified');
+    await assess(due, { score: 80, assessedAt: '2026-01-01T00:00:00Z' });
+    await monitor(due);
+    await isolateAll([...crowd, due]);
+
+    const now = new Date('2026-08-01T00:00:00Z');
+    expect(await sweepScheduledReassessments(pool, undefined, now, 1)).toBe(1);
+
+    const { rows } = await db.query<{ app_id: string }>(
+      'select app_id from public.assessment_requests where app_id = any($1::uuid[])',
+      [[...crowd.map((space) => space.appId), due.appId]],
+    );
+    expect(rows.map((row) => row.app_id)).toEqual([due.appId]);
+  });
+
+  it('takes the most overdue first', async () => {
+    // Which one gets the single slot is not arbitrary: the one that has waited
+    // longest. Otherwise a busy account starves the customer who has been owed
+    // a re-assessment since January.
+    const recent = await workspace('schedule-order-recent');
+    await subscribe(recent, 'certified');
+    await assess(recent, { score: 80, assessedAt: '2026-06-20T00:00:00Z' });
+    await monitor(recent);
+    const ancient = await workspace('schedule-order-ancient');
+    await subscribe(ancient, 'certified');
+    await assess(ancient, { score: 80, assessedAt: '2026-02-01T00:00:00Z' });
+    await monitor(ancient);
+    await isolateAll([recent, ancient]);
+
+    expect(
+      await sweepScheduledReassessments(pool, undefined, new Date('2026-08-01T00:00:00Z'), 1),
+    ).toBe(1);
+    const { rows } = await db.query<{ app_id: string }>(
+      'select app_id from public.assessment_requests where app_id = any($1::uuid[])',
+      [[recent.appId, ancient.appId]],
+    );
+    expect(rows.map((row) => row.app_id)).toEqual([ancient.appId]);
+  });
+
+  it('agrees with the rule a person reads, case by case', async () => {
+    // Two expressions of one rule — the predicate in SQL and `isReassessmentDue`
+    // in TypeScript — is how a rule quietly forks. The sweep logs a complaint
+    // when they disagree; this checks that it never has to.
+    const space = await workspace('schedule-agreement');
+    await subscribe(space, 'certified');
+    const assessmentId = await assess(space, { score: 80 });
+    await monitor(space);
+    await isolate(space);
+
+    const now = new Date('2026-08-01T00:00:00Z');
+    for (const daysAgo of [0, 1, 29, 30, 31, 60]) {
+      const assessedAt = new Date(now.getTime() - daysAgo * 86_400_000);
+      await db.query('update public.assessments set completed_at = $2 where id = $1', [
+        assessmentId,
+        assessedAt.toISOString(),
+      ]);
+      await db.query('delete from public.assessment_requests where app_id = $1', [space.appId]);
+      await db.query('update public.apps set last_reassessed_at = null where id = $1', [
+        space.appId,
+      ]);
+
+      const queued = await sweepScheduledReassessments(pool, undefined, now);
+      const expected = isReassessmentDue('certified', assessedAt, now) ? 1 : 0;
+      expect(queued, `assessed ${daysAgo} days ago`).toBe(expected);
+    }
+    await db.query('delete from public.assessment_requests where app_id = $1', [space.appId]);
+  });
 });
 
 describe('liveness', () => {
@@ -609,6 +713,129 @@ describe('liveness', () => {
     ).toBe('suspended');
   });
 
+  it('spends the page on the applications actually owed a check', async () => {
+    // The sweep reads a page of badged applications. If that page is unordered
+    // and the cadence is applied afterwards in code, the page fills up with
+    // applications pinged a minute ago and the one nobody has heard from in a
+    // day never gets looked at — while the sweep reports itself busy and well.
+    const seen = await workspace('liveness-page-seen');
+    await subscribe(seen, 'certified');
+    await liveBadge(seen, await assess(seen, { score: 80 }));
+    const owed = await workspace('liveness-page-owed');
+    await subscribe(owed, 'certified');
+    await liveBadge(owed, await assess(owed, { score: 80 }));
+    await isolateAll([seen, owed]);
+    // This plan is pinged hourly. One was answered a minute ago, the other a
+    // day ago, and there is room in the page for exactly one of them.
+    await db.query(
+      "update public.apps set last_seen_at = now() - interval '1 minute' where id = $1",
+      [seen.appId],
+    );
+    await db.query("update public.apps set last_seen_at = now() - interval '1 day' where id = $1", [
+      owed.appId,
+    ]);
+
+    const probed: string[] = [];
+    await sweepLiveness(
+      pool,
+      async (url) => {
+        probed.push(url);
+        return { status: 200 };
+      },
+      undefined,
+      new Date('2026-08-11T00:00:00Z'),
+      1,
+    );
+
+    const origin = await db.query<{ certified_origin: string }>(
+      'select certified_origin from public.badges where app_id = $1',
+      [owed.appId],
+    );
+    expect(probed).toEqual([origin.rows[0]!.certified_origin]);
+  });
+
+  it('does not suspend a badge because we were the ones who stopped looking', async () => {
+    // The scope guard refusing an origin and the origin going dark are the same
+    // shape of nothing: no status, no body, no answer. They mean opposite
+    // things. Counting a refusal as an outage suspends a working customer's
+    // badge and tells them, in writing, that their application stopped
+    // responding — a statement we would have no basis for and they would have
+    // no way to check.
+    const { space, badgeId } = await setUp('liveness-refused');
+    const refused = async () => ({
+      status: null,
+      refusedReason: 'Refused by the scope guard: it resolves to the non-public address 10.0.0.4',
+    });
+
+    for (let attempt = 1; attempt <= 9; attempt += 1) {
+      const result = await sweepLiveness(
+        pool,
+        refused,
+        undefined,
+        new Date(`2026-08-${String(attempt).padStart(2, '0')}T00:00:00Z`),
+      );
+      expect(result.refused, `sweep ${attempt}`).toBe(1);
+      expect(result.down, `sweep ${attempt}`).toBe(0);
+    }
+
+    const badge = await db.query<{ status: string }>(
+      'select status::text as status from public.badges where id = $1',
+      [badgeId],
+    );
+    expect(badge.rows[0]!.status).toBe('active');
+
+    const { rows } = await db.query<{ consecutive_liveness_failures: number }>(
+      'select consecutive_liveness_failures from public.apps where id = $1',
+      [space.appId],
+    );
+    expect(rows[0]!.consecutive_liveness_failures).toBe(0);
+
+    const kinds = (await alertsFor(space)).map((alert) => alert.kind);
+    expect(kinds).toContain('monitoring_blocked');
+    expect(kinds).not.toContain('application_unreachable');
+    expect(kinds).not.toContain('badge_suspended');
+  });
+
+  it('says we could not look, not that the application is down', async () => {
+    const { space } = await setUp('liveness-refused-wording');
+    await sweepLiveness(
+      pool,
+      async () => ({ status: null, refusedReason: 'Refused by the scope guard: out of scope' }),
+      undefined,
+      new Date('2026-08-12T00:00:00Z'),
+    );
+    const blocked = (await alertsFor(space)).find((alert) => alert.kind === 'monitoring_blocked');
+    expect(blocked).toBeDefined();
+    // The distinction is the entire point of the alert, so it is checked as
+    // wording and not only as a kind.
+    expect(blocked!.body).toContain('cannot say whether it is answering');
+    expect(blocked!.body).toContain('not a finding about the application');
+    expect(blocked!.body.toLowerCase()).not.toContain('did not respond');
+  });
+
+  it('leaves a genuine outage counting where it was when a refusal interrupts it', async () => {
+    // A refusal is not evidence either way, so it must not forgive an outage in
+    // progress. Three failures, a refusal, three more failures: still six.
+    const { badgeId } = await setUp('liveness-refused-midway');
+    const down = async () => ({ status: null, error: 'connect ETIMEDOUT' });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await sweepLiveness(pool, down, undefined, new Date(`2026-08-0${attempt}T00:00:00Z`));
+    }
+    await sweepLiveness(
+      pool,
+      async () => ({ status: null, refusedReason: 'Refused by the scope guard: out of scope' }),
+      undefined,
+      new Date('2026-08-04T00:00:00Z'),
+    );
+    for (let attempt = 5; attempt <= 7; attempt += 1) {
+      await sweepLiveness(pool, down, undefined, new Date(`2026-08-0${attempt}T00:00:00Z`));
+    }
+    expect(
+      (await db.query('select status::text as status from public.badges where id = $1', [badgeId]))
+        .rows[0]!.status,
+    ).toBe('suspended');
+  });
+
   it('checks the certified origin and nothing else', async () => {
     const { space } = await setUp('liveness-scope');
     const seen: string[] = [];
@@ -629,6 +856,23 @@ describe('liveness', () => {
   });
 });
 
+describe('every kind of alert has a name a person can read', () => {
+  it('has a console label for every alert_kind the database knows', async () => {
+    // Asked of the catalogue rather than of the migrations, because the gap this
+    // closes is between two files that never mention each other: a kind is added
+    // to the enum in SQL and the console goes on rendering the raw label. Three
+    // kinds were in exactly that state when this test was written.
+    const { rows } = await db.query<{ label: string }>(
+      `select e.enumlabel as label
+         from pg_enum e join pg_type t on t.oid = e.enumtypid
+        where t.typname = 'alert_kind'
+        order by e.enumsortorder`,
+    );
+    const unnamed = rows.map((row) => row.label).filter((label) => !KIND_LABEL[label]);
+    expect(unnamed, 'alert kinds with no label in the console inbox').toEqual([]);
+  });
+});
+
 describe('the liveness probe is inside the scope boundary', () => {
   it('refuses an origin that resolves to a private address', async () => {
     // The certified origin is a public name today. If its DNS is later pointed
@@ -636,7 +880,12 @@ describe('the liveness probe is inside the scope boundary', () => {
     // schedule, every hour, for as long as the badge lives.
     const probe = await httpLivenessProbe('http://127.0.0.1:1/');
     expect(probe.status).toBeNull();
-    expect(probe.error ?? '').toMatch(/scope guard|private|refused/i);
+    // In `refusedReason` and not in `error`, which is the difference between
+    // "we did not look" and "nobody answered". Everything downstream — the
+    // failure counter, the suspension, the wording of the notice — turns on
+    // which of the two fields this arrives in.
+    expect(probe.refusedReason ?? '').toMatch(/scope guard|private|refused/i);
+    expect(probe.error).toBeUndefined();
   });
 
   it('refuses a redirect that leaves the certified origin', async () => {
@@ -653,7 +902,8 @@ describe('the liveness probe is inside the scope boundary', () => {
     try {
       const probe = await httpLivenessProbe(`http://127.0.0.1:${port}/`);
       expect(probe.status).toBeNull();
-      expect(probe.error ?? '').toMatch(/scope guard|refused|private/i);
+      expect(probe.refusedReason ?? '').toMatch(/scope guard|refused|private/i);
+      expect(probe.error).toBeUndefined();
     } finally {
       server.close();
     }

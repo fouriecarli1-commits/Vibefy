@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ActionForm } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { KIND_LABEL } from '@/lib/alert-kinds';
 import { markAlertRead, markAllAlertsRead } from './actions';
 
 export const metadata: Metadata = { title: 'Alerts' };
@@ -11,17 +12,6 @@ const SEVERITY: Record<string, { label: string; tone: string }> = {
   info: { label: 'For information', tone: 'text-muted' },
   warning: { label: 'Worth a look', tone: 'text-warn' },
   critical: { label: 'Needs action', tone: 'text-bad' },
-};
-
-const KIND_LABEL: Record<string, string> = {
-  assessment_completed: 'Assessment finished',
-  drift_detected: 'Change since last time',
-  material_regression: 'Material change',
-  badge_suspended: 'Badge suspended',
-  badge_expiring: 'Badge expiring',
-  application_unreachable: 'Not responding',
-  application_recovered: 'Responding again',
-  subscription_problem: 'Subscription',
 };
 
 /**
