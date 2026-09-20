@@ -254,6 +254,17 @@ export class ScopeGuard {
  * It does not count requests against the run's ceiling. The caller that made the
  * request already did, and counting the same request twice would halve the
  * budget the customer authorised.
+ *
+ * Which means the consequence, said plainly rather than left to be worked out:
+ * a request that arrives *only* here — made by a dependency through the global
+ * dispatcher, never through `ScopedHttp` — is checked against every rule and
+ * counted against nothing. `maxTotalRequests` bounds the requests the engine
+ * makes on purpose, not every request that leaves the process. Browser traffic
+ * is outside it for the same reason and a more obvious one: Chromium is a
+ * separate process and does not use undici at all. Recorded in
+ * docs/OPEN_ITEMS.md; closing it properly means moving the counting here and
+ * teaching the callers not to, which is a change worth making deliberately
+ * rather than as a footnote to something else.
  */
 export function createScopedDispatcher(guard: ScopeGuard): Dispatcher {
   const allowPrivate = guard.policy.allowPrivateNetworkForTesting === true;

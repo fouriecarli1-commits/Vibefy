@@ -5,7 +5,7 @@
  * authorised to test is a criminal offence, and the guard is what stands between
  * a model's suggestion and a request actually leaving the machine.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -205,6 +205,46 @@ describe('the client enforces the address, not only the URL', () => {
     expect(source.indexOf('this.dispatcher = createScopedDispatcher')).toBeLessThan(
       source.indexOf('installGlobalDispatcher()'),
     );
+  });
+});
+
+describe('the private-network escape hatch', () => {
+  /** Every TypeScript file that ships, which is everything outside `tests/`. */
+  function shippedSources(): { path: string; source: string }[] {
+    const found: { path: string; source: string }[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name === 'node_modules' || entry.name === '.next') continue;
+          walk(full);
+        } else if (/\.(ts|tsx|mts)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+          found.push({ path: full, source: readFileSync(full, 'utf8') });
+        }
+      }
+    };
+    for (const root of ['packages', 'apps']) walk(join(process.cwd(), root));
+    return found;
+  }
+
+  it('is not opened by anything that ships', () => {
+    // `allowPrivateNetworkForTesting` turns off the one check a URL allowlist
+    // cannot make: whether the address a host resolves to is somewhere we are
+    // permitted to connect. The tests need it, because the fixture application
+    // is on loopback. Nothing else may have it, and the way it would arrive is
+    // somebody switching it on to make a stubborn case work and never switching
+    // it back — which is invisible in a diff nobody is reading closely.
+    const opened = shippedSources()
+      .filter(({ source }) => /allowPrivateNetworkForTesting\s*:\s*true/.test(source))
+      .map(({ path }) => path.replace(`${process.cwd()}/`, ''));
+    expect(opened, 'shipped files that permit reaching a private address').toEqual([]);
+  });
+
+  it('finds it when it is there, so this guard is not decorative', () => {
+    // The check above passing means nothing unless it can fail. This is the
+    // same predicate against a file that does open the hatch.
+    const pretend = 'const policy = { allowedHosts: [], allowPrivateNetworkForTesting: true };';
+    expect(/allowPrivateNetworkForTesting\s*:\s*true/.test(pretend)).toBe(true);
   });
 });
 
