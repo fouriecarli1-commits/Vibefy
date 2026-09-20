@@ -13,6 +13,11 @@ How to run, verify, debug and deploy VibefyCode. Written for one person with no 
 | `pnpm tokens:build`   | Regenerates the console's CSS custom properties from `tokens.json`                                        |
 | `pnpm legal:registry` | Rehashes `/legal` into `legal/registry.json` — run after editing any legal document                       |
 | `pnpm db:reset`       | Drops and recreates the local Supabase database from migrations                                           |
+| `pnpm check:a11y`     | Builds, serves and scans every public page at desktop and phone width for WCAG 2.2 AA failures            |
+| `pnpm check:design`   | The design survey, pointed at our own pages. A report, not a gate — `--why` prints the measurements       |
+| `pnpm db:audit`       | Prints a read-only query that tells a database which migrations it already has                            |
+| `pnpm db:catch-up`    | Prints a re-runnable version of the migrations from a given one onward, for a paste that failed halfway   |
+| `pnpm verify:all`     | `pnpm verify` plus the accessibility scan. What to run before saying something is finished                |
 
 Local URLs: console `:3000`, Supabase Studio `:54323`, mail catcher `:54324`.
 
@@ -753,6 +758,11 @@ for re-acceptance. If you did not intend that, you did not want a version bump.
 - **Database:** Supabase, EU region (Frankfurt or Ireland). The region is not a preference: the
   privacy notice says data is held in the EU, and this is the setting that makes that true.
 - **Secrets:** never in the repo. `.env.local` locally, the platform secret store in production.
+- **The public endpoints are cached, and should be cached again at the edge.**
+  `/api/badge/<id>/status` says five minutes and `/api/badges/live` says an hour. Both are
+  unauthenticated and both are the same answer for everybody, so a CDN rule honouring those
+  headers is the difference between one database read an hour and one per caller. It is also
+  the only rate limiting either page has — see `docs/OPEN_ITEMS.md`.
 - **Badge signing key:** stored only in the platform secret store, and only the worker needs it.
   If it leaks, every badge becomes forgeable — rotation means reissuing every badge, so treat it
   as the most sensitive value in the system.
@@ -845,7 +855,27 @@ is assessed without an authorisation record. Add an app in the console, publish 
 the file it asks for, then request an assessment: `assessment_requests` should go from `queued` to
 claimed within about five seconds, and the log starts naming stages.
 
-## If something goes wrong in production
+## The browser extension
+
+It lives in `apps/extension` and loads unpacked today.
+
+1. `chrome://extensions`, turn on developer mode, **Load unpacked**, choose that folder.
+2. Click the icon on any site.
+
+It asks one question of our servers — `/api/badges/live`, once an hour — and answers
+everything else from the copy on the machine. It does not light up by itself, and that is
+deliberate: an icon that lights up on its own has to watch every page you open.
+
+Two things have to change before it is submitted anywhere, and both are one line:
+
+- `manifest.json` — the single host permission, currently a guess at the primary domain.
+- `src/config.js` — the list URL, same guess.
+
+Submitting it needs a developer account in the company's name at each store, which waits on
+the legal entity. `pnpm typecheck` covers it like everything else; `tests/extension.test.ts`
+holds the permissions it may not acquire.
+
+## If something goes wrong in production## If something goes wrong in production
 
 1. **Suspected data exposure** — follow the incident response plan in `BUSINESS_CHECKLIST.md`.
    72-hour notification clock starts at awareness, not at confirmation.

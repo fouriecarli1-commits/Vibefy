@@ -333,3 +333,65 @@ describe('the worker can be deployed', () => {
     expect(renderConfig).toContain('VIBEFYCODE_BADGE_SIGNING_KEY_B64');
   });
 });
+
+describe('the runbook keeps up with the commands', () => {
+  /*
+   * A runbook is the document somebody opens when they are already stuck, and
+   * one that lists half the tools is worse than one that lists none: it reads
+   * as complete. Four commands existed for days without appearing in it.
+   *
+   * So the table is checked against `package.json` rather than against memory.
+   * Anything a person would run by hand has to be there; the ones a script or a
+   * hook runs are excused by name.
+   */
+  const runbook = readFileSync(join(process.cwd(), 'docs/RUNBOOK.md'), 'utf8');
+  const scripts = Object.keys(
+    JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')).scripts as Record<
+      string,
+      string
+    >,
+  );
+
+  /** Run by something else, not by a person with a problem. */
+  const NOT_BY_HAND: Readonly<Record<string, string>> = {
+    prepare: 'Run by pnpm on install, to set up the git hooks.',
+    build: 'Run by the platform on deploy.',
+    'test:watch': 'The same as pnpm test, with a flag.',
+    format: 'Run by the pre-commit hook and by the editor.',
+    'format:check': 'Part of pnpm verify, which is in the table.',
+    'check:copy': 'Part of pnpm verify.',
+    'check:secrets': 'Part of pnpm verify, and of the pre-commit hook.',
+    'check:contrast': 'Part of pnpm verify.',
+    'check:brand': 'Part of pnpm verify.',
+    'check:stubs': 'Part of pnpm verify.',
+    'check:schema': 'Part of pnpm verify.',
+    'schema:build': 'Covered by its own section on adding a migration.',
+    'brand:inspect': 'Covered by the section on the marks.',
+    'badge:artwork': 'Covered by the section on the marks.',
+    'badge:keygen': 'Covered by the section on the badge signing key.',
+    'dev:worker': 'Covered by the section on running an assessment locally.',
+    'dev:mobile': 'Covered by the mobile section.',
+    'db:start': 'Covered by the section on the test database.',
+  };
+
+  it('lists every command a person would reach for', () => {
+    const missing = scripts.filter(
+      (name) => !(name in NOT_BY_HAND) && !runbook.includes(`\`pnpm ${name}\``),
+    );
+    expect(
+      missing,
+      `Commands the runbook never mentions: ${missing.join(', ')}. Add them to the table, or say in this test what runs them instead.`,
+    ).toEqual([]);
+  });
+
+  it('does not excuse a command that no longer exists', () => {
+    const gone = Object.keys(NOT_BY_HAND).filter((name) => !scripts.includes(name));
+    expect(gone, `Excused commands with no script: ${gone.join(', ')}`).toEqual([]);
+  });
+
+  it('tells somebody how to run the extension, since nothing else can', () => {
+    // It is the one part of this repository that is not started by a command.
+    expect(runbook).toContain('Load unpacked');
+    expect(runbook).toMatch(/before it is submitted anywhere/i);
+  });
+});
