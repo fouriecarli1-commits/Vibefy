@@ -140,3 +140,79 @@ export async function failRequest(
 
   return requeue ? 'requeued' : 'failed';
 }
+
+/**
+ * How long a claimed request may sit before we assume its worker is gone.
+ *
+ * A run's own wall-clock ceiling is thirty minutes, and persisting what it
+ * found takes seconds. Ninety is three times the longest a run can legitimately
+ * take, and the margin is the whole safety argument: a claim is not held by a
+ * lock once the claiming transaction commits, so reclaiming one whose worker is
+ * still alive would run the same assessment twice and charge for both.
+ */
+export const RECLAIM_AFTER_MINUTES = 90;
+
+export interface ReclaimResult {
+  readonly requeued: number;
+  readonly abandoned: number;
+}
+
+/**
+ * Requests whose worker never came back.
+ *
+ * The gap this closes is the quietest failure in the system. A worker that is
+ * killed between claiming a request and finishing it — a deploy, an out-of-
+ * memory kill, a container moved — leaves the row at `claimed` for ever.
+ * Nothing retries it, nothing alerts on it, and the console shows the customer
+ * "in progress" until somebody asks why.
+ *
+ * It is worse than one lost run. The re-assessment sweep skips any application
+ * that already has a queued or claimed request, so a single stranded row stops
+ * that application ever being re-checked again: its badge stays live, drift is
+ * never looked for, and the mark goes on standing for a claim nobody is
+ * testing any more.
+ *
+ * `attempts` was already incremented when the row was claimed, so a request
+ * whose worker dies on every attempt runs out of attempts and is written down
+ * as failed rather than cycling for ever.
+ */
+export async function reclaimStaleRequests(
+  client: PoolClient,
+  options: { maxAttempts?: number; afterMinutes?: number } = {},
+): Promise<ReclaimResult> {
+  const maxAttempts = options.maxAttempts ?? 3;
+  const afterMinutes = options.afterMinutes ?? RECLAIM_AFTER_MINUTES;
+
+  const requeued = await client.query(
+    `update public.assessment_requests
+        set status = 'queued', claimed_at = null,
+            last_error = $2
+      where status = 'claimed'
+        and claimed_at < now() - make_interval(mins => $1::int)
+        and attempts < $3`,
+    [
+      afterMinutes,
+      `The worker running this stopped without finishing. Requeued after ${afterMinutes} minutes.`,
+      maxAttempts,
+    ],
+  );
+
+  // Out of attempts. Written down as failed with a reason a person can act on,
+  // rather than left claimed, because a queue row that can never move again is
+  // indistinguishable from one that is about to.
+  const abandoned = await client.query(
+    `update public.assessment_requests
+        set status = 'failed', completed_at = now(),
+            last_error = $2
+      where status = 'claimed'
+        and claimed_at < now() - make_interval(mins => $1::int)
+        and attempts >= $3`,
+    [
+      afterMinutes,
+      'The worker running this stopped without finishing, and it had no attempts left. Nothing was charged for the attempt that did not complete.',
+      maxAttempts,
+    ],
+  );
+
+  return { requeued: requeued.rowCount ?? 0, abandoned: abandoned.rowCount ?? 0 };
+}
