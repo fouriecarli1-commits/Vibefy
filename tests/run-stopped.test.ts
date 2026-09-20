@@ -35,6 +35,7 @@ import {
   runPipeline,
   type Stage,
   type StageContext,
+  type StageId,
   type StopReason,
 } from '../packages/engine/src/index.ts';
 import { STOP_EXPLANATION, STOP_HEADLINE, STOP_LABEL, STOP_REASONS } from '@vibefycode/shared';
@@ -93,6 +94,27 @@ function throwingStage(error: Error): Stage {
     run: async () => {
       throw error;
     },
+  };
+}
+
+/** A stage the pipeline will not run, which is the ordinary case, not a rarity. */
+function skippingStage(id: StageId): Stage {
+  return {
+    id,
+    appliesTo: () => false,
+    skipReason: () => 'this stage does not apply to the fixture',
+    run: async () => {
+      throw new Error('A skipped stage must never be run.');
+    },
+  };
+}
+
+/** A stage that finds nothing and says so, which is a perfectly good outcome. */
+function quietStage(id: StageId): Stage {
+  return {
+    id,
+    appliesTo: () => true,
+    run: async () => ({ stage: id, status: 'succeeded', findings: [], notes: ['Nothing found.'] }),
   };
 }
 
@@ -161,6 +183,57 @@ describe('the pipeline says which limit it was', () => {
     const notes = outcome.stageResults.flatMap((result) => result.notes).join(' ');
     expect(notes).toContain('turned back at the scope boundary');
     expect(notes).not.toMatch(/ceiling/i);
+  });
+
+  it('does not let a skipped stage turn a total failure into a completed run', async () => {
+    // The old rule was "every stage failed", and one skipped stage defeats it.
+    // There is essentially always a skipped stage — the game pass does not apply
+    // to a web application, several others are skipped by depth — so `failed`
+    // was close to unreachable and this run came out as `completed`.
+    const outcome = await runPipeline({
+      context: context(),
+      stages: [
+        skippingStage('game_experience'),
+        throwingStage(new Error('Chromium exited before the page loaded.')),
+      ],
+    });
+    expect(outcome.status).toBe('failed');
+  });
+
+  it('never hands a reviewer a perfect score for an application nothing could reach', async () => {
+    // Why the status has to carry this. The scoring is honest on its own terms —
+    // no findings means no penalty, which means full marks and no certification
+    // blockers — so a run that reached nothing produces the best possible
+    // result. `completed` would have sent that to the review queue looking like
+    // a flawless application; `failed` never reaches a reviewer at all.
+    const outcome = await runPipeline({
+      context: context(),
+      stages: [skippingStage('game_experience'), throwingStage(new Error('connect ETIMEDOUT'))],
+    });
+    expect(outcome.findings).toEqual([]);
+    expect(outcome.score.overallScore).toBeGreaterThan(90);
+    expect(outcome.score.certificationEligible).toBe(true);
+    expect(outcome.status, 'the only thing standing between this and a badge').toBe('failed');
+  });
+
+  it('says which stages did not complete, so the silence is not mistaken for a clean sheet', async () => {
+    const outcome = await runPipeline({
+      context: context(),
+      stages: [quietStage('static_intake'), throwingStage(new Error('Chromium exited.'))],
+    });
+    expect(outcome.status).toBe('completed');
+    const notes = outcome.notes.join(' ');
+    expect(notes).toContain('deterministic_checks');
+    expect(notes).toMatch(/did not complete/i);
+    expect(notes).toMatch(/not evidence that there was nothing to find/i);
+  });
+
+  it('is a completed run when something did work, even if something else did not', async () => {
+    const outcome = await runPipeline({
+      context: context(),
+      stages: [quietStage('static_intake'), throwingStage(new Error('Chromium exited.'))],
+    });
+    expect(outcome.status).toBe('completed');
   });
 
   it('keeps calling a genuine fault a failure', async () => {

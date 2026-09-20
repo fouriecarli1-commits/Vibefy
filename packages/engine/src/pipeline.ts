@@ -7,8 +7,15 @@
  * attempt, and retrying it would be spending money to break the same rule twice.
  *
  * What comes out is everything the database and the reviewer queue need: the
- * findings that survived evidence enforcement, the ones that did not and why,
- * the rubric score, the narrative, the evidence rows and the cost breakdown.
+ * findings that survived evidence enforcement, the rubric score, the narrative,
+ * the evidence rows and the cost breakdown.
+ *
+ * The claims that did *not* survive travel in the stage's notes, which reach the
+ * report through `assessment_runs.metadata`, naming each one and saying it was
+ * withheld for citing no evidence we captured. There used to be a
+ * `withheldFindings` field here promising the same thing in a structured form;
+ * nothing ever wrote to it, so it was always empty, and an always-empty typed
+ * field is a claim about the system that is not true.
  */
 import { scoreAssessment, type ScoringInput, type ScoringResult } from '@vibefycode/rubric';
 import { scopeStatement, NON_RELIANCE_LEGEND, AI_DISCLOSURE } from '@vibefycode/shared';
@@ -55,7 +62,6 @@ export interface AssessmentOutcome {
   readonly promptBundleSha256: string;
   readonly stageResults: readonly StageResult[];
   readonly findings: readonly RawFinding[];
-  readonly withheldFindings: readonly { title: string; reason: string }[];
   readonly score: ScoringResult;
   readonly narrative: ReportNarrative | null;
   readonly evidence: readonly Omit<EvidenceArtefact, 'body'>[];
@@ -90,7 +96,6 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
   const maxAttempts = options.maxAttemptsPerStage ?? 2;
 
   const stageResults: StageResult[] = [];
-  const withheld: { title: string; reason: string }[] = [];
   let stopped: StopReason | null = null;
 
   for (const stage of stages) {
@@ -124,7 +129,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
   }
 
   const findings = stageResults.flatMap((result) => result.findings);
-  const notes = stageResults.flatMap((result) => result.notes);
+  const notes: string[] = stageResults.flatMap((result) => result.notes);
 
   const functional = stageResults.find((result) => result.stage === 'functional_exploration');
   const coreFlowsUnreachable =
@@ -146,6 +151,32 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     })),
   };
   const score = scoreAssessment(scoringInput);
+
+  // Worked out before synthesis is appended, and counting only the stages that
+  // were actually asked to run.
+  //
+  // The old rule was `stageResults.every(r => r.status === 'failed')`, which one
+  // skipped stage defeats — and there is essentially always a skipped stage,
+  // because `appliesTo` skips the game pass for a web application and several
+  // others by depth. So `failed` was close to unreachable, and a run in which
+  // every stage that executed had failed came out as `completed`.
+  //
+  // That is the worst artefact this pipeline can produce. No stage ran, so there
+  // are no findings; no findings means no penalty; no penalty means a score of
+  // 100, no gates applied and `certificationEligible: true`. A target that was
+  // unreachable from first request to last would have arrived in the review
+  // queue looking like a flawless application.
+  const executed = stageResults.filter((result) => result.status !== 'skipped');
+  const nothingRan = executed.length === 0;
+  const nothingSucceeded = !executed.some((result) => result.status === 'succeeded');
+  const failedStages = executed.filter((result) => result.status === 'failed');
+  if (failedStages.length > 0) {
+    notes.push(
+      `${failedStages.length} of ${executed.length} stage(s) that ran did not complete: ` +
+        `${failedStages.map((result) => result.stage).join(', ')}. What the other stages found ` +
+        `still stands, and what they did not look at is not evidence that there was nothing to find.`,
+    );
+  }
 
   let narrative: ReportNarrative | null = null;
   if (!stopped) {
@@ -174,7 +205,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
 
   const status: AssessmentStatus = stopped
     ? 'aborted'
-    : stageResults.every((result) => result.status === 'failed')
+    : nothingRan || nothingSucceeded
       ? 'failed'
       : 'completed';
 
@@ -186,7 +217,6 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     promptBundleSha256: promptBundleSha256(),
     stageResults,
     findings,
-    withheldFindings: withheld,
     score,
     narrative,
     evidence: context.evidence.toRows(),
