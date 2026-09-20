@@ -12,8 +12,11 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, Pool } from 'pg';
 import {
+  generateReport,
   LocalReportStorage,
+  REPORT_RENDER_ATTEMPTS,
   regenerateForPlanChange,
+  resetReportFailureCounts,
   sweepPendingReports,
 } from '../apps/worker/src/report.ts';
 import { connect } from './setup/client.ts';
@@ -34,6 +37,10 @@ let storageRoot: string;
 let storage: LocalReportStorage;
 let assessmentId: string;
 let appId: string;
+
+/** Long enough to be publishable — the generator refuses anything shorter. */
+const SCOPE_STATEMENT =
+  'This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation conducted against a published rubric version on a stated date. It is not a guarantee of any kind. Absence of a finding is not evidence of absence of a defect.';
 
 beforeAll(async () => {
   db = await connect();
@@ -82,7 +89,7 @@ beforeAll(async () => {
       where id = $1`,
     [
       assessmentId,
-      'This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation conducted against a published rubric version on a stated date. It is not a guarantee of any kind. Absence of a finding is not evidence of absence of a defect.',
+      SCOPE_STATEMENT,
       JSON.stringify([
         { dimension: 'security_posture', score: 11, weight: 0.25, band: 'Not ready' },
         { dimension: 'functional_integrity', score: 90, weight: 0.25, band: 'Exemplary' },
@@ -141,6 +148,101 @@ describe('the sweep', () => {
     const again = await sweepPendingReports(pool, storage);
     expect(again).toBe(0);
   }, 30_000);
+});
+
+describe('when the PDF will not print', () => {
+  it('writes nothing at all, so the sweep comes back for it', async () => {
+    // The sweep decides there is work to do by looking for an assessment with
+    // no HTML report. Writing the HTML row and then failing to print satisfied
+    // that test while leaving a paying customer without the format they paid
+    // for — and because the sweep only ever asked about HTML, it never came
+    // back. The PDF was not late; it was gone.
+    const seeded = await seedAssessment(db, owner);
+    await seedFinding(db, owner, seeded.assessmentId, { severity: 'low' });
+    await db.query(
+      `update public.assessments
+          set overall_score = 70, scope_statement = $2, prompt_bundle_sha256 = repeat('b', 64),
+              dimension_scores = '[]'::jsonb, completed_at = now()
+        where id = $1`,
+      [seeded.assessmentId, SCOPE_STATEMENT],
+    );
+    await approveAssessment(db, owner, seeded.assessmentId, reviewer.userId, {
+      certificationEligible: false,
+    });
+
+    const client = await pool.connect();
+    try {
+      await expect(
+        generateReport(client, storage, {
+          assessmentId: seeded.assessmentId,
+          tier: 'paid',
+          formats: ['html', 'pdf'],
+          printPdf: async () => {
+            throw new Error('the printer fell over');
+          },
+        }),
+      ).rejects.toThrow(/printer fell over/);
+    } finally {
+      client.release();
+    }
+
+    const { rows } = await db.query('select format from public.reports where assessment_id = $1', [
+      seeded.assessmentId,
+    ]);
+    expect(rows, 'a half-written report is what makes the sweep stop looking').toEqual([]);
+  }, 60_000);
+});
+
+describe('an assessment that can never be rendered', () => {
+  it('stops taking a place in the window that everyone else is queued behind', async () => {
+    // The window is twenty rows, ordered oldest-review-first, and a row leaves
+    // it only by acquiring a report. One that never can — here, a scope
+    // statement too short to publish — sits at the front of it for ever and
+    // takes a slot every sweep. Twenty of those and nobody gets a report again,
+    // while the log repeats the same errors and never says that part.
+    resetReportFailureCounts();
+    const doomed = await seedAssessment(db, owner);
+    await seedFinding(db, owner, doomed.assessmentId, { severity: 'low' });
+    await db.query(
+      `update public.assessments
+          set overall_score = 55, scope_statement = 'Too short to publish.',
+              prompt_bundle_sha256 = repeat('c', 64), dimension_scores = '[]'::jsonb,
+              completed_at = now(), reviewed_at = '2000-01-01T00:00:00Z'
+        where id = $1`,
+      [doomed.assessmentId],
+    );
+    await approveAssessment(db, owner, doomed.assessmentId, reviewer.userId, {
+      certificationEligible: false,
+    });
+    // Backdated behind it, so it is the row that would be starved.
+    await db.query(
+      `update public.assessments set reviewed_at = '2000-01-01T00:00:00Z' where id = $1`,
+      [doomed.assessmentId],
+    );
+
+    const said: { message: string; detail?: Record<string, unknown> }[] = [];
+    const log = (message: string, detail?: Record<string, unknown>) =>
+      said.push(detail === undefined ? { message } : { message, detail });
+
+    for (let attempt = 1; attempt <= REPORT_RENDER_ATTEMPTS; attempt += 1) {
+      await sweepPendingReports(pool, storage, log);
+    }
+    const failures = said.filter((line) => line.message === 'report generation failed');
+    expect(failures.length).toBe(REPORT_RENDER_ATTEMPTS);
+    expect(said.some((line) => line.message.startsWith('report generation given up on'))).toBe(
+      true,
+    );
+
+    // And from now on it is not tried, and the sweep says why rather than
+    // going quiet about it.
+    said.length = 0;
+    await sweepPendingReports(pool, storage, log);
+    expect(said.some((line) => line.message === 'report generation failed')).toBe(false);
+    const blocked = said.find((line) => line.message.startsWith('assessments the sweep can no'));
+    expect(blocked?.detail?.blocked).toBe(1);
+
+    resetReportFailureCounts();
+  }, 120_000);
 });
 
 describe('upgrading after reading the free report', () => {

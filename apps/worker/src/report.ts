@@ -107,6 +107,12 @@ export interface GenerateReportInput {
   readonly assessmentId: string;
   readonly tier: ReportTier;
   readonly formats?: readonly ('html' | 'pdf')[];
+  /**
+   * How to print the PDF. Injectable only so a test can make printing fail:
+   * the promise below — that nothing is written down until everything has
+   * rendered — is not worth making if nobody has watched it hold.
+   */
+  readonly printPdf?: ((html: string) => Promise<Buffer>) | undefined;
 }
 
 /**
@@ -133,6 +139,15 @@ export async function generateReport(
 
   const rendered = renderReport(source, input.tier);
   const htmlBytes = Buffer.from(rendered.html, 'utf8');
+
+  // Everything is rendered before anything is written down, and the order is
+  // load-bearing. `sweepPendingReports` decides there is work to do by looking
+  // for an assessment with no HTML report. Writing the HTML row first and then
+  // failing to print the PDF satisfied that test while leaving a paying
+  // customer without the format they paid for — and because the sweep only ever
+  // asked about HTML, it never came back. The PDF was not late; it was gone.
+  const pdf = formats.includes('pdf') ? await (input.printPdf ?? renderPdf)(rendered.html) : null;
+
   // The file is written for whoever is developing locally and wants to open it.
   // It is not where the download comes from: this process runs on Render and the
   // console runs on Vercel, and the only thing they share is this database.
@@ -163,8 +178,7 @@ export async function generateReport(
   );
 
   let pdfStored: StoredReport | null = null;
-  if (formats.includes('pdf')) {
-    const pdf = await renderPdf(rendered.html);
+  if (pdf) {
     pdfStored = await storage.put(
       `reports/${source.assessmentId}/report.pdf`,
       pdf,
@@ -202,6 +216,31 @@ export async function generateReport(
  * reason a report is missing — a crash, a deploy, an upgrade from free to paid —
  * the next pass notices and fixes it.
  */
+/**
+ * How many times one assessment may fail to render before the sweep stops
+ * trying it, and the count of failures so far.
+ *
+ * The window is twenty rows ordered oldest-review-first, and a row leaves it
+ * only by acquiring a report. An assessment that can never acquire one — a
+ * scope statement too short to publish, a source row the assembler chokes on —
+ * therefore sits at the front of that window and takes a slot every sweep, for
+ * ever. Twenty of those and nobody's report is generated again, while the log
+ * fills with the same twenty errors and never says the thing that matters:
+ * that everyone else is now waiting behind them.
+ *
+ * In memory rather than a column, because this is a process-lifetime guard and
+ * not a record: a restart is a fresh try, which is what you want after a deploy
+ * that fixed the renderer. A permanent failure needs a person either way, and
+ * the point of the cap is that the log says so once instead of never.
+ */
+export const REPORT_RENDER_ATTEMPTS = 3;
+const renderFailures = new Map<string, number>();
+
+/** Forgets the failure counts. Exported for tests, which share one process. */
+export function resetReportFailureCounts(): void {
+  renderFailures.clear();
+}
+
 export async function sweepPendingReports(
   pool: { connect(): Promise<PoolClient> },
   storage: ReportStorage,
@@ -223,7 +262,13 @@ export async function sweepPendingReports(
     );
 
     let generated = 0;
+    let blocked = 0;
     for (const row of pending.rows) {
+      if ((renderFailures.get(row.id) ?? 0) >= REPORT_RENDER_ATTEMPTS) {
+        blocked += 1;
+        continue;
+      }
+
       const plan = await resolvePlan(client, {
         organisationId: row.organisation_id,
         appId: row.app_id,
@@ -234,15 +279,35 @@ export async function sweepPendingReports(
           tier: plan.entitlement.reportTier,
           formats: plan.entitlement.pdfExport ? ['html', 'pdf'] : ['html'],
         });
+        renderFailures.delete(row.id);
         generated += 1;
         log('report generated', { assessmentId: row.id, tier: plan.entitlement.reportTier });
       } catch (error) {
         // One bad assessment must not stop the others.
+        const failures = (renderFailures.get(row.id) ?? 0) + 1;
+        renderFailures.set(row.id, failures);
         log('report generation failed', {
           assessmentId: row.id,
+          attempt: failures,
           error: error instanceof Error ? error.message : String(error),
         });
+        if (failures >= REPORT_RENDER_ATTEMPTS) {
+          // Said once, in the words somebody woken at night needs: not "it
+          // failed" — it has been failing all along — but "it is now holding a
+          // place that other customers' reports are queued behind".
+          log('report generation given up on until this process restarts', {
+            assessmentId: row.id,
+            attempts: failures,
+            consequence: 'it no longer takes a slot in the sweep window',
+          });
+        }
       }
+    }
+    if (blocked > 0) {
+      log('assessments the sweep can no longer render', {
+        blocked,
+        note: 'each needs a person; a restart makes the sweep try them again',
+      });
     }
     return generated;
   } finally {
@@ -265,7 +330,14 @@ export async function regenerateForPlanChange(
     [assessmentId],
   );
   const row = context.rows[0];
-  if (!row) return;
+  if (!row) {
+    // Louder than a bare return, because of when this is called: somebody has
+    // just paid for the full version of a report. Quietly doing nothing there
+    // means the customer waits for a file that is never coming.
+    throw new Error(
+      `Cannot regenerate the report for assessment ${assessmentId}: there is no such assessment.`,
+    );
+  }
 
   const plan = await resolvePlan(client, {
     organisationId: row.organisation_id,
