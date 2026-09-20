@@ -22,6 +22,7 @@ import {
 } from '../packages/engine/src/index.ts';
 import {
   AuthorisationWithdrawnError,
+  DanglingEvidenceError,
   NotAuthorisedError,
   persistOutcome,
   runAssessmentJob,
@@ -297,6 +298,94 @@ describe('what lands in the database', () => {
       db.query(`update public.assessments set status = 'approved' where id = $1`, [assessmentId]),
     ).rejects.toThrow(/without a recorded human review/);
     await db.query('rollback');
+  });
+});
+
+describe('a finding whose evidence was never stored', () => {
+  /** A fresh app and authorisation, since each of these writes under its own. */
+  async function workspace(): Promise<{ appId: string; authorisationId: string }> {
+    const appId = await seedApp(db, owner);
+    const authorisationId = await seedAuthorisation(db, owner, appId);
+    return { appId, authorisationId };
+  }
+
+  it('writes nothing at all, rather than a finding with no proof behind it', async () => {
+    // Unreachable through the engine today: model findings are filtered against
+    // what was actually captured, and the deterministic stages hand back ids
+    // from a capture that either stored something or threw. Nothing joins those
+    // two guarantees up, though, and the old code quietly dropped the link and
+    // published the finding anyway — a claim with nothing behind it, on the one
+    // subject this company cannot afford to be wrong about.
+    const { appId, authorisationId } = await workspace();
+    const findings = [...outcome.findings];
+    expect(findings.length, 'the fixture run produced no findings to bend').toBeGreaterThan(0);
+    findings[0] = { ...findings[0]!, evidenceIds: ['evidence-that-was-never-stored'] };
+
+    const client = await pool.connect();
+    try {
+      await expect(
+        persistOutcome(client, {
+          outcome: { ...outcome, findings },
+          appId,
+          organisationId: owner.organisationId,
+          authorisationId,
+          depth: 'full',
+          requestedBy: owner.userId,
+          engineVersion: '1.0.0',
+        }),
+      ).rejects.toThrow(DanglingEvidenceError);
+    } finally {
+      client.release();
+    }
+
+    const stored = await db.query<{ n: number }>(
+      'select count(*)::int as n from public.assessments where app_id = $1',
+      [appId],
+    );
+    expect(stored.rows[0]!.n, 'the whole transaction goes, not just the one link').toBe(0);
+  });
+
+  it('refuses a stage outcome it has no database word for', async () => {
+    // The same conflation that was fixed one level up, one level down: every
+    // status this switch did not recognise became `failed`, which tells a
+    // customer their application broke something. A fifth status added to the
+    // engine would have inherited that silently. The compiler catches it now;
+    // this is the runtime half, because the cast below is what a future caller
+    // reaching for `any` would do.
+    const { appId, authorisationId } = await workspace();
+    const stageResults = [...outcome.stageResults];
+    // `as unknown as` because the union genuinely is closed — TypeScript
+    // refuses the direct cast, which is the fix working. What is being checked
+    // here is the runtime backstop for a caller who reaches past it anyway.
+    stageResults[0] = {
+      ...stageResults[0]!,
+      status: 'throttled',
+    } as unknown as (typeof stageResults)[number];
+
+    const client = await pool.connect();
+    try {
+      await expect(
+        persistOutcome(client, {
+          outcome: { ...outcome, stageResults },
+          appId,
+          organisationId: owner.organisationId,
+          authorisationId,
+          depth: 'full',
+          requestedBy: owner.userId,
+          engineVersion: '1.0.0',
+        }),
+      ).rejects.toThrow(/no database status is defined/i);
+    } finally {
+      client.release();
+    }
+
+    const runs = await db.query<{ n: number }>(
+      `select count(*)::int as n from public.assessment_runs r
+         join public.assessments a on a.id = r.assessment_id
+        where a.app_id = $1 and r.status = 'failed'`,
+      [appId],
+    );
+    expect(runs.rows[0]!.n, 'nothing was written down as a failure it was not').toBe(0);
   });
 });
 

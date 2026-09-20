@@ -15,7 +15,7 @@
  *     that requires a human, and the database refuses the transition without one.
  */
 import type { PoolClient } from 'pg';
-import { STOP_LABEL, type AssessmentOutcome } from '@vibefycode/engine';
+import { STOP_LABEL, type AssessmentOutcome, type StageResult } from '@vibefycode/engine';
 
 export interface PersistInput {
   readonly outcome: AssessmentOutcome;
@@ -25,6 +25,31 @@ export interface PersistInput {
   readonly depth: 'limited' | 'full' | 'continuous';
   readonly requestedBy: string | null;
   readonly engineVersion: string;
+}
+
+/**
+ * A finding cited evidence that was never stored.
+ *
+ * Unreachable today, and that is the reason it throws rather than shrugs. The
+ * guarantee is spread across three files that do not know about each other:
+ * `enforceEvidence` filters model findings against what was actually captured,
+ * and the deterministic stages pass ids straight back from a capture that
+ * either stored something or threw. Nothing joins those two facts up. If either
+ * ever stops being true, the old `continue` would publish a finding with no
+ * proof behind it, and the one claim this company cannot afford to get wrong is
+ * "here is what we found, and here is what we saw".
+ *
+ * The whole transaction goes rather than the one link, for the reason stated at
+ * the top of this file: a half-written assessment is worse than no assessment.
+ */
+export class DanglingEvidenceError extends Error {
+  constructor(findingTitle: string, evidenceId: string) {
+    super(
+      `The finding "${findingTitle}" cites evidence ${evidenceId}, which this run did not store. ` +
+        `Nothing is written: a published finding whose evidence we do not hold is a claim we cannot back.`,
+    );
+    this.name = 'DanglingEvidenceError';
+  }
 }
 
 export class AuthorisationWithdrawnError extends Error {
@@ -195,7 +220,7 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
       // all but the last.
       for (const engineEvidenceId of finding.evidenceIds) {
         const persistedId = evidenceIdMap.get(engineEvidenceId);
-        if (!persistedId) continue;
+        if (!persistedId) throw new DanglingEvidenceError(finding.title, engineEvidenceId);
         await client.query(
           `insert into public.finding_evidence (finding_id, evidence_id, organisation_id)
            values ($1, $2, $3) on conflict do nothing`,
@@ -298,15 +323,33 @@ function summariseOutcome(outcome: AssessmentOutcome): string {
   return `Assessment ${outcome.status}: ${counted}, ${money}.`;
 }
 
-function mapStageStatus(status: string): string {
+/**
+ * A stage's own word for how it ended, in the word the database uses.
+ *
+ * Exhaustive on purpose, with no default. This used to take a `string` and send
+ * everything it did not recognise to `failed` — the same conflation that was
+ * fixed one level up, where a run that stopped at a limit was written down as a
+ * breakage and the customer was told their application had broken something
+ * when what had happened was a limit working. A fifth stage status added to the
+ * engine would have inherited exactly that bug, silently. Now it does not
+ * compile.
+ */
+function mapStageStatus(status: StageResult['status']): string {
   switch (status) {
     case 'succeeded':
       return 'succeeded';
+    // The database's word for "did not run", which is not the same as failing.
     case 'skipped':
       return 'cancelled';
     case 'aborted':
       return 'aborted';
-    default:
+    case 'failed':
       return 'failed';
+    default: {
+      const unhandled: never = status;
+      throw new Error(
+        `No database status is defined for the stage outcome "${String(unhandled)}".`,
+      );
+    }
   }
 }
