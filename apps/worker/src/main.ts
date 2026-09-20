@@ -75,6 +75,16 @@ async function withClient<T>(pool: Pool, work: (client: PoolClient) => Promise<T
   }
 }
 
+/**
+ * Whether the last poll found spending paused.
+ *
+ * Module scope because `processNextRequest` is called afresh every five
+ * seconds: anything narrower would have nothing to compare against, which is
+ * how the pause came to announce itself several times a minute for as long as
+ * it lasted.
+ */
+let saidSpendingIsPaused = false;
+
 /** Runs one queued request, if there is one. Returns whether it did any work. */
 export async function processNextRequest(pool: Pool, logger: typeof log = log): Promise<boolean> {
   const claimClient = await pool.connect();
@@ -85,10 +95,20 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
     // thousand cheap ones started by a loop nobody is watching at three in the
     // morning. A pause is a row in the database, not state in this process, so
     // restarting the worker does not lift it.
-    if (await spendingIsPaused(claimClient)) {
-      logger('spending paused — not claiming work');
-      return false;
+    const paused = await spendingIsPaused(claimClient);
+    if (paused !== saidSpendingIsPaused) {
+      // The transition, not the state. This is checked every five seconds, so
+      // saying it unconditionally was seventeen thousand identical lines a day
+      // — and the lift, which is the line somebody is actually waiting for,
+      // would have arrived indistinguishable from all of them.
+      saidSpendingIsPaused = paused;
+      logger(
+        paused
+          ? 'spending paused — claiming nothing new until a person lifts it'
+          : 'spending resumed — claiming work again',
+      );
     }
+    if (paused) return false;
     claimed = await claimNextRequest(claimClient);
   } finally {
     claimClient.release();

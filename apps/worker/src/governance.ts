@@ -15,7 +15,9 @@ import {
   evaluateSpend,
   isOverdue,
   spendWindows,
+  type RequestStatus,
   type RetainedRecord,
+  type SpendTrigger,
 } from '@vibefycode/governance';
 import type { PoolClient } from 'pg';
 
@@ -35,6 +37,26 @@ export interface SpendSweepResult {
   readonly freeTierThisWeekUsd: number;
   readonly paused: boolean;
   readonly alerts: number;
+}
+
+/**
+ * The day on which each spend threshold was last said out loud.
+ *
+ * This sweep runs every five minutes, and the conditions it reports are not
+ * moments — they are states that last the rest of the day or the rest of the
+ * week. Logging them unconditionally meant the same sentence a few hundred
+ * times over, which is not a louder warning than one sentence; it is a quieter
+ * one, because the line that matters next is now buried under it.
+ *
+ * Keyed by UTC day so a threshold crossed again tomorrow is said again, and
+ * kept in memory because it is a way of speaking rather than a record — the
+ * numbers themselves are in `cost_records` and on the cost dashboard.
+ */
+const lastSaid = new Map<SpendTrigger, string>();
+
+/** Forgets what has been said. Exported for tests, which share one process. */
+export function resetSpendNotices(): void {
+  lastSaid.clear();
 }
 
 /**
@@ -70,6 +92,7 @@ export async function sweepSpendCap(
     let paused = observation.alreadyPaused;
     let alerts = 0;
 
+    const today = now.toISOString().slice(0, 10);
     for (const action of actions) {
       if (action.kind === 'pause') {
         const inserted = await client.query(
@@ -87,8 +110,15 @@ export async function sweepSpendCap(
         // Delivered to platform staff as an alert on every organisation they
         // administer would be noise, so it goes to the log and the cost
         // dashboard, which is where somebody looking at spend already is.
+        //
+        // Counted every time, said once a day. The count is what a caller and
+        // the tests read; the line is for a person, and a person reading the
+        // same sentence every five minutes is a person who stops reading.
         alerts += 1;
-        log('spend alert', { reason: action.reason });
+        if (lastSaid.get(action.trigger) !== today) {
+          lastSaid.set(action.trigger, today);
+          log('spend alert', { trigger: action.trigger, reason: action.reason });
+        }
       }
     }
 
@@ -234,9 +264,17 @@ export async function sweepGovernanceDeadlines(
         where status in ('open', 'under_review')`,
     );
 
+    // `as RequestStatus` and not `as never`, which is what stood here. The cast
+    // is still a cast — the database hands back text — but this one stops
+    // compiling if the enum and the union drift apart, and the old one was a
+    // promise to the compiler that nothing would ever be checked again.
     const overdueRequests = requests.rows.filter((row) =>
-      isOverdue(new Date(row.due_at), row.status as never, now),
+      isOverdue(new Date(row.due_at), row.status as RequestStatus, now),
     );
+    // Appeals have no status-aware equivalent: the two statuses that would make
+    // a due date moot, upheld and rejected, are already excluded by the query
+    // above. Said here because "we filtered it in SQL" is the sort of thing that
+    // stays true only until somebody edits the SQL.
     const overdueAppeals = appeals.rows.filter(
       (row) => new Date(row.due_at).getTime() < now.getTime(),
     );

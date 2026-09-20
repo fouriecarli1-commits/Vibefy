@@ -33,8 +33,19 @@ export interface SpendObservation {
 
 export type SpendActionKind = 'pause' | 'alert' | 'none';
 
+/**
+ * Which threshold produced this action.
+ *
+ * Separate from the reason text, which carries today's figure and is therefore
+ * different every time it is computed. A caller that wants to say a thing once
+ * rather than every five minutes needs something stable to compare, and a
+ * dollar amount that moves is not it.
+ */
+export type SpendTrigger = 'daily_ceiling' | 'daily_warning' | 'free_tier_weekly';
+
 export interface SpendAction {
   readonly kind: SpendActionKind;
+  readonly trigger: SpendTrigger;
   readonly reason: string;
   readonly observedUsd: number;
   readonly ceilingUsd: number;
@@ -56,6 +67,7 @@ export function evaluateSpend(
   if (!observation.alreadyPaused && observation.todayUsd >= ceilings.globalDailyUsd) {
     actions.push({
       kind: 'pause',
+      trigger: 'daily_ceiling',
       reason: `Global spend today reached $${observation.todayUsd.toFixed(2)} against a daily ceiling of $${ceilings.globalDailyUsd.toFixed(2)}. No further assessment work starts until this is lifted by a person.`,
       observedUsd: observation.todayUsd,
       ceilingUsd: ceilings.globalDailyUsd,
@@ -72,6 +84,7 @@ export function evaluateSpend(
   ) {
     actions.push({
       kind: 'alert',
+      trigger: 'daily_warning',
       reason: `Global spend today is $${observation.todayUsd.toFixed(2)}, four fifths of the $${ceilings.globalDailyUsd.toFixed(2)} daily ceiling. Work pauses automatically at the ceiling.`,
       observedUsd: observation.todayUsd,
       ceilingUsd: ceilings.globalDailyUsd,
@@ -83,6 +96,7 @@ export function evaluateSpend(
     // silently would look to a prospective customer like a broken product.
     actions.push({
       kind: 'alert',
+      trigger: 'free_tier_weekly',
       reason: `Free-tier spend this week is $${observation.freeTierThisWeekUsd.toFixed(2)}, past the $${ceilings.freeTierWeeklyAlertUsd.toFixed(2)} budget. Free assessments keep running; this is a number to look at, not a fault.`,
       observedUsd: observation.freeTierThisWeekUsd,
       ceilingUsd: ceilings.freeTierWeeklyAlertUsd,

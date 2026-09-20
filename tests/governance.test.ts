@@ -31,6 +31,7 @@ import {
   sweepGovernanceDeadlines,
   sweepRetention,
   sweepSpendCap,
+  resetSpendNotices,
 } from '../apps/worker/src/governance.ts';
 import { processNextRequest } from '../apps/worker/src/index.ts';
 import { actingAs, connect, expectRefusal } from './setup/client.ts';
@@ -184,6 +185,78 @@ describe('the spend ceiling', () => {
     const result = await sweepSpendCap(pool, () => undefined);
     expect(result.todayUsd).toBeGreaterThanOrEqual(0);
     expect(result.freeTierThisWeekUsd).toBeGreaterThanOrEqual(0);
+  });
+
+  it('announces the pause and the lift, not the state, every five seconds', async () => {
+    // The claim check runs every five seconds, so a line per poll was seventeen
+    // thousand identical sentences a day — and the lift, which is the one line
+    // somebody is waiting for, would have arrived looking exactly like them.
+    await db.query(`update public.spend_pauses set lifted_at = now(),
+                      lift_reason = 'Cleared before this test, so it starts from unpaused.'
+                    where lifted_at is null`);
+    const said: string[] = [];
+    const log = (message: string) => said.push(message);
+
+    // Unpaused first, so the transition into the pause is a real transition.
+    await processNextRequest(pool, log);
+    said.length = 0;
+
+    await db.query(
+      `insert into public.spend_pauses (reason, observed_usd, ceiling_usd)
+       values ('Paused so this test can watch what gets said about it.', 999, 200)`,
+    );
+    expect(await processNextRequest(pool, log)).toBe(false);
+    expect(await processNextRequest(pool, log)).toBe(false);
+    expect(await processNextRequest(pool, log)).toBe(false);
+    expect(said.filter((line) => line.startsWith('spending paused'))).toHaveLength(1);
+
+    await db.query(`update public.spend_pauses set lifted_at = now(),
+                      lift_reason = 'Lifted by hand, which is how a pause is meant to end.'
+                    where lifted_at is null`);
+    await processNextRequest(pool, log);
+    await processNextRequest(pool, log);
+    const resumed = said.filter((line) => line.startsWith('spending resumed'));
+    expect(resumed, 'and the lift is said exactly once too').toHaveLength(1);
+  });
+
+  it('says a standing spend condition once a day, not every five minutes', async () => {
+    // Free-tier spend past its weekly budget is a state that lasts the rest of
+    // the week, not an event. Logged unconditionally by a sweep that runs every
+    // five minutes, it was a few hundred identical sentences — and the next
+    // thing worth reading would have arrived indistinguishable from all of
+    // them. The count still reports it every time; the sentence does not.
+    resetSpendNotices();
+    const seeded = await seedAssessment(db, owner);
+    // Dated five days back, so it counts against the rolling week and not
+    // against today — a record inside today's window would push the daily
+    // total about and could pause the platform under every other test here.
+    await db.query(
+      `insert into public.cost_records
+         (assessment_id, organisation_id, model, ai_cost_usd, purpose, recorded_at)
+       values ($1, $2, 'test', $3, 'assessment', now() - interval '5 days')`,
+      [seeded.assessmentId, owner.organisationId, CEILINGS.freeTierWeeklyAlertUsd + 20],
+    );
+
+    const said: { message: string; trigger?: unknown }[] = [];
+    const log = (message: string, detail?: Record<string, unknown>) =>
+      said.push({ message, trigger: detail?.trigger });
+    const freeTierLines = () =>
+      said.filter((line) => line.message === 'spend alert' && line.trigger === 'free_tier_weekly');
+
+    const now = new Date();
+    const first = await sweepSpendCap(pool, log, now);
+    expect(first.alerts).toBeGreaterThan(0);
+    expect(freeTierLines()).toHaveLength(1);
+
+    const second = await sweepSpendCap(pool, log, now);
+    expect(second.alerts, 'the condition has not gone away').toBeGreaterThan(0);
+    expect(freeTierLines(), 'and it is not said twice in one day').toHaveLength(1);
+
+    // Tomorrow it is said again: a budget still overrun a day later is worth
+    // hearing about a second time.
+    await sweepSpendCap(pool, log, new Date(now.getTime() + 86_400_000));
+    expect(freeTierLines()).toHaveLength(2);
+    resetSpendNotices();
   });
 
   it('keeps the pause out of every customer’s sight', async () => {
