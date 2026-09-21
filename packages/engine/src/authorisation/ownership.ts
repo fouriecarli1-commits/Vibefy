@@ -23,13 +23,25 @@
  * connection actually resolved to.
  */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { resolveTxt } from 'node:dns/promises';
+import { Resolver } from 'node:dns/promises';
 import { lookup } from 'node:dns/promises';
 import { fetch } from 'undici';
 import { isPrivateAddress } from '../runtime/addresses.ts';
 import { ScopeGuard, ScopeViolationError, createScopedDispatcher } from '../runtime/scope.ts';
 
 export const CHALLENGE_PATH = '/.well-known/vibefycode-challenge.txt';
+
+/**
+ * How long we wait on a customer's nameservers, and how often we ask.
+ *
+ * `resolveTxt` from `node:dns/promises` takes no timeout and inherits the
+ * resolver's own, which retries its way up to well over a minute against a
+ * nameserver that accepts packets and never answers. This runs inside a web
+ * request somebody is sitting in front of, and the file method beside it has
+ * had a ten-second abort from the start; the DNS half had nothing.
+ */
+const DNS_TIMEOUT_MS = 5_000;
+const DNS_TRIES = 2;
 export const DNS_RECORD_PREFIX = 'vibefycode-site-verification=';
 
 export type OwnershipMethod =
@@ -90,7 +102,8 @@ export async function verifyDnsTxt(host: string, token: string): Promise<Verific
   const checkedAt = new Date().toISOString();
   let records: string[][] = [];
   try {
-    records = await resolveTxt(host);
+    const resolver = new Resolver({ timeout: DNS_TIMEOUT_MS, tries: DNS_TRIES });
+    records = await resolver.resolveTxt(host);
   } catch (error) {
     return {
       verified: false,
@@ -128,7 +141,39 @@ export async function verifyWellKnownFile(
   token: string,
 ): Promise<VerificationOutcome> {
   const checkedAt = new Date().toISOString();
-  const url = `https://${host}${CHALLENGE_PATH}`;
+
+  // Built and then checked, rather than built and trusted. `host` arrives from
+  // an application's own `primary_url`, and a string like `good.test/#` or
+  // `good.test@elsewhere.test` concatenated into a template produces a URL
+  // pointing somewhere else entirely. Until now the only thing standing in the
+  // way was the resolver declining to look up a malformed name — true today,
+  // and an accident rather than a rule. This asks the URL parser what it
+  // actually built.
+  let url: string;
+  try {
+    const parsed = new URL(`https://${host}${CHALLENGE_PATH}`);
+    if (
+      parsed.hostname !== host.toLowerCase() ||
+      parsed.pathname !== CHALLENGE_PATH ||
+      parsed.port !== '' ||
+      parsed.search !== '' ||
+      parsed.hash !== '' ||
+      parsed.username !== '' ||
+      parsed.password !== ''
+    ) {
+      throw new Error('the host does not name a plain address');
+    }
+    url = parsed.toString();
+  } catch {
+    return {
+      verified: false,
+      method: 'well_known_file',
+      host,
+      checkedAt,
+      detail: `${host} is not a plain hostname, so no challenge address can be built from it.`,
+      observed: [],
+    };
+  }
 
   const addresses = await lookup(host, { all: true }).catch(() => []);
   if (addresses.length === 0) {
@@ -256,6 +301,22 @@ export async function verifyOwnership(host: string, token: string): Promise<Veri
  * The hosts an authorisation may cover, derived from the host that was actually
  * verified. A customer who proves control of `kettle.example` may authorise
  * testing of it and its subdomains — and nothing else, however much they ask.
+ *
+ * `www.` used to be stripped before that comparison, so verifying
+ * `www.kettle.example` produced a base of `kettle.example` and authorised every
+ * subdomain of it: `admin.kettle.example`, `mail.kettle.example`, names the
+ * customer had proved nothing whatever about. Serving a file at `www.x` shows
+ * that whoever runs the `x` zone pointed `www` at you. It does not show that
+ * you run the zone, and on a shared or delegated domain the sibling belongs to
+ * somebody else. That is the one record this company calls its defence to a
+ * computer-misuse charge, and the console screen that writes it already tells
+ * the customer the rule is "the host you verify and its subdomains".
+ *
+ * The apex survives as a named exception, because a site served from `www.x`
+ * whose own canonical domain is `x` is the ordinary case and refusing it would
+ * read as a fault. Whether even that is too generous is written up in
+ * docs/OPEN_ITEMS.md for Anré — it is a question about what a proof proves,
+ * not a defect.
  */
 export function permittedScopeFor(
   verifiedHost: string,
@@ -264,13 +325,15 @@ export function permittedScopeFor(
   allowed: string[];
   refused: string[];
 } {
-  const base = verifiedHost.toLowerCase().replace(/^www\./, '');
+  const verified = verifiedHost.toLowerCase().trim();
+  const apex = verified.startsWith('www.') ? verified.slice('www.'.length) : null;
   const allowed: string[] = [];
   const refused: string[] = [];
 
   for (const candidate of requested) {
     const host = candidate.toLowerCase().trim().replace(/^\*\./, '');
-    if (host === base || host.endsWith(`.${base}`)) allowed.push(host);
+    const covered = host === verified || host.endsWith(`.${verified}`) || host === apex;
+    if (covered) allowed.push(host);
     else refused.push(host);
   }
 

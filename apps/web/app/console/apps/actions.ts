@@ -222,7 +222,7 @@ export async function startAuthorisation(
   return {
     notice:
       refused.length > 0
-        ? `Authorisation recorded. ${refused.join(', ')} ${refused.length === 1 ? 'was' : 'were'} removed from the scope: you can only authorise testing of the host you verify and its subdomains.`
+        ? `Authorisation recorded. ${refused.join(', ')} ${refused.length === 1 ? 'was' : 'were'} removed from the scope: you can only authorise testing of the host you verify, its subdomains, and — when you verify a www host — the domain it sits on. To cover other subdomains, verify the domain itself rather than the www host.`
         : 'Authorisation recorded. Publish the challenge below, then verify.',
   };
 }

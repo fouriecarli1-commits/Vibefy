@@ -106,10 +106,74 @@ describe('the scope a verification permits', () => {
     ]);
   });
 
-  it('treats www as the same site', () => {
+  it('lets a www host cover the domain it sits on', () => {
+    // A site served from www.x whose canonical domain is x is the ordinary
+    // case, and refusing it would read as a fault.
     expect(permittedScopeFor('www.kettle.example', ['kettle.example']).allowed).toEqual([
       'kettle.example',
     ]);
+  });
+
+  it('does not let a www host cover its siblings', () => {
+    // It used to. `www.` was stripped before the comparison, so verifying
+    // www.kettle.example produced a base of kettle.example and authorised every
+    // subdomain of it. Serving a file at www.x shows that whoever runs the x
+    // zone pointed www at you; it does not show that you run the zone, and on a
+    // shared or delegated domain the sibling belongs to somebody else. This is
+    // the record that stands behind a computer-misuse defence.
+    const { allowed, refused } = permittedScopeFor('www.kettle.example', [
+      'www.kettle.example',
+      'kettle.example',
+      'admin.kettle.example',
+      'mail.kettle.example',
+    ]);
+    expect(allowed).toEqual(['www.kettle.example', 'kettle.example']);
+    expect(refused).toEqual(['admin.kettle.example', 'mail.kettle.example']);
+  });
+
+  it('says on the screen exactly what it does, and no more', () => {
+    // The console told the customer "you can only authorise testing of the host
+    // you verify and its subdomains" while granting more than that. The code
+    // and the sentence have to be the same rule; whichever of them is wrong,
+    // a customer reading one and getting the other is the failure.
+    const action = readFileSync(
+      join(process.cwd(), 'apps/web/app/console/apps/actions.ts'),
+      'utf8',
+    );
+    expect(action).toContain('when you verify a www host');
+    expect(action).toContain('verify the domain itself');
+  });
+});
+
+describe('the address the challenge is fetched from', () => {
+  it('refuses a host that is not a plain hostname', async () => {
+    // `host` comes from an application's own primary_url. A string like
+    // `good.test/#` concatenated into a template produces a URL pointing
+    // somewhere else. The only thing standing in the way was the resolver
+    // declining to look up a malformed name — true today, and an accident.
+    for (const host of [
+      'good.test/#',
+      'good.test@elsewhere.test',
+      'good.test:8443',
+      'good.test?x=1',
+    ]) {
+      const outcome = await verifyWellKnownFile(host, 'token');
+      expect(outcome.verified, host).toBe(false);
+      expect(outcome.detail, host).toMatch(/not a plain hostname/i);
+    }
+  });
+
+  it('gives the nameservers a deadline, like the file check has always had', () => {
+    // `resolveTxt` from node:dns/promises takes no timeout and inherits the
+    // resolver's own, which retries its way well past a minute against a
+    // nameserver that accepts packets and never answers. This runs inside a web
+    // request somebody is sitting in front of.
+    const source = readFileSync(
+      join(process.cwd(), 'packages/engine/src/authorisation/ownership.ts'),
+      'utf8',
+    );
+    expect(source).toContain('new Resolver({ timeout: DNS_TIMEOUT_MS, tries: DNS_TRIES })');
+    expect(source).not.toMatch(/\bawait resolveTxt\(/);
   });
 });
 
