@@ -197,3 +197,88 @@ describe('the language of every finding', () => {
     }
   });
 });
+
+describe('when the browser pass cannot run', () => {
+  /**
+   * A server that answers a plain GET and refuses a browser navigation.
+   *
+   * Not a contrivance: a page that answers `curl` and then hangs, redirects in
+   * a loop, or never reaches network idle in Chromium is an ordinary Tuesday.
+   * What made it worth a test is what used to happen next — the stage reported
+   * `succeeded`, the report carried no accessibility finding, no console error,
+   * no observation about the layout at phone width, and `practicality_ux`
+   * scored full marks because nothing had been found there. Nothing had been
+   * looked for.
+   *
+   * The discriminator is the user-agent. The engine's HTTP client identifies
+   * itself as VibefyCodeAssessment on purpose — an assessment service that
+   * arrives disguised is indistinguishable from an attacker in a customer's
+   * logs — and Chromium does not. (`sec-fetch-mode` looked like the obvious
+   * choice and is not: Node's own fetch sends it too.)
+   */
+  async function serverThatRefusesBrowsers(): Promise<{ url: string; close: () => Promise<void> }> {
+    const { createServer } = await import('node:http');
+    const server = createServer((request, response) => {
+      if (!String(request.headers['user-agent'] ?? '').startsWith('VibefyCode')) {
+        request.socket.destroy();
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(
+        '<!doctype html><html lang="en"><head><title>Kettle</title></head><body><h1>Kettle</h1></body></html>',
+      );
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as { port: number }).port;
+    return {
+      url: `http://127.0.0.1:${port}/`,
+      close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    };
+  }
+
+  it('does not call the stage succeeded, and says what was not looked at', async () => {
+    const fixture = await serverThatRefusesBrowsers();
+    try {
+      const store = new EvidenceStore('assessment-no-browser');
+      const outcome = await deterministicChecksStage.run({
+        assessmentId: 'assessment-no-browser',
+        depth: 'full',
+        guard: new ScopeGuard({
+          allowedHosts: ['127.0.0.1'],
+          exclusions: [],
+          ceiling: { ...DEFAULT_CEILING, maxRequestsPerMinute: 600 },
+          allowPrivateNetworkForTesting: true,
+        }),
+        meter: new CostMeter({ maxRunCostUsd: 1 }),
+        evidence: store,
+        model: null as never,
+        log: () => undefined,
+        target: {
+          appId: 'app-no-browser',
+          organisationId: 'org-fixture',
+          appName: 'Kettle',
+          appType: 'web_url',
+          primaryUrl: fixture.url,
+          repositoryPath: null,
+          intendedForAppStore: false,
+          isGame: false,
+          hasAuthentication: false,
+          hasPayments: false,
+          processesPersonalData: false,
+          description: 'A shop that sells kettles.',
+        },
+      });
+
+      expect(outcome.status, 'the stage did not do its job').toBe('failed');
+      // The HTTP half still stands and is still reported — a failed stage is
+      // not a discarded one.
+      expect(outcome.findings.length).toBeGreaterThan(0);
+      const notes = outcome.notes.join(' ');
+      expect(notes).toMatch(/browser pass did not complete/i);
+      expect(notes).toMatch(/absent because it was not examined/i);
+      expect(outcome.findings.some((finding) => finding.ruleId === 'UX-03')).toBe(false);
+    } finally {
+      await fixture.close();
+    }
+  }, 120_000);
+});

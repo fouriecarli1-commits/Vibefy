@@ -130,6 +130,18 @@ export const deterministicChecksStage: Stage = {
     }
 
     // --- Browser pass: accessibility, viewport, console -----------------------
+    //
+    // Whether this ran is carried out of the stage, because the stage used to
+    // report `succeeded` however little of it happened. Everything this
+    // company says about accessibility, layout at phone width, console errors,
+    // the trust survey and the design survey comes from here; the HTTP half
+    // above only reads headers. A page that answered a raw GET and then failed
+    // to load in a browser — a navigation that never reaches network idle is
+    // the ordinary way — produced a report with no UX findings at all, and a
+    // `practicality_ux` dimension scoring full marks because nothing had been
+    // found there. Nothing had been looked for.
+    let browserPassCompleted = false;
+    let browserPassError: string | null = null;
     const session = new BrowserSession(context.guard, context.evidence);
     try {
       await session.open();
@@ -327,9 +339,11 @@ export const deterministicChecksStage: Stage = {
           `${session.blockedRequests.length} request(s) from the page were blocked as out of scope; that is the authorisation boundary working, not a defect in the application.`,
         );
       }
+      browserPassCompleted = true;
     } catch (error) {
+      browserPassError = error instanceof Error ? error.message : String(error);
       notes.push(
-        `The browser pass did not complete: ${error instanceof Error ? error.message : String(error)}`,
+        `The browser pass did not complete, so nothing was looked at in a browser: no accessibility scan, no check of the layout at phone width, no console errors and no design survey. What is absent from this stage is absent because it was not examined. (${browserPassError})`,
       );
     } finally {
       await session.close();
@@ -345,6 +359,7 @@ export const deterministicChecksStage: Stage = {
      * looking are numbers, and a number is cheaper, repeatable, and not
      * something anybody has to take on trust.
      */
+    let gamePassCompleted = !context.target.isGame;
     if (context.target.isGame) {
       const gameSession = new BrowserSession(context.guard, context.evidence);
       try {
@@ -360,9 +375,11 @@ export const deterministicChecksStage: Stage = {
             ? `The game began drawing frames ${((measurements.timeToPlayableMs ?? 0) / 1000).toFixed(1)}s after navigation, after ${Math.round(measurements.bytesBeforePlayable / 1024)} KB. Playability is measured as the first continuous run of animation frames, which is a lower bound.`
             : 'The game never began drawing frames, so nothing beyond the start could be assessed.',
         );
+        gamePassCompleted = true;
       } catch (error) {
+        browserPassError ??= error instanceof Error ? error.message : String(error);
         notes.push(
-          `The game pass did not complete: ${error instanceof Error ? error.message : String(error)}`,
+          `The game pass did not complete, so none of what a game is judged on was measured: ${error instanceof Error ? error.message : String(error)}`,
         );
       } finally {
         await gameSession.close();
@@ -401,11 +418,17 @@ export const deterministicChecksStage: Stage = {
       );
     }
 
+    // Succeeded means the stage did its job, not that it returned. The header
+    // checks above stand either way and are reported either way; what a
+    // `failed` here says is that the dimensions this stage is responsible for
+    // were not examined, so their silence is not evidence of anything.
+    const didItsJob = browserPassCompleted && gamePassCompleted;
     return {
       stage: 'deterministic_checks',
-      status: 'succeeded',
+      status: didItsJob ? 'succeeded' : 'failed',
       findings,
       notes,
+      ...(didItsJob || browserPassError === null ? {} : { error: browserPassError }),
       ...(exitMeasurement === undefined ? {} : { exitMeasurement }),
     };
   },
