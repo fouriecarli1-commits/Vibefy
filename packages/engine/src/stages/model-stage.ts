@@ -136,12 +136,24 @@ export function createModelStage(config: ModelStageConfig): Stage {
 
         const output = extraction.parsed;
         if (!output) {
+          // Four different faults used to arrive here wearing the same
+          // sentence. A schema the model could not satisfy needs the schema
+          // looked at; a run that used up its turns needs the ceiling looked
+          // at; a truncated answer needs `maxTokens`; a declined one needs a
+          // person. Saying "produced no structured output" to all four sends
+          // whoever reads it to the wrong place three times in four.
+          const because =
+            HALT_EXPLANATION[exploration.haltedBy ?? ''] ??
+            HALT_EXPLANATION[extraction.haltedBy ?? ''] ??
+            'The model answered, but the answer did not match the schema this stage requires.';
           return {
             stage: config.id,
             status: 'failed',
             findings: [],
-            notes: ['The stage explored the application but produced no structured output.'],
-            error: 'structured_extraction_failed',
+            notes: [
+              `The stage explored the application but produced no structured findings. ${because}`,
+            ],
+            error: extraction.haltedBy ?? exploration.haltedBy ?? 'structured_extraction_failed',
             promptSha256: extraction.promptSha256,
           };
         }
@@ -214,6 +226,22 @@ export function createModelStage(config: ModelStageConfig): Stage {
  * prompt. A model that asserts something it did not capture gets its assertion
  * dropped, and the drop is recorded.
  */
+/**
+ * What each halt means for whoever reads the run afterwards.
+ *
+ * Written for a person rather than a log parser: the value in distinguishing
+ * these is that each one sends you somewhere different, so each sentence says
+ * where.
+ */
+const HALT_EXPLANATION: Readonly<Record<string, string>> = {
+  tool_iteration_ceiling:
+    'It was still working when the stage stopped asking: the exploration used every turn it is allowed. What it had seen up to that point is in the transcript, but none of it became a finding.',
+  output_truncated:
+    'The answer was cut off at the token limit before it was complete, so there was nothing whole to read.',
+  refused:
+    'The model declined to answer. That is not a fault in the application and not a fault in this code; it needs a person to look at what was sent.',
+};
+
 export function enforceEvidence(
   findings: readonly StageOutput['findings'][number][],
   minted: ReadonlySet<string>,

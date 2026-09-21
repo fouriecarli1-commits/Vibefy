@@ -42,10 +42,22 @@ export interface ModelRequest {
   readonly context?: string;
 }
 
+/**
+ * Why the loop below stopped, when it stopped for a reason of ours.
+ *
+ * `null` means the model finished on its own terms and `stopReason` carries
+ * the API's own word for it. The others are ceilings we imposed, and they are
+ * named because every one of them used to arrive at the caller as an empty
+ * `parsed` — indistinguishable from a model that answered and failed to match
+ * the schema, which is a different fault with a different fix.
+ */
+export type LoopHalt = 'tool_iteration_ceiling' | 'refused' | 'output_truncated';
+
 export interface ModelResult<T = unknown> {
   readonly text: string;
   readonly parsed: T | null;
   readonly stopReason: string | null;
+  readonly haltedBy: LoopHalt | null;
   readonly usage: TokenUsage;
   readonly model: string;
   readonly promptSha256: string;
@@ -177,6 +189,7 @@ export class ModelClient {
     const messages: Anthropic.MessageParam[] = [...request.messages];
     const toolCalls: { name: string; input: unknown; output: string }[] = [];
     let lastResponse: TransportResponse | null = null;
+    let haltedBy: LoopHalt | null = null;
     let iterations = 0;
     const maxIterations = tools ? 24 : 1;
 
@@ -195,6 +208,20 @@ export class ModelClient {
       });
       lastResponse = response;
       this.meter.recordModelCall(request.stage, model, response.usage);
+
+      // Checked before the content is read, because on both of these there is
+      // either nothing to read or not all of it. A declined request is an HTTP
+      // 200 whose content is empty, and a truncated one is a half-written
+      // answer that will not parse — and both used to reach the caller as "the
+      // stage produced no structured output", which is a third thing.
+      if (response.stopReason === 'refusal') {
+        haltedBy = 'refused';
+        break;
+      }
+      if (response.stopReason === 'max_tokens') {
+        haltedBy = 'output_truncated';
+        break;
+      }
 
       if (response.stopReason === 'pause_turn') {
         messages.push({ role: 'assistant', content: response.content as never });
@@ -237,6 +264,13 @@ export class ModelClient {
       }
 
       messages.push({ role: 'user', content: results });
+
+      // Said here rather than inferred from the loop condition, so that a run
+      // which used its last turn on a tool call is distinguishable from one
+      // that finished. Without it the caller saw an empty `parsed` and reported
+      // a schema failure, when what happened is that the model was still
+      // working when we stopped asking.
+      if (iterations >= maxIterations) haltedBy = 'tool_iteration_ceiling';
     }
 
     if (!lastResponse) throw new Error('Transport returned no response');
@@ -251,6 +285,7 @@ export class ModelClient {
       text,
       parsed: (lastResponse.parsed ?? null) as T | null,
       stopReason: lastResponse.stopReason,
+      haltedBy,
       usage: lastResponse.usage,
       model,
       promptSha256: prompt.sha256,
