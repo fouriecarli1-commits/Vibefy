@@ -64,7 +64,7 @@ import {
   verifyBadge,
 } from '../packages/badge/src/index.ts';
 import { NON_RELIANCE_LEGEND } from '../packages/shared/src/index.ts';
-import { connect } from './setup/client.ts';
+import { committingAs, connect } from './setup/client.ts';
 import { makeReviewer, seedAccount, seedRubric, sha256, type SeededAccount } from './setup/seed.ts';
 import { startVulnerableApp, type FixtureApp } from './fixtures/vulnerable-app.ts';
 
@@ -170,7 +170,45 @@ describe('act 1: getting to the point where anything may be tested', () => {
     expect(gate[0]!.ok).toBe(false);
   });
 
-  it('refuses to run against it', async () => {
+  it('refuses to run against it, because nobody has screened it yet', async () => {
+    // Two separate reasons, and this is the first of them in order: the intake
+    // screen could not settle the question on wording alone, so a person has to
+    // look. The application page says as much to the customer, and until the
+    // screening queue existed nothing made it true.
+    await expect(
+      runAssessmentJob(
+        { appId: journey.appId!, depth: 'full', requestedBy: owner.userId },
+        { pool },
+      ),
+    ).rejects.toThrow(/not been screened by a person/);
+  });
+
+  it('a reviewer clears it, in writing', async () => {
+    await committingAs(db, { userId: reviewer.userId }, async (client) => {
+      await client.query('select public.record_screening_decision($1, $2, $3)', [
+        journey.appId,
+        'cleared',
+        'An ordinary shop front. Nothing in the submission touches the Acceptable Use Policy.',
+      ]);
+    });
+
+    const { rows } = await db.query<{ status: string; notes: string }>(
+      'select screening_status::text as status, screening_notes as notes from public.apps where id = $1',
+      [journey.appId],
+    );
+    expect(rows[0]!.status).toBe('cleared');
+    expect(rows[0]!.notes).toMatch(/Acceptable Use Policy/);
+
+    // Cleared, and still untestable: screening and authorisation are two
+    // different questions and clearing one does not answer the other.
+    const { rows: logged } = await db.query<{ action: string }>(
+      `select action from public.audit_log where entity_id = $1 and action like 'app.screening%'`,
+      [journey.appId],
+    );
+    expect(logged.map((row) => row.action)).toContain('app.screening_cleared');
+  });
+
+  it('still refuses to run against it, now on the authorisation gate', async () => {
     await expect(
       runAssessmentJob(
         { appId: journey.appId!, depth: 'full', requestedBy: owner.userId },

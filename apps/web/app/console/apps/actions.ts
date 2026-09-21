@@ -423,6 +423,12 @@ export async function requestAssessment(
         'This application was refused under the Acceptable Use Policy. Appeal it rather than re-submitting.',
     };
   }
+  if (decision.screening === 'pending') {
+    return {
+      error:
+        'This application is waiting on its human check. A reviewer looks at every submission before an assessment runs — you will see the outcome on this page.',
+    };
+  }
 
   const { verdict, plan } = decision;
 

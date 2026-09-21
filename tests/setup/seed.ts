@@ -60,16 +60,37 @@ export async function makeReviewer(client: Client, userId: string): Promise<void
   await client.query(`update public.users set platform_role = 'reviewer' where id = $1`, [userId]);
 }
 
+/**
+ * An application that has been through intake screening and cleared.
+ *
+ * `screening_status` defaults to `pending` in the schema, and a pending
+ * application is one no assessment may run against — a reviewer looks at every
+ * submission first. Almost every fixture here wants an application that is past
+ * that point, so this seeds one, and a test about the gate itself says
+ * `screening: 'pending'` and means it.
+ */
 export async function seedApp(
   client: Client,
   account: SeededAccount,
   name = 'Test App',
+  options: { screening?: 'pending' | 'cleared' | 'refused' } = {},
 ): Promise<string> {
   const slug = `app-${randomUUID().slice(0, 8)}`;
   const { rows } = await client.query<{ id: string }>(
-    `insert into public.apps (organisation_id, name, slug, app_type, primary_url, created_by)
-     values ($1, $2, $3, 'web_url', $4, $5) returning id`,
-    [account.organisationId, name, slug, `https://${slug}.example.test`, account.userId],
+    `insert into public.apps
+       (organisation_id, name, slug, app_type, primary_url, created_by,
+        screening_status, screening_notes, screened_at)
+     values ($1, $2, $3, 'web_url', $4, $5, $6::public.screening_status,
+             'Seeded fixture: cleared so the test can get to what it is about.', now())
+     returning id`,
+    [
+      account.organisationId,
+      name,
+      slug,
+      `https://${slug}.example.test`,
+      account.userId,
+      options.screening ?? 'cleared',
+    ],
   );
   return rows[0]!.id;
 }

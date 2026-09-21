@@ -138,6 +138,9 @@ export default async function ReviewQueuePage() {
       </header>
 
       <nav aria-label="Review queues" className="flex flex-wrap gap-2">
+        <Link href="/review/screening" className="chip">
+          Screening
+        </Link>
         <Link href="/review/badges" className="chip">
           Badges
         </Link>

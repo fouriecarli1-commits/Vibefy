@@ -61,6 +61,18 @@ export async function runAssessmentJob(
       `App ${job.appId} was refused under the Acceptable Use Policy; no assessment runs against it.`,
     );
   }
+  // `pending` is not "not refused yet". It is the state the intake screen puts
+  // a submission in when it could not settle the question on wording alone, and
+  // the application page tells the customer a reviewer confirms before any
+  // assessment runs. Until this check existed, `refused` was blocked here and
+  // `pending` went straight past — so the sentence on that page was untrue of
+  // every application, because the judgement pass is not wired up and every
+  // submission lands in `pending`.
+  if (appRow.screening_status === 'pending') {
+    throw new NotAuthorisedError(
+      `App ${job.appId} has not been screened by a person yet. A reviewer clears or refuses it at /review/screening; no assessment runs before that.`,
+    );
+  }
   if (!appRow.authorised) {
     throw new NotAuthorisedError(
       `App ${job.appId} has no verified, unexpired authorisation. This is the hard gate: no run starts without one.`,

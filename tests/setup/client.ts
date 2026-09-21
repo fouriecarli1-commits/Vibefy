@@ -44,6 +44,40 @@ export async function actingAs<T>(
 }
 
 /**
+ * The same, but the work is kept.
+ *
+ * `actingAs` rolls back on purpose: it exists to ask what an identity can
+ * *see*, and a read that leaves nothing behind is the right shape for that. A
+ * test that needs an identity to actually *do* something — a reviewer clearing
+ * an application, say — needs the opposite, and reaching for `actingAs` and
+ * then wondering why the row did not change is an easy half-hour to lose.
+ *
+ * Still goes through the role and the claims, so row-level security and every
+ * `auth.uid()` in a policy or a definer function see the real caller. Running
+ * the statement as the owning connection instead would prove nothing: the owner
+ * bypasses all of it.
+ */
+export async function committingAs<T>(
+  client: Client,
+  identity: ActingAs,
+  work: (client: Client) => Promise<T>,
+): Promise<T> {
+  const role = identity.role ?? 'authenticated';
+  const claims = JSON.stringify({ sub: identity.userId ?? null, role });
+  await client.query('begin');
+  try {
+    await client.query('select set_config($1, $2, true)', ['request.jwt.claims', claims]);
+    await client.query(`set local role ${role}`);
+    const result = await work(client);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  }
+}
+
+/**
  * Runs a query that is expected to be refused, inside a savepoint, so that one
  * refusal does not abort the surrounding transaction and mask the next check.
  */
