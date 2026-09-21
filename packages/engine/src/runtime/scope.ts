@@ -258,13 +258,16 @@ export class ScopeGuard {
  * Which means the consequence, said plainly rather than left to be worked out:
  * a request that arrives *only* here — made by a dependency through the global
  * dispatcher, never through `ScopedHttp` — is checked against every rule and
- * counted against nothing. `maxTotalRequests` bounds the requests the engine
- * makes on purpose, not every request that leaves the process. Browser traffic
- * is outside it for the same reason and a more obvious one: Chromium is a
- * separate process and does not use undici at all. Recorded in
- * docs/OPEN_ITEMS.md; closing it properly means moving the counting here and
- * teaching the callers not to, which is a change worth making deliberately
- * rather than as a footnote to something else.
+ * counted against nothing.
+ *
+ * Browser traffic is *not* in that gap, though an earlier version of this note
+ * said it was. Chromium is indeed a separate process that never touches undici,
+ * but `BrowserSession` routes every request the page makes through
+ * `guard.check` with counting on, so a page's own scripts, images and fetches
+ * all come off the same budget. The gap is only the dependency that calls
+ * `fetch` directly, which is narrow. Recorded in docs/OPEN_ITEMS.md all the
+ * same; closing it means moving the counting here and teaching the callers not
+ * to, which is worth doing deliberately rather than as a footnote.
  */
 export function createScopedDispatcher(guard: ScopeGuard): Dispatcher {
   const allowPrivate = guard.policy.allowPrivateNetworkForTesting === true;

@@ -9,15 +9,18 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  BrowserSession,
   CeilingExceededError,
   DEFAULT_CEILING,
   EvidenceStore,
   ScopeGuard,
   ScopedHttp,
   ScopeViolationError,
+  classifyStop,
   isPrivateAddress,
   policyFromAuthorisation,
 } from '../packages/engine/src/index.ts';
+import { startVulnerableApp } from './fixtures/vulnerable-app.ts';
 
 const policy = {
   allowedHosts: ['kettle.example'],
@@ -276,4 +279,48 @@ describe('policies built from an authorisation record', () => {
     expect(built.exclusions).toEqual(['/private']);
     expect(built.ceiling.maxRequestsPerMinute).toBe(12);
   });
+});
+
+describe('a ceiling reached inside a page’s own traffic', () => {
+  it('stops the run and says which ceiling, rather than timing out', async () => {
+    // `guard.check` throws when the run passes its request ceiling, and in a
+    // browser session it is called from inside a Playwright route handler. An
+    // exception thrown out of a route handler does not reach the caller —
+    // Playwright swallows it and the request hangs until the navigation times
+    // out. So the one event a customer most needs named correctly, a run
+    // stopped at the intensity their own authorisation permits, used to arrive
+    // as "the browser pass did not complete".
+    const app = await startVulnerableApp();
+    const guard = new ScopeGuard({
+      allowedHosts: [app.host.split(':')[0]!],
+      exclusions: [],
+      // One request is the navigation itself; everything the page then asks for
+      // is over the line.
+      ceiling: { ...DEFAULT_CEILING, maxTotalRequests: 1, maxRequestsPerMinute: 600 },
+      allowPrivateNetworkForTesting: true,
+    });
+    const session = new BrowserSession(guard, new EvidenceStore('assessment-ceiling'));
+    try {
+      await session.open();
+      // The navigation itself may or may not be the request that crosses the
+      // line, so the stop is asserted on the session rather than on one call.
+      await session.goto(app.url, 'load').catch(() => undefined);
+      const raised = await session
+        .screenshot('after the ceiling')
+        .then(() => null)
+        .catch((error: unknown) => error);
+
+      expect(session.stoppedByCeiling, 'the ceiling was reached and remembered').toBeInstanceOf(
+        CeilingExceededError,
+      );
+      expect(raised, 'and raised at the next thing the stage asked for').toBeInstanceOf(
+        CeilingExceededError,
+      );
+      // Which is what lets the pipeline call it a stop rather than a fault.
+      expect(classifyStop(raised)).toBe('intensity_ceiling');
+    } finally {
+      await session.close();
+      await app.close();
+    }
+  }, 120_000);
 });

@@ -63,6 +63,20 @@ export class BrowserSession {
   readonly consoleEntries: ConsoleEntry[] = [];
   readonly blockedRequests: { url: string; reason: string }[] = [];
   readonly pageErrors: string[] = [];
+  /**
+   * A ceiling reached inside the page's own traffic, kept until somebody can be
+   * told about it properly.
+   *
+   * `guard.check` throws when the run passes its request or wall-clock ceiling,
+   * and here it is called from inside a Playwright route handler. An exception
+   * thrown out of a route handler does not reach the caller — Playwright
+   * swallows it, and the request hangs until the navigation times out. So the
+   * one event the customer most needs named correctly, a run stopped at the
+   * intensity their own authorisation permits, arrived as "the browser pass did
+   * not complete". That is not a ceiling working; that is a ceiling failing to
+   * say what it did.
+   */
+  private ceilingReached: Error | null = null;
 
   constructor(
     private readonly guard: ScopeGuard,
@@ -99,7 +113,20 @@ export class BrowserSession {
     });
 
     await this.context.route('**/*', async (route, request) => {
-      const decision = this.guard.check(request.url(), request.method());
+      let decision;
+      try {
+        decision = this.guard.check(request.url(), request.method());
+      } catch (error) {
+        // Kept rather than thrown, and re-thrown from the next thing the stage
+        // asks of this session, where it can travel as the stop it is.
+        this.ceilingReached ??= error instanceof Error ? error : new Error(String(error));
+        this.blockedRequests.push({
+          url: request.url(),
+          reason: 'the run reached a ceiling its authorisation set',
+        });
+        await route.abort('blockedbyclient');
+        return;
+      }
       if (!decision.allowed) {
         this.blockedRequests.push({ url: request.url(), reason: decision.reason });
         await route.abort('blockedbyclient');
@@ -134,15 +161,28 @@ export class BrowserSession {
     this.pageRef = null;
   }
 
+  /**
+   * Re-raises a ceiling the route handler could not raise for itself.
+   *
+   * Called before each thing that would carry the run further, so a stop
+   * reaches the pipeline as `aborted` with its reason rather than as a
+   * navigation that timed out for no stated cause.
+   */
+  private assertNoCeilingReached(): void {
+    if (this.ceilingReached) throw this.ceilingReached;
+  }
+
   async goto(
     url: string,
     waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'domcontentloaded',
   ) {
+    this.assertNoCeilingReached();
     this.guard.assert(url, 'GET');
     return this.page.goto(url, { waitUntil, timeout: 30_000 });
   }
 
   async screenshot(summary: string, fullPage = false): Promise<string> {
+    this.assertNoCeilingReached();
     const buffer = await this.page.screenshot({ fullPage, type: 'png' });
     const artefact = this.evidence.capture({
       kind: 'screenshot',
@@ -168,6 +208,17 @@ export class BrowserSession {
   }
 
   async setViewport(viewport: { width: number; height: number }): Promise<void> {
+    this.assertNoCeilingReached();
     await this.page.setViewportSize(viewport);
+  }
+
+  /**
+   * The ceiling this session ran into, if it ran into one.
+   *
+   * `captureConsole` deliberately does not raise it: the console is evidence of
+   * what happened up to the stop and is worth keeping.
+   */
+  get stoppedByCeiling(): Error | null {
+    return this.ceilingReached;
   }
 }
