@@ -36,6 +36,7 @@ import {
   sweepRetention,
   sweepSpendCap,
 } from './governance.ts';
+import { screeningModelFactory, sweepIntakeScreening } from './screening.ts';
 
 export const POLL_INTERVAL_MS = 5_000;
 export const REPORT_SWEEP_INTERVAL_MS = 30_000;
@@ -176,6 +177,13 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
       needs: 'RESEND_API_KEY and ALERT_EMAIL_FROM',
     });
   }
+  const screeningModel = screeningModelFactory();
+  if (!screeningModel) {
+    log('no model key — every submission waits for a reviewer at /review/screening', {
+      needs: 'ANTHROPIC_API_KEY',
+      effect: 'the deterministic intake filter still runs; nothing is cleared automatically',
+    });
+  }
   let running = true;
 
   const loop = async () => {
@@ -266,6 +274,9 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
     once('spend', () => sweepSpendCap(pool, log));
     once('retention', () => sweepRetention(pool, log));
     once('governance deadline', () => sweepGovernanceDeadlines(pool, log));
+    // Intake screening. Takes the benign submissions out of the reviewer queue;
+    // never puts anybody out of business — a clearance is all it can record.
+    once('intake screening', () => sweepIntakeScreening(pool, screeningModel, log));
   }, MONITOR_SWEEP_INTERVAL_MS);
   monitor.unref();
 
