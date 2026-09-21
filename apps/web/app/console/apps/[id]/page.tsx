@@ -207,9 +207,13 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
         <section className="rounded-xl border border-line bg-surface-muted p-5">
           <h2 className="font-semibold">Waiting on a human check</h2>
           <p className="mt-2 text-sm text-muted">
-            {app.screening_notes ??
-              'A reviewer confirms every submission before an assessment runs.'}
+            Every submission is screened against the Acceptable Use Policy before an assessment
+            runs. Anything the automatic screen cannot settle is read by a person, and this one is
+            in that queue. No assessment starts until it has been.
           </p>
+          {app.screening_notes && (
+            <p className="mt-3 text-sm text-muted">{String(app.screening_notes)}</p>
+          )}
         </section>
       )}
 
