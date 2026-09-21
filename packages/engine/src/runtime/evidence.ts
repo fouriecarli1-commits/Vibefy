@@ -73,6 +73,37 @@ const REDACTION_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
   { pattern: /\b\d{13,19}\b(?=[^\d]|$)/g, label: 'POSSIBLE_PAN' },
 ];
 
+/**
+ * The same, through every string in a value, leaving everything else alone.
+ *
+ * For `summary` and `metadata`, which used to go into the artefact untouched
+ * while the body beside them was redacted — so a token in a query string was
+ * taken out of one field of a row and left in plain sight in the other two.
+ * The summary is the field the report actually shows a reader.
+ *
+ * Strings only, deliberately. `POSSIBLE_PAN` matches any run of 13 to 19
+ * digits, which is a millisecond timestamp as readily as a card number; a
+ * number that stays a number cannot be mangled by it, and there is no
+ * credential that arrives as a JavaScript number.
+ */
+function redactDeep(value: unknown, into: string[]): unknown {
+  if (typeof value === 'string') {
+    const { text, redactions } = redact(value);
+    into.push(...redactions);
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((entry) => redactDeep(entry, into));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        redactDeep(entry, into),
+      ]),
+    );
+  }
+  return value;
+}
+
 export function redact(text: string): { text: string; redactions: string[] } {
   const redactions: string[] = [];
   let output = text;
@@ -112,7 +143,19 @@ export class EvidenceStore {
 
     let body: Buffer;
     let contentType = input.contentType ?? 'application/octet-stream';
-    const metadata: Record<string, unknown> = { ...input.metadata };
+
+    // Before the body, because these two used to be the way round the rule.
+    // A screenshot's metadata carries the page URL and an HTTP artefact's
+    // summary carries the request URL, and a URL is where a reset token or an
+    // API key in a query string lives.
+    const summaryRedaction = redact(input.summary);
+    const summary = summaryRedaction.text;
+    const summaryRedactions = [...summaryRedaction.redactions];
+    const metadata = redactDeep({ ...input.metadata }, summaryRedactions) as Record<
+      string,
+      unknown
+    >;
+    if (summaryRedactions.length > 0) metadata.redactions = summaryRedactions;
 
     if (Buffer.isBuffer(input.body)) {
       body = input.body;
@@ -120,7 +163,9 @@ export class EvidenceStore {
     } else {
       const raw = typeof input.body === 'string' ? input.body : JSON.stringify(input.body, null, 2);
       const { text, redactions } = redact(raw);
-      if (redactions.length > 0) metadata.redactions = redactions;
+      if (redactions.length > 0) {
+        metadata.redactions = [...summaryRedactions, ...redactions];
+      }
       body = Buffer.from(text, 'utf8');
       contentType =
         input.contentType ?? (typeof input.body === 'string' ? 'text/plain' : 'application/json');
@@ -137,7 +182,7 @@ export class EvidenceStore {
       byteSize: body.byteLength,
       contentType,
       storagePath: `assessments/${this.assessmentId}/evidence/${id}`,
-      summary: input.summary,
+      summary,
       body,
       metadata,
     };
