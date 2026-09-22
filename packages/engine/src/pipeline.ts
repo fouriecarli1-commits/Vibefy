@@ -98,6 +98,15 @@ export interface RunPipelineOptions {
   readonly assessedOn?: string;
 }
 
+/**
+ * Criteria that cannot be observed from outside a signed-in session.
+ *
+ * Deliberately short. SEC-05 and SEC-07 are not here: the deterministic stage
+ * probes administrative routes and API paths unauthenticated and does find
+ * things, so calling them untested would be its own kind of false.
+ */
+const BEHIND_A_SIGN_IN = ['FI-02', 'FI-07', 'PRI-03', 'STR-03'] as const;
+
 export async function runPipeline(options: RunPipelineOptions): Promise<AssessmentOutcome> {
   const { context } = options;
   const rubricVersion = options.rubricVersion ?? '1.0.0';
@@ -139,6 +148,31 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
 
   const findings = stageResults.flatMap((result) => result.findings);
   const notes: string[] = stageResults.flatMap((result) => result.notes);
+  const notTested: { criterion: string; because: string }[] = [];
+
+  /*
+   * The half of an application that is behind a sign-in.
+   *
+   * `syntheticCredentials` is on the context, the tools tell the model to use
+   * only the ones it was given, and nothing has ever given it any: the worker's
+   * job carries an optional field that no caller sets and no queue row holds.
+   * So every application whose owner told us it has authentication has been
+   * assessed entirely signed out — and four published criteria cannot be
+   * observed from outside a session at all.
+   *
+   * Nothing found against them meant no findings, and no findings renders as a
+   * tick. Said here rather than in a stage, because it is a fact about the run
+   * and not about any one of them.
+   */
+  if (context.target.hasAuthentication && context.syntheticCredentials === undefined) {
+    for (const criterion of BEHIND_A_SIGN_IN) {
+      notTested.push({
+        criterion,
+        because:
+          'This application signs users in, and the assessment was given no test account, so everything behind the sign-in was left alone. What is in front of it was assessed normally.',
+      });
+    }
+  }
 
   /*
    * The gate this feeds blocks certification, and it publishes its reason: "if
@@ -259,7 +293,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     nonRelianceLegend: NON_RELIANCE_LEGEND,
     aiDisclosure: AI_DISCLOSURE,
     notes,
-    notTestedCriteria: stageResults.flatMap((result) => result.notTested ?? []),
+    notTestedCriteria: [...stageResults.flatMap((result) => result.notTested ?? []), ...notTested],
     exitMeasurement:
       stageResults.find((result) => result.exitMeasurement !== undefined)?.exitMeasurement ?? null,
   };

@@ -151,3 +151,47 @@ describe('what a stage records as its own storage', () => {
     }
   });
 });
+
+describe('the half of an application behind a sign-in', () => {
+  const withAuth = (hasAuthentication: boolean): StageContext => ({
+    ...context(),
+    target: { ...context().target, hasAuthentication },
+  });
+
+  const anyStage: Stage = {
+    id: 'deterministic_checks',
+    appliesTo: () => true,
+    run: async () => ({
+      stage: 'deterministic_checks',
+      status: 'succeeded',
+      findings: [],
+      notes: [],
+    }),
+  };
+
+  it('is reported as untested when nothing gave the run an account', async () => {
+    // `syntheticCredentials` is on the context, the tools tell the model to use
+    // only the ones it was given, and nothing has ever given it any. So every
+    // application with a sign-in has been assessed entirely signed out, and
+    // four published criteria that cannot be observed from outside a session
+    // produced no findings — which renders as a tick.
+    const outcome = await runPipeline({ context: withAuth(true), stages: [anyStage] });
+    const criteria = outcome.notTestedCriteria.map((entry) => entry.criterion);
+    expect(criteria).toEqual(expect.arrayContaining(['FI-02', 'FI-07', 'PRI-03', 'STR-03']));
+    expect(outcome.notTestedCriteria[0]?.because).toMatch(/given no test account/i);
+  });
+
+  it('says nothing of the kind about an application that has no sign-in', async () => {
+    const outcome = await runPipeline({ context: withAuth(false), stages: [anyStage] });
+    expect(outcome.notTestedCriteria).toEqual([]);
+  });
+
+  it('leaves alone the criteria that are partly testable from outside', async () => {
+    // SEC-05 and SEC-07 are probed unauthenticated and do find things. Calling
+    // them untested would be its own kind of false.
+    const outcome = await runPipeline({ context: withAuth(true), stages: [anyStage] });
+    const criteria = outcome.notTestedCriteria.map((entry) => entry.criterion);
+    expect(criteria).not.toContain('SEC-05');
+    expect(criteria).not.toContain('SEC-07');
+  });
+});
