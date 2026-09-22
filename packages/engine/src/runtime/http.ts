@@ -46,8 +46,40 @@ export interface ScopedRequestOptions {
   readonly method?: string;
   readonly headers?: Record<string, string>;
   readonly body?: string;
-  readonly captureEvidence?: boolean;
+  /**
+   * Whether the response body is kept in the evidence artefact. Default true.
+   *
+   * The exchange is always recorded — what we asked for, what came back, when.
+   * Being unable to say what a request was is not something this client offers.
+   * What a crawl does not need is fifty copies of somebody's marketing site
+   * held for ninety days, so the entry page keeps its body and the rest keep
+   * their headers.
+   *
+   * It used to be called `captureEvidence`, and it was declared here, passed
+   * deliberately at two call sites with a comment explaining the cost, and read
+   * nowhere at all: every page of every crawl was stored in full.
+   */
+  readonly keepBody?: boolean;
   readonly summary?: string;
+}
+
+/**
+ * A target that redirects to itself, which is the application's defect and not
+ * a boundary we were turned back at.
+ *
+ * It used to be raised as a ScopeViolationError, which `classifyStop` reads as
+ * one of the three deliberate stops — so a redirect loop aborted the whole run
+ * and told the customer it had been turned back at the edge of what they
+ * authorised. It is an ordinary failed request.
+ */
+export class TooManyRedirectsError extends Error {
+  constructor(
+    readonly url: string,
+    readonly chain: readonly string[],
+  ) {
+    super(`More than ${MAX_REDIRECTS} redirects starting at ${url}`);
+    this.name = 'TooManyRedirectsError';
+  }
 }
 
 export class ScopedHttp {
@@ -82,6 +114,12 @@ export class ScopedHttp {
       this.guard.assert(currentUrl, method);
 
       const controller = new AbortController();
+      // The timer covers the body as well as the headers, and is cleared once
+      // the body has been read rather than once the headers have arrived. It
+      // used to be cleared in a `finally` around the fetch alone, so a target
+      // that answered immediately and then sent its body one byte a minute had
+      // nothing stopping it: the size cap bounds what the runner holds, and
+      // bounded nothing about how long it holds the runner.
       const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       let response: Response;
       try {
@@ -103,12 +141,11 @@ export class ScopedHttp {
           ...(options.body ? { body: options.body } : {}),
         });
       } catch (error) {
+        clearTimeout(timer);
         // undici wraps whatever the connector threw in a bare `fetch failed`.
         // A scope refusal that reaches a log as "fetch failed" is a refusal
         // nobody can act on, so the real reason is put back in front.
         throw unwrapScopeViolation(error);
-      } finally {
-        clearTimeout(timer);
       }
 
       const headers: Record<string, string> = {};
@@ -117,14 +154,34 @@ export class ScopedHttp {
       });
 
       const location = headers.location;
-      if (location && response.status >= 300 && response.status < 400 && hop < MAX_REDIRECTS) {
+      if (location && response.status >= 300 && response.status < 400) {
+        clearTimeout(timer);
+        // On the last hop this throws rather than falling through. Falling
+        // through returned the redirect itself as the answer — status 302, an
+        // empty body — and the `throw` below this loop was unreachable, so a
+        // target that redirects to itself for ever came back looking like a
+        // page that had been read.
+        if (hop >= MAX_REDIRECTS) throw new TooManyRedirectsError(rawUrl, redirectChain);
         redirectChain.push(currentUrl);
         currentUrl = new URL(location, currentUrl).toString();
         continue;
       }
 
-      const { body, truncated } = await readCapped(response);
+      let body: string;
+      let truncated: boolean;
+      try {
+        ({ body, truncated } = await readCapped(response));
+      } catch (error) {
+        throw controller.signal.aborted
+          ? new Error(
+              `The response body from ${currentUrl} was still arriving after ${REQUEST_TIMEOUT_MS / 1000} seconds.`,
+            )
+          : error;
+      } finally {
+        clearTimeout(timer);
+      }
       const elapsedMs = Date.now() - startedAt;
+      const keepBody = options.keepBody ?? true;
 
       const artefact = this.evidence.capture({
         kind: 'http_exchange',
@@ -134,7 +191,9 @@ export class ScopedHttp {
           response: {
             status: response.status,
             headers,
-            bodyPreview: body.slice(0, 4000),
+            bodyPreview: keepBody ? body.slice(0, 4000) : null,
+            bodyRetained: keepBody,
+            bodyLength: body.length,
             truncated,
             elapsedMs,
           },
@@ -153,7 +212,7 @@ export class ScopedHttp {
       };
     }
 
-    throw new ScopeViolationError('Too many redirects', { url: rawUrl, reason: 'redirect_loop' });
+    throw new TooManyRedirectsError(rawUrl, redirectChain);
   }
 
   /** Probes a path, treating a refusal or a network error as "not reachable". */

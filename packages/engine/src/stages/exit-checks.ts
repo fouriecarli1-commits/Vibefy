@@ -235,9 +235,10 @@ export async function crawlForTheExit(http: ScopedHttp, startUrl: string): Promi
     try {
       const response = await http.request(next.url, {
         summary: `Looking for the way out, ${next.depth} click(s) from the front door`,
-        // Only the front door is kept as evidence; twenty-five copies of
-        // somebody's marketing site is not a record, it is a bill.
-        captureEvidence: next.depth === 0,
+        // Only the front door keeps its body; twenty-five copies of somebody's
+        // marketing site is not a record, it is a bill. Every exchange is still
+        // recorded — what was asked for, and what came back.
+        keepBody: next.depth === 0,
       });
       if (next.depth === 0) evidenceIds.push(response.evidenceId);
       if (response.status >= 400) {
@@ -284,7 +285,7 @@ export async function crawlForTheExit(http: ScopedHttp, startUrl: string): Promi
     const already = fetched.get(url);
     if (already !== undefined) return already;
     try {
-      const response = await http.request(url, { summary, captureEvidence: false });
+      const response = await http.request(url, { summary, keepBody: false });
       fetched.set(url, response.body);
       return response.body;
     } catch (error) {
