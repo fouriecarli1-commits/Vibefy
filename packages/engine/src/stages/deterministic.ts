@@ -397,8 +397,30 @@ export const deterministicChecksStage: Stage = {
       }
 
       if (session.blockedRequests.length > 0) {
+        // Said separately, because they are different events and only one of
+        // them is the customer's boundary. A request we throttled and then
+        // dropped is our own doing, and reporting it as the authorisation
+        // boundary working told the customer something false about their own
+        // application — while everything measured afterwards described a page
+        // we had broken.
+        const throttled = session.blockedRequests.filter(
+          (blocked) => blocked.reason === 'rate_limited',
+        ).length;
+        const outOfScope = session.blockedRequests.length - throttled;
+        if (outOfScope > 0) {
+          notes.push(
+            `${outOfScope} request(s) from the page were blocked as out of scope; that is the authorisation boundary working, not a defect in the application.`,
+          );
+        }
+        if (throttled > 0) {
+          notes.push(
+            `${throttled} request(s) from the page were dropped because this run reached the rate ceiling its authorisation sets. That is ours, not the application's, and what was measured afterwards was measured on a page missing those responses.`,
+          );
+        }
+      }
+      if (context.guard.waitedForRateMs > 1_000) {
         notes.push(
-          `${session.blockedRequests.length} request(s) from the page were blocked as out of scope; that is the authorisation boundary working, not a defect in the application.`,
+          `The run waited ${Math.round(context.guard.waitedForRateMs / 1000)}s in total for the rate ceiling its authorisation sets, which is ${context.guard.policy.ceiling.maxRequestsPerMinute} request(s) a minute.`,
         );
       }
       browserPassCompleted = true;

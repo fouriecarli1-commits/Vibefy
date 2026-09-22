@@ -79,6 +79,42 @@ export const DEFAULT_CEILING: IntensityCeiling = {
   syntheticAccountsOnly: true,
 };
 
+/**
+ * Waits for the rate ceiling to permit another request, and says how long it
+ * waited.
+ *
+ * Each wait is exactly as long as the guard says it needs to be, and a handful
+ * of rounds covers another caller taking the slot first. When the wait would be
+ * longer than the cap it does not wait at all: the caller asks the guard as
+ * before and gets an honest refusal, because a browser navigation that is held
+ * past its own timeout fails altogether, which is worse than a page missing an
+ * image.
+ *
+ * So this smooths a sequence — the exit crawl's twenty-five pages, the probes —
+ * and does not rescue a burst. Sixty requests a minute is the default an
+ * authorisation carries, and a page that asks for eighty things at once cannot
+ * be served inside it however patient this is. What that costs is in
+ * docs/OPEN_ITEMS.md; raising it is a decision about how hard we are willing to
+ * hit somebody's server, which is not one to take here.
+ */
+export const MAX_RATE_WAIT_MS = 15_000;
+
+export async function waitForRateSlot(
+  guard: ScopeGuard,
+  maxWaitMs: number = MAX_RATE_WAIT_MS,
+): Promise<number> {
+  let waited = 0;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const ms = guard.msUntilSlot();
+    if (ms === 0) break;
+    if (waited + ms > maxWaitMs) break;
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    waited += ms;
+  }
+  if (waited > 0) guard.recordRateWait(waited);
+  return waited;
+}
+
 /** Methods that change state on someone else's system. Never permitted. */
 const DESTRUCTIVE_METHODS = new Set(['DELETE', 'PUT', 'PATCH']);
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -94,6 +130,7 @@ export class ScopeGuard {
   private readonly startedAt: number;
   private readonly recentRequests: number[] = [];
   private readonly violations: { url: string; reason: string; at: number }[] = [];
+  private rateWaitMs = 0;
 
   constructor(policy: ScopePolicy, now: number = Date.now()) {
     if (policy.allowedHosts.length === 0) {
@@ -206,10 +243,7 @@ export class ScopeGuard {
       });
     }
 
-    const windowStart = now - 60_000;
-    while (this.recentRequests.length > 0 && this.recentRequests[0]! < windowStart) {
-      this.recentRequests.shift();
-    }
+    this.prune(now);
     if (this.recentRequests.length >= this.policy.ceiling.maxRequestsPerMinute) {
       return this.refuse(rawUrl, 'rate_limited');
     }
@@ -229,6 +263,40 @@ export class ScopeGuard {
         reason: decision.reason,
       });
     }
+  }
+
+  private prune(now: number): void {
+    const windowStart = now - 60_000;
+    while (this.recentRequests.length > 0 && this.recentRequests[0]! < windowStart) {
+      this.recentRequests.shift();
+    }
+  }
+
+  /**
+   * How long until the rate ceiling would permit another request, or zero.
+   *
+   * The rate ceiling is not a boundary to be turned back at — it is a speed
+   * limit, and the answer to a speed limit is to go slower. It used to be
+   * answered by dropping the request: a browser loading an ordinary page with
+   * eighty images had twenty-two of them refused, and the report then described
+   * a page this engine had broken, under a note telling the customer their own
+   * authorisation boundary had done it.
+   */
+  msUntilSlot(now: number = Date.now()): number {
+    this.prune(now);
+    const limit = this.policy.ceiling.maxRequestsPerMinute;
+    if (this.recentRequests.length < limit) return 0;
+    const oldest = this.recentRequests[this.recentRequests.length - limit]!;
+    return Math.max(1, oldest + 60_000 - now);
+  }
+
+  /** How long this run has spent waiting for its own rate ceiling. */
+  get waitedForRateMs(): number {
+    return this.rateWaitMs;
+  }
+
+  recordRateWait(ms: number): void {
+    this.rateWaitMs += ms;
   }
 
   private refuse(url: string, reason: string): ScopeDecision {

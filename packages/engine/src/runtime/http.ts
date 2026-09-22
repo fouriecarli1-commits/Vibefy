@@ -23,7 +23,12 @@
 // two implementations of the same library that do not recognise each other.
 import { fetch, setGlobalDispatcher } from 'undici';
 import type { Dispatcher, RequestInit, Response } from 'undici';
-import { createScopedDispatcher, ScopeGuard, ScopeViolationError } from './scope.ts';
+import {
+  createScopedDispatcher,
+  ScopeGuard,
+  ScopeViolationError,
+  waitForRateSlot,
+} from './scope.ts';
 import type { EvidenceStore } from './evidence.ts';
 import { classifyStop } from './stop.ts';
 
@@ -111,6 +116,11 @@ export class ScopedHttp {
     const startedAt = Date.now();
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+      // Slower, not refused. The rate ceiling used to throw from here, which
+      // `classifyStop` reads as a scope violation — so a run that was merely
+      // going too fast aborted, and told the customer it had been turned back
+      // at the edge of what they authorised.
+      await waitForRateSlot(this.guard);
       this.guard.assert(currentUrl, method);
 
       const controller = new AbortController();

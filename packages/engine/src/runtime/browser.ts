@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Request } from 'playwright';
-import type { ScopeGuard } from './scope.ts';
+import { waitForRateSlot, type ScopeGuard } from './scope.ts';
 import type { EvidenceStore } from './evidence.ts';
 
 export interface BrowserSessionOptions {
@@ -143,6 +143,12 @@ export class BrowserSession {
     await this.context.route('**/*', async (route, request) => {
       let decision;
       try {
+        // The page's own traffic waits for the rate ceiling rather than being
+        // dropped by it. An ordinary page with eighty images had twenty-two
+        // refused, and everything downstream — the accessibility scan, the
+        // design survey, the screenshots, the check at phone width — then
+        // described a page this engine had broken.
+        await waitForRateSlot(this.guard);
         decision = this.guard.check(request.url(), request.method());
       } catch (error) {
         // Kept rather than thrown, and re-thrown from the next thing the stage
