@@ -37,6 +37,34 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     .select('*, finding_evidence (evidence_id)')
     .eq('assessment_id', id);
 
+  /*
+   * What each artefact actually is.
+   *
+   * The page used to print a count — "3 evidence artefacts" — and nothing else,
+   * so the person whose approval is the hard gate on a badge decided from a
+   * title, a description and a number. The queue page says, in a comment beside
+   * its only button, that deciding needs the evidence and the evidence is on
+   * this page. It was not.
+   *
+   * `evidence` is readable by a reviewer under the same policy that lets them
+   * read the findings, so this is the row they are already entitled to see.
+   */
+  const { data: artefacts } = await supabase
+    .from('evidence')
+    .select('id, kind, byte_size, captured_at, metadata')
+    .eq('assessment_id', id);
+  const artefactById = new Map(
+    (artefacts ?? []).map((artefact) => [
+      artefact.id as string,
+      {
+        kind: String(artefact.kind).replace(/_/g, ' '),
+        summary:
+          (artefact.metadata as { summary?: string } | null)?.summary ?? String(artefact.kind),
+        bytes: Number(artefact.byte_size ?? 0),
+      },
+    ]),
+  );
+
   const { data: runs } = await supabase
     .from('assessment_runs')
     .select('stage, status, error_message, metadata')
@@ -165,6 +193,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         {sorted.length === 0 && (
           <p className="text-muted">No findings were published for this assessment.</p>
         )}
+        <p className="max-w-prose text-sm text-muted">
+          Each artefact is listed under the finding it backs, with what it is and how large it is.
+          Opening one is not possible from here yet: the bytes are written by the worker to its own
+          disk, and this page cannot reach them until they live somewhere both processes can see.
+          Decide on what is written down, and send anything back that you cannot decide without
+          looking.
+        </p>
         <ul className="space-y-4">
           {sorted.map((finding) => {
             const evidence =
@@ -184,9 +219,27 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                   <strong>Remediation.</strong> {finding.remediation as string}
                 </p>
                 <p className="mt-3 text-sm text-muted">
-                  {String(finding.rubric_rule_id)} · {String(finding.dimension).replace(/_/g, ' ')}{' '}
-                  · {evidence.length} evidence artefact{evidence.length === 1 ? '' : 's'}
+                  {String(finding.rubric_rule_id)} · {String(finding.dimension).replace(/_/g, ' ')}
                 </p>
+                {evidence.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-sm">
+                    {evidence.map(({ evidence_id }) => {
+                      const artefact = artefactById.get(evidence_id);
+                      if (!artefact) return null;
+                      return (
+                        <li key={evidence_id} className="text-muted">
+                          <span className="chip">{artefact.kind}</span> {artefact.summary}
+                          {artefact.bytes > 0 && (
+                            <span className="tabular">
+                              {' '}
+                              · {Math.round(artefact.bytes / 1024)} KB
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </li>
             );
           })}

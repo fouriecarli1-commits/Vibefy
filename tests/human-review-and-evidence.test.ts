@@ -7,6 +7,7 @@
  * reputational event, not a rounding error.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { Client } from 'pg';
 import { connect, expectRefusal } from './setup/client.ts';
 import {
@@ -185,5 +186,26 @@ describe('the certification gate is a gate, not arithmetic', () => {
     );
     expect(message).toMatch(/critical security or privacy finding/i);
     await db.query('rollback');
+  });
+});
+
+describe('what the reviewer is shown about the evidence', () => {
+  const page = readFileSync('apps/web/app/review/[id]/page.tsx', 'utf8');
+
+  it('names each artefact rather than counting them', () => {
+    // It printed "3 evidence artefacts" and nothing else, so the person whose
+    // approval is the hard gate on a badge decided from a title, a description
+    // and a number — while the queue page told them, beside its only button,
+    // that deciding needs the evidence and the evidence is on this page.
+    expect(page).toMatch(/from\('evidence'\)/);
+    expect(page).toMatch(/artefact\.summary/);
+    expect(page).not.toMatch(/evidence artefact\{evidence\.length === 1/);
+  });
+
+  it('says out loud that the bytes cannot be opened from there yet', () => {
+    // A list that looks complete is worse than a short one that says what it
+    // is missing: a reviewer who thinks they have looked has not.
+    expect(page).toMatch(/Opening one is not possible from here yet/);
+    expect(page).toMatch(/send anything back that you cannot decide without/i);
   });
 });
