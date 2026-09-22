@@ -86,6 +86,19 @@ describe('what the code does with it', () => {
     expect(worker).toMatch(/needs a fresh authorisation/);
   });
 
+  it('clones nothing before the hard gate has passed', () => {
+    // Cloning is an assessment step, and the brief's first guardrail is that no
+    // assessment step runs against a target without a verified authorisation
+    // record. Ordering is the whole of that guarantee here, and ordering is
+    // exactly what a later edit moves without noticing.
+    const gate = worker.indexOf('This is the hard gate');
+    const authorisation = worker.indexOf('current_authorisation');
+    const clone = worker.indexOf('await fetch(authorisedRepository');
+    expect(gate).toBeGreaterThan(0);
+    expect(clone).toBeGreaterThan(gate);
+    expect(clone).toBeGreaterThan(authorisation);
+  });
+
   it('validates the declared repository before writing it down', () => {
     // Refused here with the same function the runner uses, so a repository the
     // console accepts is one the clone will take.
