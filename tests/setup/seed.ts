@@ -104,16 +104,23 @@ export async function seedAuthorisation(
   client: Client,
   account: SeededAccount,
   appId: string,
-  overrides: { status?: string; scopeDomains?: string[]; expiresAt?: string | null } = {},
+  overrides: {
+    status?: string;
+    scopeDomains?: string[];
+    expiresAt?: string | null;
+    /** The repository this authorisation covers. The runner clones only this. */
+    repositoryUrl?: string;
+  } = {},
 ): Promise<string> {
   const status = overrides.status ?? 'verified';
   const { rows } = await client.query<{ id: string }>(
     `insert into public.authorisations (
        app_id, organisation_id, status, method, verification_target, verified_at,
-       scope_domains, warranty_text_version, warranty_text_sha256, granted_by, expires_at
+       scope_domains, warranty_text_version, warranty_text_sha256, granted_by, expires_at,
+       repository_url
      ) values ($1, $2, $3::text::public.authorisation_status, 'dns_txt', 'example.test',
        case when $3::text = 'verified' then now() else null end,
-       $4, '1.0.0', $5, $6, $7)
+       $4, '1.0.0', $5, $6, $7, $8)
      returning id`,
     [
       appId,
@@ -123,6 +130,7 @@ export async function seedAuthorisation(
       sha256('authorisation-warranty-1.0.0'),
       account.userId,
       overrides.expiresAt ?? null,
+      overrides.repositoryUrl ?? null,
     ],
   );
   return rows[0]!.id;

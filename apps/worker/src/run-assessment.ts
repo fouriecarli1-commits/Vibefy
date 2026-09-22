@@ -116,15 +116,33 @@ export async function runAssessmentJob(
    */
   let repository: FetchedRepository | null = null;
   let repositoryUnavailable: string | undefined;
-  if (typeof appRow.repository_url === 'string' && appRow.repository_url.length > 0) {
+  const authorisedRepository =
+    typeof record.repository_url === 'string' && record.repository_url.length > 0
+      ? record.repository_url
+      : null;
+  const declaredRepository =
+    typeof appRow.repository_url === 'string' && appRow.repository_url.length > 0
+      ? appRow.repository_url
+      : null;
+
+  if (authorisedRepository !== null) {
     try {
       const fetch = dependencies.fetchRepository ?? fetchRepository;
-      repository = await fetch(appRow.repository_url, { log });
+      repository = await fetch(authorisedRepository, { log });
       log('repository ready', { appId: appRow.id, bytes: repository.bytes });
     } catch (error) {
       repositoryUnavailable = error instanceof Error ? error.message : String(error);
       log('repository unavailable', { appId: appRow.id, reason: repositoryUnavailable });
     }
+  } else if (declaredRepository !== null) {
+    // The app names a repository and the authorisation does not. That is the
+    // same rule the domain scope has, for the same reason: an authorisation we
+    // can widen afterwards is worth nothing as evidence that our testing was
+    // lawful. Said out loud rather than skipped, because from the report it
+    // would otherwise look exactly like an application with no source.
+    repositoryUnavailable =
+      'the authorisation on file does not cover it — a repository added after the warranty was accepted needs a fresh authorisation';
+    log('repository not authorised', { appId: appRow.id });
   }
 
   const target: AssessmentTarget = {

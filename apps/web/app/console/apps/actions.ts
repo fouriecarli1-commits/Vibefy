@@ -12,6 +12,7 @@ import {
   screenIntake,
   verifyOwnership,
 } from '@vibefycode/engine/authorisation';
+import { RepositoryRefusedError, repositoryUrlOrRefuse } from '@vibefycode/engine';
 import { decideAssessmentRequest, resolvePlan } from '@vibefycode/billing';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
@@ -69,6 +70,24 @@ export async function createApp(_previous: ActionState, formData: FormData): Pro
     };
   }
 
+  // Checked here with the same function the runner uses, so a repository the
+  // console accepts is one the clone will take. Accepting it now and failing
+  // in the runner an hour later would tell the customer their source was
+  // assessed when it was not.
+  const repositoryUrl = String(formData.get('repositoryUrl') ?? '').trim();
+  if (repositoryUrl) {
+    try {
+      repositoryUrlOrRefuse(repositoryUrl);
+    } catch (error) {
+      return {
+        error:
+          error instanceof RepositoryRefusedError
+            ? `That repository cannot be read: ${error.reason}. Public repositories on GitHub, GitLab, Bitbucket, Codeberg or sr.ht, over https, with no credentials in the address.`
+            : 'That repository address could not be read.',
+      };
+    }
+  }
+
   const screening = await screenIntake({
     appName: name,
     description,
@@ -93,6 +112,7 @@ export async function createApp(_previous: ActionState, formData: FormData): Pro
       slug,
       app_type: 'web_url',
       primary_url: primaryUrl,
+      repository_url: repositoryUrl || null,
       description: description || null,
       category: String(formData.get('category') ?? '') || null,
       builder: String(formData.get('builder') ?? '') || null,
@@ -160,7 +180,7 @@ export async function startAuthorisation(
 
   const { data: app, error: appError } = await supabase
     .from('apps')
-    .select('id, organisation_id, primary_url, screening_status')
+    .select('id, organisation_id, primary_url, repository_url, screening_status')
     .eq('id', appId)
     .single();
   if (appError || !app) return { error: appError?.message ?? 'App not found.' };
@@ -190,6 +210,12 @@ export async function startAuthorisation(
     verification_token: challenge.token,
     verification_target: host,
     scope_domains: allowed,
+    // Copied onto the authorisation, beside the hash of the words they
+    // accepted. A domain is proved by a DNS record; a public repository cannot
+    // be, so what stands in its place is that they declared it at the moment
+    // they accepted the warranty. Changing it on the app afterwards does not
+    // widen what we read.
+    repository_url: (app.repository_url as string | null) ?? null,
     scope_exclusions: String(formData.get('exclusions') ?? '')
       .split(/[\s,]+/)
       .map((entry) => entry.trim())

@@ -73,6 +73,13 @@ export default async function NewAppPage({
           hint="The address a real user would visit. HTTPS only."
         />
         <Field
+          label="Repository"
+          name="repositoryUrl"
+          type="url"
+          placeholder="https://github.com/you/your-app"
+          hint="Optional, and the half of an assessment that reads your source: a key committed to a repository is the most common serious defect in applications built this way, and it stays usable after the file is deleted. Public repositories on GitHub, GitLab, Bitbucket, Codeberg or sr.ht. We clone it, read it, and delete it — never paste an address containing a token."
+        />
+        <Field
           label="What does it do?"
           name="description"
           multiline

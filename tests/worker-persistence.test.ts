@@ -226,7 +226,7 @@ describe('the hard gate at dispatch', () => {
       const appId = await seedApp(db, owner, 'Repo App', {
         repositoryUrl: `file://${source}`,
       });
-      await seedAuthorisation(db, owner, appId);
+      await seedAuthorisation(db, owner, appId, { repositoryUrl: `file://${source}` });
       const result = await runAssessmentJob(
         { appId, depth: 'limited', requestedBy: owner.userId },
         {
