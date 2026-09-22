@@ -324,3 +324,44 @@ describe('white-label', () => {
     expect(renderReport(source, 'paid').html).not.toContain('Prepared for you by');
   });
 });
+
+describe('the order a report lists findings in', () => {
+  it('is the same every time, for findings that are otherwise identical', () => {
+    // Severity and rule id leave two findings of the same severity against the
+    // same criterion comparing equal — which is the ordinary case, since one
+    // rule covers several exposed paths — and `sort` is stable, so their order
+    // was whatever order the database happened to return.
+    const three = [
+      finding({ ruleId: 'SEC-08', severity: 'critical', title: 'Git repository is exposed' }),
+      finding({ ruleId: 'SEC-08', severity: 'critical', title: 'Environment file is readable' }),
+      finding({ ruleId: 'SEC-08', severity: 'critical', title: 'A database dump is readable' }),
+    ];
+    const forwards = sortFindings(three).map((entry) => entry.title);
+    const backwards = sortFindings([...three].reverse()).map((entry) => entry.title);
+    expect(forwards).toEqual(backwards);
+  });
+
+  it('decides which three a free report shows', () => {
+    // The free tier shows the three most serious. When the fourth is as serious
+    // as the third, which one is cut was decided by row order.
+    const four = [
+      finding({ ruleId: 'SEC-08', severity: 'critical', title: 'D' }),
+      finding({ ruleId: 'SEC-08', severity: 'critical', title: 'C' }),
+      finding({ ruleId: 'SEC-08', severity: 'critical', title: 'B' }),
+      finding({ ruleId: 'SEC-08', severity: 'critical', title: 'A' }),
+    ];
+    const shown = (input: ReportFinding[]) =>
+      redactForTier({ ...source, findings: input }, 'free').findings.map((entry) => entry.title);
+    expect(shown(four)).toEqual(shown([...four].reverse()));
+    expect(shown(four)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('is settled in the query as well as in the sort', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    const assemble = readFileSync('packages/report/src/assemble.ts', 'utf8');
+    // Both halves: the sort is total, and the rows arrive in a fixed order so
+    // that anything reading them before the sort sees the same thing too.
+    expect(assemble).toMatch(/order by f\.severity, f\.rubric_rule_id, f\.id/);
+    expect(assemble).toMatch(/order by started_at nulls last, stage/);
+  });
+});

@@ -111,12 +111,20 @@ export async function assembleReportSource(
        left join public.finding_evidence fe on fe.finding_id = f.id
        left join public.evidence e on e.id = fe.evidence_id
       where f.assessment_id = $1 and f.is_published
-      group by f.id`,
+      group by f.id
+      -- Ordered, because Postgres has no obligation to return rows the same
+      -- way twice and this decides which three findings a free report shows.
+      -- The finding_severity enum is declared critical-first, so its own order
+      -- is the order a reader wants; the rule id and the primary key settle the
+      -- ties, which same-rule findings produce constantly.
+      order by f.severity, f.rubric_rule_id, f.id`,
     [assessmentId],
   );
 
   const runs = await client.query<RunRow>(
-    `select stage, status, metadata from public.assessment_runs where assessment_id = $1`,
+    `select stage, status, metadata from public.assessment_runs
+      where assessment_id = $1
+      order by started_at nulls last, stage`,
     [assessmentId],
   );
 

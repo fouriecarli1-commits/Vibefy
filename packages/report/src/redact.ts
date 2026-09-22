@@ -25,11 +25,24 @@ export function severityRank(severity: ReportFinding['severity']): number {
   return SEVERITY_ORDER.indexOf(severity);
 }
 
+/**
+ * Most serious first, and the same order every time.
+ *
+ * The last clause is the one that matters. Severity and rule id leave two
+ * findings of the same severity against the same criterion — which is the
+ * ordinary case, since one rule covers several exposed paths — comparing equal,
+ * and `sort` is stable, so their order was whatever order the database happened
+ * to return. A free report shows the three most serious, so that decided which
+ * three a customer saw, and two renders of one assessment produced two
+ * different PDFs.
+ */
 export function sortFindings(findings: readonly ReportFinding[]): ReportFinding[] {
   return [...findings].sort((a, b) => {
     const bySeverity = severityRank(a.severity) - severityRank(b.severity);
     if (bySeverity !== 0) return bySeverity;
-    return a.ruleId.localeCompare(b.ruleId);
+    const byRule = a.ruleId.localeCompare(b.ruleId);
+    if (byRule !== 0) return byRule;
+    return a.title.localeCompare(b.title);
   });
 }
 
