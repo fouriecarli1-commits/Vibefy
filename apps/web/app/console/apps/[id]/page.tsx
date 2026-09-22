@@ -252,6 +252,14 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                   hint={`Comma-separated. You can only authorise ${host} and its subdomains — anything else is removed.`}
                 />
                 <Field
+                  label="Repository"
+                  name="repositoryUrl"
+                  type="url"
+                  defaultValue={(app.repository_url as string | null) ?? ''}
+                  placeholder="https://github.com/you/your-app"
+                  hint="Optional, and the half of an assessment that reads your source: a key committed to a repository is the most common serious defect in applications built this way, and it stays usable after the file is deleted. Public repositories only — we clone it, read it, and delete it. Never paste an address containing a token."
+                />
+                <Field
                   label="Out of scope"
                   name="exclusions"
                   hint="Paths or hosts the runner must never touch, for example /billing."

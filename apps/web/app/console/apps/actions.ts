@@ -191,6 +191,31 @@ export async function startAuthorisation(
     };
   }
 
+  /*
+   * The repository, declared here rather than only at sign-up.
+   *
+   * It belongs in this form because this is the act it has to be part of: a
+   * domain is proved by a DNS record and a public repository cannot be, so what
+   * stands in its place is that the customer named it in the same breath as
+   * accepting the warranty. It also means an application registered before any
+   * of this existed can add one without starting again.
+   */
+  const declaredRepository =
+    String(formData.get('repositoryUrl') ?? '').trim() ||
+    ((app.repository_url as string | null) ?? '');
+  if (declaredRepository) {
+    try {
+      repositoryUrlOrRefuse(declaredRepository);
+    } catch (repositoryError) {
+      return {
+        error:
+          repositoryError instanceof RepositoryRefusedError
+            ? `That repository cannot be read: ${repositoryError.reason}. Public repositories on GitHub, GitLab, Bitbucket, Codeberg or sr.ht, over https, with no credentials in the address.`
+            : 'That repository address could not be read.',
+      };
+    }
+  }
+
   const host = new URL(app.primary_url as string).hostname;
   const challenge = createChallenge(host);
   const warranty = documentFingerprint('authorisation-to-test.md');
@@ -215,7 +240,7 @@ export async function startAuthorisation(
     // be, so what stands in its place is that they declared it at the moment
     // they accepted the warranty. Changing it on the app afterwards does not
     // widen what we read.
-    repository_url: (app.repository_url as string | null) ?? null,
+    repository_url: declaredRepository || null,
     scope_exclusions: String(formData.get('exclusions') ?? '')
       .split(/[\s,]+/)
       .map((entry) => entry.trim())

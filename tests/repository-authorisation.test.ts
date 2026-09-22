@@ -86,8 +86,10 @@ describe('what the code does with it', () => {
     expect(worker).toMatch(/needs a fresh authorisation/);
   });
 
-  it('copies the declared repository at the moment the warranty is accepted', () => {
-    expect(actions).toMatch(/repository_url: \(app\.repository_url as string \| null\) \?\? null/);
+  it('validates the declared repository before writing it down', () => {
+    // Refused here with the same function the runner uses, so a repository the
+    // console accepts is one the clone will take.
+    expect(actions).toMatch(/repositoryUrlOrRefuse\(declaredRepository\)/);
   });
 
   it('refuses in the console exactly what the runner would refuse', () => {
@@ -118,5 +120,19 @@ describe('what the code does with it', () => {
     const form = readFileSync('apps/web/app/console/apps/new/page.tsx', 'utf8');
     expect(form).toMatch(/name="repositoryUrl"/);
     expect(form).toMatch(/never paste an address containing a token/i);
+  });
+
+  it('asks for it in the same act as accepting the warranty', () => {
+    // A domain is proved by a DNS record and a repository cannot be, so what
+    // stands in its place is that the customer named it in the same breath as
+    // agreeing to the words. It also lets an application registered before any
+    // of this add one without starting again.
+    const page = readFileSync('apps/web/app/console/apps/[id]/page.tsx', 'utf8');
+    const authorisationForm = page.slice(
+      page.indexOf('action={startAuthorisation}'),
+      page.indexOf('action={startAuthorisation}') + 2_000,
+    );
+    expect(authorisationForm).toMatch(/name="repositoryUrl"/);
+    expect(actions).toMatch(/repository_url: declaredRepository \|\| null/);
   });
 });
