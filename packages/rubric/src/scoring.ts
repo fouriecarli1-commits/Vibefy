@@ -15,6 +15,30 @@ import type {
   ScoringResult,
 } from './types.ts';
 
+/**
+ * The rubric could not score something it was given.
+ *
+ * Both of these are unreachable against a rubric that is internally consistent,
+ * and that is why they throw. A score is the product: the alternative to
+ * stopping is publishing a number assembled from a lookup that missed, which
+ * nobody downstream can tell from a number that is right.
+ */
+export class UnscorableFindingError extends Error {
+  constructor(rubricVersion: string, what: string) {
+    super(
+      `Rubric ${rubricVersion} defines no scoring for ${what}, so this assessment has no score.`,
+    );
+    this.name = 'UnscorableFindingError';
+  }
+}
+
+export class UnbandedScoreError extends Error {
+  constructor(rubricVersion: string, score: number) {
+    super(`Rubric ${rubricVersion} has no band covering ${score}, so this assessment has no band.`);
+    this.name = 'UnbandedScoreError';
+  }
+}
+
 export function scoreAssessment(input: ScoringInput): ScoringResult {
   const rubric = getRubric(input.rubricVersion);
   const published = input.findings.filter((finding) => finding.isPublished);
@@ -53,8 +77,19 @@ function scoreDimension(
   const penalty = findings
     .filter((finding) => finding.dimension === dimensionId)
     .reduce((total, finding) => {
-      const severity = rubric.scoring.severityPenalties[finding.severity] ?? 0;
-      const confidence = rubric.scoring.confidenceMultipliers[finding.confidence] ?? 1;
+      // A severity the rubric has no penalty for used to cost nothing, and a
+      // confidence it has no multiplier for used to count in full. Both are
+      // lookups into data published in a migration, so both are one
+      // typographical error in a future rubric away from a finding that is
+      // free — silently, and on everybody's score at once.
+      const severity = rubric.scoring.severityPenalties[finding.severity];
+      const confidence = rubric.scoring.confidenceMultipliers[finding.confidence];
+      if (severity === undefined) {
+        throw new UnscorableFindingError(rubric.version, `severity "${finding.severity}"`);
+      }
+      if (confidence === undefined) {
+        throw new UnscorableFindingError(rubric.version, `confidence "${finding.confidence}"`);
+      }
       return total + severity * confidence;
     }, 0);
 
@@ -139,9 +174,21 @@ function certificationBlockers(
   return blockers;
 }
 
+/**
+ * The band a score falls in.
+ *
+ * It used to answer "Unbanded" for a score no band covered, which is a word
+ * that would have been printed on a badge and a report. The bands are published
+ * data and the rounding is published beside them: 1.1.0 rounds to two decimals
+ * and its bands run 0–39.99, 40–59.99, 60–74.99, 75–89.99, 90–100, which
+ * happens to leave no gap. Change the rounding to three decimals and 39.995
+ * belongs to nothing — and the first anybody would know is a customer asking
+ * what "Unbanded" means.
+ */
 function bandFor(rubric: RubricDefinition, score: number): string {
   const band = rubric.bands.find((candidate) => score >= candidate.min && score <= candidate.max);
-  return band?.label ?? 'Unbanded';
+  if (!band) throw new UnbandedScoreError(rubric.version, score);
+  return band.label;
 }
 
 function clamp(value: number, min: number, max: number): number {

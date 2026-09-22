@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getRubric, rubricChecksum, CURRENT_RUBRIC_VERSION } from './rubric.ts';
-import { scoreAssessment } from './scoring.ts';
+import { getRubric, listRubricVersions, rubricChecksum, CURRENT_RUBRIC_VERSION } from './rubric.ts';
+import { scoreAssessment, UnscorableFindingError } from './scoring.ts';
 import type { ScoringFinding, ScoringInput } from './types.ts';
 
 const clean: ScoringInput = { rubricVersion: '1.0.0', findings: [], coreFlowsUnreachable: false };
@@ -169,5 +169,52 @@ describe('determinism', () => {
     const a = finding({ severity: 'high', ruleId: 'SEC-01' });
     const b = finding({ dimension: 'production_readiness', severity: 'medium', ruleId: 'PRD-02' });
     expect(scoreAssessment(withFindings(a, b))).toEqual(scoreAssessment(withFindings(b, a)));
+  });
+});
+
+describe('a rubric that cannot score what it is given', () => {
+  it('covers every attainable score with a band, at its own rounding', () => {
+    // 1.1.0 rounds to two decimals and its bands run 0–39.99, 40–59.99,
+    // 60–74.99, 75–89.99, 90–100 — which happens to leave no gap. Change the
+    // rounding to three decimals and 39.995 belongs to nothing, and the first
+    // anybody would know is a customer asking what "Unbanded" means.
+    for (const version of listRubricVersions()) {
+      const rubric = getRubric(version);
+      const step = 10 ** -rubric.scoring.roundingDecimals;
+      for (let score = 0; score <= 100 + 1e-9; score = Number((score + step).toFixed(6))) {
+        const rounded = Number(score.toFixed(rubric.scoring.roundingDecimals));
+        const band = rubric.bands.find(
+          (candidate) => rounded >= candidate.min && rounded <= candidate.max,
+        );
+        expect(band, `${version} has no band for ${rounded}`).toBeDefined();
+      }
+    }
+  });
+
+  it('has a penalty for every severity and a multiplier for every confidence', () => {
+    // Both are lookups into data published in a migration, and both used to
+    // fall back to something harmless — nothing, and in full — so one
+    // typographical error in a future rubric made a whole severity free on
+    // everybody's score at once.
+    for (const version of listRubricVersions()) {
+      const rubric = getRubric(version);
+      for (const severity of ['critical', 'high', 'medium', 'low', 'info'] as const) {
+        expect(rubric.scoring.severityPenalties[severity], `${version} ${severity}`).toBeDefined();
+      }
+      for (const confidence of ['high', 'medium', 'low'] as const) {
+        expect(
+          rubric.scoring.confidenceMultipliers[confidence],
+          `${version} ${confidence}`,
+        ).toBeDefined();
+      }
+    }
+  });
+
+  it('stops rather than scoring a finding it has no penalty for', () => {
+    // The alternative is a number assembled from a lookup that missed, which
+    // nobody downstream can tell from a number that is right.
+    expect(() =>
+      scoreAssessment(withFindings(finding({ severity: 'catastrophic' as unknown as 'critical' }))),
+    ).toThrow(UnscorableFindingError);
   });
 });

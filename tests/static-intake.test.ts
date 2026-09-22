@@ -335,3 +335,34 @@ describe('a file too large to read', () => {
     expect(result.notes.join(' ')).toMatch(/1 file\(s\) larger than 1 MB were not read/i);
   });
 });
+
+describe('a credential-shaped string in an example file', () => {
+  it('is a note, not a finding, because that is what an example file is for', async () => {
+    // The comment above the check has always said an example file is not the
+    // finding. It produced one anyway, at `low` — a downgrade meant to say
+    // "this is not a leak". GATE-EXPOSED-SECRET carries no trigger severity, so
+    // it fires on any SEC-04 whatever: a placeholder like sk_live_xxxxxxxxxxxx,
+    // which is what a well-kept example file contains, capped the whole
+    // assessment at 39 and blocked the badge.
+    const repo = makeRepo('example-only');
+    writeFileSync(join(repo, '.env.example'), `STRIPE_SECRET_KEY=${'sk'}_live_xxxxxxxxxxxx\n`);
+
+    const result = await runAgainst(repo);
+    expect(result.findings.filter((finding) => finding.ruleId === 'SEC-04')).toEqual([]);
+    // Still told: a real key does sometimes get pasted into the example file.
+    expect(result.notes.join(' ')).toMatch(/found in example files/i);
+    expect(result.notes.join(' ')).toMatch(/\.env\.example/);
+  });
+
+  it('does not hide a real one in a real file beside it', async () => {
+    const repo = makeRepo('example-and-real');
+    writeFileSync(join(repo, '.env.example'), `STRIPE_SECRET_KEY=${'sk'}_live_xxxxxxxxxxxx\n`);
+    writeFileSync(join(repo, '.env'), `STRIPE_SECRET_KEY=${FABRICATED_STRIPE_KEY}\n`);
+
+    const result = await runAgainst(repo);
+    const credential = result.findings.find((finding) => finding.ruleId === 'SEC-04');
+    expect(credential?.severity).toBe('critical');
+    // One match, not two: the example is counted in the note instead.
+    expect(credential?.title).toMatch(/^1 apparent credential /);
+  });
+});

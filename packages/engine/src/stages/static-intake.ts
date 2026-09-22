@@ -238,6 +238,7 @@ export const staticIntakeStage: Stage = {
 
     const credentials = scanForCredentials(root, files, context);
     findings.push(...credentials.findings);
+    if (credentials.examples) notes.push(credentials.examples);
     if (credentials.unreadable.length > 0) {
       notes.push(
         `${credentials.unreadable.length} file(s) could not be opened and were not scanned` +
@@ -366,17 +367,23 @@ interface CredentialScan {
   readonly unreadable: string[];
   /** Paths that produced a hit, so hygiene does not charge for the same file twice. */
   readonly filesWithHits: ReadonlySet<string>;
+  /** What was found in example files, said in a note rather than charged as a finding. */
+  readonly examples: string | null;
 }
 
 function scanForCredentials(root: string, files: string[], context: StageContext): CredentialScan {
-  const hits: { file: string; line: number; label: string; severity: RawFinding['severity'] }[] =
-    [];
+  type Hit = { file: string; line: number; label: string; severity: RawFinding['severity'] };
+  const hits: Hit[] = [];
+  /** Matches in `.env.example` and friends: told about, never charged for. */
+  const inExamples: Hit[] = [];
   const unreadable: string[] = [];
   const filesWithHits = new Set<string>();
 
   for (const file of files) {
     const relativePath = relative(root, file);
-    // A committed .env is itself the finding; an example file is not.
+    // A committed .env is itself the finding; an example file is not, and since
+    // 2026-09-22 that is true of what this produces rather than only of this
+    // comment.
     const isExample = /\.example$|\.sample$|\.template$/.test(relativePath);
     let contents: string;
     try {
@@ -391,19 +398,42 @@ function scanForCredentials(root: string, files: string[], context: StageContext
     contents.split('\n').forEach((line, index) => {
       for (const { pattern, label, severity } of CREDENTIAL_PATTERNS) {
         if (pattern.test(line)) {
-          hits.push({
-            file: relativePath,
-            line: index + 1,
-            label,
-            severity: isExample ? 'low' : severity,
-          });
+          const hit = { file: relativePath, line: index + 1, label, severity };
+          if (isExample) inExamples.push(hit);
+          else hits.push(hit);
           filesWithHits.add(relativePath);
         }
       }
     });
   }
 
-  if (hits.length === 0) return { findings: [], unreadable, filesWithHits };
+  /*
+   * An example file is not the finding, and it used to produce one anyway.
+   *
+   * The comment above says so, and the code then reported a match in a
+   * `.env.example` as SEC-04 at `low` — a downgrade meant to say "this is not a
+   * leak". GATE-EXPOSED-SECRET carries no trigger severity, so it fires on any
+   * SEC-04 whatever: a placeholder like `sk_live_xxxxxxxxxxxx`, which is what a
+   * well-kept example file contains, capped the whole assessment at 39 and
+   * blocked the badge.
+   *
+   * So it is a note. The customer is still told — a real key does sometimes get
+   * pasted into the example file — and the note says exactly where to look.
+   * Whether that gate should have a trigger severity at all is a question about
+   * the published rubric, and it is in docs/OPEN_ITEMS.md for Anré.
+   */
+  const examples =
+    inExamples.length === 0
+      ? null
+      : `${inExamples.length} credential-shaped string(s) were found in example files (${[
+          ...new Set(inExamples.map((hit) => hit.file)),
+        ]
+          .slice(0, 5)
+          .join(
+            ', ',
+          )}). That is what an example file is for, so this is not reported as a finding — but it is worth confirming none of them is a real value somebody pasted in.`;
+
+  if (hits.length === 0) return { findings: [], unreadable, filesWithHits, examples };
 
   const worst = hits.reduce((current, hit) =>
     rank(hit.severity) > rank(current.severity) ? hit : current,
@@ -426,6 +456,7 @@ function scanForCredentials(root: string, files: string[], context: StageContext
   return {
     unreadable,
     filesWithHits,
+    examples,
     findings: [
       {
         ruleId: 'SEC-04',
