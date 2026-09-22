@@ -52,7 +52,11 @@ beforeAll(async () => {
     const session = new BrowserSession(guard, new EvidenceStore(url));
     await session.open();
     try {
-      return await measureDesign(session, url);
+      // Navigating is the caller's business. `measureDesign` reads the page as
+      // it stands, so that in a real run the screenshot already taken is of the
+      // same load the measurement describes.
+      await session.goto(url, 'networkidle');
+      return await measureDesign(session);
     } finally {
       await session.close();
     }
@@ -276,8 +280,37 @@ describe('the assessment runs it at both widths', () => {
     'utf8',
   );
 
+  it('reads the page it was given rather than fetching it again', async () => {
+    // It used to navigate, and both callers had already loaded the page — so
+    // every assessment made two extra full navigations against an intensity
+    // ceiling the customer set.
+    //
+    // The worse half is the evidence. The desktop screenshot is taken before
+    // the survey runs and attached to the findings it produces, so a
+    // re-navigation meant the picture was of one load and the measurement of
+    // the next. On a page with a rotating hero or an experiment those are not
+    // the same page, and the whole claim here is that the picture shows what
+    // was found.
+    const guard = new ScopeGuard({
+      allowedHosts: [page.host.split(':')[0]!],
+      exclusions: [],
+      ceiling: { ...DEFAULT_CEILING, maxRequestsPerMinute: 600, maxTotalRequests: 500 },
+      allowPrivateNetworkForTesting: true,
+    });
+    const session = new BrowserSession(guard, new EvidenceStore('measure-no-fetch'));
+    await session.open();
+    try {
+      await session.goto(page.url, 'networkidle');
+      const before = guard.requestsMade;
+      await measureDesign(session);
+      expect(guard.requestsMade, 'measuring asked the network for nothing').toBe(before);
+    } finally {
+      await session.close();
+    }
+  }, 120_000);
+
   it('surveys the phone viewport as well as the desktop one', () => {
-    expect(stage).toMatch(/measureDesign\(session, url\)[\s\S]*measureDesign\(session, url\)/);
+    expect(stage).toMatch(/measureDesign\(session\)[\s\S]*measureDesign\(session\)/);
     expect(stage).toContain('at phone width, 390 pixels across');
   });
 

@@ -235,7 +235,7 @@ export const deterministicChecksStage: Stage = {
        */
       const designTitles = new Set<string>();
       try {
-        const design = await measureDesign(session, url);
+        const design = await measureDesign(session);
         const found = designFindings(design, [desktopShot]);
         for (const finding of found) designTitles.add(finding.title);
         findings.push(...found);
@@ -267,7 +267,7 @@ export const deterministicChecksStage: Stage = {
        * somebody to stop reading it.
        */
       try {
-        const mobileDesign = await measureDesign(session, url);
+        const mobileDesign = await measureDesign(session);
         const newAtThisWidth = designFindings(mobileDesign, [mobileShot], {
           at: 'at phone width, 390 pixels across',
         }).filter((finding) => !designTitles.has(finding.title));

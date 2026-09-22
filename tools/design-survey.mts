@@ -168,7 +168,8 @@ async function main(): Promise<void> {
         });
         await session.open();
         try {
-          const measurements = await measureDesign(session, `${origin}${page}`);
+          await session.goto(`${origin}${page}`, 'networkidle');
+          const measurements = await measureDesign(session);
           const findings = designFindings(measurements, ['survey']);
           surveyed += 1;
           if (findings.length === 0) {

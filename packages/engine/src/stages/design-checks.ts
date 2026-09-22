@@ -434,11 +434,24 @@ export function readRhythm(gaps: readonly number[]): { distinct: number[]; misse
   };
 }
 
-export async function measureDesign(
-  session: BrowserSession,
-  url: string,
-): Promise<DesignMeasurements> {
-  await session.goto(url, 'networkidle');
+/**
+ * Reads the page as it currently stands. It does not navigate.
+ *
+ * It used to, and both callers had already loaded the page — so every
+ * assessment made two extra full navigations, pulling the document and every
+ * subresource again, against an intensity ceiling the customer set.
+ *
+ * The worse half is what it did to the evidence. The desktop screenshot is
+ * taken before this runs and attached to the findings this produces, so a
+ * re-navigation meant the picture was of one page load and the measurement of
+ * the next. On a static page those are the same; on a page with a rotating
+ * hero, an experiment or anything that varies at load, they are not — and this
+ * company's whole claim is that the picture shows what was found.
+ *
+ * `measureTrust` beside it has always had this shape. This is the one that was
+ * out of step.
+ */
+export async function measureDesign(session: BrowserSession): Promise<DesignMeasurements> {
   const survey = (await session.page.evaluate(SURVEY)) as {
     families: string[];
     sizes: number[];
