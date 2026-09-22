@@ -6,6 +6,7 @@
  * time. Between those two moments the customer can withdraw it, and if they do,
  * the run's output is discarded rather than stored.
  */
+import { UnretryableError } from './errors.ts';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
@@ -40,7 +41,7 @@ export interface RunDependencies {
   readonly log?: (message: string, detail?: Record<string, unknown>) => void;
 }
 
-export class NotAuthorisedError extends Error {}
+export class NotAuthorisedError extends UnretryableError {}
 
 export async function runAssessmentJob(
   job: AssessmentJob,

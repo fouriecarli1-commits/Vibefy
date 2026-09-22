@@ -11,13 +11,14 @@
  */
 import { Pool, type PoolClient } from 'pg';
 import { resendFromEnvironment } from '@vibefycode/notify';
-import { NotAuthorisedError, runAssessmentJob } from './run-assessment.ts';
+import { runAssessmentJob } from './run-assessment.ts';
 import {
   claimNextRequest,
   completeRequest,
   failRequest,
   isRetryableFailure,
   reclaimStaleRequests,
+  RUN_TIMEOUT_MINUTES,
 } from './queue.ts';
 import { resolveReportStorage, sweepPendingReports } from './report.ts';
 import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
@@ -137,9 +138,12 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
   logger('request claimed', { requestId: claimed.id, appId: claimed.appId, depth: claimed.depth });
 
   try {
-    const result = await runAssessmentJob(
-      { appId: claimed.appId, depth: claimed.depth, requestedBy: claimed.requestedBy },
-      { pool, log: logger },
+    const result = await withRunTimeout(
+      runAssessmentJob(
+        { appId: claimed.appId, depth: claimed.depth, requestedBy: claimed.requestedBy },
+        { pool, log: logger },
+      ),
+      claimed.id,
     );
     const client = await pool.connect();
     try {
@@ -155,7 +159,7 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
     // Nor does a constraint violation resolve itself: the assessment has already
     // been paid for by the time persistence fails, so requeueing a deterministic
     // database error buys the same error at full price.
-    const retryable = !(error instanceof NotAuthorisedError) && isRetryableFailure(error);
+    const retryable = isRetryableFailure(error);
     const client = await pool.connect();
     try {
       const outcome = await failRequest(client, claimed.id, message, { retryable });
@@ -166,6 +170,59 @@ export async function processNextRequest(pool: Pool, logger: typeof log = log): 
   }
 
   return true;
+}
+
+/**
+ * Stops waiting for a run that has taken longer than any run should.
+ *
+ * Nothing else bounded this. The scope guard's wall-clock ceiling is checked
+ * when a request passes through it, so a model call or a page load that hangs
+ * never reaches it — and the reclaim sweep requeues a claim after ninety
+ * minutes whether or not its worker is still alive. A run that hung for ninety
+ * minutes was therefore performed twice and charged twice.
+ *
+ * The promise is not cancellable, so this does not stop the run; it stops
+ * waiting for it, and the caller marks the request failed. `runIsOrphaned` then
+ * tells the loop to shut down, because a run still in flight could still write
+ * an assessment for a request that has been given back to the queue, and the
+ * only reliable way to be sure it does not is for this process to end.
+ */
+let orphanedRun: string | null = null;
+
+export function runIsOrphaned(): string | null {
+  return orphanedRun;
+}
+
+/** Test seam: forgets an orphaned run so a later case starts clean. */
+export function clearOrphanedRun(): void {
+  orphanedRun = null;
+}
+
+class RunTimedOutError extends Error {
+  constructor(requestId: string, minutes: number) {
+    super(
+      `The run for request ${requestId} was still going after ${minutes} minutes and the worker stopped waiting for it. Nothing it may still write will be accepted.`,
+    );
+    this.name = 'RunTimedOutError';
+  }
+}
+
+async function withRunTimeout<T>(work: Promise<T>, requestId: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expiry = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new RunTimedOutError(requestId, RUN_TIMEOUT_MINUTES)),
+      RUN_TIMEOUT_MINUTES * 60_000,
+    );
+  });
+  try {
+    return await Promise.race([work, expiry]);
+  } catch (error) {
+    if (error instanceof RunTimedOutError) orphanedRun = requestId;
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }> {
@@ -192,6 +249,15 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
         // One at a time per worker. Assessments are heavy, and a worker that runs
         // eight at once is a worker that hits the daily spend cap by lunchtime.
         const did = await processNextRequest(pool, log);
+        if (runIsOrphaned()) {
+          // A run we stopped waiting for is still in flight and could still
+          // write. Ending the process is the only way to be sure it does not.
+          log('worker stopping: a run outlasted its timeout and cannot be cancelled', {
+            requestId: runIsOrphaned(),
+          });
+          running = false;
+          break;
+        }
         if (!did) await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       } catch (error) {
         log('worker loop error', { error: String(error) });

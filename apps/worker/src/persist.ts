@@ -15,6 +15,7 @@
  *     that requires a human, and the database refuses the transition without one.
  */
 import type { PoolClient } from 'pg';
+import { UnretryableError } from './errors.ts';
 import { STOP_LABEL, type AssessmentOutcome, type StageResult } from '@vibefycode/engine';
 
 export interface PersistInput {
@@ -42,7 +43,7 @@ export interface PersistInput {
  * The whole transaction goes rather than the one link, for the reason stated at
  * the top of this file: a half-written assessment is worse than no assessment.
  */
-export class DanglingEvidenceError extends Error {
+export class DanglingEvidenceError extends UnretryableError {
   constructor(findingTitle: string, evidenceId: string) {
     super(
       `The finding "${findingTitle}" cites evidence ${evidenceId}, which this run did not store. ` +
@@ -52,7 +53,7 @@ export class DanglingEvidenceError extends Error {
   }
 }
 
-export class AuthorisationWithdrawnError extends Error {
+export class AuthorisationWithdrawnError extends UnretryableError {
   constructor(appId: string) {
     super(
       `Authorisation for app ${appId} is no longer verified. The run's output is discarded rather than stored: we do not keep the results of testing we are no longer authorised to have done.`,

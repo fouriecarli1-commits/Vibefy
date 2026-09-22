@@ -7,6 +7,7 @@
  * table the customer can see rather than a library's private schema.
  */
 import type { PoolClient } from 'pg';
+import { UnretryableError } from './errors.ts';
 
 export interface ClaimedRequest {
   readonly id: string;
@@ -73,13 +74,35 @@ export async function completeRequest(
   requestId: string,
   assessmentId: string,
 ): Promise<void> {
-  await client.query(
+  const { rowCount } = await client.query(
     `update public.assessment_requests
         set status = 'completed', assessment_id = $2, completed_at = now()
       where id = $1`,
     [requestId, assessmentId],
   );
+  // An update that matched nothing is not a request that completed. Left
+  // silent, the row stays `claimed` until the reclaim sweep finds it ninety
+  // minutes later and runs the whole assessment again — and the console shows
+  // the customer "in progress" for an assessment that finished.
+  if (rowCount === 0) {
+    throw new Error(
+      `Assessment ${assessmentId} finished, and request ${requestId} was not there to mark completed.`,
+    );
+  }
 }
+
+/**
+ * How long a run may take before the worker stops waiting for it.
+ *
+ * Shorter than `RECLAIM_AFTER_MINUTES` on purpose, and that gap is the whole
+ * argument. Nothing else bounds a run's wall-clock time: the scope guard's
+ * thirty-minute ceiling is only checked when a request passes through it, so a
+ * model call or a page load that hangs never reaches it. A run still alive at
+ * ninety minutes is requeued by the reclaim sweep while it is still running,
+ * and the same assessment is then performed twice and charged twice — which is
+ * the hazard the reclaim comment names and nothing enforced.
+ */
+export const RUN_TIMEOUT_MINUTES = 60;
 
 /**
  * Postgres error classes a retry cannot fix.
@@ -103,6 +126,8 @@ const UNRETRYABLE_SQLSTATE_CLASSES = ['22', '23', '42'];
 
 /** Whether another attempt could plausibly end differently. */
 export function isRetryableFailure(error: unknown): boolean {
+  // Ours, and said structurally rather than listed at the call site.
+  if (error instanceof UnretryableError) return false;
   const code = (error as { code?: unknown } | null)?.code;
   if (typeof code !== 'string') return true;
   return !UNRETRYABLE_SQLSTATE_CLASSES.includes(code.slice(0, 2));
@@ -149,6 +174,9 @@ export async function failRequest(
  * take, and the margin is the whole safety argument: a claim is not held by a
  * lock once the claiming transaction commits, so reclaiming one whose worker is
  * still alive would run the same assessment twice and charge for both.
+ *
+ * The margin is now enforced rather than assumed: the worker stops waiting for
+ * a run at `RUN_TIMEOUT_MINUTES`, half an hour before this.
  */
 export const RECLAIM_AFTER_MINUTES = 90;
 
