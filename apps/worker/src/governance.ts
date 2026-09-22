@@ -9,6 +9,7 @@
  * pure function in `@vibefycode/governance`, this file is the part that talks to
  * Postgres, and every sweep is idempotent.
  */
+import type { ArtefactStorage } from './report.ts';
 import {
   deletionRecordFor,
   dueForDeletion,
@@ -158,6 +159,15 @@ export async function sweepRetention(
   log: Logger = noop,
   now: Date = new Date(),
   limit = 500,
+  /**
+   * Where the bytes are, so that deleting a row deletes the artefact too.
+   *
+   * Optional only so that a test which cares about the rows can leave it out.
+   * The worker passes one: without it this sweep wrote a deletion record and
+   * removed a row while the file it accounted for stayed on disk for ever,
+   * which is a retention policy that deletes the paperwork.
+   */
+  storage?: Pick<ArtefactStorage, 'remove'>,
 ): Promise<RetentionSweepResult> {
   const client = await pool.connect();
   const result = { evidenceDeleted: 0, alertsDeleted: 0 };
@@ -167,14 +177,16 @@ export async function sweepRetention(
       organisation_id: string;
       sha256: string;
       retention_until: string;
+      storage_path: string;
     }>(
-      `select id, organisation_id, sha256, retention_until
+      `select id, organisation_id, sha256, retention_until, storage_path
          from public.evidence
         where retention_until < $1
         order by retention_until
         limit $2`,
       [now.toISOString(), limit],
     );
+    const pathById = new Map(rows.map((row) => [row.id, row.storage_path] as const));
 
     const records: RetainedRecord[] = rows.map((row) => ({
       id: row.id,
@@ -205,6 +217,21 @@ export async function sweepRetention(
         );
         await client.query('delete from public.evidence where id = $1', [record.id]);
         await client.query('commit');
+        // The bytes, after the row and after the commit. A file left behind by
+        // a crash here is found again by the next sweep — the row is gone, so
+        // nothing points at it, and `remove` is safe to call on a path that is
+        // already gone. Deleting the file first and failing to delete the row
+        // would leave a row pointing at nothing, which is the state this whole
+        // change exists to end.
+        const path = pathById.get(record.id);
+        if (path && storage) {
+          await storage.remove(path).catch((error: unknown) => {
+            log('evidence file not removed', {
+              entityId: record.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+        }
         result.evidenceDeleted += 1;
       } catch (error) {
         await client.query('rollback');

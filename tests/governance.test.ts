@@ -39,6 +39,7 @@ import {
   resetSpendPauseNotice,
 } from '../apps/worker/src/index.ts';
 import { actingAs, connect, expectRefusal } from './setup/client.ts';
+import { memoryStorage } from './setup/artefacts.ts';
 import {
   makeReviewer,
   seedAccount,
@@ -351,6 +352,31 @@ describe('retention', () => {
     );
     expect(deletion.rows[0]!.data_class).toBe('evidence');
     expect(deletion.rows[0]!.sha256).toBe(sha256('old-evidence'));
+  });
+
+  it('deletes the artefact as well as the row that accounted for it', async () => {
+    // The sweep wrote a deletion record, removed a row, and left the file on
+    // disk for ever — a retention policy that deletes the paperwork. It could
+    // not have done otherwise: nothing had written the file in the first place.
+    const seeded = await seedAssessment(db, owner);
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.evidence (assessment_id, organisation_id, kind, storage_path, sha256, retention_until)
+       values ($1, $2, 'screenshot', 'evidence/expired.png', $3, now() - interval '1 day')
+       returning id`,
+      [seeded.assessmentId, owner.organisationId, sha256('expired-evidence')],
+    );
+    const storage = memoryStorage();
+    await storage.put('evidence/expired.png', Buffer.from('a screenshot'));
+    await storage.put('evidence/current.png', Buffer.from('another screenshot'));
+
+    await sweepRetention(pool, () => undefined, new Date(), 500, storage);
+
+    expect(await storage.get('evidence/expired.png')).toBeNull();
+    // And only that one: a sweep that took everything with it would be worse
+    // than one that took nothing.
+    expect(await storage.get('evidence/current.png')).not.toBeNull();
+    const remaining = await db.query('select id from public.evidence where id = $1', [rows[0]!.id]);
+    expect(remaining.rowCount).toBe(0);
   });
 
   it('leaves evidence that is still within its retention period', async () => {

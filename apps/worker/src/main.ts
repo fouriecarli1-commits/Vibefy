@@ -20,7 +20,7 @@ import {
   reclaimStaleRequests,
   RUN_TIMEOUT_MINUTES,
 } from './queue.ts';
-import { resolveReportStorage, sweepPendingReports } from './report.ts';
+import { resolveArtefactStorage, sweepPendingReports } from './report.ts';
 import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
 import {
   sweepBadgeExpiryWarnings,
@@ -227,7 +227,7 @@ async function withRunTimeout<T>(work: Promise<T>, requestId: string): Promise<T
 
 export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }> {
   const pool = new Pool({ connectionString: requireEnv('SUPABASE_DB_URL'), max: 4 });
-  const storage = resolveReportStorage();
+  const storage = resolveArtefactStorage();
   const emailProvider = resendFromEnvironment();
   if (!emailProvider) {
     log('email not configured — alerts will reach the console and phones only', {
@@ -338,7 +338,7 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
     // Governance: the ceiling, the retention deadline and the response deadline.
     // All three were recorded in the schema from M1 and acted on by nothing.
     once('spend', () => sweepSpendCap(pool, log));
-    once('retention', () => sweepRetention(pool, log));
+    once('retention', () => sweepRetention(pool, log, new Date(), 500, storage));
     once('governance deadline', () => sweepGovernanceDeadlines(pool, log));
     // Intake screening. Takes the benign submissions out of the reviewer queue;
     // never puts anybody out of business — a clearance is all it can record.

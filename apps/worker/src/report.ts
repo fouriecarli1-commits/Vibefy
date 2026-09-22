@@ -11,7 +11,7 @@
  * customer was actually told.
  */
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
 import { resolveBrowserExecutable } from '@vibefycode/engine';
@@ -26,13 +26,26 @@ export interface StoredReport {
   readonly byteSize: number;
 }
 
-/** Where rendered reports go. Local disk now; object storage when it exists. */
-export interface ReportStorage {
+/**
+ * Where a rendered artefact goes. Local disk now; object storage when it exists.
+ *
+ * Not only reports. Evidence rows carry a `storage_path`, a `sha256` and a
+ * `byte_size` and nothing ever wrote a byte to any of those paths, so every
+ * screenshot, HTTP exchange and accessibility scan a finding cites was a row
+ * claiming we hold proof we did not hold — and the reviewer whose job is to
+ * look at it had nothing to open.
+ */
+export interface ArtefactStorage {
   put(path: string, body: Buffer, contentType: string): Promise<StoredReport>;
   get(path: string): Promise<Buffer | null>;
+  /** Used by the retention sweep, which used to delete a row and leave the file. */
+  remove(path: string): Promise<void>;
 }
 
-export class LocalReportStorage implements ReportStorage {
+/** @deprecated The same thing under its older, narrower name. */
+export type ReportStorage = ArtefactStorage;
+
+export class LocalReportStorage implements ArtefactStorage {
   constructor(private readonly root: string) {}
 
   async put(path: string, body: Buffer, _contentType: string): Promise<StoredReport> {
@@ -47,14 +60,24 @@ export class LocalReportStorage implements ReportStorage {
   }
 
   async get(path: string): Promise<Buffer | null> {
-    // Paths come from our own `reports` rows, but a traversal here would read
-    // anything on the disk, so it is refused rather than trusted.
-    if (path.includes('..')) throw new Error('Refusing a report path containing "..".');
+    // Paths come from our own rows, but a traversal here would read anything on
+    // the disk, so it is refused rather than trusted.
+    this.refuseTraversal(path);
     try {
       return await readFile(join(this.root, path));
     } catch {
       return null;
     }
+  }
+
+  async remove(path: string): Promise<void> {
+    // And a traversal here would delete anything on the disk, which is worse.
+    this.refuseTraversal(path);
+    await rm(join(this.root, path), { force: true });
+  }
+
+  private refuseTraversal(path: string): void {
+    if (path.includes('..')) throw new Error('Refusing an artefact path containing "..".');
   }
 }
 
@@ -63,9 +86,12 @@ export class LocalReportStorage implements ReportStorage {
  * bucket once the project exists, which is a deployment decision rather than a
  * code one — see docs/OPEN_ITEMS.md.
  */
-export function resolveReportStorage(): ReportStorage {
+export function resolveArtefactStorage(): ArtefactStorage {
   return new LocalReportStorage(process.env.VIBEFYCODE_REPORT_DIR ?? '.tmp/reports');
 }
+
+/** @deprecated The same thing under its older, narrower name. */
+export const resolveReportStorage = resolveArtefactStorage;
 
 /** Prints the rendered HTML to PDF. Self-contained input, so no network is needed. */
 export async function renderPdf(html: string): Promise<Buffer> {

@@ -40,6 +40,7 @@ import {
 } from '../packages/engine/src/index.ts';
 import { STOP_EXPLANATION, STOP_HEADLINE, STOP_LABEL, STOP_REASONS } from '@vibefycode/shared';
 import { persistOutcome } from '../apps/worker/src/index.ts';
+import { bodiesFor, memoryStorage } from './setup/artefacts.ts';
 import { connect } from './setup/client.ts';
 import {
   seedAccount,
@@ -296,6 +297,8 @@ describe('what the database is told', () => {
     try {
       return await persistOutcome(client, {
         outcome,
+        evidenceBodies: bodiesFor(outcome),
+        storage: memoryStorage(),
         appId,
         organisationId: owner.organisationId,
         authorisationId,

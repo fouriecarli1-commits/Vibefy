@@ -64,6 +64,7 @@ import {
   verifyBadge,
 } from '../packages/badge/src/index.ts';
 import { NON_RELIANCE_LEGEND } from '../packages/shared/src/index.ts';
+import { bodiesFor, memoryStorage } from './setup/artefacts.ts';
 import { committingAs, connect } from './setup/client.ts';
 import { makeReviewer, seedAccount, seedRubric, sha256, type SeededAccount } from './setup/seed.ts';
 import { startVulnerableApp, type FixtureApp } from './fixtures/vulnerable-app.ts';
@@ -429,6 +430,8 @@ describe('act 3: the re-assessment that passes', () => {
     journey.secondAssessmentId = await withClient((client) =>
       persistOutcome(client, {
         outcome,
+        evidenceBodies: bodiesFor(outcome),
+        storage: memoryStorage(),
         appId: journey.appId!,
         organisationId: owner.organisationId,
         authorisationId: journey.authorisationId!,
@@ -514,6 +517,8 @@ describe('act 4: drift, and taking the badge back', () => {
     journey.thirdAssessmentId = await withClient((client) =>
       persistOutcome(client, {
         outcome,
+        evidenceBodies: bodiesFor(outcome),
+        storage: memoryStorage(),
         appId: journey.appId!,
         organisationId: owner.organisationId,
         authorisationId: journey.authorisationId!,
@@ -665,6 +670,8 @@ async function runRealPipeline(): Promise<{ assessmentId: string }> {
   const persisted = await withClient((client) =>
     persistOutcome(client, {
       outcome,
+      evidenceBodies: bodiesFor(outcome),
+      storage: memoryStorage(),
       appId: journey.appId!,
       organisationId: owner.organisationId,
       authorisationId: journey.authorisationId!,

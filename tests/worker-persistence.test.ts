@@ -28,6 +28,7 @@ import {
   persistOutcome,
   runAssessmentJob,
 } from '../apps/worker/src/index.ts';
+import { bodiesFor, memoryStorage } from './setup/artefacts.ts';
 import { connect } from './setup/client.ts';
 import {
   makeReviewer,
@@ -188,6 +189,74 @@ describe('the hard gate at dispatch', () => {
     ).rejects.toThrow(/hard gate/);
   });
 
+  it('stores the bytes behind every evidence row it writes', async () => {
+    // The `evidence` row has carried a storage_path, a sha256 and a byte_size
+    // since the first migration, and nothing ever wrote a byte to one. Every
+    // screenshot, HTTP exchange and accessibility scan a finding cites was a
+    // row claiming we hold proof we did not hold — and the reviewer whose whole
+    // job is to look at it had nothing to open.
+    const appId = await seedApp(db, owner, 'Evidence App');
+    await seedAuthorisation(db, owner, appId);
+    const storage = memoryStorage();
+    const client = await pool.connect();
+    try {
+      const assessment = { ...outcome, assessmentId: crypto.randomUUID() };
+      const id = await persistOutcome(client, {
+        outcome: assessment,
+        evidenceBodies: bodiesFor(assessment),
+        storage,
+        appId,
+        organisationId: owner.organisationId,
+        authorisationId: (
+          await db.query<{ id: string }>('select id from public.current_authorisation($1)', [appId])
+        ).rows[0]!.id,
+        depth: 'full',
+        requestedBy: owner.userId,
+        engineVersion: '1.0.0',
+      });
+
+      const rows = await db.query<{ storage_path: string }>(
+        'select storage_path from public.evidence where assessment_id = $1',
+        [id],
+      );
+      expect(rows.rows.length).toBeGreaterThan(0);
+      for (const row of rows.rows) {
+        expect(await storage.get(row.storage_path), row.storage_path).not.toBeNull();
+      }
+    } finally {
+      client.release();
+    }
+  }, 60_000);
+
+  it('leaves nothing behind when the transaction it wrote them for rolls back', async () => {
+    // A file written for a transaction that then fails is an orphan under an
+    // assessment id that will never exist. Harmless, but it is ours to tidy.
+    const appId = await seedApp(db, owner, 'Rollback App');
+    await seedAuthorisation(db, owner, appId);
+    const storage = memoryStorage();
+    const client = await pool.connect();
+    try {
+      const assessment = { ...outcome, assessmentId: crypto.randomUUID() };
+      await expect(
+        persistOutcome(client, {
+          outcome: assessment,
+          evidenceBodies: bodiesFor(assessment),
+          storage,
+          appId,
+          organisationId: owner.organisationId,
+          // Not this app's authorisation: the insert fails on the foreign key.
+          authorisationId: crypto.randomUUID(),
+          depth: 'full',
+          requestedBy: owner.userId,
+          engineVersion: '1.0.0',
+        }),
+      ).rejects.toThrow();
+      expect(storage.files.size).toBe(0);
+    } finally {
+      client.release();
+    }
+  }, 60_000);
+
   it('reads the repository the app declared, which no assessment used to do', async () => {
     // `repositoryPath` was the literal `null` in the worker, so the static
     // stage — the cheapest and least arguable in this engine — had never run
@@ -302,6 +371,8 @@ describe('what lands in the database', () => {
       // happens outside a test.
       assessmentId = await persistOutcome(client, {
         outcome: { ...outcome, assessmentId: crypto.randomUUID() },
+        evidenceBodies: bodiesFor(outcome),
+        storage: memoryStorage(),
         appId,
         organisationId: owner.organisationId,
         authorisationId,
@@ -408,6 +479,10 @@ describe('a finding whose evidence was never stored', () => {
       await expect(
         persistOutcome(client, {
           outcome: { ...outcome, findings },
+
+          evidenceBodies: bodiesFor(outcome),
+
+          storage: memoryStorage(),
           appId,
           organisationId: owner.organisationId,
           authorisationId,
@@ -449,6 +524,10 @@ describe('a finding whose evidence was never stored', () => {
       await expect(
         persistOutcome(client, {
           outcome: { ...outcome, stageResults },
+
+          evidenceBodies: bodiesFor(outcome),
+
+          storage: memoryStorage(),
           appId,
           organisationId: owner.organisationId,
           authorisationId,
@@ -488,6 +567,8 @@ describe('withdrawal during a run', () => {
       await expect(
         persistOutcome(client, {
           outcome,
+          evidenceBodies: bodiesFor(outcome),
+          storage: memoryStorage(),
           appId,
           organisationId: owner.organisationId,
           authorisationId: granted,

@@ -26,6 +26,7 @@ import {
   type StageContext,
 } from '@vibefycode/engine';
 import { persistOutcome, recordUnattributedCost } from './persist.ts';
+import { resolveArtefactStorage, type ArtefactStorage } from './report.ts';
 
 export const ENGINE_VERSION = '1.0.0';
 
@@ -47,6 +48,8 @@ export interface RunDependencies {
    * inside the validator where a misconfiguration could open it in production.
    */
   readonly fetchRepository?: typeof fetchRepository;
+  /** Where evidence bodies go. Defaults to the same place reports do. */
+  readonly storage?: Pick<ArtefactStorage, 'put' | 'remove'>;
   readonly log?: (message: string, detail?: Record<string, unknown>) => void;
 }
 
@@ -194,6 +197,12 @@ export async function runAssessmentJob(
   try {
     const persistedId = await persistOutcome(client, {
       outcome,
+      // The bodies the run actually captured. `outcome.evidence` is the rows
+      // with the bytes stripped out, which is why they have to travel beside it.
+      evidenceBodies: new Map(
+        evidence.all.map((artefact) => [artefact.id, artefact.body] as const),
+      ),
+      storage: dependencies.storage ?? resolveArtefactStorage(),
       appId: appRow.id,
       organisationId: appRow.organisation_id,
       authorisationId: record.id,

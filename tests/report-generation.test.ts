@@ -28,6 +28,7 @@ import {
   assembleReportSource,
   generateReport,
 } from '../apps/worker/src/report.ts';
+import { bodiesFor, memoryStorage } from './setup/artefacts.ts';
 import { connect } from './setup/client.ts';
 import {
   makeReviewer,
@@ -175,6 +176,8 @@ beforeAll(async () => {
   try {
     assessmentId = await persistOutcome(client, {
       outcome,
+      evidenceBodies: bodiesFor(outcome),
+      storage: memoryStorage(),
       appId,
       organisationId: owner.organisationId,
       authorisationId,

@@ -16,10 +16,24 @@
  */
 import type { PoolClient } from 'pg';
 import { UnretryableError } from './errors.ts';
+import type { ArtefactStorage } from './report.ts';
 import { STOP_LABEL, type AssessmentOutcome, type StageResult } from '@vibefycode/engine';
 
 export interface PersistInput {
   readonly outcome: AssessmentOutcome;
+  /**
+   * The bytes behind each evidence artefact, keyed by the id the engine gave it.
+   *
+   * Required rather than optional, so that the compiler asks every caller. The
+   * `evidence` row has carried a `storage_path`, a `sha256` and a `byte_size`
+   * since the first migration and nothing ever wrote a byte to any of those
+   * paths: every screenshot, HTTP exchange and accessibility scan a finding
+   * cites was a row claiming we hold proof we did not hold. The reviewer whose
+   * whole job is to look at it had nothing to open, and the retention sweep
+   * recorded destroying artefacts that had never existed.
+   */
+  readonly evidenceBodies: ReadonlyMap<string, Buffer>;
+  readonly storage: Pick<ArtefactStorage, 'put' | 'remove'>;
   readonly appId: string;
   readonly organisationId: string;
   readonly authorisationId: string;
@@ -50,6 +64,23 @@ export class DanglingEvidenceError extends UnretryableError {
         `Nothing is written: a published finding whose evidence we do not hold is a claim we cannot back.`,
     );
     this.name = 'DanglingEvidenceError';
+  }
+}
+
+/**
+ * An artefact reached persistence without its bytes.
+ *
+ * Unreachable when the caller passes the store the run actually used, and it
+ * throws rather than shrugs for the same reason `DanglingEvidenceError` does:
+ * the alternative is a row that says we hold proof of something, pointing at a
+ * path nobody wrote.
+ */
+export class MissingEvidenceBodyError extends UnretryableError {
+  constructor(evidenceId: string, kind: string) {
+    super(
+      `Evidence ${evidenceId} (${kind}) reached persistence with no body to store. Nothing is written: a row that says we hold proof, pointing at a path nobody wrote, is worse than no row.`,
+    );
+    this.name = 'MissingEvidenceBodyError';
   }
 }
 
@@ -113,6 +144,23 @@ export async function recordUnattributedCost(
 
 export async function persistOutcome(client: PoolClient, input: PersistInput): Promise<string> {
   const { outcome } = input;
+
+  /*
+   * The bytes first, then the rows that point at them.
+   *
+   * This order is the one that fails safely. A file written for a transaction
+   * that then rolls back is an orphan under an assessment id that will never
+   * exist — wasteful, cleanable, and harmless. A row written for a file that
+   * was never stored is the thing we are fixing: a finding citing proof that
+   * is not there.
+   */
+  const stored: string[] = [];
+  for (const artefact of outcome.evidence) {
+    const body = input.evidenceBodies.get(artefact.id);
+    if (!body) throw new MissingEvidenceBodyError(artefact.id, artefact.kind);
+    await input.storage.put(artefact.storagePath, body, artefact.contentType);
+    stored.push(artefact.storagePath);
+  }
 
   await client.query('begin');
   try {
@@ -297,6 +345,9 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
     return assessmentId;
   } catch (error) {
     await client.query('rollback');
+    // Best effort, and deliberately quiet: another error is on its way up and
+    // must not be replaced by a failure to tidy up after it.
+    for (const path of stored) await input.storage.remove(path).catch(() => undefined);
     throw error;
   }
 }
