@@ -10,6 +10,9 @@
  * DELETE is stopped here, whatever the model or the page's script intended.
  */
 import { existsSync, readdirSync } from 'node:fs';
+import { readFile, rm } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Request } from 'playwright';
 import type { ScopeGuard } from './scope.ts';
@@ -77,6 +80,7 @@ export class BrowserSession {
    * say what it did.
    */
   private ceilingReached: Error | null = null;
+  private tracing = false;
 
   constructor(
     private readonly guard: ScopeGuard,
@@ -111,6 +115,30 @@ export class BrowserSession {
         'Mozilla/5.0 (compatible; VibefyCodeAssessment/1.0; +https://vibefycode.example/methodology)',
       ignoreHTTPSErrors: false,
     });
+
+    /*
+     * A record of every action taken in this browser.
+     *
+     * The published rubric names `playwright_trace` as the evidence for ten of
+     * its criteria — whether a flow completes, whether state survives a reload,
+     * whether a deletion route can be followed — and nothing in this engine had
+     * ever produced one. Those criteria could be found against and could not be
+     * evidenced as the rubric says they must be.
+     *
+     * Without screenshots or DOM snapshots: those are what make a trace weigh
+     * megabytes, and the thing being evidenced here is the sequence of actions
+     * and what each one did. Screenshots are captured deliberately, as their
+     * own artefacts, with captions saying why they were taken.
+     */
+    try {
+      await this.context.tracing.start({ screenshots: false, snapshots: false });
+      this.tracing = true;
+    } catch {
+      // An older Playwright, or a context that will not trace. The pass still
+      // runs; `traceId` stays null and the stage says so rather than citing an
+      // artefact that does not exist.
+      this.tracing = false;
+    }
 
     await this.context.route('**/*', async (route, request) => {
       let decision;
@@ -153,7 +181,37 @@ export class BrowserSession {
     });
   }
 
+  /**
+   * Stops tracing and captures the trace as evidence.
+   *
+   * Separate from `close` and called before it, because the trace is only
+   * written when tracing stops and the context is still needed to stop it. The
+   * id comes back to the stage, which attaches it to the findings this session
+   * produced — they were all observed in the actions it records.
+   */
+  async captureTrace(summary: string): Promise<string | null> {
+    if (!this.tracing || !this.context) return null;
+    this.tracing = false;
+    const path = join(tmpdir(), `vibefycode-trace-${randomUUID()}.zip`);
+    try {
+      await this.context.tracing.stop({ path });
+      const body = await readFile(path);
+      return this.evidence.capture({
+        kind: 'playwright_trace',
+        summary,
+        contentType: 'application/zip',
+        body,
+      }).id;
+    } catch {
+      return null;
+    } finally {
+      await rm(path, { force: true }).catch(() => undefined);
+    }
+  }
+
   async close(): Promise<void> {
+    if (this.tracing) await this.context?.tracing.stop().catch(() => undefined);
+    this.tracing = false;
     await this.context?.close().catch(() => undefined);
     await this.browser?.close().catch(() => undefined);
     this.context = null;

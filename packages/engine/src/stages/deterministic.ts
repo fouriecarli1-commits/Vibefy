@@ -102,10 +102,26 @@ export const deterministicChecksStage: Stage = {
       };
     }
 
-    findings.push(...transportChecks(url, root));
-    findings.push(...headerChecks(root));
+    /*
+     * The headers, as a record of their own.
+     *
+     * SEC-01, SEC-02 and SEC-11 are findings about headers, and the published
+     * rubric says each is evidenced by a `header_scan`. Nothing in this engine
+     * had ever produced one: they cited the initial page load's http_exchange,
+     * which is a different kind of artefact from the one the criterion names.
+     * The rubric is published; the engine should meet it rather than the other
+     * way round.
+     */
+    const headerScan = context.evidence.capture({
+      kind: 'header_scan',
+      summary: `Response headers from ${url}`,
+      body: { url: root.url, status: root.status, headers: root.headers },
+    }).id;
+
+    findings.push(...transportChecks(url, root, headerScan));
+    findings.push(...headerChecks(root, headerScan));
     findings.push(...cookieChecks(root));
-    findings.push(...corsChecks(root));
+    findings.push(...corsChecks(root, headerScan));
     findings.push(...bodyChecks(root));
 
     for (const candidate of EXPOSED_PATHS) {
@@ -164,11 +180,30 @@ export const deterministicChecksStage: Stage = {
     // found there. Nothing had been looked for.
     let browserPassCompleted = false;
     let browserPassError: string | null = null;
+    // Where this pass's findings start, so the trace can be attached to exactly
+    // the ones it records and to nothing the HTTP half found before it.
+    const browserPassFirstFinding = findings.length;
     const session = new BrowserSession(context.guard, context.evidence);
     try {
       await session.open();
       await session.goto(url, 'networkidle');
       const desktopShot = await session.screenshot('Landing page, desktop viewport');
+
+      /*
+       * The picture of the page the HTTP half made claims about.
+       *
+       * "No link to a privacy policy on the landing page" is a statement about
+       * what a visitor sees, and the rubric says PRI-01 is evidenced by a
+       * screenshot. It was evidenced by the raw exchange, because the body
+       * checks run before a browser exists — so the finding cited a different
+       * kind of artefact from the one the published criterion names. The claim
+       * and the picture are of the same page load.
+       */
+      for (let index = 0; index < browserPassFirstFinding; index += 1) {
+        const finding = findings[index]!;
+        if (finding.ruleId !== 'PRI-01') continue;
+        findings[index] = { ...finding, evidenceIds: [...finding.evidenceIds, desktopShot] };
+      }
 
       const axe = await new AxeBuilder({ page: session.page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -384,6 +419,21 @@ export const deterministicChecksStage: Stage = {
         });
       }
     } finally {
+      // Before close, because the trace is only written when tracing stops and
+      // that needs the context still open.
+      const traceId = await session.captureTrace(
+        'Every action taken in the browser during the deterministic pass',
+      );
+      if (traceId === null) {
+        notes.push(
+          'No trace of the browser pass was recorded, so findings from it cite the screenshots and scans taken during it and not the sequence of actions.',
+        );
+      } else {
+        for (let index = browserPassFirstFinding; index < findings.length; index += 1) {
+          const finding = findings[index]!;
+          findings[index] = { ...finding, evidenceIds: [...finding.evidenceIds, traceId] };
+        }
+      }
       await session.close();
     }
 
@@ -503,7 +553,11 @@ export const deterministicChecksStage: Stage = {
 // Individual checks
 // ---------------------------------------------------------------------------
 
-function transportChecks(requestedUrl: string, response: ScopedResponse): RawFinding[] {
+function transportChecks(
+  requestedUrl: string,
+  response: ScopedResponse,
+  headerScan: string,
+): RawFinding[] {
   const findings: RawFinding[] = [];
   const isHttps = new URL(response.url).protocol === 'https:';
 
@@ -517,7 +571,7 @@ function transportChecks(requestedUrl: string, response: ScopedResponse): RawFin
       description: `${requestedUrl} resolved to ${response.url}, which is not encrypted. Everything a user sends — including their password — travels in the clear and can be read or altered by anyone on the network path.`,
       remediation:
         'Serve the application over HTTPS only, and redirect HTTP to HTTPS with a 301. Most hosts issue a certificate automatically.',
-      evidenceIds: [response.evidenceId],
+      evidenceIds: [response.evidenceId, headerScan],
     });
     return findings;
   }
@@ -534,14 +588,14 @@ function transportChecks(requestedUrl: string, response: ScopedResponse): RawFin
         'The response carries no HSTS header, so a browser that has never visited the site before can still be talked into a first request over plain HTTP.',
       remediation:
         'Add `Strict-Transport-Security: max-age=31536000; includeSubDomains` once you are confident every subdomain serves HTTPS.',
-      evidenceIds: [response.evidenceId],
+      evidenceIds: [response.evidenceId, headerScan],
     });
   }
 
   return findings;
 }
 
-function headerChecks(response: ScopedResponse): RawFinding[] {
+function headerChecks(response: ScopedResponse, headerScan: string): RawFinding[] {
   const findings: RawFinding[] = [];
   const headers = response.headers;
   const missing: string[] = [];
@@ -566,7 +620,7 @@ function headerChecks(response: ScopedResponse): RawFinding[] {
       description: `The response is missing: ${missing.join(', ')}. Each of these closes off a class of browser-side attack that is otherwise available against your users.`,
       remediation:
         'Set the missing headers at the edge or in the framework config. Start the Content-Security-Policy in report-only mode, watch what it would have blocked, then enforce it.',
-      evidenceIds: [response.evidenceId],
+      evidenceIds: [response.evidenceId, headerScan],
     });
   }
 
@@ -580,7 +634,7 @@ function headerChecks(response: ScopedResponse): RawFinding[] {
       title: 'The server advertises its exact software version',
       description: `The response carries "${server}", which tells an attacker precisely which published vulnerabilities to try first.`,
       remediation: 'Suppress the Server and X-Powered-By headers at the edge.',
-      evidenceIds: [response.evidenceId],
+      evidenceIds: [response.evidenceId, headerScan],
     });
   }
 
@@ -614,7 +668,7 @@ function cookieChecks(response: ScopedResponse): RawFinding[] {
   ];
 }
 
-function corsChecks(response: ScopedResponse): RawFinding[] {
+function corsChecks(response: ScopedResponse, headerScan: string): RawFinding[] {
   const origin = response.headers['access-control-allow-origin'];
   const credentials = response.headers['access-control-allow-credentials'];
   if (origin !== '*' || credentials?.toLowerCase() !== 'true') return [];
@@ -630,7 +684,7 @@ function corsChecks(response: ScopedResponse): RawFinding[] {
         'The response sets Access-Control-Allow-Origin: * together with Access-Control-Allow-Credentials: true. Any website a signed-in user visits can read authenticated responses from this application.',
       remediation:
         'Replace the wildcard with an explicit list of origins you control, and only send Access-Control-Allow-Credentials for those.',
-      evidenceIds: [response.evidenceId],
+      evidenceIds: [response.evidenceId, headerScan],
     },
   ];
 }
