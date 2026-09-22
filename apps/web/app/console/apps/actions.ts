@@ -295,6 +295,12 @@ export async function verifyAuthorisation(
     scope_domains: pending.scope_domains,
     scope_exclusions: pending.scope_exclusions,
     third_parties: pending.third_parties,
+    // Carried forward with the rest of the scope. The verified row supersedes
+    // the pending one and is the row the runner reads, so leaving this behind
+    // would authorise the domain and quietly drop the repository — the static
+    // stage would then say the authorisation does not cover a repository the
+    // customer had declared and accepted the warranty for.
+    repository_url: pending.repository_url,
     warranty_text_version: pending.warranty_text_version,
     warranty_text_sha256: pending.warranty_text_sha256,
     granted_by: user.id,

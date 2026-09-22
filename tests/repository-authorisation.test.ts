@@ -97,6 +97,23 @@ describe('what the code does with it', () => {
     expect(actions).toMatch(/RepositoryRefusedError/);
   });
 
+  it('carries the repository from the pending row onto the verified one', () => {
+    // Verification inserts a superseding row and that row is what the runner
+    // reads. Leaving this behind authorised the domain and quietly dropped the
+    // repository, so the report would have said the authorisation did not
+    // cover a repository the customer had declared and accepted the warranty
+    // for — found by reading the flow rather than by a test failing.
+    const verified = actions.slice(actions.indexOf('export async function verifyAuthorisation'));
+    expect(verified).toMatch(/repository_url: pending\.repository_url/);
+  });
+
+  it('leaves it off a withdrawal, which covers nothing', () => {
+    const revoked = actions.slice(actions.indexOf('export async function revokeAuthorisation'));
+    const insert = revoked.slice(revoked.indexOf('.insert({'), revoked.indexOf('});'));
+    expect(insert).toMatch(/scope_domains: \[\]/);
+    expect(insert).not.toMatch(/repository_url/);
+  });
+
   it('offers the field at all, which is the whole point', () => {
     const form = readFileSync('apps/web/app/console/apps/new/page.tsx', 'utf8');
     expect(form).toMatch(/name="repositoryUrl"/);
