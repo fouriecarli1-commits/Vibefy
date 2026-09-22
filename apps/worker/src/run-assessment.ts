@@ -17,7 +17,9 @@ import {
   ModelClient,
   ScopeGuard,
   policyFromAuthorisation,
+  fetchRepository,
   runPipeline,
+  type FetchedRepository,
   type AssessmentDepth,
   type AssessmentTarget,
   type ModelTransport,
@@ -38,6 +40,13 @@ export interface RunDependencies {
   readonly pool: Pool;
   /** Injected so tests can run the whole job without calling the real API. */
   readonly transport?: ModelTransport;
+  /**
+   * How the declared repository is fetched. The real one only clones public
+   * HTTPS URLs on a handful of forges; a test injects one that will also take
+   * a local path, so the seam is here at the call site rather than a permission
+   * inside the validator where a misconfiguration could open it in production.
+   */
+  readonly fetchRepository?: typeof fetchRepository;
   readonly log?: (message: string, detail?: Record<string, unknown>) => void;
 }
 
@@ -91,13 +100,41 @@ export async function runAssessmentJob(
   const assessmentId = randomUUID();
   const evidence = new EvidenceStore(assessmentId);
 
+  /*
+   * The repository, where the customer declared one.
+   *
+   * `repositoryPath` was the literal `null` here, with nothing beside it to
+   * say why — so the static stage, which its own header calls the cheapest and
+   * least arguable in this engine, has never once run against a customer. Every
+   * paid assessment told them in writing that secrets in source, dependency
+   * risk and licensing were outside its scope, for the tier whose whole
+   * differentiator is that they are not.
+   *
+   * It is fetched into the runner's temporary space and deleted in the
+   * `finally` below, whatever happens: the safest place to keep somebody
+   * else's source is nowhere.
+   */
+  let repository: FetchedRepository | null = null;
+  let repositoryUnavailable: string | undefined;
+  if (typeof appRow.repository_url === 'string' && appRow.repository_url.length > 0) {
+    try {
+      const fetch = dependencies.fetchRepository ?? fetchRepository;
+      repository = await fetch(appRow.repository_url, { log });
+      log('repository ready', { appId: appRow.id, bytes: repository.bytes });
+    } catch (error) {
+      repositoryUnavailable = error instanceof Error ? error.message : String(error);
+      log('repository unavailable', { appId: appRow.id, reason: repositoryUnavailable });
+    }
+  }
+
   const target: AssessmentTarget = {
     appId: appRow.id,
     organisationId: appRow.organisation_id,
     appName: appRow.name,
     appType: appRow.app_type,
     primaryUrl: appRow.primary_url,
-    repositoryPath: null,
+    repositoryPath: repository?.path ?? null,
+    ...(repositoryUnavailable === undefined ? {} : { repositoryUnavailable }),
     intendedForAppStore: appRow.intended_for_app_store,
     isGame: appRow.is_game,
     hasAuthentication: appRow.has_authentication,
@@ -119,7 +156,15 @@ export async function runAssessmentJob(
   };
 
   log('Assessment starting', { assessmentId, appId: job.appId, depth: job.depth });
-  const outcome = await runPipeline({ context });
+  let outcome;
+  try {
+    outcome = await runPipeline({ context });
+  } finally {
+    // Always, and before anything else can fail. Decision 008: a customer's
+    // source is processed in the ephemeral runner volume and deleted on
+    // completion, because the safest place to store it is nowhere.
+    await repository?.dispose();
+  }
   log('Assessment finished', {
     assessmentId,
     status: outcome.status,

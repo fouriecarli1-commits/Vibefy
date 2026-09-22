@@ -5,6 +5,7 @@ export * from './runtime/stop.ts';
 export * from './runtime/evidence.ts';
 export * from './runtime/http.ts';
 export * from './runtime/browser.ts';
+export * from './runtime/repository.ts';
 export * from './model/prompts.ts';
 export * from './model/client.ts';
 export * from './model/scripted.ts';

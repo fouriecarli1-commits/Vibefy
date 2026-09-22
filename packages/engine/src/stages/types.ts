@@ -32,6 +32,16 @@ export interface AssessmentTarget {
   readonly primaryUrl: string | null;
   /** Local path to the checked-out repository, when the tier includes source. */
   readonly repositoryPath: string | null;
+  /**
+   * Why the repository the customer declared is not on disk, where one was
+   * declared and could not be fetched.
+   *
+   * The static stage's skip note says "no repository was provided", which is
+   * true of an application that has none and false of one whose clone was
+   * refused. The difference matters to the customer: the first is the scope
+   * they chose and the second is a thing to fix.
+   */
+  readonly repositoryUnavailable?: string;
   readonly intendedForAppStore: boolean;
   /**
    * Whether the owner registered this as a game.

@@ -73,14 +73,18 @@ export async function seedApp(
   client: Client,
   account: SeededAccount,
   name = 'Test App',
-  options: { screening?: 'pending' | 'cleared' | 'refused' } = {},
+  options: {
+    screening?: 'pending' | 'cleared' | 'refused';
+    /** A repository the app declares, for the half of an assessment that reads source. */
+    repositoryUrl?: string;
+  } = {},
 ): Promise<string> {
   const slug = `app-${randomUUID().slice(0, 8)}`;
   const { rows } = await client.query<{ id: string }>(
     `insert into public.apps
-       (organisation_id, name, slug, app_type, primary_url, created_by,
+       (organisation_id, name, slug, app_type, primary_url, repository_url, created_by,
         screening_status, screening_notes, screened_at)
-     values ($1, $2, $3, 'web_url', $4, $5, $6::public.screening_status,
+     values ($1, $2, $3, 'web_url', $4, $5, $6, $7::public.screening_status,
              'Seeded fixture: cleared so the test can get to what it is about.', now())
      returning id`,
     [
@@ -88,6 +92,7 @@ export async function seedApp(
       name,
       slug,
       `https://${slug}.example.test`,
+      options.repositoryUrl ?? null,
       account.userId,
       options.screening ?? 'cleared',
     ],

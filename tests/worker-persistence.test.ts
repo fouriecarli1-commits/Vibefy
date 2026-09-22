@@ -19,6 +19,7 @@ import {
   type AssessmentOutcome,
   type StageContext,
   type TransportRequest,
+  fetchRepository,
 } from '../packages/engine/src/index.ts';
 import {
   AuthorisationWithdrawnError,
@@ -186,6 +187,76 @@ describe('the hard gate at dispatch', () => {
       runAssessmentJob({ appId, depth: 'full', requestedBy: owner.userId }, { pool }),
     ).rejects.toThrow(/hard gate/);
   });
+
+  it('reads the repository the app declared, which no assessment used to do', async () => {
+    // `repositoryPath` was the literal `null` in the worker, so the static
+    // stage — the cheapest and least arguable in this engine — had never run
+    // against a customer, and every paid report said secrets in source were
+    // outside its scope.
+    const { execFileSync } = await import('node:child_process');
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+
+    const workspace = mkdtempSync(join(tmpdir(), 'vibefycode-job-repo-'));
+    const source = join(workspace, 'kettle');
+    mkdirSync(source, { recursive: true });
+    writeFileSync(
+      join(source, '.env'),
+      // secret-scan-allow: assembled at runtime so our own scanner sees nothing
+      `STRIPE_SECRET_KEY=${'sk'}_live_${'51ZZZZZZZZZZZZZZZZZZZ'}\n`,
+    );
+    const git = (...args: string[]) =>
+      execFileSync('git', args, {
+        cwd: source,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Fixture',
+          GIT_AUTHOR_EMAIL: 'fixture@example.test',
+          GIT_COMMITTER_NAME: 'Fixture',
+          GIT_COMMITTER_EMAIL: 'fixture@example.test',
+        },
+      });
+    git('init', '--initial-branch=main', '--quiet');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'A shop that sells kettles');
+
+    let clonedAt: string | null = null;
+    try {
+      const appId = await seedApp(db, owner, 'Repo App', {
+        repositoryUrl: `file://${source}`,
+      });
+      await seedAuthorisation(db, owner, appId);
+      const result = await runAssessmentJob(
+        { appId, depth: 'limited', requestedBy: owner.userId },
+        {
+          pool,
+          transport: new ScriptedTransport([]),
+          // The seam is here, at the call site. The real fetcher only clones
+          // public HTTPS URLs on a handful of forges, and nothing in production
+          // passes an override.
+          fetchRepository: async (url, options) => {
+            const fetched = await fetchRepository(url, { ...options, allowLocalForTesting: true });
+            clonedAt = fetched.path;
+            return fetched;
+          },
+        },
+      );
+
+      const findings = await db.query<{ title: string }>(
+        'select title from public.findings where assessment_id = $1',
+        [result.assessmentId],
+      );
+      expect(findings.rows.map((row) => row.title).join(' | ')).toMatch(/apparent credential/i);
+      // Decision 008: processed in the ephemeral runner volume and deleted on
+      // completion, because the safest place to store a customer's source is
+      // nowhere.
+      expect(clonedAt).not.toBeNull();
+      expect(existsSync(clonedAt!)).toBe(false);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  }, 120_000);
 
   it('never permits a private address, even for an app whose declared host resolves inward', async () => {
     const appId = await seedApp(db, owner);

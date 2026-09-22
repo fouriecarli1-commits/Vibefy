@@ -185,18 +185,30 @@ export const staticIntakeStage: Stage = {
   id: 'static_intake',
 
   appliesTo(context) {
-    return Boolean(context.target.repositoryPath);
+    // A repository that was declared and could not be fetched still runs this
+    // stage, so that it can say so. Opting out on `repositoryPath` alone put
+    // that case behind the pipeline's generic skip note, which says the stage
+    // does not apply to this kind of assessment — and it does.
+    return (
+      Boolean(context.target.repositoryPath) || context.target.repositoryUnavailable !== undefined
+    );
   },
 
   async run(context): Promise<StageResult> {
     const root = context.target.repositoryPath;
     if (!root || !existsSync(root)) {
+      // Two different sentences, because they mean different things to whoever
+      // reads the report. One is the scope the customer chose; the other is a
+      // repository they declared that we could not read, which is theirs to fix.
+      const unavailable = context.target.repositoryUnavailable;
       return {
         stage: 'static_intake',
-        status: 'skipped',
+        status: unavailable === undefined ? 'skipped' : 'failed',
         findings: [],
         notes: [
-          'No repository was provided, so static analysis did not run. Findings about secrets in source, dependency risk and licensing are outside the scope of this assessment.',
+          unavailable === undefined
+            ? 'No repository was provided, so static analysis did not run. Findings about secrets in source, dependency risk and licensing are outside the scope of this assessment.'
+            : `The repository this application declared could not be read (${unavailable}), so the secret scan, the dependency check and the licence check did not run. Their absence here is not a clean result.`,
         ],
       };
     }
