@@ -80,6 +80,7 @@ export const deterministicChecksStage: Stage = {
     }
 
     const startedAt = Date.now();
+    const bytesAtStart = context.evidence.totalBytes;
     const http = new ScopedHttp(context.guard, context.evidence);
     const findings: RawFinding[] = [];
     const notes: string[] = [];
@@ -515,7 +516,8 @@ export const deterministicChecksStage: Stage = {
     context.meter.recordCompute(
       'deterministic_checks',
       (Date.now() - startedAt) / 1000,
-      context.evidence.totalBytes,
+      // What this stage captured, not what the run has captured so far.
+      context.evidence.totalBytes - bytesAtStart,
       context.guard.requestsMade,
     );
 

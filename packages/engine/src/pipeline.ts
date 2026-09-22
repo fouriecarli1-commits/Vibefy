@@ -140,11 +140,31 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
   const findings = stageResults.flatMap((result) => result.findings);
   const notes: string[] = stageResults.flatMap((result) => result.notes);
 
+  /*
+   * The gate this feeds blocks certification, and it publishes its reason: "if
+   * the authorised scope did not permit exercising the core flows, we did not
+   * assess the product and must not certify it".
+   *
+   * `coreFlowsReached` is the exploring model's own judgement, and it cannot
+   * tell that apart from running out of turns or from an application that is
+   * simply broken — the last of which is a finding, not this gate. So it is
+   * corroborated: the scope has to have actually refused something during that
+   * stage. Where it did not, the model's report is said out loud in the notes
+   * and the gate is not applied, because applying it would tell a customer
+   * their authorisation was too narrow when nothing of theirs was refused.
+   */
   const functional = stageResults.find((result) => result.stage === 'functional_exploration');
-  const coreFlowsUnreachable =
+  const modelSaysUnreached =
     functional !== undefined &&
     functional.status !== 'skipped' &&
     functional.coreFlowsReached === false;
+  const scopeRefusals = functional?.scopeRefusals ?? 0;
+  const coreFlowsUnreachable = modelSaysUnreached && scopeRefusals > 0;
+  if (modelSaysUnreached && scopeRefusals === 0) {
+    notes.push(
+      'The exploration reported that it could not complete the core flows, and nothing was refused by the authorised scope while it ran. That is recorded here rather than applied as a gate about authorisation coverage, which is a statement about the scope the customer granted.',
+    );
+  }
 
   // The scoring input carries findings and nothing else. It has no field for the
   // customer's plan, and packages/rubric would fail to compile if it did.

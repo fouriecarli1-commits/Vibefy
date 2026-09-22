@@ -87,8 +87,15 @@ interface StageResultFields {
   readonly stage: StageId;
   readonly findings: readonly RawFinding[];
   readonly notes: readonly string[];
-  /** False when the authorised scope did not permit exercising the core flows. */
+  /**
+   * The exploring model's own judgement about whether it completed the core
+   * flows. It cannot tell "the scope refused me" from "I ran out of turns" or
+   * "the application is broken", so it is not on its own a reason to apply a
+   * gate about authorisation coverage.
+   */
   readonly coreFlowsReached?: boolean;
+  /** Requests the authorised scope refused during this stage, excluding our own throttle. */
+  readonly scopeRefusals?: number;
   /**
    * How hard the way out was to find, where a stage measured it.
    *

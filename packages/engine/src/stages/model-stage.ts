@@ -93,6 +93,7 @@ export function createModelStage(config: ModelStageConfig): Stage {
       const mintedEvidence = new Set<string>();
       const notes: string[] = [];
 
+      const bytesAtStart = context.evidence.totalBytes;
       try {
         await session.open();
         await session.goto(url, 'domcontentloaded');
@@ -167,16 +168,39 @@ export function createModelStage(config: ModelStageConfig): Stage {
           );
         }
         notes.push(...output.notes);
-        if (session.blockedRequests.length > 0) {
+
+        // An exploration that used every turn it is allowed did not finish
+        // looking. The findings it produced stand; the ones it did not reach
+        // are missing because we stopped asking, and until now the stage said
+        // `succeeded` and mentioned none of it.
+        if (exploration.haltedBy) {
           notes.push(
-            `${session.blockedRequests.length} request(s) were blocked as out of scope during this stage.`,
+            `The exploration did not run to a natural end. ${
+              HALT_EXPLANATION[exploration.haltedBy] ?? 'It stopped early.'
+            } What it found still stands; what it did not reach is not evidence that there was nothing there.`,
+          );
+        }
+
+        const throttled = session.blockedRequests.filter(
+          (blocked) => blocked.reason === 'rate_limited',
+        ).length;
+        const scopeRefusals = session.blockedRequests.length - throttled;
+        if (scopeRefusals > 0) {
+          notes.push(`${scopeRefusals} request(s) were blocked as out of scope during this stage.`);
+        }
+        if (throttled > 0) {
+          notes.push(
+            `${throttled} request(s) were dropped because this run reached the rate ceiling its authorisation sets. That is ours, not the application's.`,
           );
         }
 
         context.meter.recordCompute(
           config.id,
           (Date.now() - startedAt) / 1000,
-          context.evidence.totalBytes,
+          // What this stage captured, not what the run has captured so far.
+          // Every stage recorded the running total, so the per-stage rows summed
+          // to two or three times the evidence that actually exists.
+          context.evidence.totalBytes - bytesAtStart,
         );
 
         return {
@@ -185,6 +209,12 @@ export function createModelStage(config: ModelStageConfig): Stage {
           findings: kept,
           notes,
           coreFlowsReached: output.coreFlowsReached,
+          // What the scope actually refused, so that the gate this feeds is
+          // applied for the reason it publishes. `coreFlowsReached` is the
+          // model's own judgement and cannot tell "the scope refused me" from
+          // "I ran out of turns" or "the application is broken" — and the gate
+          // blocks certification under a rationale naming only the first.
+          scopeRefusals,
           promptSha256: extraction.promptSha256,
         };
       } catch (error) {
