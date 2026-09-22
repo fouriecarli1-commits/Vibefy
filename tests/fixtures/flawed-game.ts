@@ -174,6 +174,72 @@ ${fixed ? '<meta name="viewport" content="width=device-width, initial-scale=1">'
 </html>`;
 }
 
+/**
+ * A game whose loop is a setInterval and nothing else.
+ *
+ * Not a defect — it is how a great many first games are written. It is here
+ * because the checks used to define "started" as requestAnimationFrame alone,
+ * and reported every game like this one as having never started, at critical
+ * severity.
+ */
+function timerLoopPage(): string {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Tick Dodge</title></head>
+<body>
+<canvas id="game" width="320" height="240"></canvas>
+<script>
+(function () {
+  var ctx = document.getElementById('game').getContext('2d');
+  var x = 0;
+  document.addEventListener('keydown', function () { x = 0; });
+  // A loop, at roughly 60 Hz, with no requestAnimationFrame anywhere.
+  setInterval(function () {
+    x = (x + 4) % 320;
+    ctx.clearRect(0, 0, 320, 240);
+    ctx.fillStyle = '#5b8def';
+    ctx.fillRect(x, 100, 24, 24);
+  }, 16);
+})();
+</script>
+</body>
+</html>`;
+}
+
+/**
+ * A game that throws while it loads, and never again.
+ *
+ * The errors-during-play window used to be closed after the reload that the
+ * storage check performs, so this page's load error was reported as an error
+ * that appeared after play began.
+ */
+function throwsOnLoadPage(): string {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Throw Dodge</title></head>
+<body>
+<canvas id="game" width="320" height="240"></canvas>
+<script>throw new Error('boom while loading');</script>
+<script>
+(function () {
+  var ctx = document.getElementById('game').getContext('2d');
+  var x = 0;
+  document.addEventListener('keydown', function () { x = 0; });
+  document.addEventListener('pointerdown', function () { x = 0; });
+  function step() {
+    x = (x + 4) % 320;
+    ctx.clearRect(0, 0, 320, 240);
+    ctx.fillStyle = '#5b8def';
+    ctx.fillRect(x, 100, 24, 24);
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>`;
+}
+
 export async function startFlawedGame(): Promise<GameFixture> {
   const sprites = Buffer.alloc(SPRITE_BYTES, 7);
 
@@ -193,7 +259,13 @@ export async function startFlawedGame(): Promise<GameFixture> {
     }
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      const body = page(url.searchParams.get('fixed') === '1');
+      const variant = url.searchParams.get('variant');
+      const body =
+        variant === 'timer'
+          ? timerLoopPage()
+          : variant === 'throws-on-load'
+            ? throwsOnLoadPage()
+            : page(url.searchParams.get('fixed') === '1');
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       response.end(body);
       return;

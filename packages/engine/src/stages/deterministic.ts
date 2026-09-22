@@ -364,17 +364,32 @@ export const deterministicChecksStage: Stage = {
       const gameSession = new BrowserSession(context.guard, context.evidence);
       try {
         await gameSession.open();
-        const measurements = await measureGame(context, gameSession, url);
+        const measurements = await measureGame(gameSession, url);
         const shot = await gameSession.screenshot('The game after a short play session');
         const console_ = await gameSession.captureConsole(
           'Console output while the game was played',
         );
-        findings.push(...gameFindings(measurements, [shot, console_]));
+        // The measurement itself, as a record. The weight and start-up findings
+        // quote seconds and kilobytes, and until now the only things behind
+        // those numbers were a screenshot and a console log — neither of which
+        // shows what was transferred or when.
+        const record = context.evidence.capture({
+          kind: 'http_exchange',
+          summary: `Start-up measurement over ${measurements.networkProfile}`,
+          body: { url, ...measurements },
+        });
+        findings.push(...gameFindings(measurements, [record.id, shot, console_]));
         notes.push(
           measurements.becamePlayable
             ? `The game began drawing frames ${((measurements.timeToPlayableMs ?? 0) / 1000).toFixed(1)}s after navigation, after ${Math.round(measurements.bytesBeforePlayable / 1024)} KB. Playability is measured as the first continuous run of animation frames, which is a lower bound.`
-            : 'The game never began drawing frames, so nothing beyond the start could be assessed.',
+            : measurements.loopSignal === 'timer'
+              ? 'The game drew no animation frames but was running a timer loop, so it was played and everything except the start-up figures was assessed.'
+              : 'The game never began drawing frames, so nothing beyond the start could be assessed.',
         );
+        // What the measurement could not establish, in its own words. Without
+        // these a check that failed and a check that came back clean reach the
+        // report as the same thing: no finding.
+        notes.push(...measurements.limitations);
         gamePassCompleted = true;
       } catch (error) {
         browserPassError ??= error instanceof Error ? error.message : String(error);
