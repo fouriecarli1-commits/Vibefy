@@ -14,7 +14,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { z } from 'zod';
-import { CostMeter, DEFAULT_MODEL, type TokenUsage } from '../runtime/cost.ts';
+import {
+  CostCeilingExceededError,
+  CostMeter,
+  DEFAULT_MODEL,
+  type TokenUsage,
+} from '../runtime/cost.ts';
+import { CeilingExceededError } from '../runtime/scope.ts';
 import { getPrompt } from './prompts.ts';
 
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
@@ -148,6 +154,18 @@ function toUsage(usage: {
   };
 }
 
+/**
+ * A limit the run has reached, as opposed to a boundary it was turned back at.
+ *
+ * The scope boundary is deliberately not here: a refused URL is something the
+ * model is told to note and work around, and every tool description says so.
+ * These two are not workaroundable — there is no other URL that costs less or
+ * counts less — so they leave the loop rather than becoming advice.
+ */
+function isCeiling(error: unknown): boolean {
+  return error instanceof CostCeilingExceededError || error instanceof CeilingExceededError;
+}
+
 export class ModelClient {
   constructor(
     private readonly transport: ModelTransport,
@@ -239,8 +257,18 @@ export class ModelClient {
       const results: Anthropic.ToolResultBlockParam[] = [];
       for (const use of uses) {
         const tool = byName.get(use.name);
-        // A refused tool call is returned to the model as an error result rather
-        // than thrown: the model should learn the boundary and continue, not die.
+        /*
+         * A refused tool call comes back to the model as an error result rather
+         * than thrown: the model should learn the boundary and continue, not
+         * die. Every tool description says so — "that refusal is the boundary
+         * working, so note it and try something else".
+         *
+         * A ceiling is not a boundary to learn. It is the run stopping, and
+         * handing it back as a tool result told the model to try something
+         * else — which is refused too, and again, until the iteration ceiling
+         * ran out. Meanwhile nothing reached the pipeline, so the run was never
+         * classified as stopped and never carried a reason.
+         */
         let output: string;
         let isError = false;
         if (!tool) {
@@ -250,6 +278,7 @@ export class ModelClient {
           try {
             output = await tool.run((use.input ?? {}) as Record<string, unknown>);
           } catch (error) {
+            if (isCeiling(error)) throw error;
             output = error instanceof Error ? error.message : String(error);
             isError = true;
           }

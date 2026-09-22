@@ -10,6 +10,7 @@
 import type { BrowserSession } from '../runtime/browser.ts';
 import type { ScopedHttp } from '../runtime/http.ts';
 import type { ToolDefinition } from '../model/client.ts';
+import { classifyStop } from '../runtime/stop.ts';
 
 const MAX_TEXT = 6_000;
 const MAX_ELEMENTS = 60;
@@ -42,25 +43,73 @@ async function describePage(session: BrowserSession): Promise<string> {
         }
         return { index, tag, text, attributes };
       };
-      const interactive = Array.from(
+      const all = Array.from(
         document.querySelectorAll(
           'a, button, input, select, textarea, [role="button"], [role="link"]',
         ),
-      )
-        .filter(visible)
-        .slice(0, maxElements)
-        .map(describe);
+      ).filter(visible);
+      const interactive = all.slice(0, maxElements).map(describe);
+      const fullText = (document.body?.innerText ?? '').replace(/\n{3,}/g, '\n\n');
       return {
         url: window.location.href,
         title: document.title,
-        text: (document.body?.innerText ?? '').replace(/\n{3,}/g, '\n\n').slice(0, maxText),
+        text: fullText.slice(0, maxText),
         interactive,
+        // What was left out, said rather than implied.
+        //
+        // The model reasons about absence from this description — "there is no
+        // way to log out", "there is no cancel link" — and a page with more
+        // than `maxElements` controls, or more text than fits, was handed to it
+        // as though it were the whole page. A finding of absence drawn from a
+        // list that was quietly cut is a finding about our truncation.
+        interactiveShown: interactive.length,
+        interactiveTotal: all.length,
+        interactiveTruncated: all.length > interactive.length,
+        textTruncated: fullText.length > maxText,
         status: document.readyState,
       };
     },
     { maxText: MAX_TEXT, maxElements: MAX_ELEMENTS },
   );
-  return JSON.stringify(snapshot, null, 2);
+  const described = JSON.stringify(snapshot, null, 2);
+  const warnings: string[] = [];
+  if (snapshot.interactiveTruncated) {
+    warnings.push(
+      `Only ${snapshot.interactiveShown} of ${snapshot.interactiveTotal} interactive elements are listed above. There are more on this page than are shown; do not conclude that something is absent from this list alone.`,
+    );
+  }
+  if (snapshot.textTruncated) {
+    warnings.push(
+      'The page text above is cut short. There is more of it than is shown; do not conclude that something is absent from this text alone.',
+    );
+  }
+  return warnings.length === 0 ? described : `${described}\n\n${warnings.join('\n')}`;
+}
+
+/**
+ * Runs a page action and says whether it happened.
+ *
+ * Playwright signals "nothing to do" by resolving with null rather than by
+ * throwing — there was no history entry, the navigation was same-document —
+ * so both have to be read. A ceiling reached inside the page's own traffic is
+ * held on the session and is not an answer to give the model: it is the run
+ * stopping, so it is re-thrown here.
+ */
+async function attempt(
+  session: BrowserSession,
+  action: () => Promise<unknown | null>,
+): Promise<{ ok: true } | { ok: false; why: string }> {
+  try {
+    const result = await action();
+    const ceiling = session.stoppedByCeiling;
+    if (ceiling) throw ceiling;
+    return result === null ? { ok: false, why: 'there was nothing to do.' } : { ok: true };
+  } catch (error) {
+    const ceiling = session.stoppedByCeiling;
+    if (ceiling) throw ceiling;
+    if (classifyStop(error) !== null) throw error;
+    return { ok: false, why: error instanceof Error ? `${error.message}.` : `${String(error)}.` };
+  }
 }
 
 export interface BrowserToolOptions {
@@ -161,7 +210,12 @@ export function browserTools({ session, onScreenshot }: BrowserToolOptions): Too
       description: 'Press the browser back button, to check that navigation history behaves.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       async run() {
-        await session.page.goBack({ timeout: 10_000 }).catch(() => undefined);
+        const before = session.page.url();
+        const moved = await attempt(session, () => session.page.goBack({ timeout: 10_000 }));
+        // It used to report "Back at <url>" whatever happened. A back button
+        // that did nothing then read as a back button that worked and returned
+        // to the same page, which is a different answer about the application.
+        if (!moved.ok) return `The back button did nothing: ${moved.why} Still at ${before}.`;
         return `Back at ${session.page.url()}\n\n${await describePage(session)}`;
       },
     },
@@ -170,7 +224,13 @@ export function browserTools({ session, onScreenshot }: BrowserToolOptions): Too
       description: 'Reload the current page, to check whether state survives a refresh.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       async run() {
-        await session.page.reload({ timeout: 20_000 }).catch(() => undefined);
+        const before = session.page.url();
+        const reloaded = await attempt(session, () => session.page.reload({ timeout: 20_000 }));
+        // This tool exists to answer whether state survives a refresh. A reload
+        // that silently did not happen leaves the state exactly where it was,
+        // which reads as state that survived — a clean bill on the criterion
+        // this tool was called to test.
+        if (!reloaded.ok) return `The page did not reload: ${reloaded.why} Still at ${before}.`;
         return `Reloaded ${session.page.url()}\n\n${await describePage(session)}`;
       },
     },
@@ -217,7 +277,14 @@ export function httpTool(
         headers,
         '',
         response.body.slice(0, 4_000),
-        response.truncated ? '\n[body truncated]' : '',
+        // Two different truncations, and only one of them used to be named.
+        // `truncated` is the read cap on the wire; this slice is ours, and a
+        // body cut here without saying so invites a conclusion about what the
+        // response does not contain.
+        response.body.length > 4_000
+          ? `\n[body shown to 4000 of ${response.body.length} characters]`
+          : '',
+        response.truncated ? '\n[the response was larger than this client reads]' : '',
       ].join('\n');
     },
   };

@@ -17,8 +17,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  CeilingExceededError,
+  CostCeilingExceededError,
   CostMeter,
   ModelClient,
+  ScopeViolationError,
   ScriptedTransport,
   type ScriptedStep,
 } from '../packages/engine/src/index.ts';
@@ -99,5 +102,83 @@ describe('the loop says why it stopped', () => {
     });
     expect(result.haltedBy).toBe('refused');
     expect(transport.stepsConsumed, 'one call, then out').toBe(1);
+  });
+});
+
+describe('what a tool failure is allowed to become', () => {
+  const failing = (error: Error) => ({
+    name: 'look',
+    description: 'Looks at something.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    run: async () => {
+      throw error;
+    },
+  });
+
+  const twoSteps: ScriptedStep[] = [
+    { stopReason: 'tool_use', toolUses: [{ name: 'look', input: {} }] },
+    { text: 'I carried on regardless.' },
+  ];
+
+  it('hands a scope refusal back to the model, which is what the boundary is for', async () => {
+    // Every tool description tells the model a refusal is the boundary working
+    // and to try something else. That only holds if the refusal reaches it.
+    const result = await client(twoSteps).run({
+      stage: 'functional_exploration',
+      promptId: 'functional-exploration',
+      messages: [{ role: 'user', content: 'Have a look.' }],
+      tools: [
+        failing(
+          new ScopeViolationError('Request refused: host_not_allowed', {
+            url: 'https://elsewhere.test/',
+            reason: 'host_not_allowed',
+          }),
+        ),
+      ],
+    });
+    expect(result.text).toMatch(/carried on/i);
+    expect(result.toolCalls[0]?.output).toMatch(/host_not_allowed/);
+  });
+
+  it('stops the run at a ceiling instead of advising the model to try elsewhere', async () => {
+    // There is no other URL that costs less or counts less, so "note it and try
+    // something else" is advice to burn the rest of the iteration budget on
+    // calls that are all refused — while the pipeline never learns the run
+    // stopped, and the report carries no reason.
+    await expect(
+      client(twoSteps).run({
+        stage: 'functional_exploration',
+        promptId: 'functional-exploration',
+        messages: [{ role: 'user', content: 'Have a look.' }],
+        tools: [
+          failing(
+            new CeilingExceededError('Ceiling reached', {
+              ceiling: 'maxTotalRequests',
+              limit: 10,
+              observed: 11,
+            }),
+          ),
+        ],
+      }),
+    ).rejects.toBeInstanceOf(CeilingExceededError);
+  });
+
+  it('stops the run at the spending cap for the same reason', async () => {
+    await expect(
+      client(twoSteps).run({
+        stage: 'functional_exploration',
+        promptId: 'functional-exploration',
+        messages: [{ role: 'user', content: 'Have a look.' }],
+        tools: [
+          failing(
+            new CostCeilingExceededError('Spent enough', {
+              ceiling: 'maxRunCostUsd',
+              limitUsd: 4,
+              observedUsd: 4.2,
+            }),
+          ),
+        ],
+      }),
+    ).rejects.toBeInstanceOf(CostCeilingExceededError);
   });
 });
