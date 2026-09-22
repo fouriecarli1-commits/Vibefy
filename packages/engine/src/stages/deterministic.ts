@@ -35,31 +35,122 @@ function rethrowIfStop(error: unknown): void {
   if (classifyStop(error) !== null) throw error;
 }
 
-/** Paths that should never be reachable, and what it means when they are. */
+/**
+ * Paths that should never be reachable, and what it means when they are.
+ *
+ * Every one is a single GET. Nothing here fuzzes, enumerates or guesses at
+ * volume: these are the specific files that a build pipeline, a framework
+ * default or a careless copy leaves served, and each one that answers is a
+ * secret somebody can read today. A deployment that serves none of them costs
+ * this list thirty-odd requests, which is what four seconds of the rate ceiling
+ * buys.
+ */
 const EXPOSED_PATHS: readonly { path: string; title: string; severity: RawFinding['severity'] }[] =
   [
+    // Environment files, by the names the frameworks actually use.
     { path: '/.env', title: 'Environment file is publicly readable', severity: 'critical' },
     {
       path: '/.env.local',
       title: 'Local environment file is publicly readable',
       severity: 'critical',
     },
+    {
+      path: '/.env.production',
+      title: 'Production environment file is publicly readable',
+      severity: 'critical',
+    },
+    {
+      path: '/.env.production.local',
+      title: 'Production environment file is publicly readable',
+      severity: 'critical',
+    },
+    {
+      path: '/.env.bak',
+      title: 'A backup of the environment file is served',
+      severity: 'critical',
+    },
+
+    // Version control. `.git/config` and `HEAD` are the two that prove the
+    // directory is served; from there the whole history is downloadable.
     { path: '/.git/config', title: 'Git configuration is publicly readable', severity: 'critical' },
     { path: '/.git/HEAD', title: 'Git repository is exposed', severity: 'critical' },
-    { path: '/config.json', title: 'Configuration file is publicly readable', severity: 'high' },
+    { path: '/.git/index', title: 'The git index is publicly readable', severity: 'critical' },
+    { path: '/.svn/entries', title: 'A Subversion directory is served', severity: 'high' },
+
+    // Credentials and keys left beside the application.
     {
       path: '/.aws/credentials',
       title: 'Cloud credentials path is reachable',
       severity: 'critical',
     },
+    { path: '/.npmrc', title: 'An npm configuration file is served', severity: 'critical' },
+    { path: '/.netrc', title: 'A netrc credentials file is served', severity: 'critical' },
+    { path: '/id_rsa', title: 'A private key is publicly readable', severity: 'critical' },
+    {
+      path: '/.ssh/id_rsa',
+      title: 'A private key is publicly readable',
+      severity: 'critical',
+    },
+
+    // Configuration and deployment descriptors.
+    { path: '/config.json', title: 'Configuration file is publicly readable', severity: 'high' },
+    { path: '/config.yml', title: 'Configuration file is publicly readable', severity: 'high' },
+    {
+      path: '/docker-compose.yml',
+      title: 'The deployment compose file is served',
+      severity: 'high',
+    },
+    { path: '/Dockerfile', title: 'The Dockerfile is served', severity: 'medium' },
+    {
+      path: '/wp-config.php.bak',
+      title: 'A backup of the site configuration is served',
+      severity: 'critical',
+    },
+    {
+      path: '/.htpasswd',
+      title: 'An htpasswd file is publicly readable',
+      severity: 'critical',
+    },
+
+    // Data left where the web server can reach it.
+    { path: '/backup.sql', title: 'A database dump is publicly readable', severity: 'critical' },
+    { path: '/dump.sql', title: 'A database dump is publicly readable', severity: 'critical' },
+    { path: '/database.sqlite', title: 'A database file is served', severity: 'critical' },
+
+    // Operational surfaces that describe the inside of the system.
     {
       path: '/server-status',
       title: 'Server status page is publicly readable',
       severity: 'medium',
     },
+    { path: '/phpinfo.php', title: 'A phpinfo page is served', severity: 'high' },
+    {
+      path: '/actuator/env',
+      title: 'The Spring actuator environment is exposed',
+      severity: 'critical',
+    },
+    { path: '/actuator/health', title: 'A Spring actuator endpoint is reachable', severity: 'low' },
+    { path: '/debug/vars', title: 'A debug variables endpoint is reachable', severity: 'medium' },
+
+    // Build output that should not have shipped.
+    { path: '/.DS_Store', title: 'A macOS directory index is served', severity: 'low' },
+    {
+      path: '/webpack.config.js',
+      title: 'The build configuration is served',
+      severity: 'low',
+    },
   ];
 
-const ADMIN_PATHS = ['/admin', '/administrator', '/dashboard/admin', '/wp-admin'] as const;
+const ADMIN_PATHS = [
+  '/admin',
+  '/administrator',
+  '/dashboard/admin',
+  '/wp-admin',
+  '/admin/login',
+  '/cms',
+  '/phpmyadmin',
+  '/adminer.php',
+] as const;
 
 export const deterministicChecksStage: Stage = {
   id: 'deterministic_checks',
@@ -167,6 +258,16 @@ export const deterministicChecksStage: Stage = {
         'No robots.txt was served. That is not a defect, but it is worth adding before launch.',
       );
     }
+
+    // The opposite of the list above: a path whose presence is good news. It is
+    // a note rather than a finding because the published rubric has no criterion
+    // for it, and inventing one would produce a score nobody can check.
+    const securityTxt = await http.probe(url, '/.well-known/security.txt');
+    notes.push(
+      securityTxt?.status === 200
+        ? 'A security.txt is published, so somebody who finds a defect knows where to send it.'
+        : 'No security.txt was served. Publishing one at /.well-known/security.txt tells a finder where to report a defect instead of guessing.',
+    );
 
     // --- Browser pass: accessibility, viewport, console -----------------------
     //

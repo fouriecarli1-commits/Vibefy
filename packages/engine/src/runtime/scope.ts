@@ -68,10 +68,25 @@ export interface ScopePolicy {
   readonly allowPrivateNetworkForTesting?: boolean;
 }
 
+/**
+ * The intensity a new authorisation carries unless the customer sets another.
+ *
+ * Sixty a minute was the original figure and it was below what a single page
+ * asks for, so a fifth of an ordinary page was refused and everything measured
+ * afterwards described a page this engine had broken. Two hundred and forty —
+ * four a second sustained, a minute's worth available at once — is what a real
+ * visitor's browser does on arrival, which is the load profile an assessment
+ * should present. It is well under what any synthetic-monitoring service runs
+ * against the same server every day.
+ *
+ * What is *not* raised here is deliberate and is the point of the ceiling: no
+ * destructive method, no data modification, no export, synthetic accounts only.
+ * Going harder means looking at more of the application, not doing more to it.
+ */
 export const DEFAULT_CEILING: IntensityCeiling = {
   nonDestructiveOnly: true,
-  maxRequestsPerMinute: 60,
-  maxTotalRequests: 5000,
+  maxRequestsPerMinute: 240,
+  maxTotalRequests: 12_000,
   maxDurationSeconds: 1800,
   allowDataModification: false,
   allowDataExport: false,
@@ -128,7 +143,8 @@ export class ScopeGuard {
   readonly policy: ScopePolicy;
   private requestCount = 0;
   private readonly startedAt: number;
-  private readonly recentRequests: number[] = [];
+  private tokens: number;
+  private lastRefill: number;
   private readonly violations: { url: string; reason: string; at: number }[] = [];
   private rateWaitMs = 0;
 
@@ -140,6 +156,10 @@ export class ScopeGuard {
     }
     this.policy = { ...policy, ceiling: { ...DEFAULT_CEILING, ...policy.ceiling } };
     this.startedAt = now;
+    // Starts full: the first thing a run does is load a page, and a bucket that
+    // starts empty would throttle exactly the request the whole run is about.
+    this.tokens = this.policy.ceiling.maxRequestsPerMinute;
+    this.lastRefill = now;
   }
 
   /** Everything that was refused, for the run record. Refusals are evidence too. */
@@ -243,12 +263,10 @@ export class ScopeGuard {
       });
     }
 
-    this.prune(now);
-    if (this.recentRequests.length >= this.policy.ceiling.maxRequestsPerMinute) {
+    if (!this.takeToken(now)) {
       return this.refuse(rawUrl, 'rate_limited');
     }
 
-    this.recentRequests.push(now);
     this.requestCount += 1;
     return { allowed: true, reason: 'in_scope' };
   }
@@ -265,29 +283,39 @@ export class ScopeGuard {
     }
   }
 
-  private prune(now: number): void {
-    const windowStart = now - 60_000;
-    while (this.recentRequests.length > 0 && this.recentRequests[0]! < windowStart) {
-      this.recentRequests.shift();
-    }
+  /**
+   * The rate ceiling, as a bucket that refills rather than a window that resets.
+   *
+   * A fixed window is the wrong shape for what a browser does. Sixty a minute
+   * in a window means sixty requests and then fifty-eight seconds of nothing —
+   * so an ordinary page asking for eighty things at once had a fifth of them
+   * refused, and everything measured afterwards described a page this engine
+   * had broken. A real visitor's browser bursts and then idles, and a bucket
+   * that holds a minute's worth and refills continuously is exactly that: the
+   * burst goes through, and a run that keeps asking settles to the sustained
+   * rate within a second rather than within a minute.
+   *
+   * The sustained rate is unchanged by this. What changes is that the waiting
+   * is now measured in hundreds of milliseconds, which is a wait a navigation
+   * can survive, so a request is delayed instead of dropped.
+   */
+  private takeToken(now: number): boolean {
+    const rate = this.policy.ceiling.maxRequestsPerMinute;
+    const elapsed = Math.max(0, now - this.lastRefill);
+    this.tokens = Math.min(rate, this.tokens + (elapsed / 60_000) * rate);
+    this.lastRefill = now;
+    if (this.tokens < 1) return false;
+    this.tokens -= 1;
+    return true;
   }
 
-  /**
-   * How long until the rate ceiling would permit another request, or zero.
-   *
-   * The rate ceiling is not a boundary to be turned back at — it is a speed
-   * limit, and the answer to a speed limit is to go slower. It used to be
-   * answered by dropping the request: a browser loading an ordinary page with
-   * eighty images had twenty-two of them refused, and the report then described
-   * a page this engine had broken, under a note telling the customer their own
-   * authorisation boundary had done it.
-   */
+  /** How long until the rate ceiling would permit another request, or zero. */
   msUntilSlot(now: number = Date.now()): number {
-    this.prune(now);
-    const limit = this.policy.ceiling.maxRequestsPerMinute;
-    if (this.recentRequests.length < limit) return 0;
-    const oldest = this.recentRequests[this.recentRequests.length - limit]!;
-    return Math.max(1, oldest + 60_000 - now);
+    const rate = this.policy.ceiling.maxRequestsPerMinute;
+    const elapsed = Math.max(0, now - this.lastRefill);
+    const available = Math.min(rate, this.tokens + (elapsed / 60_000) * rate);
+    if (available >= 1) return 0;
+    return Math.max(1, Math.ceil(((1 - available) / rate) * 60_000));
   }
 
   /** How long this run has spent waiting for its own rate ceiling. */

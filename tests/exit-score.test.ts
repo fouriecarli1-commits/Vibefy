@@ -107,6 +107,19 @@ describe('walking to the exit', () => {
     expect(layered.clicksToSubscribe).toBe(2);
   });
 
+  it('reaches an exit five clicks in, which is where a real service puts it', async () => {
+    // Nav, account, settings, membership, plan, cancel. The walk confirms a
+    // candidate wherever it is, so a cancel link on the last page it queued was
+    // always reachable; what was not was a cancel page linked from a page one
+    // level past the queue. Three levels stopped there and the report said no
+    // route to cancelling was found.
+    const deep = await walk(`${site.url}?deep=1`);
+    expect(deep.routeFound).toBe(true);
+    expect(deep.clicksToCancel).toBe(5);
+    expect(deep.plainlyNamed).toBe(true);
+    expect(deep.selfService).toBe(true);
+  });
+
   it('stops the run at a ceiling instead of walking on without saying so', async () => {
     // A crawl catches per-page failures and carries on, which is right for a
     // 404 and wrong for a ceiling: it meant forty-nine more refused requests,

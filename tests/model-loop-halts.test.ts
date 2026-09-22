@@ -56,14 +56,14 @@ describe('the loop says why it stopped', () => {
       stopReason: 'tool_use',
       toolUses: [{ name: 'look', input: {} }],
     };
-    const result = await client(Array.from({ length: 40 }, () => forever)).run({
+    const result = await client(Array.from({ length: 80 }, () => forever)).run({
       stage: 'functional_exploration',
       promptId: 'functional-exploration',
       tools: [echoTool],
       messages: [{ role: 'user', content: 'Have a look.' }],
     });
     expect(result.haltedBy).toBe('tool_iteration_ceiling');
-    expect(result.toolCalls.length).toBeGreaterThan(20);
+    expect(result.toolCalls.length).toBeGreaterThan(40);
   });
 
   it('names a refusal, which is neither our fault nor the application’s', async () => {

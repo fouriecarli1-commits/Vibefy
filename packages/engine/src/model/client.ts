@@ -209,7 +209,18 @@ export class ModelClient {
     let lastResponse: TransportResponse | null = null;
     let haltedBy: LoopHalt | null = null;
     let iterations = 0;
-    const maxIterations = tools ? 24 : 1;
+    /*
+     * How many turns an exploring stage gets.
+     *
+     * Twenty-four was not enough to work through an application: the halt note
+     * this loop produces — "it was still working when the stage stopped
+     * asking" — was the ordinary outcome rather than the exception, and every
+     * finding it had not reached yet was simply absent from the report. The
+     * spending ceiling is the real bound on an exploration and it is checked on
+     * every iteration; this number only decides whether the money is allowed to
+     * be spent on finishing.
+     */
+    const maxIterations = tools ? 48 : 1;
 
     while (iterations < maxIterations) {
       iterations += 1;

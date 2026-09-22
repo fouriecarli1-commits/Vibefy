@@ -14,6 +14,13 @@
  * every page that mentions cancelling and carries a newsletter form, a pricing
  * page that is a step towards joining rather than the place you join, and the
  * real exit one click further than the first page that looked like it.
+ *
+ * `?deep=1` is the shape a real service has: nav, account, settings, membership,
+ * plan, cancel. The walk queues pages by depth and confirms a candidate wherever
+ * it is, so a cancel link *on* the last page it queued was always reachable —
+ * what was not, was a cancel page linked from a page one level past the queue.
+ * Three levels stopped there, and the report then said no route to cancelling
+ * was found, which is the strongest negative statement this measurement makes.
  */
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -122,6 +129,38 @@ const LAYERED: Record<string, string> = {
   '/about': wrap('About', `<h1>About</h1><p>We like kettles.</p>${FOOTER}`),
 };
 
+const DEEP: Record<string, string> = {
+  '/': wrap(
+    'Kettle Club',
+    `<h1>Kettle Club</h1><a href="/join">Start your free trial</a>
+     <a href="/account">Your account</a>`,
+  ),
+  '/join': wrap(
+    'Join',
+    `<h1>Start your trial</h1><form action="/join"><button>Subscribe now</button></form>`,
+  ),
+  '/account': wrap('Your account', `<h1>Your account</h1><a href="/account/settings">Settings</a>`),
+  '/account/settings': wrap(
+    'Settings',
+    `<h1>Settings</h1><a href="/account/settings/membership">Manage your membership</a>`,
+  ),
+  '/account/settings/membership': wrap(
+    'Membership',
+    `<h1>Membership</h1><a href="/account/settings/membership/plan">Manage your plan</a>`,
+  ),
+  // Four clicks in, and a page that is a step rather than the exit. Its links
+  // are only read if the walk queued it, which is what MAX_DEPTH decides.
+  '/account/settings/membership/plan': wrap(
+    'Plan',
+    `<h1>Your plan</h1><a href="/account/settings/membership/plan/cancel">Cancel your subscription</a>`,
+  ),
+  '/account/settings/membership/plan/cancel': wrap(
+    'Cancel',
+    `<h1>Cancel your subscription</h1>
+     <form method="post" action="/cancel"><button type="submit">Cancel my subscription</button></form>`,
+  ),
+};
+
 export async function startSubscriptionSite(): Promise<SubscriptionFixture> {
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
@@ -130,8 +169,17 @@ export async function startSubscriptionSite(): Promise<SubscriptionFixture> {
         ? 'fair'
         : url.searchParams.get('layered') === '1'
           ? 'layered'
-          : 'hard';
-    const pages = variant === 'fair' ? FAIR : variant === 'layered' ? LAYERED : HARD;
+          : url.searchParams.get('deep') === '1'
+            ? 'deep'
+            : 'hard';
+    const pages =
+      variant === 'fair'
+        ? FAIR
+        : variant === 'layered'
+          ? LAYERED
+          : variant === 'deep'
+            ? DEEP
+            : HARD;
     const body = pages[url.pathname];
     if (!body) {
       response.writeHead(404, { 'content-type': 'text/plain' });
@@ -145,8 +193,7 @@ export async function startSubscriptionSite(): Promise<SubscriptionFixture> {
         ? body
         : body.replace(
             /href="([^"]+)"/g,
-            (m, href) =>
-              `href="${href}${String(href).includes('?') ? '&' : '?'}${variant === 'fair' ? 'fair' : 'layered'}=1"`,
+            (m, href) => `href="${href}${String(href).includes('?') ? '&' : '?'}${variant}=1"`,
           );
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end(carried);

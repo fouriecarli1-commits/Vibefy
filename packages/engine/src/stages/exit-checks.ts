@@ -29,9 +29,23 @@
 import type { ScopedHttp } from '../runtime/http.ts';
 import { classifyStop } from '../runtime/stop.ts';
 
-/** How far from the front door to walk, and how many pages to open. */
-const MAX_DEPTH = 3;
-const MAX_PAGES = 25;
+/**
+ * How far from the front door to walk, and how many pages to open.
+ *
+ * Three levels and twenty-five pages was chosen when a crawl cost sixty
+ * requests a minute and there was no room for it.
+ *
+ * What the depth decides is which pages are read for *links*. A candidate is
+ * confirmed wherever it is, so a cancel link on the last page the walk queued
+ * was always reachable — what was not, was a cancel page linked from a page one
+ * level past the queue. A real service puts the account area behind a nav, the
+ * settings behind that, the membership page behind settings and the plan behind
+ * membership, and the cancel route behind the plan. The report then said no
+ * route to cancelling was found, which is the strongest negative statement this
+ * measurement makes, for a site that plainly has one.
+ */
+const MAX_DEPTH = 4;
+const MAX_PAGES = 60;
 
 /** The way out, by every name it is given. */
 const CANCEL_LINK =
