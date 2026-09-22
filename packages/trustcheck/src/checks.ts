@@ -54,8 +54,29 @@ interface Check {
 }
 
 /** Finds a link whose address or words match, and reports what it matched. */
+/**
+ * A mailing list is not the subscription.
+ *
+ * Every footer on the internet carries "Unsubscribe", and it means the emails
+ * rather than the money. Without this, "Does it say how to cancel?" — the
+ * question this whole tool exists to answer — came back "found" for a site that
+ * offers no way to cancel anything except the newsletter.
+ */
+const MAILING_LIST =
+  /\b(newsletter|mailing list|marketing emails?|email (updates|preferences|notifications)|our emails|from (this|these) emails?)\b/i;
+
 function linkMatcher(page: FetchedPage, pattern: RegExp): { href: string; text: string }[] {
   return links(page.html).filter((link) => pattern.test(link.href) || pattern.test(link.text));
+}
+
+/** The same, for the questions where an email preference is a different answer. */
+function subscriptionLinkMatcher(
+  page: FetchedPage,
+  pattern: RegExp,
+): { href: string; text: string }[] {
+  return linkMatcher(page, pattern).filter(
+    (link) => !MAILING_LIST.test(link.text) && !MAILING_LIST.test(link.href),
+  );
 }
 
 const CHECKS: readonly Check[] = [
@@ -86,7 +107,7 @@ const CHECKS: readonly Check[] = [
     run: (page) => {
       const pattern =
         /cancel|unsubscribe|manage (your )?(subscription|plan|membership)|end (your )?(subscription|membership)|opt.?out/i;
-      const matched = linkMatcher(page, pattern);
+      const matched = subscriptionLinkMatcher(page, pattern);
       const text = visibleText(page.html);
       const mentioned = /how to cancel|cancel (at )?any ?time|you can cancel/i.exec(text);
 
@@ -359,13 +380,34 @@ const CHECKS: readonly Check[] = [
 
 export function runChecks(page: FetchedPage): Observation[] {
   return CHECKS.map((check) => {
-    const { outcome, detail, evidence } = check.run(page);
+    /*
+     * One question that cannot be answered does not take the other nine.
+     *
+     * Each of these is a pure function over a string somebody else wrote, and
+     * a string somebody else wrote is exactly the kind of input that finds the
+     * one case a pattern was not written for. Without this, a page that broke
+     * one check produced no report at all — and the page most likely to break
+     * one is the page somebody is most worried about.
+     *
+     * It answers `unclear`, which is the honest word: we do not know, and the
+     * reason we do not know is ours rather than theirs.
+     */
+    let answer;
+    try {
+      answer = check.run(page);
+    } catch (error) {
+      answer = {
+        outcome: 'unclear' as Outcome,
+        detail: `This check could not read the page well enough to answer. That is a limit of ours, not something about the site. (${error instanceof Error ? error.message : String(error)})`,
+        evidence: [] as string[],
+      };
+    }
     return {
       id: check.id,
       question: check.question,
-      outcome,
-      detail,
-      evidence,
+      outcome: answer.outcome,
+      detail: answer.detail,
+      evidence: answer.evidence,
       weight: check.weight,
     };
   });

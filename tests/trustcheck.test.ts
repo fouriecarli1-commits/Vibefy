@@ -255,3 +255,60 @@ function readSource(path: string): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('node:fs').readFileSync(require('node:path').join(process.cwd(), path), 'utf8');
 }
+
+describe('a footer that every site has', () => {
+  const pageWith = (body: string): FetchedPage => ({
+    finalUrl: 'https://kettle.test/',
+    status: 200,
+    headers: {},
+    html: `<!doctype html><html lang="en"><body>${body}</body></html>`,
+    redirected: false,
+  });
+
+  it('does not answer "how do I cancel?" with a newsletter unsubscribe link', () => {
+    // The question this whole tool exists to answer, and every footer on the
+    // internet carries the word. A site with no way out of the subscription
+    // came back "found" because it lets you stop the emails.
+    const observations = runChecks(
+      pageWith(
+        '<h1>Kettle Club</h1><footer><a href="/email-prefs">Unsubscribe from our emails</a></footer>',
+      ),
+    );
+    const cancellation = observations.find((observation) => observation.id === 'cancellation')!;
+    expect(cancellation.outcome).toBe('not_found');
+  });
+
+  it('still finds a real one', () => {
+    const observations = runChecks(
+      pageWith('<a href="/account/cancel">Cancel your subscription</a>'),
+    );
+    const cancellation = observations.find((observation) => observation.id === 'cancellation')!;
+    expect(cancellation.outcome).toBe('found');
+    expect(cancellation.evidence.join(' ')).toMatch(/cancel/i);
+  });
+});
+
+describe('a page that breaks one of the questions', () => {
+  it('still answers the other nine', () => {
+    // Each check is a pure function over a string somebody else wrote, which is
+    // exactly the input that finds the case a pattern was not written for. The
+    // page most likely to break one is the page somebody is most worried about.
+    const broken: FetchedPage = {
+      // Not a URL: the encryption check builds one from this and throws.
+      finalUrl: 'not-a-url',
+      status: 200,
+      headers: {},
+      html: '<!doctype html><html lang="en"><body><a href="/cancel">Cancel</a></body></html>',
+      redirected: false,
+    };
+    const observations = runChecks(broken);
+    expect(observations).toHaveLength(CHECK_COUNT);
+    const encrypted = observations.find((observation) => observation.id === 'encrypted')!;
+    expect(encrypted.outcome).toBe('unclear');
+    expect(encrypted.detail).toMatch(/a limit of ours, not something about the site/i);
+    // And the rest answered normally.
+    expect(observations.find((observation) => observation.id === 'cancellation')!.outcome).toBe(
+      'found',
+    );
+  });
+});
