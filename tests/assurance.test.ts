@@ -65,6 +65,37 @@ describe('a tick for something nobody checked', () => {
     expect(lineFor('hostile_code').state).toBe('not_tested');
   });
 
+  it('cannot happen when the rubric has the check and the run did not reach it', () => {
+    // The other half of the same failure, and the one that was live: the
+    // rubric defines SEC-12, the engine has a check for it, and the check is
+    // read from the landing page. A checkout lives at /checkout, so for most
+    // applications that take payments nothing looked — and "no findings"
+    // printed a tick under "If I pay, does my card go to a proper payment
+    // company?".
+    const unreached = assuranceFor({
+      ...base,
+      rubricCriteria: [...CRITERIA, 'SEC-12', 'SEC-13', 'PRI-07'],
+      notTested: [{ criterion: 'SEC-12', because: 'No checkout was found on the landing page.' }],
+    });
+    const payments = unreached.find((line) => line.claim.id === 'payments')!;
+    expect(payments.state).toBe('not_tested');
+    expect(payments.notTestedBecause).toMatch(/no checkout was found/i);
+    expect(payments.notTestedBecause).toMatch(/not a pass/i);
+    // And the questions the run did reach are unaffected.
+    expect(unreached.find((line) => line.claim.id === 'someone_there')!.state).toBe(
+      'checked_clear',
+    );
+  });
+
+  it('is carried from the run to the page rather than re-derived there', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    // The engine decides what it could not test; the page shows it. A page that
+    // worked it out for itself would be guessing about a run it did not watch.
+    expect(readFileSync('packages/engine/src/pipeline.ts', 'utf8')).toMatch(/notTestedCriteria/);
+    expect(readFileSync('apps/worker/src/persist.ts', 'utf8')).toMatch(/not_tested/);
+    expect(readFileSync('apps/web/app/a/[slug]/page.tsx', 'utf8')).toMatch(/a\.not_tested/);
+  });
+
   it('lights up on its own once the rubric defines the criterion', () => {
     const withFuture = assuranceFor({
       ...base,

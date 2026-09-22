@@ -72,6 +72,15 @@ export interface AssessmentOutcome {
   readonly aiDisclosure: string;
   readonly notes: readonly string[];
   /**
+   * Criteria the rubric defines and this run did not answer.
+   *
+   * The verification page turns "no findings against this criterion" into a
+   * tick, so a criterion nothing reached renders as a pass for something nobody
+   * looked at. `rubricCriteria` already covers a criterion the rubric does not
+   * define; this covers one this particular run could not test.
+   */
+  readonly notTestedCriteria: readonly { readonly criterion: string; readonly because: string }[];
+  /**
    * How hard it was to find the way out, or null where nothing measured it.
    *
    * Deliberately beside the score rather than inside it. A rubric score is what
@@ -230,6 +239,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     nonRelianceLegend: NON_RELIANCE_LEGEND,
     aiDisclosure: AI_DISCLOSURE,
     notes,
+    notTestedCriteria: stageResults.flatMap((result) => result.notTested ?? []),
     exitMeasurement:
       stageResults.find((result) => result.exitMeasurement !== undefined)?.exitMeasurement ?? null,
   };

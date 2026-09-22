@@ -24,6 +24,7 @@
  */
 import { runChecks, type FetchedPage, type Observation } from '@vibefycode/trustcheck';
 import type { BrowserSession } from '../runtime/browser.ts';
+import type { ScopedResponse } from '../runtime/http.ts';
 import type { RawFinding } from './types.ts';
 
 /**
@@ -82,11 +83,29 @@ export interface TrustMeasurements {
   readonly scriptHosts: readonly string[];
   readonly minerHosts: readonly string[];
   readonly minerSignatures: readonly string[];
-  /** A card input was found on the page. */
+  /** Too much inline script to read all of, so the signatures saw only part. */
+  readonly inlineScriptTruncated: boolean;
+  /**
+   * A card input was found in the application's own document.
+   *
+   * `document.querySelectorAll` does not cross a frame boundary, so this is
+   * already the question that matters: whether the card number is typed into a
+   * field the merchant's own page owns.
+   */
   readonly collectsCardDetails: boolean;
-  /** Card inputs sit inside a frame belonging to a recognised processor. */
-  readonly cardFieldsAreFramed: boolean;
+  /**
+   * A frame belonging to a recognised processor is somewhere on the page.
+   *
+   * It used to be called `cardFieldsAreFramed`, and the field it named claimed
+   * the card inputs were inside such a frame. It never established that — it
+   * asked only whether such a frame existed anywhere — and it was used to
+   * withhold SEC-12, so a page with its own card fields *and* a processor frame
+   * for something else was reported clean on the criterion it was failing.
+   */
+  readonly processorFramePresent: boolean;
   readonly processorsPresent: readonly string[];
+  /** Something that looks like a payment flow was on the page at all. */
+  readonly checkoutObserved: boolean;
   /** Contactability, from the consumer trust check's own signals. */
   readonly contactRoutes: readonly string[];
   readonly contactOutcome: 'found' | 'not_found' | 'unclear';
@@ -110,16 +129,18 @@ const CARD_FIELD = `(() => {
     .map((frame) => frame.src)
     .filter(Boolean);
 
+  const inline = [...document.querySelectorAll('script:not([src])')]
+    .map((script) => script.textContent || '')
+    .join('\\n');
+
   return {
     cardInputsOnPage: onPage.length,
     // A processor's fields live in its own frame, which is the whole point of
     // the arrangement: the card never enters the merchant's document.
     frameSources: frames,
     scripts: [...document.querySelectorAll('script[src]')].map((script) => script.src),
-    inlineScripts: [...document.querySelectorAll('script:not([src])')]
-      .map((script) => script.textContent || '')
-      .join('\\n')
-      .slice(0, 200000),
+    inlineScripts: inline.slice(0, 200000),
+    inlineScriptTruncated: inline.length > 200000,
   };
 })();`;
 
@@ -134,16 +155,25 @@ const hostOf = (url: string): string | null => {
 const matchesKnown = (host: string, list: readonly string[]) =>
   list.some((known) => host === known || host.endsWith(`.${known}`));
 
+/**
+ * Reads the three signals off a page that is already loaded.
+ *
+ * Takes the response rather than its body. The contact check reads the status
+ * and the headers on some of its paths, and this used to hand it `status: 200`
+ * and `headers: {}` — fabricated, beside a comment explaining that fabricating
+ * them would give a quiet wrong answer about whether anybody can be contacted.
+ * The real response is one argument away at every call site.
+ */
 export async function measureTrust(
   session: BrowserSession,
-  html: string,
-  finalUrl: string,
+  response: Pick<ScopedResponse, 'url' | 'status' | 'headers' | 'body' | 'redirectChain'>,
 ): Promise<TrustMeasurements> {
-  const page = (await session.page.evaluate(FIELD_SCRIPT())) as {
+  const page = (await session.page.evaluate(CARD_FIELD)) as {
     cardInputsOnPage: number;
     frameSources: string[];
     scripts: string[];
     inlineScripts: string;
+    inlineScriptTruncated: boolean;
   };
 
   const scriptHosts = [
@@ -164,16 +194,18 @@ export async function measureTrust(
   // headers on some paths, and a cast that hid an absent field would produce a
   // quiet wrong answer about whether anybody can be contacted.
   const fetched: FetchedPage = {
-    finalUrl,
-    status: 200,
-    headers: {},
-    html,
-    redirected: false,
+    finalUrl: response.url,
+    status: response.status,
+    headers: response.headers,
+    html: response.body,
+    redirected: response.redirectChain.length > 0,
   };
   const contact: Observation[] = runChecks(fetched).filter((observation) =>
     ['contact_email', 'telephone', 'company_identity'].includes(observation.id),
   );
   const found = contact.filter((observation) => observation.outcome === 'found');
+
+  const processorFramePresent = frameHosts.some((host) => matchesKnown(host, PAYMENT_PROCESSORS));
 
   return {
     scriptHosts,
@@ -181,9 +213,11 @@ export async function measureTrust(
     minerSignatures: MINER_SIGNATURES.filter((pattern) => pattern.test(page.inlineScripts)).map(
       (pattern) => pattern.source,
     ),
+    inlineScriptTruncated: page.inlineScriptTruncated,
     collectsCardDetails: page.cardInputsOnPage > 0,
-    cardFieldsAreFramed: frameHosts.some((host) => matchesKnown(host, PAYMENT_PROCESSORS)),
+    processorFramePresent,
     processorsPresent,
+    checkoutObserved: page.cardInputsOnPage > 0 || processorsPresent.length > 0,
     contactRoutes: found.map((observation) => observation.id),
     contactOutcome:
       found.length > 0
@@ -194,35 +228,64 @@ export async function measureTrust(
   };
 }
 
-function FIELD_SCRIPT(): string {
-  return CARD_FIELD;
+/** A criterion this run did not get to test, and the sentence that says so. */
+export interface NotTested {
+  readonly criterion: string;
+  readonly because: string;
+}
+
+export interface TrustOutcome {
+  readonly findings: readonly RawFinding[];
+  /**
+   * The criteria this page could not answer, rather than silently none.
+   *
+   * "No findings against this criterion" renders as a tick. A checkout lives at
+   * /checkout, not on the landing page this reads, so for an application whose
+   * owner told us it takes payments, SEC-12 produced no finding and the visitor
+   * was shown a tick against "If I pay, does my card go to a proper payment
+   * company?" — for a page nobody had opened. That is the failure this file's
+   * own header says it exists to prevent, and it was happening here.
+   */
+  readonly notTested: readonly NotTested[];
 }
 
 export function trustFindings(
   measurements: TrustMeasurements,
   declared: { payments: boolean },
   evidenceIds: readonly string[],
-): RawFinding[] {
+): TrustOutcome {
   const findings: RawFinding[] = [];
+  const notTested: NotTested[] = [];
   const evidence = [...evidenceIds];
 
   // --- SEC-12: where a card number goes ------------------------------------
   //
-  // Only when a card field was actually found. An application with no checkout
-  // is not failing this criterion; it has nothing to fail it with, and the
-  // verification page says "there was no checkout to test" rather than ticking.
-  if (measurements.collectsCardDetails && !measurements.cardFieldsAreFramed) {
+  // A card field in the application's own document is the finding, and a
+  // processor's frame somewhere else on the page does not undo it.
+  // `querySelectorAll` does not cross a frame boundary, so these fields are the
+  // merchant's own. Withholding the finding because a Stripe frame existed
+  // elsewhere reported a page clean on the criterion it was failing.
+  if (measurements.collectsCardDetails) {
     findings.push({
       ruleId: 'SEC-12',
       dimension: 'security_posture',
       severity: 'high',
       confidence: 'medium',
       title: 'Card details are typed into the application’s own page',
-      description:
-        'A field that takes a card number was found in the application’s own document rather than inside a frame belonging to a payment processor. When a card is typed into the merchant’s own page, the merchant’s servers and every script on that page are in the path of the card number — which is the arrangement the card schemes require merchants to avoid, and the one that turns a single compromised script into a card-skimming incident.',
+      description: `A field that takes a card number was found in the application’s own document rather than inside a frame belonging to a payment processor. When a card is typed into the merchant’s own page, the merchant’s servers and every script on that page are in the path of the card number — which is the arrangement the card schemes require merchants to avoid, and the one that turns a single compromised script into a card-skimming incident.${
+        measurements.processorFramePresent
+          ? ' A payment processor’s frame is also present on this page, so the hosted arrangement is available and these fields are not using it.'
+          : ''
+      }`,
       remediation:
         'Use the hosted fields or hosted checkout your payment provider offers, so the card number never enters your own document. Every recognised processor provides one.',
       evidenceIds: evidence,
+    });
+  } else if (declared.payments && !measurements.checkoutObserved) {
+    notTested.push({
+      criterion: 'SEC-12',
+      because:
+        'The owner says this application takes payments, and no checkout was found on the landing page — which is the only page this criterion is read from. Where a card number goes was not established.',
     });
   }
 
@@ -245,6 +308,14 @@ export function trustFindings(
     });
   }
 
+  if (measurements.inlineScriptTruncated) {
+    notTested.push({
+      criterion: 'SEC-13',
+      because:
+        'The page carries more inline script than this check reads, so the signatures were matched against part of it. The scripts it loads from elsewhere were all checked.',
+    });
+  }
+
   // --- PRI-07: somebody to write to ----------------------------------------
   if (measurements.contactOutcome === 'not_found') {
     findings.push({
@@ -254,12 +325,12 @@ export function trustFindings(
       confidence: 'medium',
       title: 'No way to reach the operator was found without signing in',
       description:
-        'No address that a person answers, telephone number, or named company was found on the pages we could reach. Both POPIA and the GDPR expect somebody a data subject can write to about their own data, and a user who cannot find anybody to ask has no route to exercise any of it. It may exist behind a sign-in, or on a page this assessment did not open — absence of a finding is not evidence of absence.',
+        'No address that a person answers, telephone number, or named company was found on the landing page. Both POPIA and the GDPR expect somebody a data subject can write to about their own data, and a user who cannot find anybody to ask has no route to exercise any of it. It may exist behind a sign-in, or on a page this assessment did not open — absence of a finding is not evidence of absence.',
       remediation:
         'Publish an address a person actually reads, on a page a visitor can reach without an account. A no-reply address is not a contact route.',
       evidenceIds: evidence,
     });
   }
 
-  return findings;
+  return { findings, notTested };
 }

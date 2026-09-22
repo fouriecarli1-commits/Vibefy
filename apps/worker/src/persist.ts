@@ -129,8 +129,8 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
          id, app_id, organisation_id, authorisation_id, rubric_version, depth, status,
          overall_score, dimension_scores, certification_eligible, gate_failures,
          scope_statement, prompt_bundle_sha256, engine_version, requested_by,
-         report_narrative, exit_measurement, started_at, completed_at
-       ) values ($1, $2, $3, $4, $5, $6, 'running', $7, $8, false, $9, $10, $11, $12, $13, $14, $15, now(), now())
+         report_narrative, exit_measurement, not_tested, started_at, completed_at
+       ) values ($1, $2, $3, $4, $5, $6, 'running', $7, $8, false, $9, $10, $11, $12, $13, $14, $15, $16, now(), now())
        returning id`,
       [
         outcome.assessmentId,
@@ -148,6 +148,7 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
         input.requestedBy,
         outcome.narrative ? JSON.stringify(outcome.narrative) : null,
         outcome.exitMeasurement ? JSON.stringify(outcome.exitMeasurement) : null,
+        JSON.stringify(outcome.notTestedCriteria),
       ],
     );
     const assessmentId = assessment.rows[0]!.id;

@@ -98,6 +98,16 @@ interface StageResultFields {
    * reads a score.
    */
   readonly exitMeasurement?: unknown;
+  /**
+   * Criteria this run could not answer, with the reason in the words the
+   * verification page should use.
+   *
+   * The page turns "no findings against this criterion" into a tick, so a
+   * criterion nothing looked at renders as a pass. `rubricCriteria` already
+   * stops that for a criterion the rubric does not define; this stops it for
+   * one the rubric defines and this particular run did not reach.
+   */
+  readonly notTested?: readonly { readonly criterion: string; readonly because: string }[];
   readonly error?: string;
   readonly promptSha256?: string;
 }

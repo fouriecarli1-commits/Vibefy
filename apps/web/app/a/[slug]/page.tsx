@@ -68,10 +68,11 @@ async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
       has_authentication: boolean;
       has_payments: boolean;
       processes_personal_data: boolean;
+      not_tested: { criterion: string; because: string }[] | null;
     }>(
       `select app.name as app_name, a.rubric_version, a.depth::text as depth,
               a.gate_failures, app.has_authentication, app.has_payments,
-              app.processes_personal_data,
+              app.processes_personal_data, a.not_tested,
               coalesce(a.completed_at, a.created_at)::date::text as assessed_on
          from public.badges b
          join public.assessments a on a.id = b.assessment_id
@@ -112,6 +113,7 @@ async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
         severity: finding.severity as AssuranceInput['findings'][number]['severity'],
       })),
       rubricCriteria,
+      notTested: row.not_tested ?? [],
       declared: {
         authentication: row.has_authentication,
         payments: row.has_payments,

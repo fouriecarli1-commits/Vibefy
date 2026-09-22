@@ -83,6 +83,7 @@ export const deterministicChecksStage: Stage = {
     const http = new ScopedHttp(context.guard, context.evidence);
     const findings: RawFinding[] = [];
     const notes: string[] = [];
+    const notTested: { criterion: string; because: string }[] = [];
 
     let root: ScopedResponse;
     try {
@@ -223,10 +224,12 @@ export const deterministicChecksStage: Stage = {
        * document rather than judged.
        */
       try {
-        const trust = await measureTrust(session, root.body, url);
-        findings.push(
-          ...trustFindings(trust, { payments: context.target.hasPayments }, [desktopShot]),
-        );
+        const trust = await measureTrust(session, root);
+        const outcome = trustFindings(trust, { payments: context.target.hasPayments }, [
+          desktopShot,
+        ]);
+        findings.push(...outcome.findings);
+        notTested.push(...outcome.notTested);
         notes.push(
           `Trust survey: ${trust.scriptHosts.length} script origin(s), ${
             trust.processorsPresent.length > 0
@@ -370,6 +373,16 @@ export const deterministicChecksStage: Stage = {
       notes.push(
         `The browser pass did not complete, so nothing was looked at in a browser: no accessibility scan, no check of the layout at phone width, no console errors and no design survey. What is absent from this stage is absent because it was not examined. (${browserPassError})`,
       );
+      // Including the three criteria rubric 1.1.0 added, every one of which is
+      // read from the loaded page. Absent findings against them are absent
+      // because nothing was read, and the page must not tick them.
+      for (const criterion of ['SEC-12', 'SEC-13', 'PRI-07']) {
+        notTested.push({
+          criterion,
+          because:
+            'The page could not be loaded in a browser, so nothing this criterion is read from was observed.',
+        });
+      }
     } finally {
       await session.close();
     }
@@ -481,6 +494,7 @@ export const deterministicChecksStage: Stage = {
       notes,
       ...(didItsJob || browserPassError === null ? {} : { error: browserPassError }),
       ...(exitMeasurement === undefined ? {} : { exitMeasurement }),
+      ...(notTested.length === 0 ? {} : { notTested }),
     };
   },
 };

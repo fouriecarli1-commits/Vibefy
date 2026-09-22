@@ -82,9 +82,10 @@ describe('the three the verification page asks on a visitor’s behalf', () => {
   let fixture: CheckoutFixture;
   let bad: TrustMeasurements;
   let good: TrustMeasurements;
+  let both: TrustMeasurements;
 
   const rulesOf = (measurements: TrustMeasurements) =>
-    trustFindings(measurements, { payments: true }, ['evidence-1']).map((f) => f.ruleId);
+    trustFindings(measurements, { payments: true }, ['evidence-1']).findings.map((f) => f.ruleId);
 
   beforeAll(async () => {
     fixture = await startCheckoutPage();
@@ -100,7 +101,13 @@ describe('the three the verification page asks on a visitor’s behalf', () => {
       await session.open();
       try {
         await session.goto(url, 'domcontentloaded');
-        return await measureTrust(session, await session.page.content(), url);
+        return await measureTrust(session, {
+          url,
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+          body: await session.page.content(),
+          redirectChain: [],
+        });
       } finally {
         await session.close();
       }
@@ -108,6 +115,7 @@ describe('the three the verification page asks on a visitor’s behalf', () => {
 
     bad = await measure(fixture.url);
     good = await measure(`${fixture.url}?good=1`);
+    both = await measure(`${fixture.url}?both=1`);
   }, 180_000);
 
   afterAll(async () => {
@@ -116,7 +124,7 @@ describe('the three the verification page asks on a visitor’s behalf', () => {
 
   it('sees a card typed into the application’s own page', () => {
     expect(bad.collectsCardDetails).toBe(true);
-    expect(bad.cardFieldsAreFramed).toBe(false);
+    expect(bad.processorFramePresent).toBe(false);
     expect(rulesOf(bad)).toContain('SEC-12');
   });
 
@@ -133,7 +141,8 @@ describe('the three the verification page asks on a visitor’s behalf', () => {
 
   it('says nothing about the same shop done properly', () => {
     // The half that makes the other half mean something.
-    expect(good.cardFieldsAreFramed).toBe(true);
+    expect(good.processorFramePresent).toBe(true);
+    expect(good.collectsCardDetails).toBe(false);
     expect(good.processorsPresent).toContain('js.stripe.com');
     expect(good.contactOutcome).toBe('found');
     expect(rulesOf(good)).toEqual([]);
@@ -145,9 +154,42 @@ describe('the three the verification page asks on a visitor’s behalf', () => {
     const noCheckout: TrustMeasurements = {
       ...good,
       collectsCardDetails: false,
-      cardFieldsAreFramed: false,
+      processorFramePresent: false,
+      processorsPresent: [],
+      checkoutObserved: false,
     };
-    expect(trustFindings(noCheckout, { payments: false }, ['e'])).toEqual([]);
+    expect(trustFindings(noCheckout, { payments: false }, ['e']).findings).toEqual([]);
+  });
+
+  it('still names the finding when a processor frame is on the page and the card fields are not in it', () => {
+    // The common half-migrated checkout. `cardFieldsAreFramed` claimed the
+    // card inputs were inside a processor's frame and only ever established
+    // that such a frame existed somewhere — and it withheld SEC-12, so this
+    // page was reported clean on the criterion it was failing.
+    expect(both.processorFramePresent).toBe(true);
+    expect(both.collectsCardDetails).toBe(true);
+    expect(rulesOf(both)).toContain('SEC-12');
+    const finding = trustFindings(both, { payments: true }, ['e']).findings.find(
+      (f) => f.ruleId === 'SEC-12',
+    );
+    expect(finding?.description).toMatch(/frame is also present/i);
+  });
+
+  it('says a criterion was not tested rather than letting the page tick it', () => {
+    // A checkout lives at /checkout, and this criterion is read from the
+    // landing page. For an owner who told us their application takes payments,
+    // "no finding" is what a tick is made of.
+    const noCheckout: TrustMeasurements = {
+      ...good,
+      collectsCardDetails: false,
+      processorFramePresent: false,
+      processorsPresent: [],
+      checkoutObserved: false,
+    };
+    const outcome = trustFindings(noCheckout, { payments: true }, ['e']);
+    expect(outcome.findings.some((f) => f.ruleId === 'SEC-12')).toBe(false);
+    expect(outcome.notTested.map((entry) => entry.criterion)).toContain('SEC-12');
+    expect(outcome.notTested[0]?.because).toMatch(/no checkout was found/i);
   });
 
   it('keeps the miner list short enough to be defensible', () => {

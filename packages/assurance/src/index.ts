@@ -78,6 +78,17 @@ export interface AssuranceInput {
    * tested", said out loud, until the rubric has a check for it.
    */
   readonly rubricCriteria: readonly string[];
+  /**
+   * Criteria this particular run did not answer, with the reason.
+   *
+   * `rubricCriteria` above stops a tick for a criterion the rubric does not
+   * define. This stops the other half of the same failure: a criterion the
+   * rubric defines that this run could not reach. The question that asks where
+   * a card number goes is read from the landing page, and a checkout lives at
+   * /checkout — so for most applications that take payments nothing looked, and
+   * "no findings" printed a tick.
+   */
+  readonly notTested?: readonly { readonly criterion: string; readonly because: string }[];
   /** Published findings only. A withheld finding was never told to the owner. */
   readonly findings: readonly AssuranceFinding[];
   /**
@@ -270,10 +281,24 @@ export function assuranceFor(input: AssuranceInput): AssuranceLine[] {
      * was true.
      */
     const unknown = claim.criteria.filter((id) => !input.rubricCriteria.includes(id));
+    /*
+     * The same rule for a criterion the run did not reach.
+     *
+     * The paragraph above is about a rubric with no check for something. This
+     * is about a run that had the check and did not get to use it — the
+     * question about where a card number goes is read from the landing page,
+     * and a checkout is at /checkout. One missing criterion falsifies the
+     * claim's sentence exactly as before, and there is still no partial tick.
+     */
+    const unreached = (input.notTested ?? []).filter((entry) =>
+      claim.criteria.includes(entry.criterion),
+    );
     const reason =
       unknown.length > 0
         ? `Rubric version ${input.rubricVersion} has no check for ${unknown.length === claim.criteria.length ? 'this' : 'part of this'} yet, so it was not tested. It is not a pass.`
-        : (claim.notTested?.(input) ?? null);
+        : unreached.length > 0
+          ? `${unreached[0]!.because} It is not a pass.`
+          : (claim.notTested?.(input) ?? null);
 
     if (!applies || reason) {
       return {
