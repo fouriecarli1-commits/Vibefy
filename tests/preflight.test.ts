@@ -32,12 +32,23 @@ import {
   PREFLIGHT_LEGEND,
   PREFLIGHT_NOT_AN_ASSESSMENT,
   preflightItems,
+  runChecks,
+  type FetchedPage,
   type PreflightItem,
 } from '../packages/trustcheck/src/index.ts';
 import { messyPage, readyPage } from './fixtures/shippable-page.ts';
 
 const messy = preflightItems(messyPage, 'http://my-app.example/');
 const ready = preflightItems(readyPage, 'https://kettle.example/');
+
+/** A page with exactly the markup a case is about, and nothing else. */
+const pageWith = (html: string): FetchedPage => ({
+  finalUrl: 'https://kettle.test/',
+  status: 200,
+  headers: {},
+  html: `<!doctype html><html lang="en">${html}</html>`,
+  redirected: false,
+});
 
 const outcome = (items: PreflightItem[], id: string) =>
   items.find((entry) => entry.id === id)?.outcome;
@@ -233,5 +244,45 @@ describe('the header check and the fetcher agree on case', () => {
     const headers = withOne.find((item) => item.id === 'headers')!;
     expect(headers.detail).toContain('3 of the four');
     expect(headers.evidence).not.toContain('content-security-policy');
+  });
+});
+
+describe('a meta tag written the other way round', () => {
+  it('is read, because that is ordinary HTML', () => {
+    // `<meta content="..." name="description">` is valid and several frameworks
+    // emit it. A pattern that insists on one attribute order tells those
+    // builders they have no description when they have one — and the fix it
+    // offers is to add the thing they already added.
+    const items = preflightItems(
+      pageWith(
+        '<head><title>Kettle Club</title><meta content="A kettle every month, delivered." name="description"></head><body><h1>Kettle</h1></body>',
+      ),
+      'https://kettle.test/',
+    );
+    const says = items.find((entry) => entry.id === 'says_what_it_is')!;
+    expect(says.outcome).toBe('ok');
+  });
+
+  it('still says so when there really is none', () => {
+    const items = preflightItems(
+      pageWith('<head><title>Kettle Club</title></head><body><h1>Kettle</h1></body>'),
+      'https://kettle.test/',
+    );
+    const says = items.find((entry) => entry.id === 'says_what_it_is')!;
+    expect(says.outcome).toBe('unclear');
+    expect(says.fix).toMatch(/meta description/i);
+  });
+});
+
+describe('every borrowed question', () => {
+  it('names a check that exists', () => {
+    // A borrowed item whose source id no longer matches is dropped without a
+    // word: the question simply stops appearing, and the summary counts one
+    // fewer, with nothing anywhere saying a question went missing.
+    const source = readFileSync('packages/trustcheck/src/preflight.ts', 'utf8');
+    const borrowed = [...source.matchAll(/from: '([a-z_]+)'/g)].map((match) => match[1]!);
+    expect(borrowed.length).toBeGreaterThan(0);
+    const checks = runChecks(pageWith('<body>x</body>')).map((observation) => observation.id);
+    for (const id of borrowed) expect(checks, id).toContain(id);
   });
 });

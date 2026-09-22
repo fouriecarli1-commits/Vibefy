@@ -96,6 +96,18 @@ interface Page {
 }
 
 /** The builder's questions, answered from the one response. */
+/** The content of a named meta tag, whichever order its attributes are in. */
+function metaContent(html: string, name: string): string {
+  for (const tag of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const text = tag[0];
+    const named = new RegExp(`\\bname\\s*=\\s*["']${name}["']`, 'i').test(text);
+    if (!named) continue;
+    const content = /\bcontent\s*=\s*["']([^"']*)["']/i.exec(text);
+    if (content) return content[1]!.trim();
+  }
+  return '';
+}
+
 export function preflightItems(page: Page, requestedUrl: string): PreflightItem[] {
   const html = page.html;
   const header = (name: string) => page.headers[name.toLowerCase()] ?? null;
@@ -149,9 +161,11 @@ export function preflightItems(page: Page, requestedUrl: string): PreflightItem[
 
   // 3. It says what it is.
   const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.trim() ?? '';
-  const description =
-    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i.exec(html)?.[1]?.trim() ??
-    '';
+  // Read whichever way round the attributes are written. `<meta content="..."
+  // name="description">` is ordinary HTML and several frameworks emit it, and
+  // a pattern that insists on one order tells those builders they have no
+  // description when they have one — which is a fix they cannot find.
+  const description = metaContent(html, 'description');
   items.push(
     title.length > 2
       ? item(
