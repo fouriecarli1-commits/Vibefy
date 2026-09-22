@@ -9,6 +9,11 @@
  * exit nobody finds.
  *
  * `?fair=1` is the same service with the way out where the way in is.
+ *
+ * `?layered=1` is the ordinary case that broke the measurement: a footer on
+ * every page that mentions cancelling and carries a newsletter form, a pricing
+ * page that is a step towards joining rather than the place you join, and the
+ * real exit one click further than the first page that looked like it.
  */
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -66,10 +71,67 @@ const FAIR: Record<string, string> = {
   '/about': wrap('About', `<h1>About</h1><p>We like kettles.</p>`),
 };
 
+/** A footer of the kind every page of an ordinary site carries. */
+const FOOTER = `<footer>
+  <p>You can cancel your subscription at any time.</p>
+  <form action="/newsletter"><input name="email"><button>Subscribe to our newsletter</button></form>
+  <a href="/about">About us</a>
+</footer>`;
+
+const LAYERED: Record<string, string> = {
+  '/': wrap(
+    'Kettle Club',
+    `<h1>Kettle Club</h1><p>A kettle every month.</p>
+     <a href="/pricing">Pricing</a>
+     <a href="/account">Your account</a>
+     ${FOOTER}`,
+  ),
+  // A page about what things cost, not a page you join on. The old rule took
+  // the first link whose text matched, so this fixed the way in at one click.
+  '/pricing': wrap(
+    'Pricing',
+    `<h1>Pricing</h1><p>Standard is R99 a month.</p>
+     <a href="/join">Choose Standard</a>
+     ${FOOTER}`,
+  ),
+  '/join': wrap(
+    'Join',
+    `<h1>Start your trial</h1><form action="/join"><button>Subscribe now</button></form>${FOOTER}`,
+  ),
+  '/account': wrap(
+    'Your account',
+    `<h1>Your account</h1><a href="/account/settings">Account settings</a>${FOOTER}`,
+  ),
+  // The page the old rule called the exit: it mentions cancelling in its
+  // footer and has a form in the same footer, and it is neither.
+  '/account/settings': wrap(
+    'Settings',
+    `<h1>Settings</h1>
+     <a href="/cancel">Cancel your subscription</a>
+     <a href="/account/settings/address">Change your address</a>
+     ${FOOTER}`,
+  ),
+  '/account/settings/address': wrap('Address', `<h1>Change your address</h1>${FOOTER}`),
+  '/cancel': wrap(
+    'Cancel',
+    `<h1>Cancel your subscription</h1>
+     <p>This stops your subscription at the end of the current month.</p>
+     <form method="post" action="/cancel"><button type="submit">Cancel my subscription</button></form>
+     ${FOOTER}`,
+  ),
+  '/about': wrap('About', `<h1>About</h1><p>We like kettles.</p>${FOOTER}`),
+};
+
 export async function startSubscriptionSite(): Promise<SubscriptionFixture> {
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
-    const pages = url.searchParams.get('fair') === '1' ? FAIR : HARD;
+    const variant =
+      url.searchParams.get('fair') === '1'
+        ? 'fair'
+        : url.searchParams.get('layered') === '1'
+          ? 'layered'
+          : 'hard';
+    const pages = variant === 'fair' ? FAIR : variant === 'layered' ? LAYERED : HARD;
     const body = pages[url.pathname];
     if (!body) {
       response.writeHead(404, { 'content-type': 'text/plain' });
@@ -79,12 +141,13 @@ export async function startSubscriptionSite(): Promise<SubscriptionFixture> {
     // The query string has to survive a click, or the fair site's links land on
     // the hard site and the fixture quietly tests one page twice.
     const carried =
-      url.searchParams.get('fair') === '1'
-        ? body.replace(
+      variant === 'hard'
+        ? body
+        : body.replace(
             /href="([^"]+)"/g,
-            (m, href) => `href="${href}${String(href).includes('?') ? '&' : '?'}fair=1"`,
-          )
-        : body;
+            (m, href) =>
+              `href="${href}${String(href).includes('?') ? '&' : '?'}${variant === 'fair' ? 'fair' : 'layered'}=1"`,
+          );
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end(carried);
   });

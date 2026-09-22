@@ -17,6 +17,8 @@ import {
   type StageContext,
   type StageResult,
 } from '../packages/engine/src/index.ts';
+import { CeilingExceededError } from '../packages/engine/src/runtime/scope.ts';
+import { runPipeline } from '../packages/engine/src/pipeline.ts';
 import { startVulnerableApp, type FixtureApp } from './fixtures/vulnerable-app.ts';
 
 let app: FixtureApp;
@@ -280,5 +282,66 @@ describe('when the browser pass cannot run', () => {
     } finally {
       await fixture.close();
     }
+  }, 120_000);
+});
+
+describe('when the run reaches a ceiling inside this stage', () => {
+  /**
+   * The stop has to leave the stage.
+   *
+   * Every catch block in here turned what it caught into a note and carried on,
+   * and `probe` returned null for anything that threw. That is right for a page
+   * that would not load; for a ceiling it meant the run did not stop. Nothing
+   * reached the pipeline, so nothing was classified, so `stopped` stayed null,
+   * so every later stage ran on to hit the same ceiling — and the run came out
+   * `completed`, with no stop reason recorded, carrying a security posture
+   * assembled from probes that were never sent.
+   */
+  const contextWith = (url: string, maxTotalRequests: number): StageContext => ({
+    assessmentId: 'assessment-ceiling',
+    depth: 'full',
+    guard: new ScopeGuard({
+      allowedHosts: [new URL(url).hostname],
+      exclusions: [],
+      ceiling: { ...DEFAULT_CEILING, maxRequestsPerMinute: 600, maxTotalRequests },
+      allowPrivateNetworkForTesting: true,
+    }),
+    meter: new CostMeter({ maxRunCostUsd: 1 }),
+    evidence: new EvidenceStore('assessment-ceiling'),
+    model: null as never,
+    log: () => undefined,
+    target: {
+      appId: 'app-ceiling',
+      organisationId: 'org-fixture',
+      appName: 'Kettle',
+      appType: 'web_url',
+      primaryUrl: url,
+      repositoryPath: null,
+      intendedForAppStore: false,
+      isGame: false,
+      hasAuthentication: false,
+      hasPayments: false,
+      processesPersonalData: false,
+      description: 'A shop that sells kettles.',
+    },
+  });
+
+  it('throws the ceiling rather than noting it and carrying on', async () => {
+    // One request is allowed: the initial page load. The first probe after it
+    // is refused, and used to come back as "nothing is served at /.env".
+    await expect(deterministicChecksStage.run(contextWith(app.url, 1))).rejects.toBeInstanceOf(
+      CeilingExceededError,
+    );
+  }, 120_000);
+
+  it('comes out of the pipeline as an aborted run with a reason', async () => {
+    const outcome = await runPipeline({
+      context: contextWith(app.url, 1),
+      stages: [deterministicChecksStage],
+    });
+    expect(outcome.status).toBe('aborted');
+    expect(outcome.stopReason).toBe('intensity_ceiling');
+    // And it is not retried: spending money to break the same rule twice.
+    expect(outcome.notes.join(' ')).not.toMatch(/Succeeded on attempt 2/);
   }, 120_000);
 });

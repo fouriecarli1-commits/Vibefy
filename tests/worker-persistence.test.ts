@@ -190,8 +190,8 @@ describe('the hard gate at dispatch', () => {
   it('never permits a private address, even for an app whose declared host resolves inward', async () => {
     const appId = await seedApp(db, owner);
     await seedAuthorisation(db, owner, appId, { scopeDomains: ['localhost'] });
-    // The run starts — authorisation exists — but no request reaches loopback,
-    // so the deterministic stage cannot fetch anything and the run ends failed.
+    // The run starts — authorisation exists — but the dispatcher refuses the
+    // address the declared host resolves to, so nothing is fetched.
     const result = await runAssessmentJob(
       { appId, depth: 'limited', requestedBy: owner.userId },
       { pool, transport: new ScriptedTransport([]) },
@@ -201,7 +201,18 @@ describe('the hard gate at dispatch', () => {
       [result.assessmentId],
     );
     const deterministic = stages.rows.find((row) => row.stage === 'deterministic_checks');
-    expect(deterministic?.status).toBe('failed');
+    const assessment = await db.query(
+      'select status, stop_reason from public.assessments where id = $1',
+      [result.assessmentId],
+    );
+    // Aborted, not failed. This used to be written down as a failure — the same
+    // word as a stage that crashed — which tells a customer their application
+    // broke when what happened is that the scope boundary held. The stage
+    // caught the refusal and turned it into a note; now it hands it to the
+    // pipeline, which files it under the reason it was.
+    expect(deterministic?.status).toBe('aborted');
+    expect(assessment.rows[0]?.status).toBe('aborted');
+    expect(assessment.rows[0]?.stop_reason).toBe('scope_violation');
   }, 60_000);
 });
 

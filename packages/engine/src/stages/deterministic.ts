@@ -16,7 +16,24 @@ import { measureTrust, trustFindings } from './trust-checks.ts';
 import { crawlForTheExit } from './exit-checks.ts';
 import { scoreExit } from '@vibefycode/trustcheck';
 import { gameFindings, measureGame } from './game-checks.ts';
+import { classifyStop } from '../runtime/stop.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
+
+/**
+ * Re-throws the three deliberate stops, and only those.
+ *
+ * This stage does the most work and catches the most failures, and every one of
+ * its catch blocks turned what it caught into a note and carried on. That is
+ * right for a page that would not load and wrong for a ceiling: a run that has
+ * reached its spending cap, used up the intensity the customer authorised, or
+ * been refused at the scope boundary is a run that must stop, with a reason.
+ * The pipeline does exactly that — but only for errors that reach it, and none
+ * of these did. Every later stage ran on to hit the same ceiling, and the run
+ * came out `completed` with no stop reason recorded at all.
+ */
+function rethrowIfStop(error: unknown): void {
+  if (classifyStop(error) !== null) throw error;
+}
 
 /** Paths that should never be reachable, and what it means when they are. */
 const EXPOSED_PATHS: readonly { path: string; title: string; severity: RawFinding['severity'] }[] =
@@ -71,6 +88,10 @@ export const deterministicChecksStage: Stage = {
     try {
       root = await http.request(url, { summary: 'Initial page load' });
     } catch (error) {
+      // A ceiling on the very first request is not an application that did not
+      // respond, and returning `failed` for it had the pipeline retry — which
+      // is the one thing it promises never to do with a ceiling.
+      rethrowIfStop(error);
       return {
         stage: 'deterministic_checks',
         status: 'failed',
@@ -214,6 +235,7 @@ export const deterministicChecksStage: Stage = {
           }, contact route ${trust.contactOutcome.replace('_', ' ')}.`,
         );
       } catch (error) {
+        rethrowIfStop(error);
         notes.push(
           `The trust survey did not complete: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -243,6 +265,7 @@ export const deterministicChecksStage: Stage = {
           `Design survey: ${design.fontSizesPx.length} text sizes, ${design.fontFamilies.length} typefaces, ${design.buttonStyles.length} button styles, ${Math.round(design.spacingsOnGrid * 100)}% of spacing on a 4px grid.`,
         );
       } catch (error) {
+        rethrowIfStop(error);
         notes.push(
           `The design survey did not complete: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -276,6 +299,7 @@ export const deterministicChecksStage: Stage = {
           `Design survey at phone width: ${mobileDesign.fontSizesPx.length} text sizes, ${Math.round(mobileDesign.spacingsOnGrid * 100)}% of spacing on a 4px grid, ${newAtThisWidth.length} observation(s) that the desktop pass did not already make.`,
         );
       } catch (error) {
+        rethrowIfStop(error);
         notes.push(
           `The design survey at phone width did not complete: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -341,6 +365,7 @@ export const deterministicChecksStage: Stage = {
       }
       browserPassCompleted = true;
     } catch (error) {
+      rethrowIfStop(error);
       browserPassError = error instanceof Error ? error.message : String(error);
       notes.push(
         `The browser pass did not complete, so nothing was looked at in a browser: no accessibility scan, no check of the layout at phone width, no console errors and no design survey. What is absent from this stage is absent because it was not examined. (${browserPassError})`,
@@ -392,6 +417,7 @@ export const deterministicChecksStage: Stage = {
         notes.push(...measurements.limitations);
         gamePassCompleted = true;
       } catch (error) {
+        rethrowIfStop(error);
         browserPassError ??= error instanceof Error ? error.message : String(error);
         notes.push(
           `The game pass did not complete, so none of what a game is judged on was measured: ${error instanceof Error ? error.message : String(error)}`,
@@ -420,14 +446,24 @@ export const deterministicChecksStage: Stage = {
     let exitMeasurement: unknown = undefined;
     try {
       const crawl = await crawlForTheExit(http, url);
-      const score = scoreExit(crawl);
-      exitMeasurement = { ...crawl, score };
-      notes.push(
-        crawl.routeFound
-          ? `Way out: found ${crawl.clicksToCancel} click(s) from the front door, ${score.percentage}% (${score.band}).`
-          : 'Way out: no route to cancelling was found on the pages we could reach. It may exist behind a sign-in.',
-      );
+      if (crawl.unreadable !== null) {
+        // Scoring this would publish "No route found" — a statement that the
+        // company gives its customers no way to cancel — on the strength of a
+        // walk that never read a page.
+        notes.push(
+          `Way out: not measured. The front door could not be read (${crawl.unreadable}), so nothing was walked. That is not the same as there being no way out.`,
+        );
+      } else {
+        const score = scoreExit(crawl);
+        exitMeasurement = { ...crawl, score };
+        notes.push(
+          crawl.routeFound
+            ? `Way out: found ${crawl.clicksToCancel} click(s) from the front door, ${score.percentage}% (${score.band}).`
+            : 'Way out: no route to cancelling was found on the pages we could reach. It may exist behind a sign-in.',
+        );
+      }
     } catch (error) {
+      rethrowIfStop(error);
       notes.push(
         `The walk to the exit did not complete: ${error instanceof Error ? error.message : String(error)}`,
       );

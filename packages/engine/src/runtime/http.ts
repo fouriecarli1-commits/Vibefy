@@ -25,6 +25,7 @@ import { fetch, setGlobalDispatcher } from 'undici';
 import type { Dispatcher, RequestInit, Response } from 'undici';
 import { createScopedDispatcher, ScopeGuard, ScopeViolationError } from './scope.ts';
 import type { EvidenceStore } from './evidence.ts';
+import { classifyStop } from './stop.ts';
 
 const MAX_BODY_BYTES = 2_000_000;
 const MAX_REDIRECTS = 5;
@@ -156,12 +157,22 @@ export class ScopedHttp {
   }
 
   /** Probes a path, treating a refusal or a network error as "not reachable". */
+  /**
+   * A request whose failure is an answer: null means the path was not served.
+   *
+   * A ceiling is not that answer. Reaching the spending cap or the intensity
+   * the customer authorised used to come back from here as null, which the
+   * caller reads as "nothing is exposed at /.env" — a clean security posture
+   * reported from a probe that was never sent. The three deliberate stops are
+   * thrown; everything else is still an answer.
+   */
   async probe(baseUrl: string, path: string): Promise<ScopedResponse | null> {
     try {
       return await this.request(new URL(path, baseUrl).toString(), {
         summary: `Probe ${path}`,
       });
-    } catch {
+    } catch (error) {
+      if (classifyStop(error) !== null) throw error;
       return null;
     }
   }

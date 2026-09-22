@@ -129,8 +129,85 @@ export function scoreExit(signals: ExitSignals): ExitScore {
     },
   ];
 
-  const percentage = components.reduce((total, component) => total + component.earned, 0);
-  return { percentage, band: bandFor(percentage), components };
+  // A component that could not be measured must not be scored as a failure.
+  //
+  // Symmetry needs both routes. Where the exit was found and the entrance was
+  // not, the old rule earned zero for it — so a company with a plainly named,
+  // one-click, self-service cancel route was marked down twenty points because
+  // *we* could not find its join button. Its weight is shared across the
+  // components that were measured instead, the panel shows the adjusted
+  // weights, and the detail says why.
+  const measured = components.filter((component) => !unmeasurable(component.id, signals));
+  const adjusted =
+    measured.length === components.length
+      ? components
+      : redistribute(components, new Set(measured.map((component) => component.id)));
+
+  const percentage = adjusted.reduce((total, component) => total + component.earned, 0);
+  return { percentage, band: bandFor(percentage), components: adjusted };
+}
+
+/**
+ * Whether a component had nothing to measure, as opposed to measuring badly.
+ *
+ * Only ever true where the route *was* found: a run that found no route
+ * measured that, and scoring it at zero is the answer rather than the absence
+ * of one.
+ */
+function unmeasurable(id: string, signals: ExitSignals): boolean {
+  if (id !== 'symmetry') return false;
+  return (
+    signals.routeFound && (signals.clicksToCancel === null || signals.clicksToSubscribe === null)
+  );
+}
+
+/**
+ * Shares an unmeasurable component's weight across the rest, keeping whole
+ * numbers and a total of a hundred, so that the components still add up to the
+ * percentage shown beside them.
+ */
+function redistribute(
+  components: ExitScore['components'],
+  keep: ReadonlySet<string>,
+): ExitScore['components'] {
+  const total = components.reduce((sum, component) => sum + component.weight, 0);
+  const kept = components.filter((component) => keep.has(component.id));
+  const keptWeight = kept.reduce((sum, component) => sum + component.weight, 0);
+  if (keptWeight === 0) return components;
+
+  const exact = kept.map((component) => (component.weight * total) / keptWeight);
+  const floors = exact.map((value) => Math.floor(value));
+  let remainder = total - floors.reduce((sum, value) => sum + value, 0);
+  const order = exact
+    .map((value, index) => ({ index, fraction: value - floors[index]! }))
+    .sort((a, b) => b.fraction - a.fraction);
+  const weights = [...floors];
+  for (const entry of order) {
+    if (remainder <= 0) break;
+    weights[entry.index] = weights[entry.index]! + 1;
+    remainder -= 1;
+  }
+
+  const byId = new Map(
+    kept.map((component, index) => {
+      const weight = weights[index]!;
+      // Earned in the same proportion it was earned before, so a half-earned
+      // component stays half-earned.
+      const earned =
+        component.weight === 0 ? 0 : Math.round((component.earned / component.weight) * weight);
+      return [component.id, { ...component, weight, earned }];
+    }),
+  );
+
+  return components.map(
+    (component) =>
+      byId.get(component.id) ?? {
+        ...component,
+        weight: 0,
+        earned: 0,
+        detail: `${component.detail} It is not counted, and its weight is shared across the components that were measured.`,
+      },
+  );
 }
 
 /**

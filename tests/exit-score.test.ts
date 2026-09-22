@@ -14,7 +14,11 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ScopedHttp } from '../packages/engine/src/runtime/http.ts';
-import { DEFAULT_CEILING, ScopeGuard } from '../packages/engine/src/runtime/scope.ts';
+import {
+  CeilingExceededError,
+  DEFAULT_CEILING,
+  ScopeGuard,
+} from '../packages/engine/src/runtime/scope.ts';
 import { EvidenceStore } from '../packages/engine/src/runtime/evidence.ts';
 import { crawlForTheExit, type ExitCrawl } from '../packages/engine/src/stages/exit-checks.ts';
 import {
@@ -28,20 +32,24 @@ import { startSubscriptionSite, type SubscriptionFixture } from './fixtures/subs
 let site: SubscriptionFixture;
 let hard: ExitCrawl;
 let fair: ExitCrawl;
+let layered: ExitCrawl;
+
+const guardFor = (maxTotalRequests: number) =>
+  new ScopeGuard({
+    allowedHosts: [site.host.split(':')[0]!],
+    exclusions: [],
+    ceiling: { ...DEFAULT_CEILING, maxRequestsPerMinute: 600, maxTotalRequests },
+    allowPrivateNetworkForTesting: true,
+  });
+
+const walk = async (url: string, maxTotalRequests = 400) =>
+  crawlForTheExit(new ScopedHttp(guardFor(maxTotalRequests), new EvidenceStore(url)), url);
 
 beforeAll(async () => {
   site = await startSubscriptionSite();
-  const walk = async (url: string) => {
-    const guard = new ScopeGuard({
-      allowedHosts: [site.host.split(':')[0]!],
-      exclusions: [],
-      ceiling: { ...DEFAULT_CEILING, maxRequestsPerMinute: 600, maxTotalRequests: 400 },
-      allowPrivateNetworkForTesting: true,
-    });
-    return crawlForTheExit(new ScopedHttp(guard, new EvidenceStore(url)), url);
-  };
   hard = await walk(site.url);
   fair = await walk(`${site.url}?fair=1`);
+  layered = await walk(`${site.url}?layered=1`);
 }, 180_000);
 
 afterAll(async () => {
@@ -78,9 +86,57 @@ describe('walking to the exit', () => {
     expect(fair.plainlyNamed).toBe(true);
   });
 
+  it('does not mistake the footer every page carries for the way out', () => {
+    // An ordinary site says "you can cancel at any time" in its footer and puts
+    // a newsletter form beside it, on every page. "Mentions cancelling and has
+    // a form somewhere" made each of those pages the exit at whatever depth it
+    // was first reached — which flatters the site and points the customer at a
+    // page where they cannot cancel.
+    expect(layered.cancelUrl).toMatch(/\/cancel/);
+    expect(layered.clicksToCancel).toBe(3);
+    expect(layered.plainlyNamed).toBe(true);
+    expect(layered.selfService).toBe(true);
+  });
+
+  it('holds the way in to the same standard as the way out', () => {
+    // A pricing page is a step towards joining, not the page you join on. The
+    // exit had to be a page that really offered cancelling while the entrance
+    // was whichever link said "Pricing" first, so the gap came out a click
+    // wider than it is — on every site, in the direction that scores worse.
+    expect(layered.subscribeUrl).toMatch(/\/join/);
+    expect(layered.clicksToSubscribe).toBe(2);
+  });
+
+  it('stops the run at a ceiling instead of walking on without saying so', async () => {
+    // A crawl catches per-page failures and carries on, which is right for a
+    // 404 and wrong for a ceiling: it meant forty-nine more refused requests,
+    // a partial measurement published as a whole one, and a run that came out
+    // `completed` with no stop reason recorded anywhere.
+    await expect(walk(`${site.url}?layered=1`, 2)).rejects.toBeInstanceOf(CeilingExceededError);
+  });
+
   it('stays bounded, because a crawl is the easiest way to look like an attack', () => {
     expect(hard.pagesVisited).toBeLessThanOrEqual(25);
     expect(fair.pagesVisited).toBeLessThanOrEqual(25);
+  });
+});
+
+describe('a walk that read nothing', () => {
+  it('is not reported as a site with no way out', async () => {
+    // routeFound: false scores zero and bands as "No route found", which is
+    // published as a statement that a company gives its customers no way to
+    // cancel. Reaching that from a front door that never loaded is the
+    // difference between looking and not finding, and not looking.
+    const nowhere = await walk(`${site.url}no-such-page`);
+    expect(nowhere.pagesVisited).toBe(0);
+    expect(nowhere.unreadable).toMatch(/404/);
+  });
+
+  it('is read by the stage as a measurement that did not happen', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync('packages/engine/src/stages/deterministic.ts', 'utf8');
+    expect(source).toMatch(/crawl\.unreadable !== null/);
+    expect(source).toMatch(/not the same as there being no way out/i);
   });
 });
 
@@ -124,6 +180,28 @@ describe('the number', () => {
     expect(scoreExit(base).percentage).toBe(100);
     expect(scoreExit({ ...base, clicksToCancel: 3 }).percentage).toBeLessThan(100);
     expect(scoreExit({ ...base, clicksToCancel: 5 }).percentage).toBe(80);
+  });
+
+  it('does not charge a site for a route we could not find the other end of', () => {
+    // Symmetry needs both routes. Earning zero for it marked a company down
+    // twenty points because we could not find its join button — a measurement
+    // that did not happen, scored as a failure.
+    const found: ExitSignals = {
+      routeFound: true,
+      selfService: true,
+      plainlyNamed: true,
+      clicksToCancel: 1,
+      clicksToSubscribe: null,
+    };
+    const score = scoreExit(found);
+    expect(score.percentage).toBe(100);
+    expect(score.band).toBe('Easy');
+    const symmetry = score.components.find((component) => component.id === 'symmetry')!;
+    expect(symmetry.weight).toBe(0);
+    expect(symmetry.detail).toMatch(/weight is shared/i);
+    // The components still add up to the number shown beside them.
+    expect(score.components.reduce((a, c) => a + c.earned, 0)).toBe(score.percentage);
+    expect(score.components.reduce((a, c) => a + c.weight, 0)).toBe(100);
   });
 
   it('scores nothing at all when no route was found', () => {
