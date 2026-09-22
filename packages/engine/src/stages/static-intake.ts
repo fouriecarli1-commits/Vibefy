@@ -458,12 +458,38 @@ function checkDependencies(root: string, context: StageContext, notes: string[])
   }
 
   const declared = { ...manifest.dependencies, ...manifest.devDependencies };
-  const matched: { name: string; declared: string; advisory: Advisory; pinned: boolean }[] = [];
+  const locked = readLockfile(root);
+  if (locked !== null) notes.push(`Resolved ${locked.source} for the versions actually installed.`);
+
+  const matched: {
+    name: string;
+    declared: string;
+    /** The version the lockfile resolves, where there is one to read. */
+    installed: string | null;
+    advisory: Advisory;
+    certain: boolean;
+  }[] = [];
 
   for (const [name, range] of Object.entries(declared)) {
+    const installed = locked?.versions.get(name) ?? null;
     for (const advisory of ADVISORIES) {
-      if (advisory.package === name && permitsVulnerable(range, advisory.vulnerable)) {
-        matched.push({ name, declared: range, advisory, pinned: isPinned(range) });
+      if (advisory.package !== name) continue;
+      // The lockfile is the answer where there is one: it says which version is
+      // on disk, which is the question. Without it the range is all there is,
+      // and a caret permits an affected version and a fixed one alike.
+      if (installed !== null) {
+        if (!below(installed, advisory.vulnerable)) continue;
+        matched.push({ name, declared: range, installed, advisory, certain: true });
+        continue;
+      }
+      if (permitsVulnerable(range, advisory.vulnerable)) {
+        matched.push({
+          name,
+          declared: range,
+          installed: null,
+          advisory,
+          certain: isPinned(range),
+        });
       }
     }
   }
@@ -475,7 +501,7 @@ function checkDependencies(root: string, context: StageContext, notes: string[])
       declared,
       matched,
       coverage:
-        'Matched against a curated high-confidence advisory set, not a complete vulnerability feed. Absence of a match here is not evidence that a dependency is unaffected. Matching is against the range declared in package.json; the lockfile, which decides the version actually installed, is not read.',
+        'Matched against a curated high-confidence advisory set, not a complete vulnerability feed. Absence of a match here is not evidence that a dependency is unaffected.',
       source: advisoryData.source,
     },
   });
@@ -494,28 +520,113 @@ function checkDependencies(root: string, context: StageContext, notes: string[])
   // or tilde range permits an affected version and a fixed one alike, and which
   // is installed is decided by a lockfile this check does not read — so a match
   // on a range is reported as what it is, at lower confidence.
-  const allPinned = matched.every((entry) => entry.pinned);
+  const allCertain = matched.every((entry) => entry.certain);
   return [
     {
       ruleId: 'SEC-10',
       dimension: 'security_posture',
       severity: worst,
-      confidence: allPinned ? 'high' : 'medium',
+      confidence: allCertain ? 'high' : 'medium',
       title: `${matched.length} dependenc${matched.length === 1 ? 'y' : 'ies'} declared at a version with a known advisory`,
       description: `${matched
-        .map(
-          (entry) =>
-            `${entry.name}@${entry.declared}${
-              entry.pinned ? '' : ', a range that permits an affected version,'
-            } (${entry.advisory.id}: ${entry.advisory.summary})`,
+        .map((entry) =>
+          entry.installed !== null
+            ? `${entry.name}@${entry.installed}, which is what your lockfile installs (${entry.advisory.id}: ${entry.advisory.summary})`
+            : `${entry.name}@${entry.declared}${
+                entry.certain ? '' : ', a range that permits an affected version,'
+              } (${entry.advisory.id}: ${entry.advisory.summary})`,
         )
         .join(
           '; ',
-        )}. These were matched against a curated advisory set rather than a complete feed, and against the ranges in package.json rather than the versions your lockfile resolves, so this is a floor, not a full audit.`,
+        )}. These were matched against a curated advisory set rather than a complete feed, so this is a floor, not a full audit.`,
       remediation: `Upgrade ${matched.map((entry) => entry.name).join(', ')} past the affected range, then run your package manager's own audit command for the dependencies this curated set does not cover.`,
       evidenceIds: [artefact.id],
     },
   ];
+}
+
+/**
+ * The versions a lockfile actually installs.
+ *
+ * The finding used to say, in the customer's report, that it matched "against
+ * the ranges in package.json rather than the versions your lockfile resolves" —
+ * an honest sentence about a check that was guessing where the answer was
+ * sitting in the next file along. `^1.2.0` permits an affected version and a
+ * fixed one alike; the lockfile says which is on disk.
+ *
+ * Three formats, read for the one fact each of them agrees on. npm and pnpm
+ * both key their entries by path and carry a version; yarn's classic format is
+ * a header line and an indented version. None is parsed further than that,
+ * because anything more is a package manager's own business.
+ */
+function readLockfile(root: string): { source: string; versions: Map<string, string> } | null {
+  const versions = new Map<string, string>();
+
+  const npm = join(root, 'package-lock.json');
+  if (existsSync(npm)) {
+    try {
+      const parsed = JSON.parse(readFileSync(npm, 'utf8')) as {
+        packages?: Record<string, { version?: string }>;
+        dependencies?: Record<string, { version?: string }>;
+      };
+      for (const [path, entry] of Object.entries(parsed.packages ?? {})) {
+        const name = path.startsWith('node_modules/') ? path.slice('node_modules/'.length) : null;
+        // A nested copy is a different version of the same package; the first
+        // one wins, which is the top-level install.
+        if (name && entry.version && !versions.has(name)) versions.set(name, entry.version);
+      }
+      for (const [name, entry] of Object.entries(parsed.dependencies ?? {})) {
+        if (entry.version && !versions.has(name)) versions.set(name, entry.version);
+      }
+      if (versions.size > 0) return { source: 'package-lock.json', versions };
+    } catch {
+      // A lockfile we cannot parse is one we do not have.
+    }
+  }
+
+  const pnpm = join(root, 'pnpm-lock.yaml');
+  if (existsSync(pnpm)) {
+    try {
+      const text = readFileSync(pnpm, 'utf8');
+      // `/@scope/name@1.2.3:` and `/name@1.2.3:` are the shapes pnpm writes.
+      for (const match of text.matchAll(/^\s{2}\/?((?:@[\w.-]+\/)?[\w.-]+)@([\d][^\s:(]*)/gm)) {
+        const name = match[1]!;
+        if (!versions.has(name)) versions.set(name, match[2]!);
+      }
+      if (versions.size > 0) return { source: 'pnpm-lock.yaml', versions };
+    } catch {
+      // As above.
+    }
+  }
+
+  const yarn = join(root, 'yarn.lock');
+  if (existsSync(yarn)) {
+    try {
+      const text = readFileSync(yarn, 'utf8');
+      const lines = text.split('\n');
+      for (let index = 0; index < lines.length; index += 1) {
+        const header = /^"?((?:@[\w.-]+\/)?[\w.-]+)@/.exec(lines[index]!);
+        if (!header) continue;
+        const version = /^\s+version:?\s+"?([^"\s]+)"?/.exec(lines[index + 1] ?? '');
+        if (version && !versions.has(header[1]!)) versions.set(header[1]!, version[1]!);
+      }
+      if (versions.size > 0) return { source: 'yarn.lock', versions };
+    } catch {
+      // As above.
+    }
+  }
+
+  return null;
+}
+
+/** Whether an exact version sits below an advisory's `<x.y.z` bound. */
+function below(version: string, vulnerableRange: string): boolean {
+  const bound = /^<\s*(\d+)\.(\d+)\.(\d+)/.exec(vulnerableRange);
+  const parsed = /^v?(\d+)\.(\d+)\.(\d+)/.exec(version.trim());
+  if (!bound || !parsed) return false;
+  const toNumber = (match: RegExpExecArray) =>
+    Number(match[1]) * 1_000_000 + Number(match[2]) * 1_000 + Number(match[3]);
+  return toNumber(parsed) < toNumber(bound);
 }
 
 /**

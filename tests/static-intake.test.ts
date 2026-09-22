@@ -230,6 +230,80 @@ describe('a dependency matched against a declared range', () => {
   });
 });
 
+describe('the lockfile', () => {
+  it('is what the advisory match is made against, where there is one', async () => {
+    // The finding used to say, in the customer's report, that it matched
+    // against the ranges in package.json rather than the versions their
+    // lockfile resolves — an honest sentence about a check that was guessing
+    // with the answer sitting in the next file along.
+    const repo = makeRepo('locked');
+    writeFileSync(
+      join(repo, 'package.json'),
+      JSON.stringify({ name: 'kettle', license: 'MIT', dependencies: { minimist: '^1.2.0' } }),
+    );
+    writeFileSync(
+      join(repo, 'package-lock.json'),
+      JSON.stringify({
+        lockfileVersion: 3,
+        packages: { '': { name: 'kettle' }, 'node_modules/minimist': { version: '1.2.0' } },
+      }),
+    );
+
+    const result = await runAgainst(repo);
+    const advisory = result.findings.find((finding) => finding.ruleId === 'SEC-10');
+    // A caret permits an affected version and a fixed one alike. The lockfile
+    // says which is on disk, so this is certain rather than possible.
+    expect(advisory?.confidence).toBe('high');
+    expect(advisory?.description).toMatch(/1\.2\.0, which is what your lockfile installs/);
+    expect(result.notes.join(' ')).toMatch(/Resolved package-lock\.json/);
+  });
+
+  it('clears a dependency the range would have flagged', async () => {
+    // The other half, and the half that makes this worth doing: ^1.2.0 with
+    // 1.2.8 installed is not affected, and saying it is at medium confidence
+    // is a false alarm in somebody's report.
+    const repo = makeRepo('locked-clean');
+    writeFileSync(
+      join(repo, 'package.json'),
+      JSON.stringify({ name: 'kettle', license: 'MIT', dependencies: { minimist: '^1.2.0' } }),
+    );
+    writeFileSync(
+      join(repo, 'package-lock.json'),
+      JSON.stringify({
+        lockfileVersion: 3,
+        packages: { '': { name: 'kettle' }, 'node_modules/minimist': { version: '1.2.8' } },
+      }),
+    );
+
+    const result = await runAgainst(repo);
+    expect(result.findings.some((finding) => finding.ruleId === 'SEC-10')).toBe(false);
+  });
+
+  it('reads pnpm and yarn too', async () => {
+    const pnpmRepo = makeRepo('pnpm');
+    writeFileSync(
+      join(pnpmRepo, 'package.json'),
+      JSON.stringify({ name: 'kettle', license: 'MIT', dependencies: { minimist: '^1.2.0' } }),
+    );
+    writeFileSync(
+      join(pnpmRepo, 'pnpm-lock.yaml'),
+      "lockfileVersion: '9.0'\n\npackages:\n\n  minimist@1.2.0:\n    resolution: {integrity: sha512-x}\n",
+    );
+    expect((await runAgainst(pnpmRepo)).notes.join(' ')).toMatch(/Resolved pnpm-lock\.yaml/);
+
+    const yarnRepo = makeRepo('yarn');
+    writeFileSync(
+      join(yarnRepo, 'package.json'),
+      JSON.stringify({ name: 'kettle', license: 'MIT', dependencies: { minimist: '^1.2.0' } }),
+    );
+    writeFileSync(
+      join(yarnRepo, 'yarn.lock'),
+      'minimist@^1.2.0:\n  version "1.2.0"\n  resolved "https://registry.example/minimist"\n',
+    );
+    expect((await runAgainst(yarnRepo)).notes.join(' ')).toMatch(/Resolved yarn\.lock/);
+  });
+});
+
 describe('the licence check', () => {
   it('runs on a repository that has no package.json at all', async () => {
     const repo = makeRepo('nomanifest');

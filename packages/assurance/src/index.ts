@@ -166,10 +166,14 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   {
     id: 'leaked_keys',
     question: 'Is the application leaking its own passwords and keys?',
+    // The criterion's own published label is "no live credential in client
+    // bundles, source maps or repository history", and this sentence promised
+    // only the first two — because the repository half had never run. It does
+    // now, where one is authorised, and the wording says which.
     whatWeChecked:
-      'We read everything the application sends to a browser and searched it for live credentials — the keys that let somebody spend the owner’s money or read their database. This is the most common serious defect in software built quickly.',
+      'We read everything the application sends to a browser and searched it for live credentials, and where a repository was authorised we read its source and searched that too. These are the keys that let somebody spend the owner’s money or read their database, and this is the most common serious defect in software built quickly.',
     limitation:
-      'We searched what a browser receives. A key held somewhere we cannot see is neither found nor ruled out.',
+      'We searched what a browser receives, and the source of a repository where one was authorised. A key held somewhere we cannot see is neither found nor ruled out.',
     criteria: ['SEC-04'],
     gate: 'GATE-EXPOSED-SECRET',
   },
