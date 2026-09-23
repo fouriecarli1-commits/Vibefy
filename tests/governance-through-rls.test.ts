@@ -104,6 +104,29 @@ describe('a data-subject request, filed by the data subject', () => {
   });
 
   it('is invisible to anybody but the person who filed it', async () => {
+    /*
+     * Seeded on the owning connection, and the owner's own read asserted first.
+     *
+     * The version of this test I wrote passed with the policy removed entirely,
+     * because every request above was filed inside a rolled-back `actingAs` and
+     * there was nothing left for a stranger to fail to see. A mutation run that
+     * opened every read policy in the schema found it — two of my own tests,
+     * after I had already caught and fixed the same mistake once in this file.
+     */
+    await db.query(
+      `insert into public.data_requests (user_id, organisation_id, request_type)
+       values ($1, $2, 'access')`,
+      [owner.userId, owner.organisationId],
+    );
+    const mine = await actingAs(db, { userId: owner.userId, aal: 'aal2' }, async (client) => {
+      const { rows } = await client.query(
+        `select id from public.data_requests where user_id = $1`,
+        [owner.userId],
+      );
+      return rows.length;
+    });
+    expect(mine).toBeGreaterThan(0);
+
     const visible = await actingAs(db, { userId: stranger.userId, aal: 'aal2' }, async (client) => {
       const { rows } = await client.query(
         `select id from public.data_requests where user_id = $1`,
@@ -261,6 +284,22 @@ describe('a consent record, written by the person who consented', () => {
   });
 
   it('is invisible to anybody else', async () => {
+    // Seeded to outlive a rolled-back transaction, and the owner's own read
+    // asserted first, for the reason set out on the data-request case above.
+    await db.query(
+      `insert into public.consents
+         (user_id, organisation_id, document_type, document_version, document_sha256)
+       values ($1, $2, 'privacy_policy', '8.8.8', $3)`,
+      [owner.userId, owner.organisationId, 'c'.repeat(64)],
+    );
+    const mine = await actingAs(db, { userId: owner.userId, aal: 'aal2' }, async (client) => {
+      const { rows } = await client.query(`select id from public.consents where user_id = $1`, [
+        owner.userId,
+      ]);
+      return rows.length;
+    });
+    expect(mine).toBeGreaterThan(0);
+
     const visible = await actingAs(db, { userId: stranger.userId, aal: 'aal2' }, async (client) => {
       const { rows } = await client.query(`select id from public.consents where user_id = $1`, [
         owner.userId,

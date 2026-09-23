@@ -886,3 +886,37 @@ holds the permissions it may not acquire.
    the internal cost dashboard, then `cost_records` for the assessment responsible.
 4. **A finding turns out to be wrong** — correct it under the Appeals & Corrections Policy,
    whether or not the customer raised it, and whether or not the correction favours them.
+
+## Finding a policy nothing tests
+
+A row-level-security policy with no test is one that can be deleted, weakened by
+a later migration, or shadowed by a permissive policy added beside it, and
+nothing anywhere will say so. Reading the suite does not answer it: a test can
+name a table, exercise it on the owning connection — which bypasses policies
+entirely — and look exactly like coverage.
+
+`tools/policy-mutation.mjs` asks the question the only way it can be answered.
+It prints a migration that opens a whole class of policies at once, and the
+suite then says which of them anything actually notices.
+
+```sh
+DSN=$(bash scripts/test-db.sh reset | tail -1)
+VIBEFYCODE_TEST_DSN="$DSN" node tools/policy-mutation.mjs reads \
+  > supabase/migrations/29999999999999_mutate.sql
+pnpm test          # read the failures
+rm supabase/migrations/29999999999999_mutate.sql
+```
+
+`reads` opens every policy scoping a select to a membership or a person: a hole
+there is one customer reading another's findings. `writes` removes every
+`auth.uid()` comparison from a `with check`, including the `using` clause of an
+update policy: a hole there is a row recorded in somebody else's name — an
+authorisation to test an application granted by a person who did not grant it.
+
+Every policy in the class whose loss nothing notices is a hole in the tests, not
+in the schema. `deployment.test.ts` will fail on the schema-file comparison —
+that is the gate noticing the migrations changed, which is its job, and it is
+the one failure to ignore.
+
+Delete the generated file before committing. It sorts last on purpose so it is
+obvious in `git status`, and `pnpm check:schema` refuses to pass while it exists.
