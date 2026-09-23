@@ -298,6 +298,42 @@ describe('the spend ceiling', () => {
 });
 
 describe('retention', () => {
+  it('publishes the figures the engine actually enforces', async () => {
+    /*
+     * Two tables about the same thing, in two packages, with nothing joining
+     * them.
+     *
+     * `RETENTION_SCHEDULE` in `@vibefycode/governance` is rendered to customers
+     * on `/console/privacy`, rationale and all — so `evidence: 90 days` and the
+     * sentence about screenshots being held for thirty are a published promise.
+     * What is enforced is `RETENTION_DAYS` in `@vibefycode/engine`, per evidence
+     * kind, which is what `stamp` puts in `retention_until` and what the sweep
+     * deletes on.
+     *
+     * Today they agree: the engine's longest kind is ninety and its shortest is
+     * thirty. Nothing makes them keep agreeing, and the direction that hurts is
+     * quiet — raise one engine kind to a hundred and eighty and the notice
+     * understates how long we keep somebody's screenshots, in the document they
+     * were given to rely on.
+     *
+     * The governance package deliberately does not import the engine; a test
+     * can, and this is the seam where they are held together.
+     */
+    const { RETENTION_DAYS } = await import('../packages/engine/src/runtime/evidence.ts');
+    const enforced = Object.values(RETENTION_DAYS);
+    const published = RETENTION_SCHEDULE.find((rule) => rule.dataClass === 'evidence');
+    expect(published).toBeDefined();
+
+    // The headline figure is the longest we ever keep an artefact. A customer
+    // reading "90 days" is entitled to have nothing outlive it.
+    expect(published!.days).toBe(Math.max(...enforced));
+
+    // And the shortest, which the rationale names out loud because screenshots
+    // are the ones that can incidentally capture a real person.
+    expect(Math.min(...enforced)).toBe(30);
+    expect(published!.rationale).toContain('30 days');
+  });
+
   it('publishes a rationale for every data class, written for a customer', () => {
     for (const rule of RETENTION_SCHEDULE) {
       expect(rule.days).toBeGreaterThan(0);

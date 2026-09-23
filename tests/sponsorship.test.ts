@@ -151,6 +151,23 @@ describe('advertising beside your own rating', () => {
     expect(isSelfAdjacent('directory', { listedInDirectory: false })).toBe(false);
   });
 
+  it('is asked of the rule, not re-derived by the thing that renders', () => {
+    /*
+     * The tests above exercise `isSelfAdjacent`, and for a while nothing
+     * called it. The slot carried its own copy —
+     * `placement === 'directory' && sponsor.sponsor_is_listed_in_directory` —
+     * so the rule lived in two places, the tests covered the one nothing ran,
+     * and the copy that did run was covered by nothing.
+     *
+     * The direction that hurts is quiet: widen the function to a second surface
+     * that shows a rating and every test here passes while the page keeps the
+     * old rule and the advertisement stays where it is.
+     */
+    const slot = readFileSync(join(process.cwd(), 'apps/web/components/sponsor-slot.tsx'), 'utf8');
+    expect(slot).toContain('isSelfAdjacent(placement,');
+    expect(slot).not.toMatch(/placement === 'directory' &&/);
+  });
+
   it('does not apply where no rating is on the page', () => {
     expect(isSelfAdjacent('methodology', { listedInDirectory: true })).toBe(false);
     expect(isSelfAdjacent('how_it_works', { listedInDirectory: true })).toBe(false);

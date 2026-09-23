@@ -1,6 +1,7 @@
 import {
   SPONSOR_LABEL,
   assertPlaceable,
+  isSelfAdjacent,
   sponsorDisclosures,
   type LiveSponsorship,
   type SponsorshipPlacement,
@@ -63,14 +64,25 @@ export async function SponsorSlot({ placement }: { placement: SponsorshipPlaceme
     sponsorIsMarketingClient: sponsor.sponsor_is_marketing_client,
   };
 
-  // Advertising beside your own rating. The one case a label genuinely cannot
-  // fix: a company listed in the directory that has also bought the space
-  // beneath it has, to any reader, bought its way up the page, and being able
-  // to say we did not mean it that way is not the same as it not being that.
-  //
-  // Withheld, not moved and not re-labelled — and the sponsor is not charged
-  // for a placement nobody saw.
-  if (placement === 'directory' && sponsor.sponsor_is_listed_in_directory) return null;
+  /*
+   * Advertising beside your own rating. The one case a label genuinely cannot
+   * fix: a company listed in the directory that has also bought the space
+   * beneath it has, to any reader, bought its way up the page, and being able
+   * to say we did not mean it that way is not the same as it not being that.
+   *
+   * Withheld, not moved and not re-labelled — and the sponsor is not charged
+   * for a placement nobody saw.
+   *
+   * Asked of `isSelfAdjacent` rather than restated here. This line used to
+   * compare the placement and the flag itself — the same comparison the
+   * function makes — so the rule lived in two places: the tests covered the one
+   * nothing called, and the copy that actually ran was covered by nothing.
+   * Widen the function to a second surface that shows a rating and its tests
+   * would pass while this kept the old rule.
+   */
+  if (isSelfAdjacent(placement, { listedInDirectory: sponsor.sponsor_is_listed_in_directory })) {
+    return null;
+  }
 
   return (
     <aside aria-label={SPONSOR_LABEL} className="mt-12 space-y-3 rounded-xl border border-line p-6">

@@ -47,6 +47,7 @@ import {
 import {
   ENGINE_VERSION,
   claimNextRequest,
+  type ClaimedRequest,
   completeRequest,
   findIssuanceCandidates,
   issueBadgeFor,
@@ -295,6 +296,41 @@ describe('act 1: getting to the point where anything may be tested', () => {
 // Act 2 — the queue, the engine, and a verdict the customer will not enjoy
 // ---------------------------------------------------------------------------
 
+/**
+ * Claims this journey's own request, whatever else is queued.
+ *
+ * `claimNextRequest` takes the oldest queued row in the whole table, which is
+ * right for a worker and wrong for a test: vitest runs files in parallel
+ * against one database, and `stranded-requests.test.ts` queues rows it must
+ * leave behind by design — that is the thing it is about. So this journey could
+ * claim somebody else's request, fail its first assertion, and cascade through
+ * the three acts that build on it. It did, once every so often, and passing the
+ * other times was luck rather than isolation.
+ *
+ * Anything that is not ours is put back exactly as it was — status, claim time
+ * and attempt count — so the file it belongs to sees no difference. The real
+ * claim path is still what is being exercised; the loop only decides which row
+ * this test keeps.
+ */
+async function claimOurRequest(appId: string | undefined): Promise<ClaimedRequest> {
+  // Said rather than asserted away. A journey that reaches here with no
+  // application never got through act 1, and "cannot read appId of undefined"
+  // is a worse way to learn that than this sentence.
+  if (!appId) throw new Error('This journey has no application, so act 1 did not complete.');
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const claimed = await withClient((client) => claimNextRequest(client));
+    if (!claimed) throw new Error('Nothing is queued, so this journey never queued its request.');
+    if (claimed.appId === appId) return claimed;
+    await db.query(
+      `update public.assessment_requests
+          set status = 'queued', claimed_at = null, attempts = attempts - 1
+        where id = $1`,
+      [claimed.id],
+    );
+  }
+  throw new Error(`Claimed 25 requests and none belonged to ${appId}.`);
+}
+
 describe('act 2: the first assessment, run for real', () => {
   it('queues a request the customer can see in their own tables', async () => {
     await db.query(
@@ -311,8 +347,8 @@ describe('act 2: the first assessment, run for real', () => {
   });
 
   it('runs the engine against the application and lands in the review queue', async () => {
-    const claimed = await withClient((client) => claimNextRequest(client));
-    expect(claimed?.appId).toBe(journey.appId);
+    const claimed = await claimOurRequest(journey.appId);
+    expect(claimed.appId).toBe(journey.appId);
 
     // The scope guard the worker builds from the stored record cannot reach a
     // private address, and the fixture is on loopback — so the run is driven
@@ -320,7 +356,7 @@ describe('act 2: the first assessment, run for real', () => {
     // do and nothing else in the codebase is.
     const result = await runRealPipeline();
     journey.firstAssessmentId = result.assessmentId;
-    await withClient((client) => completeRequest(client, claimed!.id, result.assessmentId));
+    await withClient((client) => completeRequest(client, claimed.id, result.assessmentId));
 
     const { rows } = await db.query<{ status: string; certification_eligible: boolean }>(
       'select status, certification_eligible from public.assessments where id = $1',
@@ -411,8 +447,9 @@ describe('act 3: the re-assessment that passes', () => {
        values ($1, $2, $3, 'full', 4.00, 'one_off')`,
       [journey.appId, owner.organisationId, owner.userId],
     );
-    const claimed = await withClient((client) => claimNextRequest(client));
-    expect(claimed).not.toBeNull();
+    // Ours, for the same reason as act 2: the oldest queued row in a shared
+    // database is not necessarily this journey's.
+    const claimed = await claimOurRequest(journey.appId);
 
     const outcome = await runSubstitutedPipeline([
       finding({
@@ -440,7 +477,7 @@ describe('act 3: the re-assessment that passes', () => {
         engineVersion: ENGINE_VERSION,
       }),
     );
-    await withClient((client) => completeRequest(client, claimed!.id, journey.secondAssessmentId!));
+    await withClient((client) => completeRequest(client, claimed.id, journey.secondAssessmentId!));
 
     await db.query(
       `insert into public.reviews (assessment_id, organisation_id, reviewer_id, action, reason)
