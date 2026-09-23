@@ -912,6 +912,14 @@ there is one customer reading another's findings. `writes` removes every
 `auth.uid()` comparison from a `with check`, including the `using` clause of an
 update policy: a hole there is a row recorded in somebody else's name — an
 authorisation to test an application granted by a person who did not grant it.
+`triggers` disables every trigger whose function can raise, which is where this
+schema makes illegal states impossible — a badge issuing with no human review, an
+append-only table written over.
+
+Measured on 2026-09-23: of forty-four read-scoping policies, sixteen had no test.
+Of twenty-six assertion triggers, none did. Worth knowing before running it, and
+worth re-running rather than trusting: the layer that turned out to be weak was
+not the one anybody would have guessed.
 
 Every policy in the class whose loss nothing notices is a hole in the tests, not
 in the schema. `deployment.test.ts` will fail on the schema-file comparison —
