@@ -38,6 +38,26 @@ export function isSortKey(value: string): value is SortKey {
   );
 }
 
+/**
+ * A dimension's score, or `-1` for one the entry does not carry.
+ *
+ * `-1` sorts below a genuine zero, which is deliberate and is also the thing to
+ * be careful about: it presents *not measured* as the worst possible result, in
+ * a public directory that ranks strangers' applications. Everywhere else in this
+ * product an unmeasured criterion is said out loud rather than scored, and this
+ * would be the one place that quietly does the opposite.
+ *
+ * It is unreachable today, and a test holds it that way: `scoreAssessment` maps
+ * over every dimension the rubric defines, so an assessment always carries all
+ * of them. What would make it fire is a later rubric version adding a dimension
+ * — then every application scored against an older version sorts below every
+ * newer one on that column, as though it had scored zero rather than not having
+ * been asked.
+ *
+ * If that day comes, the fix is not a different number. It is to leave entries
+ * that were never scored on a dimension out of that ordering and say so, the
+ * way the tick list says "not tested" rather than showing a cross.
+ */
 function dimensionScore(entry: RankableFields, dimension: DirectoryDimension): number {
   return entry.dimensions.find((score) => score.dimension === dimension)?.score ?? -1;
 }

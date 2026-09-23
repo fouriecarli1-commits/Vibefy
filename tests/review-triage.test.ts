@@ -226,3 +226,74 @@ describe('what it tells the reviewer up front', () => {
     expect(lintText(copy, 'triage')).toEqual([]);
   });
 });
+
+describe('an assessment that found nothing at all', () => {
+  /*
+   * The defect this exists for, and it went the wrong way on the one page that
+   * decides whether a badge is real.
+   *
+   * `suspiciously_few_findings` read `published.length > 0 && < 3`, so it fired
+   * for one finding or two and not for none. None is the most suspicious result
+   * this engine can produce: a run that reached almost nothing — a sign-in it
+   * could not pass, a page that would not load — looks exactly like a flawless
+   * application from here.
+   *
+   * So a reviewer was shown an empty attention list, the routine lines "No
+   * critical findings" and "Every stage completed", a one-minute estimate and
+   * the word `straightforward`. That is this file's own third rule broken by
+   * its own arithmetic: it may only ever raise attention, and the absence of a
+   * reason is not a recommendation.
+   */
+  const nothing = {
+    overallScore: 94.2,
+    certificationEligible: true,
+    gateFailures: [],
+    findings: [],
+    failedStages: [],
+    previousScore: null,
+  };
+
+  it('is raised for attention rather than passed over', () => {
+    const triage = triageAssessment(nothing);
+    const ids = triage.attention.map((entry) => entry.id);
+    expect(ids).toContain('suspiciously_few_findings');
+  });
+
+  it('is not called straightforward', () => {
+    expect(triageAssessment(nothing).suggestion).toBe('read_closely');
+  });
+
+  it('says the two readings are indistinguishable from here', () => {
+    const raised = triageAssessment(nothing).attention.find(
+      (entry) => entry.id === 'suspiciously_few_findings',
+    );
+    expect(raised?.detail).toMatch(/reached almost none of it/i);
+    expect(raised?.detail).toMatch(/scope statement/i);
+  });
+
+  it('does not reassure about an application nobody examined', () => {
+    // "No critical findings" is true of a run that found nothing, and reads
+    // there as a fact about the application rather than about the run.
+    const triage = triageAssessment(nothing);
+    expect(triage.routine).not.toContain('No critical findings.');
+    expect(triage.routine.join(' ')).not.toMatch(/Every finding is medium or high confidence/);
+  });
+
+  it('still reassures where there is something to reassure about', () => {
+    // The guard must not have been bought by making the routine list useless.
+    const triage = triageAssessment({
+      ...nothing,
+      findings: [
+        {
+          title: 'Missing Content-Security-Policy header',
+          severity: 'medium' as const,
+          dimension: 'security_posture',
+          confidence: 'high' as const,
+          isPublished: true,
+          evidenceCount: 1,
+        },
+      ],
+    });
+    expect(triage.routine).toContain('No critical findings.');
+  });
+});

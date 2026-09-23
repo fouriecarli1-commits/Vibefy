@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client } from 'pg';
 import {
+  DIMENSIONS,
   categoriesOf,
   disclosuresFor,
   matches,
@@ -336,5 +337,37 @@ describe('only certified applications, and only while they are', () => {
       return rows.length;
     });
     expect(visible).toBe(0);
+  });
+});
+
+describe('the assumption that keeps a missing dimension score unreachable', () => {
+  /*
+   * `rank.ts` reads a dimension an entry does not carry as `-1`, which sorts
+   * below a genuine zero. That presents *not measured* as the worst possible
+   * result, in a public directory that ranks strangers' applications —
+   * everywhere else in this product an unmeasured criterion is said out loud
+   * rather than scored.
+   *
+   * I first wrote a second test here asserting that `scoreAssessment` scores
+   * every dimension its rubric defines. Mutating a rubric to check it fails
+   * showed two things: with a careless mutation it failed for an unrelated
+   * reason (the weights no longer summed and an unbanded score threw first),
+   * and with a clean one — a dimension that exists and changes nothing else —
+   * it passed. It could not fail, because `scoreAssessment` maps over
+   * `rubric.dimensions`. A test that cannot fail is not a guard, so it is gone.
+   *
+   * This is the one that can. `DIMENSIONS` in `rank.ts` is a fixed list, and
+   * directory entries carry the dimension scores frozen at assessment time. The
+   * day a rubric version adds a dimension and that list gains it, every entry
+   * assessed under an older version lacks it and sorts last on that column, as
+   * though it had scored zero rather than not having been asked. This fails on
+   * that day — before the column exists to be sorted by — and `rank.ts` says
+   * what to do instead.
+   */
+  it('sorts by exactly the dimensions the current rubric defines', () => {
+    const rubric = JSON.parse(
+      readFileSync(join(process.cwd(), 'packages/rubric/versions/1.1.0.json'), 'utf8'),
+    ) as { dimensions: { id: string }[] };
+    expect([...DIMENSIONS].sort()).toEqual(rubric.dimensions.map((d) => d.id).sort());
   });
 });

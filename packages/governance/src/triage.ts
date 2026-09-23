@@ -117,12 +117,32 @@ export function triageAssessment(input: TriageInput): Triage {
     });
   }
 
-  if (published.length > 0 && published.length < 3) {
+  /*
+   * Zero counts, and counts hardest.
+   *
+   * This read `published.length > 0 && published.length < 3`, so it fired for
+   * one or two findings and not for none — and none is the most suspicious
+   * result this engine can produce. A run that reached nothing looks exactly
+   * like a flawless application from here.
+   *
+   * With no findings and no failed stages, a reviewer was shown an empty
+   * attention list, two reassuring routine lines, a one-minute estimate and the
+   * word `straightforward`. That is this file's own third rule broken by its
+   * own arithmetic: the absence of a reason is not a recommendation. The
+   * sentence below already said why, for one finding and two; the case it
+   * described best was the one it excluded.
+   */
+  if (published.length < 3) {
     attention.push({
       id: 'suspiciously_few_findings',
-      label: `Only ${published.length} finding${published.length === 1 ? '' : 's'}`,
+      label:
+        published.length === 0
+          ? 'No published findings at all'
+          : `Only ${published.length} finding${published.length === 1 ? '' : 's'}`,
       detail:
-        'Very few findings usually means the run did not reach much of the application — a sign-in it could not pass, a page it could not load — rather than that there was little to find. Check the scope statement and the stage notes before treating this as a clean result.',
+        published.length === 0
+          ? 'Nothing was published against this application. That is either a genuinely clean result or a run that reached almost none of it — a sign-in it could not pass, a page that would not load, a scope narrower than the application. The two look identical from here, so read the scope statement and the stage notes before approving: a report saying nothing was found is the strongest thing this product ever says.'
+          : 'Very few findings usually means the run did not reach much of the application — a sign-in it could not pass, a page it could not load — rather than that there was little to find. Check the scope statement and the stage notes before treating this as a clean result.',
     });
   }
 
@@ -195,7 +215,10 @@ export function triageAssessment(input: TriageInput): Triage {
   if (unevidenced.length === 0 && published.length > 0) {
     routine.push(`All ${published.length} published findings carry evidence.`);
   }
-  if (criticals.length === 0) routine.push('No critical findings.');
+  // Guarded like the two around it. "No critical findings" is true of an
+  // assessment that found nothing, and reads there as reassurance about an
+  // application nobody managed to examine.
+  if (criticals.length === 0 && published.length > 0) routine.push('No critical findings.');
   if (lowConfidence.length === 0 && published.length > 0) {
     routine.push('Every finding is medium or high confidence.');
   }
