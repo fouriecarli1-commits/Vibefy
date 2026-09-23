@@ -26,11 +26,81 @@ import {
  * assumes the missing line was fine.
  */
 
-const STATE_MARK: Record<AssuranceLine['state'], { mark: string; label: string; tone: string }> = {
-  checked_clear: { mark: '✓', label: 'Checked — nothing found', tone: 'text-ok' },
-  checked_found: { mark: '!', label: 'Checked — something was found', tone: 'text-warn' },
-  not_tested: { mark: '–', label: 'Not tested', tone: 'text-muted' },
+const STATE_MARK: Record<
+  AssuranceLine['state'],
+  { mark: string; label: string; short: string; tone: string }
+> = {
+  checked_clear: {
+    mark: '✓',
+    label: 'Checked — nothing found',
+    short: 'Nothing found',
+    tone: 'text-ok',
+  },
+  checked_found: {
+    mark: '!',
+    label: 'Checked — something was found',
+    short: 'Something found',
+    tone: 'text-warn',
+  },
+  not_tested: { mark: '–', label: 'Not tested', short: 'Not tested', tone: 'text-muted' },
 };
+
+/**
+ * The same nine answers, at a glance.
+ *
+ * A visitor who clicked a mark on a stranger's site gives this page seconds,
+ * not minutes, and nine cards of prose is longer than that. So the grid is the
+ * whole list in one screenful, and every cell links to the paragraph that says
+ * what was actually checked — the summary is a way into the detail, never a
+ * replacement for it.
+ *
+ * Three things keep it from becoming the thing it summarises:
+ *
+ *   · It is built from the same `lines` the list below is built from, in the
+ *     same component. There is no second call to `assuranceFor`, so a grid that
+ *     disagrees with the list underneath it is not a bug that can happen.
+ *   · Every cell carries the state in words as well as a symbol. A grid of
+ *     symbols is read as a scorecard, and a dash in a column of ticks reads as
+ *     a small blemish rather than as "nobody looked at this".
+ *   · There is no count, no ratio and no "7 of 9". A fraction invites the
+ *     reader to do arithmetic on questions that are not comparable, and it is
+ *     one short step from there to a second score.
+ */
+function AssuranceGrid({ lines }: { lines: readonly AssuranceLine[] }) {
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {lines.map((line) => {
+        const state = STATE_MARK[line.state];
+        return (
+          <li key={line.claim.id}>
+            <a
+              href={`#assurance-${line.claim.id}`}
+              className="flex h-full items-start gap-3 rounded-xl border border-line p-4 no-underline hover:border-line-strong focus-visible:border-line-strong"
+            >
+              {/* The box, drawn rather than an input.
+                  
+                  A real checkbox would be an interactive control that does
+                  nothing when clicked, announced to a screen reader as
+                  something the reader can change. This is a statement of fact,
+                  so it is drawn as one and the state is in the text beside it
+                  where assistive software will read it in order. */}
+              <span
+                aria-hidden="true"
+                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded border border-line text-sm font-bold ${state.tone}`}
+              >
+                {state.mark}
+              </span>
+              <span className="space-y-1">
+                <span className="block text-sm font-medium text-ink">{line.claim.shortLabel}</span>
+                <span className={`block text-sm ${state.tone}`}>{state.short}</span>
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export function AssuranceList({ input }: { input: AssuranceInput }) {
   const lines = assuranceFor(input);
@@ -44,11 +114,17 @@ export function AssuranceList({ input }: { input: AssuranceInput }) {
         <p className="max-w-prose text-muted">{assuranceHeadline(input, lines)}</p>
       </div>
 
+      <AssuranceGrid lines={lines} />
+
       <ul className="space-y-4">
         {lines.map((line) => {
           const state = STATE_MARK[line.state];
           return (
-            <li key={line.claim.id} className="rounded-xl border border-line p-5">
+            <li
+              key={line.claim.id}
+              id={`assurance-${line.claim.id}`}
+              className="scroll-mt-24 rounded-xl border border-line p-5"
+            >
               <div className="flex gap-4">
                 {/* A fixed width, because a tick, an exclamation mark and a
                     dash are three different widths, and without it the nine

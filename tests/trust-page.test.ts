@@ -146,8 +146,14 @@ describe('it cannot extend the mark', () => {
 describe('what the page does with it', () => {
   const page = readFileSync(join(process.cwd(), 'apps/web/app/a/[slug]/page.tsx'), 'utf8');
 
-  it('puts the owner’s name in the heading', () => {
-    expect(page).toMatch(/What \{trustPage\.owner_name\} says about itself/);
+  it('heads the block without naming anybody', () => {
+    // It used to read "What {trustPage.owner_name} says about itself", with the
+    // name taken from the account. An account name is not a publication, and
+    // for a solo builder it is a person's name on an unauthenticated page with
+    // a share card. The block still has to say whose words these are; it does
+    // that by role, which needs no personal information at all.
+    expect(page).toContain('What the owner of this application says');
+    expect(page).not.toMatch(/owner_name/);
   });
 
   it('says we did not check it, in the same block', () => {

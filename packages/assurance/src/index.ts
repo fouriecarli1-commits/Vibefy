@@ -111,6 +111,17 @@ export interface AssuranceClaim {
   readonly id: string;
   /** The question in the visitor's words. */
   readonly question: string;
+  /**
+   * The aspect this question is about, in two or three words, for the grid.
+   *
+   * Deliberately a *topic* and never an answer. "No leaked keys" beside a tick
+   * says the same thing twice and beside a cross it contradicts itself, and the
+   * second one is how a grid comes to mislead: the label keeps asserting the
+   * good outcome after the mark has stopped agreeing with it. So the label
+   * names what was looked at, and the mark — with the state spelled out in
+   * words beside it — carries the entire answer.
+   */
+  readonly shortLabel: string;
   /** What we did, past tense, specific. Shown whatever the answer turns out to be. */
   readonly whatWeChecked: string;
   /** What this line does not mean. Shown on a tick as loudly as on a cross. */
@@ -134,6 +145,7 @@ export interface AssuranceClaim {
 export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   {
     id: 'account_takeover',
+    shortLabel: 'Getting into your account',
     question: 'Could somebody else get into my account?',
     whatWeChecked:
       'We signed in with a test account and tried the ways accounts are usually taken over: session cookies a script can read, pages that check who you are in the browser but not on the server, and endpoints that answer without asking who is calling.',
@@ -151,6 +163,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'other_peoples_data',
+    shortLabel: 'Other people’s data',
     question: 'Could I end up seeing somebody else’s data — or them seeing mine?',
     whatWeChecked:
       'We changed the identifiers in addresses the application uses, called its endpoints as a different user, and looked at whether anything that should be private came back.',
@@ -165,6 +178,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'leaked_keys',
+    shortLabel: 'The application’s own keys',
     question: 'Is the application leaking its own passwords and keys?',
     // The criterion's own published label is "no live credential in client
     // bundles, source maps or repository history", and this sentence promised
@@ -179,6 +193,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'connection',
+    shortLabel: 'The connection',
     question: 'Is what I type protected on the way there?',
     whatWeChecked:
       'We checked that the whole site is served over an encrypted connection, that it refuses an unencrypted one, and that no part of a page arrives unencrypted inside an encrypted one.',
@@ -188,6 +203,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'what_they_collect',
+    shortLabel: 'Privacy policy and deletion',
     question: 'Do they say what they collect — and can I get my account deleted?',
     whatWeChecked:
       'We opened the privacy policy, compared what it says against what the application was observed sending, and looked for a route a user can actually follow to delete their account.',
@@ -198,6 +214,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'payments',
+    shortLabel: 'Card payments',
     question: 'If I pay, does my card go to a proper payment company?',
     whatWeChecked:
       'We looked at where a card number goes when it is typed in: to a payment company that is set up to hold one, or to the application’s own server.',
@@ -212,6 +229,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'hostile_code',
+    shortLabel: 'Hostile code',
     question: 'Is it running anything it should not be?',
     whatWeChecked:
       'We recorded every script the page loaded and where each came from, and checked them against known cryptominers and known malicious hosts. We also checked the application’s declared dependencies for advisories rated critical.',
@@ -221,6 +239,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'someone_there',
+    shortLabel: 'Reaching a human',
     question: 'Is there a real person to contact if something goes wrong?',
     whatWeChecked:
       'We looked for a way to reach a human that a visitor could find without signing in: an address that is not a no-reply, a telephone number, or a named company behind the site.',
@@ -230,6 +249,7 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
   },
   {
     id: 'usable',
+    shortLabel: 'Whether it works',
     question: 'Will it actually work when I use it?',
     whatWeChecked:
       'We worked through the application’s main path from beginning to end, on a desktop and at the width of a phone, with a keyboard only, and we read what it says when something goes wrong.',

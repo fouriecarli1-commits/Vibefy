@@ -37,7 +37,6 @@ interface BadgeRecord {
   signature: string;
   signing_key_id: string;
   app_name: string;
-  owner_name: string;
   owner_is_marketing_client: boolean;
   owner_has_remediation: boolean;
   exit_measurement: ExitMeasurement | null;
@@ -124,7 +123,6 @@ async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
 }
 
 interface TrustPage {
-  owner_name: string;
   contact_email: string | null;
   security_contact: string | null;
   status_url: string | null;
@@ -145,7 +143,7 @@ interface TrustPage {
 async function loadTrustPage(slug: string): Promise<TrustPage | null> {
   return readAsAnon(async (client) => {
     const { rows } = await client.query<TrustPage>(
-      `select owner_name, contact_email, security_contact, status_url,
+      `select contact_email, security_contact, status_url,
               privacy_url, terms_url, note, updated_at
          from public.trust_page_public where badge_slug = $1`,
       [slug],
@@ -158,7 +156,7 @@ async function loadBadge(slug: string): Promise<BadgeRecord | null> {
   return readAsAnon(async (client) => {
     const { rows } = await client.query<BadgeRecord>(
       `select public_id, slug, status, score, rubric_version, assessed_at, issued_at, expires_at,
-              certified_origin, signature, signing_key_id, app_name, owner_name,
+              certified_origin, signature, signing_key_id, app_name,
               owner_is_marketing_client, owner_has_remediation, exit_measurement
          from public.badge_verification where slug = $1`,
       [slug],
@@ -271,7 +269,18 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{badge.app_name}</h1>
             <p className={`mt-1 font-medium ${status.tone}`}>{status.label}</p>
-            <p className="text-sm text-muted">Owned by {badge.owner_name}</p>
+            {/* The certified origin, and deliberately not the name of whoever
+                owns it.
+
+                The account name on an organisation row is what somebody typed
+                into a sign-up form, and for a sole builder it is their own
+                name. Publishing it on an unauthenticated, indexed page with a
+                share card is publishing personal information nobody consented
+                to publish — and it is not information a reader needs: the
+                question they arrived with is about a website, and the address
+                of that website is the answer. Anything more about who is behind
+                it is the owner's to say, in their own section below. */}
+            <p className="text-sm text-muted">{badge.certified_origin}</p>
           </div>
         </div>
         <p className="max-w-prose text-muted">{status.meaning}</p>
@@ -374,8 +383,14 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           Everything above this line is what an assessment found. Everything in
           here is what the application's owner says about themselves, and a
           reader who cannot tell the difference has been misled by the layout
-          rather than by anything either of us wrote. So: their name in the
-          heading, a sentence saying we did not check it, and a visible edge. */}
+          rather than by anything either of us wrote. So: an eyebrow saying we
+          did not check it, a sentence saying who wrote it, and a visible edge.
+
+          The heading used to carry the owner's name, taken from the account,
+          and does not any more. Everything in this section is something they
+          typed and published on purpose; their account name is not, and the
+          distinction between the two is the whole reason this section exists
+          in the first place. */}
       {trustPage && (
         <section
           aria-labelledby="owner-says"
@@ -384,7 +399,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           <div className="space-y-1">
             <p className="eyebrow">Not checked by us</p>
             <h2 id="owner-says" className="text-2xl font-bold tracking-tight">
-              What {trustPage.owner_name} says about itself
+              What the owner of this application says
             </h2>
             <p className="max-w-prose text-sm text-muted">
               Written by the application’s owner, not by VibefyCode. We have not verified any of it,

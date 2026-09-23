@@ -273,3 +273,75 @@ describe('where it sits on the page', () => {
     expect(page.indexOf('<AssuranceList')).toBeGreaterThan(scope);
   });
 });
+
+describe('the grid', () => {
+  const component = readFileSync(
+    join(process.cwd(), 'apps/web/components/assurance-list.tsx'),
+    'utf8',
+  );
+
+  it('gives every question a label short enough to read at a glance', () => {
+    for (const claim of ASSURANCE_CLAIMS) {
+      expect(claim.shortLabel.length).toBeGreaterThan(0);
+      expect(claim.shortLabel.length).toBeLessThanOrEqual(32);
+    }
+  });
+
+  it('names the topic and never the answer', () => {
+    /*
+     * The failure this exists for: a label like "No leaked keys" reads as a
+     * second, shorter claim. Beside a tick it says the same thing twice, and
+     * beside a cross it contradicts the mark next to it — and a reader
+     * skimming a grid takes the words, not the symbol. So a label may not
+     * assert an outcome, and every word below is one that asserts one.
+     */
+    for (const claim of ASSURANCE_CLAIMS) {
+      expect(claim.shortLabel).not.toMatch(
+        /\b(no|none|free|clear|safe|secure|protected|passed|compliant|verified|guaranteed)\b/i,
+      );
+    }
+  });
+
+  it('is built from the same lines as the list beneath it', () => {
+    // One call to assuranceFor in the component, so a grid that disagrees with
+    // the detail it summarises is not a bug that can happen. Two calls with
+    // two inputs is how a summary drifts from the thing it summarises.
+    expect(component.match(/assuranceFor\(/g) ?? []).toHaveLength(1);
+    expect(component).toMatch(/<AssuranceGrid lines=\{lines\} \/>/);
+  });
+
+  it('says the state in words in every cell, not only as a symbol', () => {
+    // A grid of bare symbols is read as a scorecard, and a dash among ticks
+    // reads as a small blemish rather than as "nobody looked at this".
+    const grid = component.slice(
+      component.indexOf('function AssuranceGrid'),
+      component.indexOf('export function AssuranceList'),
+    );
+    expect(grid).toContain('{state.short}');
+    expect(grid).toContain('{line.claim.shortLabel}');
+    // The symbol itself is hidden from assistive software, which reads the
+    // words instead.
+    expect(grid).toMatch(/aria-hidden="true"[\s\S]{0,200}\{state\.mark\}/);
+  });
+
+  it('shows no count, ratio or total', () => {
+    const grid = component.slice(
+      component.indexOf('function AssuranceGrid'),
+      component.indexOf('export function AssuranceList'),
+    );
+    // "7 of 9 checks passed" is a second score wearing a different hat, and
+    // the nine questions are not comparable enough to be added up.
+    expect(grid).not.toMatch(/\.length/);
+    expect(grid).not.toMatch(/\bof 9\b|\bout of\b/i);
+  });
+
+  it('leads to the detail rather than standing in for it', () => {
+    // Every cell is an anchor to the paragraph that says what was actually
+    // checked and what it does not mean.
+    for (const claim of ASSURANCE_CLAIMS) {
+      expect(component).toContain('href={`#assurance-${line.claim.id}`}');
+      expect(component).toContain('id={`assurance-${line.claim.id}`}');
+      expect(claim.id).toMatch(/^[a-z_]+$/);
+    }
+  });
+});
