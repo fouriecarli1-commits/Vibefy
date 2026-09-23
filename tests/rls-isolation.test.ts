@@ -249,6 +249,36 @@ describe('a table with policies and no grants is a table nobody can reach', () =
     ).toEqual([]);
   });
 
+  it('names the role every policy applies to, rather than leaving it to everybody', async () => {
+    /*
+     * A policy written without `to <role>` gets the catch-all `public`, which
+     * includes `anon` and every role that will ever exist. Two policies on the
+     * remediation tables were written that way and nothing leaked, because
+     * neither table is granted to `anon` and both conditions reduce to false
+     * without a session.
+     *
+     * The way that becomes real is ordinary and would pass review: somebody
+     * adds a public view over one of those tables, grants select on the table
+     * underneath to make it work, and a policy always written for signed-in
+     * people starts being consulted for everybody. The grant gets looked at.
+     * The policy does not, because nobody changed it.
+     *
+     * `anon` may be named deliberately — the published rubric is — so what this
+     * refuses is the unnamed default, not a considered decision.
+     */
+    const { rows } = await db.query<{ tablename: string; policyname: string }>(
+      `select tablename, policyname from pg_policies
+        where schemaname = 'public' and 'public' = any(roles)
+        order by tablename, policyname`,
+    );
+    const unnamed = rows.map((row) => `${row.tablename}.${row.policyname}`);
+    expect(
+      unnamed,
+      `Policies that apply to every role, including anon:\n  ${unnamed.join('\n  ')}\n` +
+        'Add `to authenticated` — or `to anon, authenticated` if it is meant to be public.',
+    ).toEqual([]);
+  });
+
   it('gives every policy on those tables something to filter', async () => {
     // The other direction, and the quieter failure: a grant with no policy on a
     // forced-RLS table means every row is hidden and nothing says why.

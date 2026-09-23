@@ -1,4 +1,4 @@
--- Drie migrasies, in hierdie volgorde.
+-- Vier migrasies, in hierdie volgorde.
 -- Gegenereer 2026-09-23.
 --
 -- Onseker wat jou databasis het? node tools/migration-audit.mjs > audit.sql, en plak
@@ -451,3 +451,38 @@ comment on function public.create_workspace is
 
 revoke all on function public.create_workspace(text, text, public.account_type) from public, anon;
 grant execute on function public.create_workspace(text, text, public.account_type) to authenticated;
+
+-- =============================================================================
+-- 20260923140000_name_the_role.sql
+-- =============================================================================
+-- audit-marker: not exists (select 1 from pg_policies where schemaname='public' and 'public' = any(roles))
+-- =============================================================================
+-- Two policies that never named the role they apply to.
+--
+-- Every policy in this schema says `to authenticated`. These two do not, so
+-- Postgres gives them the catch-all `public` role — which includes `anon`, and
+-- every role that exists or will exist.
+--
+-- Nothing leaks today. Neither table is granted to `anon`, so `anon` cannot
+-- reach them at all, and both conditions reduce to false without a session:
+-- `is_org_member` and `is_platform_admin` both go through `auth.uid()`, which
+-- is null. This is a latent hole rather than an open one.
+--
+-- It is worth closing anyway, and not for tidiness. The way this becomes real is
+-- ordinary: somebody adds a public view over one of these tables, grants select
+-- on the underlying table to `anon` to make it work, and the policy that was
+-- always written for signed-in people quietly starts being consulted for
+-- everybody. The grant would be reviewed. The policy would not, because nobody
+-- changed it.
+--
+-- Found by measuring rather than reading: after mutating the read policies and
+-- the triggers, the remaining question was what `anon` can reach, and asking the
+-- catalogue which policies name `anon` or `public` turned up exactly these two.
+--
+-- `alter policy ... to authenticated` only narrows. Nothing that works today
+-- stops working: the remediation code reaches these tables as the service role,
+-- which bypasses policies, and a signed-in reader is `authenticated` either way.
+-- =============================================================================
+
+alter policy remediation_engagements_own on public.remediation_engagements to authenticated;
+alter policy remediation_workers_admin on public.remediation_workers to authenticated;
