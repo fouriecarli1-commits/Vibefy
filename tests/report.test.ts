@@ -144,7 +144,7 @@ const source: ReportSource = {
   ],
   stages: [
     { stage: 'deterministic_checks', status: 'succeeded', notes: [] },
-    { stage: 'store_readiness', status: 'skipped', notes: ['Not intended for an app store.'] },
+    { stage: 'store_readiness', status: 'cancelled', notes: ['Not intended for an app store.'] },
   ],
   scopeStatement:
     'This assessment is a point-in-time, scope-limited, AI-assisted and human-reviewed evaluation of Kettle, conducted by VibefyCode against published VibefyCode Rubric version 1.0.0 on 2026-08-22. It is not a penetration test, a security audit, a code audit, a legal or regulatory compliance certification, or a guarantee of any kind. Absence of a finding is not evidence of absence of a defect.',
@@ -232,7 +232,14 @@ describe('what no tier may withhold', () => {
     const html = renderReport(source, tier).html;
     expect(html).toContain('What was not assessed');
     expect(html).toContain('would require a real card');
-    expect(html).toMatch(/store readiness stage did not complete/i);
+    expect(html).toMatch(/store readiness stage was not run/i);
+    // The note that says why, which was being thrown away: `assemble.ts` reads
+    // `metadata.notes` onto every stage and nothing here ever read it.
+    expect(html).toContain('Not intended for an app store.');
+    // "cancelled" is the database's word for "did not run" — to a customer it
+    // means somebody cancelled their assessment, which is a different and worse
+    // claim than the truth.
+    expect(html).not.toMatch(/\(cancelled\)/);
     // The engine's own record, which is a different thing from the model's
     // account of the same run and is named by criterion.
     expect(html).toContain('SEC-12');

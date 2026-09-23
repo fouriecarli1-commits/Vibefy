@@ -28,12 +28,39 @@ import { decideSecondStep } from '../apps/web/lib/second-step.ts';
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 
 describe('a returning customer', () => {
-  it('is offered a way in from the landing page', () => {
-    // Every other button in that hero is for somebody who has never been here,
-    // and on a phone the navigation is the last place they look.
+  it('is offered a way in from the landing page, as a button rather than a footnote', () => {
+    /*
+     * A line of muted text under the row was not a fix, and Anré said so.
+     *
+     * On a phone `.nav-panel` is `display: none` until the hamburger is opened,
+     * and the navigation's "Sign in" lives inside it — so a returning customer
+     * arriving on a phone had no visible way in anywhere on this page. A small
+     * grey sentence under three chunky buttons is not one either, which is why
+     * this asserts the styling and not merely the href.
+     */
     const page = read('apps/web/app/page.tsx');
-    expect(page).toContain('href="/sign-in"');
-    expect(page).toMatch(/Already have an account/i);
+    const hero = page.slice(
+      page.indexOf('<div className="flex flex-wrap justify-center gap-3">'),
+      page.indexOf('<InShort'),
+    );
+    expect(hero).toContain('href="/sign-in"');
+    // The same button treatment the other three carry, so it reads as one.
+    expect(hero).toMatch(
+      /href="\/sign-in"\s*\n?\s*className="rounded-lg border border-line-strong px-5 py-3 font-medium"/,
+    );
+    // Beside the other account action rather than at the end of the row.
+    expect(hero.indexOf('/sign-in')).toBeLessThan(hero.indexOf('/how-it-works'));
+  });
+
+  it('does not rely on the navigation, which a phone hides until it is opened', () => {
+    // The root cause, held so it cannot come back as "it is in the nav".
+    const css = read('apps/web/app/globals.css');
+    expect(css).toMatch(
+      /@media \(max-width: 62rem\)[\s\S]{0,200}\.nav-panel\s*\{[\s\S]{0,80}display: none/,
+    );
+    const nav = read('apps/web/components/site-nav.tsx');
+    // The nav's own sign-in is inside the panel, which is the thing that hides.
+    expect(nav).toMatch(/nav-panel[\s\S]*href="\/sign-in"/);
   });
 
   it('is offered a reset before being offered a second account', () => {

@@ -105,6 +105,36 @@ function stylesheet(): string {
   `;
 }
 
+/**
+ * What a stage's database status means, in the customer's words.
+ *
+ * `cancelled` is the database's word for "did not run" and its own column
+ * comment says as much, but a customer reading "cancelled" understands that
+ * somebody cancelled their assessment. The rest are spelled out for the same
+ * reason: this list appears under the heading "What was not assessed", which is
+ * the part of a report a reader is most entitled to have in plain language.
+ *
+ * An unknown status is described rather than guessed at. A fifth value added to
+ * the enum should read awkwardly here, not confidently and wrongly.
+ */
+function wordFor(status: string): string {
+  switch (status) {
+    case 'cancelled':
+      return 'was not run';
+    case 'skipped':
+      return 'was not run';
+    case 'failed':
+      return 'did not finish';
+    case 'aborted':
+      return 'was stopped before it finished';
+    case 'queued':
+    case 'running':
+      return 'had not finished when this report was produced';
+    default:
+      return `did not complete (${status})`;
+  }
+}
+
 export function renderReport(source: ReportSource, tier: ReportTier): RenderedReport {
   const view = redactForTier(source, tier);
   const fingerprint = scoreFingerprint(source);
@@ -240,11 +270,29 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
     ...(source.narrative?.notAssessed ?? []).map((item) => escapeHtml(item)),
     ...source.stages
       .filter((stage) => stage.status !== 'succeeded')
-      .map((stage) =>
-        escapeHtml(
-          `The ${stage.stage.replace(/_/g, ' ')} stage did not complete (${stage.status}).`,
-        ),
-      ),
+      .map((stage) => {
+        /*
+         * The stage's own note, which was being thrown away.
+         *
+         * `assemble.ts` reads `metadata.notes` out of `assessment_runs` and puts
+         * it on every `ReportStage`, and nothing here ever read it. So the
+         * store-readiness stage on an application not meant for an app store
+         * printed "The store readiness stage did not complete (cancelled)" — and
+         * the sentence that says why, "Not intended for an app store", was sitting
+         * in the same object.
+         *
+         * "cancelled" is also the wrong word to show a customer. It is the
+         * database's word for "did not run" — the column's own comment says so —
+         * and to a reader it means somebody cancelled it, which is a different
+         * and worse claim about their assessment than the truth.
+         */
+        const note = stage.notes.find((line) => line.trim().length > 0);
+        return escapeHtml(
+          `The ${stage.stage.replace(/_/g, ' ')} stage ${wordFor(stage.status)}.${
+            note ? ` ${note.replace(/\.?$/, '.')}` : ''
+          }`,
+        );
+      }),
   ];
 
   const html = `<!doctype html>

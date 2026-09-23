@@ -65,6 +65,24 @@ export default function HomePage() {
           >
             Create an account
           </Link>
+          {/* A button, beside the one for people who have never been here.
+
+              This was a line of muted text under the row, and that was not a
+              fix. On a phone `.nav-panel` is `display: none` until the
+              hamburger is opened, and the navigation's "Sign in" lives inside
+              it — so a returning customer arriving on a phone had no visible
+              way in anywhere on this page, and a small grey sentence under
+              three chunky buttons is not one either.
+
+              It sits second, next to the other account action, so the two ways
+              into an account are together and the two informational links
+              follow. */}
+          <Link
+            href="/sign-in"
+            className="rounded-lg border border-line-strong px-5 py-3 font-medium"
+          >
+            Sign in
+          </Link>
           <Link
             href="/how-it-works"
             className="rounded-lg border border-line-strong px-5 py-3 font-medium"
@@ -78,17 +96,6 @@ export default function HomePage() {
             Check an app before you pay
           </Link>
         </div>
-
-        {/* The way back in.
-
-            Every button above is for somebody who has never been here. "Sign
-            in" was in the navigation and nowhere else, which is fine on a
-            desktop and much less fine on a phone, where the first thing a
-            returning customer sees is three invitations to start again. The
-            people this matters to are the ones who already paid. */}
-        <p className="text-sm text-muted">
-          Already have an account? <Link href="/sign-in">Sign in</Link>.
-        </p>
       </section>
 
       <InShort lines={IN_SHORT} />
