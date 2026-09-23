@@ -305,6 +305,8 @@ describe('the scan keeps up with the pages', () => {
     '/sign-up': 'Scanned as /sign-in, which is the same form component with a different heading.',
     '/invite/[token]':
       'Needs a live invitation token, which does not exist outside a seeded database.',
+    '/auth/new-password':
+      'Redirects to /forgot-password without a session, so a scan of it scans that page. Its form is the same component the sign-in page is scanned with.',
   };
 
   const scanned = (() => {

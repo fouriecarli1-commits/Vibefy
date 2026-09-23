@@ -78,6 +78,17 @@ export default function HomePage() {
             Check an app before you pay
           </Link>
         </div>
+
+        {/* The way back in.
+
+            Every button above is for somebody who has never been here. "Sign
+            in" was in the navigation and nowhere else, which is fine on a
+            desktop and much less fine on a phone, where the first thing a
+            returning customer sees is three invitations to start again. The
+            people this matters to are the ones who already paid. */}
+        <p className="text-sm text-muted">
+          Already have an account? <Link href="/sign-in">Sign in</Link>.
+        </p>
       </section>
 
       <InShort lines={IN_SHORT} />

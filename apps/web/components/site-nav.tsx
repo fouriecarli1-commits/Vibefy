@@ -99,6 +99,11 @@ const GROUPS: readonly NavGroup[] = [
       { href: '/console/alerts', label: 'Alerts', hint: 'What changed, and what it costs you' },
       { href: '/console/billing', label: 'Billing', hint: 'Plan, invoices and receipts' },
       {
+        href: '/console/security',
+        label: 'Sign-in security',
+        hint: 'Your password, and a second step if you want one',
+      },
+      {
         href: '/console/privacy',
         label: 'Your data',
         hint: 'What we hold, and your rights over it',

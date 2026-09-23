@@ -65,3 +65,70 @@ export async function recordSignUpConsents(): Promise<void> {
     });
   }
 }
+
+/**
+ * The same acceptance record, for somebody who signed up through a provider.
+ *
+ * A password sign-up carries the accepted versions in the sign-up metadata,
+ * because acceptance happens before there is a session to write under. An OAuth
+ * sign-up has no such moment: the provider hands back a confirmed user and the
+ * metadata is Google's, not ours. Without this, signing up with Google produced
+ * an account with no consent record at all — and a consent record is the whole
+ * reason that table is append-only.
+ *
+ * What is declared arrives in the callback URL and is therefore not trusted. It
+ * does not need to be: every entry is checked against the registry we publish
+ * right now, exactly as the password path checks it, so the only thing somebody
+ * can do by forging it is record their own acceptance of documents we publish.
+ * Anything that does not match is dropped rather than recorded, because a hash
+ * we do not publish is a consent record nobody can reproduce.
+ *
+ * The button that sends this sits under the sentence saying that clicking it
+ * records acceptance. That sentence is what makes the record true, and it is
+ * why a sign-*in* button passes nothing and writes nothing.
+ */
+export async function recordProviderConsents(declared: string | null): Promise<void> {
+  if (!declared) return;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const headerList = await headers();
+  const forwardedFor = headerList.get('x-forwarded-for');
+  const ip = forwardedFor?.split(',')[0]?.trim() ?? null;
+  const userAgent = headerList.get('user-agent');
+  const current = consentPayload();
+
+  for (const entry of current) {
+    // Named in what came back, and matching what we publish. Both, because the
+    // first is a claim and the second is the fact.
+    if (!declared.split('|').includes(`${entry.documentType}:${entry.version}:${entry.sha256}`)) {
+      continue;
+    }
+    const { data: alreadyRecorded } = await supabase.rpc('has_current_consent', {
+      target_user: user.id,
+      document: entry.documentType,
+      required_version: entry.version,
+    });
+    if (alreadyRecorded) continue;
+
+    await supabase.from('consents').insert({
+      user_id: user.id,
+      document_type: entry.documentType,
+      document_version: entry.version,
+      document_sha256: entry.sha256,
+      action: 'accepted',
+      ip,
+      user_agent: userAgent,
+    });
+  }
+}
+
+/** What a sign-up button puts in its callback URL, from the current registry. */
+export async function declaredConsents(): Promise<string> {
+  return consentPayload()
+    .map((entry) => `${entry.documentType}:${entry.version}:${entry.sha256}`)
+    .join('|');
+}

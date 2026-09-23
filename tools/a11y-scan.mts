@@ -60,6 +60,9 @@ const PAGES = [
   '/trust-check/traps/the-free-trial-that-was-not',
   '/sign-in',
   '/sign-up',
+  // The way back in, added the day it was built. It is the page somebody
+  // reaches when they are already locked out and least able to fight a form.
+  '/forgot-password',
   '/not-a-page-that-exists',
 ];
 
