@@ -46,7 +46,7 @@ export interface SubjectExport {
   readonly exportVersion: typeof SUBJECT_EXPORT_VERSION;
   readonly assembledAt: string;
   readonly subjectId: string;
-  readonly account: Record<string, unknown> | null;
+  readonly account: Record<string, unknown>;
   readonly memberships: readonly Record<string, unknown>[];
   readonly consents: readonly Record<string, unknown>[];
   readonly applications: readonly Record<string, unknown>[];
@@ -121,6 +121,15 @@ const READ_ME = [
   'what to ask for next.',
 ].join('\n');
 
+export class NoSuchSubjectError extends Error {
+  constructor(subjectId: string) {
+    super(
+      `There is no account ${subjectId}, so there is nothing to export. An export assembled anyway would say every category is empty, which reads as "we hold nothing about you" rather than as "we looked up the wrong person" — and it would be handed over as the answer to a statutory request.`,
+    );
+    this.name = 'NoSuchSubjectError';
+  }
+}
+
 export class NotPermittedToExportError extends Error {
   constructor() {
     super(
@@ -146,6 +155,22 @@ export async function assembleSubjectExport(
        from public.users where id = $1`,
     [subjectId],
   );
+
+  /*
+   * No account, no subject.
+   *
+   * `account.rows[0] ?? null` assembled the export anyway, with every array
+   * empty and `notIncluded` still listing what we deliberately left out — a
+   * document that reads as "we hold nothing about you" and is handed over as the
+   * answer to an access request. A platform admin can read every user, so the
+   * only way this happens is that the id is wrong, and a wrong id is a mistake
+   * to report rather than a fact to publish.
+   *
+   * It is the same rule as this file's second one, one step earlier: an export
+   * that silently omits something looks complete. So does an export that omits
+   * everything.
+   */
+  if (account.rows.length === 0) throw new NoSuchSubjectError(subjectId);
 
   const memberships = await sql.query<Record<string, unknown>>(
     `select m.organisation_id, o.name as organisation_name, o.is_personal,
@@ -201,7 +226,7 @@ export async function assembleSubjectExport(
     exportVersion: SUBJECT_EXPORT_VERSION,
     assembledAt: now.toISOString(),
     subjectId,
-    account: account.rows[0] ?? null,
+    account: account.rows[0]!,
     memberships: memberships.rows,
     consents: consents.rows,
     applications: applications.rows,

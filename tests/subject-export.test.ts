@@ -11,6 +11,7 @@
  * What is tested is mostly the boundary: whose data comes back, whose does not,
  * and whether an export that cannot be complete refuses rather than looking it.
  */
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -21,6 +22,7 @@ import {
   REQUEST_KINDS,
   assembleSubjectExport,
   subjectExportFilename,
+  NoSuchSubjectError,
 } from '../packages/governance/src/index.ts';
 import { actingAs, connect } from './setup/client.ts';
 import {
@@ -212,5 +214,31 @@ describe('the endpoint', () => {
     const page = readFileSync(join(process.cwd(), 'apps/web/app/review/requests/page.tsx'), 'utf8');
     expect(page).toContain("['access', 'portability'].includes");
     expect(page).toContain('/export');
+  });
+});
+
+describe('a subject who does not exist', () => {
+  /*
+   * `account.rows[0] ?? null` assembled the export anyway: every array empty,
+   * `notIncluded` still listing what we deliberately left out, and a `readMe`
+   * explaining how to read it. A document that says "we hold nothing about you"
+   * — handed over as the answer to a statutory access request.
+   *
+   * A platform admin can read every user, so the only way this happens is that
+   * the id is wrong. A wrong id is a mistake to report, not a fact to publish.
+   */
+  it('is refused rather than exported as an empty one', async () => {
+    await expect(exportFor(randomUUID(), admin.userId)).rejects.toThrow(NoSuchSubjectError);
+  });
+
+  it('says which id it could not find, so the mistake is visible', async () => {
+    const missing = randomUUID();
+    await expect(exportFor(missing, admin.userId)).rejects.toThrow(missing);
+  });
+
+  it('still exports a subject who does exist, so the refusal is about the id', async () => {
+    // The guard must not have been bought by refusing everything.
+    const assembled = await exportFor(subject.userId, admin.userId);
+    expect(assembled.account.id).toBe(subject.userId);
   });
 });
