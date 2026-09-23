@@ -48,26 +48,25 @@ export async function createWorkspace(
     return { error: 'A shared workspace is either an agency or an organisation.' };
   }
 
-  const { data: organisation, error } = await supabase
-    .from('organisations')
-    .insert({
-      name,
-      slug: slugify(name),
-      account_type: accountType,
-      is_personal: false,
-      created_by: user.id,
-      billing_email: user.email,
-    })
-    .select('id')
-    .single();
-  if (error || !organisation) return { error: error?.message ?? 'Could not create the workspace.' };
-
-  const { error: membershipError } = await supabase.from('memberships').insert({
-    organisation_id: organisation.id,
-    user_id: user.id,
-    role: 'owner',
+  /*
+   * One call, because the two writes have to be one transaction and the read
+   * back has to happen with a privilege the creator does not yet hold.
+   *
+   * This used to be `.insert({...}).select('id').single()` on `organisations`
+   * followed by an insert on `memberships`, and it never worked once.
+   * `organisations_insert_own` permits the insert, but `.select('id')` makes it
+   * an `insert ... returning`, and `returning` is read through
+   * `organisations_select_members` — which asks `is_org_member(id)`, false for
+   * the creator until the membership on the next line exists. So every attempt
+   * to create an agency or organisation workspace failed with "new row violates
+   * row-level security policy for table organisations", from this form.
+   */
+  const { data: created, error } = await supabase.rpc('create_workspace', {
+    workspace_name: name,
+    workspace_slug: slugify(name),
+    workspace_account_type: accountType,
   });
-  if (membershipError) return { error: membershipError.message };
+  if (error || !created) return { error: error?.message ?? 'Could not create the workspace.' };
 
   revalidatePath('/console');
   return { notice: `${name} created. You are its owner.` };
