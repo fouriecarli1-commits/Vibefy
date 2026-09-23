@@ -31,6 +31,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PREFLIGHT_LEGEND,
   PREFLIGHT_NOT_AN_ASSESSMENT,
+  borrowedItems,
   preflightItems,
   runChecks,
   type FetchedPage,
@@ -284,5 +285,46 @@ describe('every borrowed question', () => {
     expect(borrowed.length).toBeGreaterThan(0);
     const checks = runChecks(pageWith('<body>x</body>')).map((observation) => observation.id);
     for (const id of borrowed) expect(checks, id).toContain(id);
+  });
+});
+
+describe('a question it could not answer', () => {
+  /*
+   * The three borrowed questions used to be mapped with `flatMap` and a
+   * `return []` when the consumer check had no observation with that id. A
+   * missing answer therefore removed the question from the list and from the
+   * counts, and the builder was shown a preflight that had never asked it.
+   *
+   * That is the failure this whole tool is built against: it says out loud
+   * what it did not look at, and a list that quietly shortens when something
+   * goes wrong says the opposite.
+   */
+  const observationsWithout = (missing: string) =>
+    runChecks(readyPage).filter((observation) => observation.id !== missing);
+
+  it('still asks it, and counts it as open rather than passed', () => {
+    const items = borrowedItems(observationsWithout('cancellation'));
+    const cancellation = items.find((entry) => entry.id === 'cancellation');
+    expect(cancellation).toBeDefined();
+    expect(cancellation!.outcome).toBe('unclear');
+    expect(cancellation!.outcome).not.toBe('ok');
+    expect(cancellation!.detail).toMatch(/a limit of ours/i);
+    expect(cancellation!.fix).not.toBeNull();
+  });
+
+  it('asks all three whatever the consumer check managed to answer', () => {
+    for (const missing of ['contact_email', 'privacy_policy', 'cancellation', 'nothing']) {
+      const ids = borrowedItems(observationsWithout(missing)).map((entry) => entry.id);
+      expect(ids).toEqual(['contact', 'privacy', 'cancellation']);
+    }
+  });
+
+  it('answers each of them normally when the observation is there', () => {
+    const items = borrowedItems(runChecks(readyPage));
+    expect(items).toHaveLength(3);
+    for (const entry of items) {
+      expect(['ok', 'missing', 'unclear']).toContain(entry.outcome);
+      expect(entry.detail.length).toBeGreaterThan(20);
+    }
   });
 });

@@ -188,6 +188,7 @@ describe('the evaluation cannot carry a score back', () => {
       scopeStatement: 'x'.repeat(120),
       promptBundleSha256: 'c'.repeat(64),
       intendedForAppStore: false,
+      notTested: [],
     } as const;
 
     const fingerprint = (html: string) =>

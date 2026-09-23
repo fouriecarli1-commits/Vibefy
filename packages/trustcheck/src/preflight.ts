@@ -331,6 +331,54 @@ const OUTCOME_FROM: Readonly<Record<string, PreflightOutcome>> = {
   unclear: 'unclear',
 };
 
+/**
+ * The three questions the consumer check already answers, restated for a builder.
+ *
+ * Its own function, and exported, because the shape it has to hold cannot be
+ * reached through `runPreflight`: that fetches a real page. A rule nothing can
+ * exercise is a rule nobody is keeping.
+ */
+export function borrowedItems(observations: readonly Observation[]): PreflightItem[] {
+  return BORROWED.map((entry) => {
+    const observation = observations.find((candidate) => candidate.id === entry.from);
+    /*
+     * A question we could not answer is still asked.
+     *
+     * This used to `return []` on a missing observation, which dropped the
+     * whole question out of the list and out of the counts — so a builder
+     * whose page broke the cancellation check was shown a preflight that
+     * never asked whether somebody who subscribed can get out again, with
+     * nothing to tell them it had been asked and not answered. That is the
+     * same lie by omission the public tick list exists to avoid, committed
+     * in the tool whose whole promise is that it says what it did not look
+     * at.
+     *
+     * `runChecks` answers every check today, including one that throws. This
+     * is not defensive dressing for that: the list of questions this tool
+     * asks is a promise about the tool, and a promise that quietly shortens
+     * when something goes wrong is not one.
+     */
+    if (!observation) {
+      return item(
+        entry.id,
+        entry.question,
+        'unclear',
+        'This question could not be answered from the page we fetched. That is a limit of ours rather than something about your site, and it means this question is open, not that it passed.',
+        entry.fix,
+      );
+    }
+    const outcome = OUTCOME_FROM[observation.outcome] ?? 'unclear';
+    return item(
+      entry.id,
+      entry.question,
+      outcome,
+      observation.detail,
+      outcome === 'ok' ? null : entry.fix,
+      observation.evidence,
+    );
+  });
+}
+
 export async function runPreflight(
   rawUrl: string,
   now: Date = new Date(),
@@ -356,26 +404,10 @@ export async function runPreflight(
     };
   }
 
-  const borrowed = runChecks(page);
   const items: PreflightItem[] = [
     ...preflightItems(page, requestedUrl),
-    ...BORROWED.flatMap((entry) => {
-      const observation = borrowed.find((candidate) => candidate.id === entry.from);
-      if (!observation) return [];
-      const outcome = OUTCOME_FROM[observation.outcome] ?? 'unclear';
-      return [
-        item(
-          entry.id,
-          entry.question,
-          outcome,
-          observation.detail,
-          outcome === 'ok' ? null : entry.fix,
-          observation.evidence,
-        ),
-      ];
-    }),
+    ...borrowedItems(runChecks(page)),
   ];
-
   return {
     requestedUrl,
     finalUrl: page.finalUrl,

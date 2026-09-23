@@ -256,6 +256,7 @@ describe('what a report shows never changes what it scored', () => {
       promptBundleSha256: 'c'.repeat(64),
       intendedForAppStore: false,
       isGame: false,
+      notTested: [],
     } as const;
 
     const free = renderReport(source, entitlementFor('free').reportTier);

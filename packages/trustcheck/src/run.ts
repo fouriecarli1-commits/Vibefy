@@ -22,6 +22,39 @@ export const TRUST_CHECK_LEGEND =
 export const TRUST_CHECK_NOT_A_BADGE =
   'A trust check is not a “Verified by VibefyCode” badge and does not lead to one. A badge is issued only to an owner who proved they control the application, after an assessment against the published rubric that a person reviewed.';
 
+/**
+ * Why there was no page to read, without blaming the site for our own faults.
+ *
+ * Every failure used to produce one sentence: "The site could not be reached.
+ * It may be offline, blocking automated visitors, or slow to answer." That
+ * asserts three things about somebody else's business, and a `TypeError` in
+ * this package would have asserted all three just as confidently. The result
+ * is shown to a stranger deciding whether to trust that business, so a bug of
+ * ours was being published as evidence against them.
+ *
+ * The builder-facing preflight beside this one already said what went wrong.
+ * This is the same courtesy pointed at the person being checked.
+ *
+ * Three outcomes, and the third is the one that matters: a failure we cannot
+ * attribute is ours until proven otherwise, and it says so.
+ */
+export function whyItCouldNotBeRead(error: unknown): string {
+  const name = error instanceof Error ? error.name : '';
+  if (name === 'AbortError' || name === 'TimeoutError') {
+    // A fact we observed, and the only one of the three the old sentence
+    // offered that we can ever actually stand behind.
+    return 'The site did not answer in time, so there was no page to read. It may be slow, or it may be declining automated visitors by leaving them waiting.';
+  }
+  // What `fetch` throws when it never got a response: DNS, TLS, a refused
+  // connection. `cause` is where undici puts the underlying code.
+  const networkFailure =
+    error instanceof TypeError && (error.message === 'fetch failed' || 'cause' in error);
+  if (networkFailure) {
+    return 'The site could not be reached. It may be offline, blocking automated visitors, or misconfigured in a way that stops a connection being made.';
+  }
+  return `Nothing was checked, because something went wrong on our side while reading that page. That is a fault of ours and is not a finding about this site. (${error instanceof Error ? error.message : String(error)})`;
+}
+
 export async function runTrustCheck(
   rawUrl: string,
   now: Date = new Date(),
@@ -47,8 +80,7 @@ export async function runTrustCheck(
     }
   } catch (error) {
     if (error instanceof TrustCheckInputError) throw error;
-    unreachable =
-      'The site could not be reached. It may be offline, blocking automated visitors, or slow to answer.';
+    unreachable = whyItCouldNotBeRead(error);
   }
 
   const reachable: Observation = {

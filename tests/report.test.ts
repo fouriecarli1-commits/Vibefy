@@ -135,6 +135,13 @@ const source: ReportSource = {
     ],
     notAssessed: ['The payment flow was not exercised, because that would require a real card.'],
   },
+  notTested: [
+    {
+      criterion: 'SEC-12',
+      because:
+        'The owner says this application takes payments, and no checkout was found on the landing page \u2014 which is the only page this criterion is read from. Where a card number goes was not established.',
+    },
+  ],
   stages: [
     { stage: 'deterministic_checks', status: 'succeeded', notes: [] },
     { stage: 'store_readiness', status: 'skipped', notes: ['Not intended for an app store.'] },
@@ -226,6 +233,56 @@ describe('what no tier may withhold', () => {
     expect(html).toContain('What was not assessed');
     expect(html).toContain('would require a real card');
     expect(html).toMatch(/store readiness stage did not complete/i);
+    // The engine's own record, which is a different thing from the model's
+    // account of the same run and is named by criterion.
+    expect(html).toContain('SEC-12');
+    expect(html).toContain('Where a card number goes was not established');
+  });
+
+  it.each(['free', 'paid'] as const)(
+    'never claims everything in scope was assessed while a criterion was not, on a %s report',
+    (tier) => {
+      /*
+       * The defect this exists for.
+       *
+       * The section read `narrative.notAssessed` and the stages that did not
+       * succeed, and fell back to "Everything within the authorised scope was
+       * assessed" when both were empty. `assessments.not_tested` — which the
+       * engine writes as the run finishes, and which the free public
+       * verification page prints — was never consulted. So this exact shape of
+       * run put the strongest sentence in the document in front of a paying
+       * customer while a stranger could open a page beside it listing four
+       * criteria nobody had looked at.
+       */
+      const quietNarrative: ReportSource = {
+        ...source,
+        narrative: source.narrative ? { ...source.narrative, notAssessed: [] } : null,
+        stages: source.stages.map((stage) => ({ ...stage, status: 'succeeded' })),
+      };
+      const html = renderReport(quietNarrative, tier).html;
+      expect(html).not.toContain('Everything within the authorised scope was assessed');
+      expect(html).toContain('SEC-12');
+    },
+  );
+
+  it('groups criteria that share a reason rather than repeating it', () => {
+    // Four criteria behind a sign-in carry one sentence between them. Printed
+    // four times it reads as four problems, which overstates in the other
+    // direction from the one the fallback did.
+    const behindSignIn =
+      'This application signs users in, and the assessment was given no test account, so everything behind the sign-in was left alone.';
+    const html = renderReport(
+      {
+        ...source,
+        notTested: ['FI-02', 'FI-07', 'PRI-03', 'STR-03'].map((criterion) => ({
+          criterion,
+          because: behindSignIn,
+        })),
+      },
+      'paid',
+    ).html;
+    expect(html.split(behindSignIn).length - 1).toBe(1);
+    expect(html).toContain('FI-02, FI-07, PRI-03, STR-03');
   });
 
   it.each(['free', 'paid'] as const)(

@@ -73,6 +73,24 @@ export interface ReportSource {
   readonly dimensions: readonly ReportDimensionScore[];
   readonly findings: readonly ReportFinding[];
   readonly narrative: ReportNarrative | null;
+  /**
+   * Criteria this run did not answer, recorded by the engine as it ran.
+   *
+   * Not the same thing as `narrative.notAssessed`, and it is here because the
+   * two were being confused. That one is a model's account of what it thinks it
+   * did not do. This is the engine's own record: the stage that could not load
+   * the page in a browser, the checkout that was never found, the four criteria
+   * behind a sign-in nobody was given an account for. It is written to
+   * `assessments.not_tested` as the run finishes and is what the public
+   * verification page prints.
+   *
+   * Until this field existed the report did not read that column at all, so a
+   * run whose model narrative happened to be quiet printed "Everything within
+   * the authorised scope was assessed" — the strongest sentence in the
+   * document, in the paying customer's copy, while the free page a stranger
+   * could open listed four things nobody had looked at.
+   */
+  readonly notTested: readonly { readonly criterion: string; readonly because: string }[];
   readonly stages: readonly ReportStage[];
   readonly scopeStatement: string;
   readonly promptBundleSha256: string;

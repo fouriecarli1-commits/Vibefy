@@ -166,6 +166,7 @@ describe('in the report', () => {
     dimensions: [],
     findings: [],
     narrative: null,
+    notTested: [],
     stages: [],
     scopeStatement: 'Scope.',
     promptBundleSha256: 'a'.repeat(64),

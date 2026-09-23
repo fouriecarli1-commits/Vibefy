@@ -207,6 +207,46 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
       </section>`
     : '';
 
+  /*
+   * What was not assessed, from three sources rather than one.
+   *
+   * It used to read only `narrative.notAssessed` and the stages that did not
+   * succeed, and fall back to "Everything within the authorised scope was
+   * assessed" — the strongest sentence in the document — whenever both were
+   * empty. `assessments.not_tested` was never consulted, although the engine
+   * writes it as the run finishes and the free public verification page prints
+   * it. So a paying customer could be told everything in scope was assessed
+   * while the page a stranger could open beside it listed four criteria nobody
+   * had looked at. The weaker claim was in the copy that was paid for.
+   *
+   * The engine's record goes first because it is a fact about the run; the
+   * narrative is a model's account of the same run and belongs after it.
+   *
+   * Reasons are grouped rather than repeated. Four criteria behind a sign-in
+   * share one sentence, and printing that sentence four times reads as four
+   * problems instead of one — which overstates in the other direction.
+   */
+  const byReason = new Map<string, string[]>();
+  for (const entry of source.notTested) {
+    const criteria = byReason.get(entry.because);
+    if (criteria) criteria.push(entry.criterion);
+    else byReason.set(entry.because, [entry.criterion]);
+  }
+  const notAssessedItems = [
+    ...[...byReason.entries()].map(
+      ([because, criteria]) =>
+        `<strong>${escapeHtml(criteria.join(', '))}</strong> — ${escapeHtml(because)}`,
+    ),
+    ...(source.narrative?.notAssessed ?? []).map((item) => escapeHtml(item)),
+    ...source.stages
+      .filter((stage) => stage.status !== 'succeeded')
+      .map((stage) =>
+        escapeHtml(
+          `The ${stage.stage.replace(/_/g, ' ')} stage did not complete (${stage.status}).`,
+        ),
+      ),
+  ];
+
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -318,19 +358,7 @@ ${
   <h2>What was not assessed</h2>
   <p class="muted">Stated so that silence is not mistaken for a clean result.</p>
   <ul class="plain">
-    ${
-      (source.narrative?.notAssessed ?? [])
-        .concat(
-          source.stages
-            .filter((stage) => stage.status !== 'succeeded')
-            .map(
-              (stage) =>
-                `The ${stage.stage.replace(/_/g, ' ')} stage did not complete (${stage.status}).`,
-            ),
-        )
-        .map((item) => `<li>${escapeHtml(item)}</li>`)
-        .join('') || '<li>Everything within the authorised scope was assessed.</li>'
-    }
+    ${notAssessedItems.map((item) => `<li>${item}</li>`).join('') || '<li>Everything within the authorised scope was assessed, and the engine recorded no criterion it could not answer.</li>'}
   </ul>
 </section>
 

@@ -94,6 +94,7 @@ const source: ReportSource = {
     ],
     notAssessed: ['Anything behind the paywall, which the authorised scope did not cover.'],
   },
+  notTested: [],
   stages: [{ stage: 'deterministic', status: 'completed', notes: ['12 checks run'] }],
   scopeStatement:
     'This assessment covered the web application at kettle.example on 2026-08-22, within the scope its owner authorised. It is point-in-time and scope-limited.',

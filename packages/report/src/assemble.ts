@@ -37,6 +37,9 @@ interface AssessmentRow {
   scope_statement: string | null;
   prompt_bundle_sha256: string | null;
   report_narrative: ReportSource['narrative'];
+  // Already returned by the `a.*` in the query below; it was simply never
+  // declared here, so nothing downstream could see it and nothing complained.
+  not_tested: { criterion: string; because: string }[] | null;
   completed_at: string | null;
   created_at: string;
   reviewed_at: string | null;
@@ -252,6 +255,16 @@ export async function assembleReportSource(
       category: row.category ?? null,
       peerScores,
     }),
+    /*
+     * The engine's own record of what it did not answer.
+     *
+     * Rendered whatever it says and on every tier, for the same reason the
+     * public tick list shows `not_tested` as prominently as a pass: a document
+     * that quietly drops the questions it could not answer lets the reader
+     * assume the missing line was fine, and that is the specific way an
+     * assurance report misleads somebody.
+     */
+    notTested: row.not_tested ?? [],
     stages: runs.rows.map((run) => ({
       stage: run.stage,
       status: run.status,
