@@ -416,3 +416,90 @@ describe('applying a Paystack event to our records', () => {
     expect(rows[0]!.n).toBe(2);
   });
 });
+
+describe('a subscription status neither provider recognises', () => {
+  /*
+   * Stripe read an unrecognised status as `incomplete`. Paystack read one as
+   * `active`, and `active` is not a cosmetic difference: `subscriptions.status
+   * in ('active','trialing')` is what grants seats, what permits a badge to
+   * issue, and what decides how often an application is re-assessed. A status
+   * we could not read was buying all three.
+   *
+   * The two had no reason to agree, because nothing made them answer the same
+   * question with the same function. They share one now.
+   */
+  const signed = (payload: Record<string, unknown>) => ({
+    id: `evt_${Math.random().toString(36).slice(2)}`,
+    type: 'subscription.create',
+    data: payload,
+    receivedAt: new Date().toISOString(),
+  });
+
+  it('is never read as a live subscription', () => {
+    const change = interpretPaystackEvent(
+      signed({
+        subscription_code: 'SUB_probe',
+        status: 'a_word_paystack_invented_last_tuesday',
+        metadata: { organisationId: 'org', plan: 'agency' },
+      }) as never,
+      'ZAR',
+    );
+    expect(change.kind).toBe('subscription_changed');
+    expect(change.kind === 'subscription_changed' && change.status).toBe('incomplete');
+    expect(change.kind === 'subscription_changed' && change.status).not.toBe('active');
+  });
+
+  it('is not read as live when no status is sent at all', () => {
+    const change = interpretPaystackEvent(
+      signed({
+        subscription_code: 'SUB_probe2',
+        metadata: { organisationId: 'org', plan: 'agency' },
+      }) as never,
+      'ZAR',
+    );
+    expect(change.kind === 'subscription_changed' && change.status).toBe('incomplete');
+  });
+
+  it('still reads the statuses it does recognise', () => {
+    // The refusal must not have been bought by breaking the ordinary case.
+    for (const [declared, expected] of [
+      ['active', 'active'],
+      ['attention', 'past_due'],
+      ['cancelled', 'cancelled'],
+      ['non-renewing', 'cancelled'],
+    ] as const) {
+      const change = interpretPaystackEvent(
+        signed({
+          subscription_code: `SUB_${declared}`,
+          status: declared,
+          metadata: { organisationId: 'org', plan: 'agency' },
+        }) as never,
+        'ZAR',
+      );
+      expect(change.kind === 'subscription_changed' && change.status).toBe(expected);
+    }
+  });
+
+  it.each(['complete', 'completed'])('reads %s as cancelled, both spellings', (declared) => {
+    // One letter deciding whether somebody has a live subscription is not a
+    // risk worth taking to keep a map tidy.
+    const change = interpretPaystackEvent(
+      signed({
+        subscription_code: `SUB_${declared}`,
+        status: declared,
+        metadata: { organisationId: 'org', plan: 'agency' },
+      }) as never,
+      'ZAR',
+    );
+    expect(change.kind === 'subscription_changed' && change.status).toBe('cancelled');
+  });
+
+  it('answers the same way on both providers, from one function', () => {
+    const source = readFileSync('packages/billing/src/paystack.ts', 'utf8');
+    const stripe = readFileSync('packages/billing/src/stripe.ts', 'utf8');
+    for (const file of [source, stripe]) expect(file).toContain('subscriptionStateOf(');
+    // Neither may keep its own fallback beside the shared one.
+    expect(source).not.toMatch(/PAYSTACK_SUBSCRIPTION_STATE\[[^\]]+\] \?\?/);
+    expect(stripe).not.toMatch(/STRIPE_SUBSCRIPTION_STATE\[[^\]]+\] \?\?/);
+  });
+});

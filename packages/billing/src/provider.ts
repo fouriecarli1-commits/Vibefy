@@ -105,6 +105,34 @@ export type SubscriptionState =
   | 'cancelled'
   | 'incomplete';
 
+/**
+ * A provider's word for a subscription's state, translated into ours.
+ *
+ * One function, used by both providers, because they had drifted. Stripe read
+ * an unrecognised status as `incomplete`; Paystack read one as **`active`** —
+ * and `active` is not a cosmetic difference. `subscriptions.status in ('active',
+ * 'trialing')` is what grants seats, what permits a badge to issue, and what
+ * decides how often an application is re-assessed. A status we could not read
+ * was buying all three.
+ *
+ * `incomplete` is the honest answer to "we do not know": the subscription
+ * exists, and nothing about it has been established. It is also the one the
+ * customer will notice, which is the point — a subscription that silently looks
+ * live is a subscription nobody reports.
+ *
+ * The unrecognised word is returned beside the state so a caller can say it out
+ * loud rather than having to guess afterwards what it saw.
+ */
+export function subscriptionStateOf(
+  vocabulary: Readonly<Record<string, SubscriptionState>>,
+  declared: string | null | undefined,
+): { readonly state: SubscriptionState; readonly unrecognised: string | null } {
+  const word = (declared ?? '').trim();
+  const known = vocabulary[word];
+  if (known) return { state: known, unrecognised: null };
+  return { state: 'incomplete', unrecognised: word.length > 0 ? word : '(none sent)' };
+}
+
 export interface PaymentSettled {
   readonly kind: 'payment_settled';
   readonly organisationId: string | null;

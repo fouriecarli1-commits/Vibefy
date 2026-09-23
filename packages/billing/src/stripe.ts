@@ -19,6 +19,7 @@ import {
   type RefundResult,
   type SettledPayment,
   type SubscriptionState,
+  subscriptionStateOf,
 } from './provider.ts';
 
 export interface StripeProviderOptions {
@@ -203,7 +204,10 @@ export function interpretStripeEvent(event: BillingEvent): BillingChange {
         status:
           event.type === 'customer.subscription.deleted'
             ? 'cancelled'
-            : (STRIPE_SUBSCRIPTION_STATE[String(data.status ?? '')] ?? 'incomplete'),
+            : // The shared reader, so the two providers cannot drift again. This
+              // side was already right; Paystack was not, and nothing made them
+              // answer the same question the same way.
+              subscriptionStateOf(STRIPE_SUBSCRIPTION_STATE, stringOrNull(data.status)).state,
         periodStart: unixOrNull(data.current_period_start),
         periodEnd: unixOrNull(data.current_period_end),
       };

@@ -38,6 +38,7 @@ import {
   type RefundResult,
   type SettledPayment,
   type SubscriptionState,
+  subscriptionStateOf,
 } from './provider.ts';
 
 export const PAYSTACK_API = 'https://api.paystack.co';
@@ -258,6 +259,10 @@ const PAYSTACK_SUBSCRIPTION_STATE: Readonly<Record<string, SubscriptionState>> =
   complete: 'cancelled',
   cancelled: 'cancelled',
   'non-renewing': 'cancelled',
+  // Both spellings. Paystack's documentation and its payloads have not always
+  // agreed, and a single letter deciding whether somebody has a live
+  // subscription is not a risk worth taking to keep a map tidy.
+  completed: 'cancelled',
   attention: 'past_due',
 };
 
@@ -304,6 +309,13 @@ export function interpretPaystackEvent(event: BillingEvent, currency: Currency):
       const subscriptionId = stringOf(data.subscription_code);
       if (!subscriptionId) return { kind: 'ignored', why: 'Subscription event with no code.' };
       const declaredStatus = stringOf(data.status);
+      // Shared with the Stripe reader. An unrecognised status is `incomplete`,
+      // never `active`: `status in ('active','trialing')` grants seats, permits
+      // a badge to issue and sets the re-assessment cadence, and a word we
+      // could not read was buying all three. `complete` and `completed` are
+      // both in the map below for the same reason — one spelling apart is how
+      // this fell through in the first place.
+      const interpreted = subscriptionStateOf(PAYSTACK_SUBSCRIPTION_STATE, declaredStatus);
       return {
         kind: 'subscription_changed',
         organisationId,
@@ -315,7 +327,7 @@ export function interpretPaystackEvent(event: BillingEvent, currency: Currency):
         status:
           event.type === 'subscription.disable' || event.type === 'subscription.not_renewing'
             ? 'cancelled'
-            : (PAYSTACK_SUBSCRIPTION_STATE[declaredStatus ?? ''] ?? 'active'),
+            : interpreted.state,
         periodStart: dateOf(data.createdAt)?.toISOString() ?? null,
         periodEnd: dateOf(data.next_payment_date)?.toISOString() ?? null,
       };
