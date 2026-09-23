@@ -8,6 +8,19 @@ import { Client } from 'pg';
 export interface ActingAs {
   readonly userId?: string;
   readonly role?: 'anon' | 'authenticated' | 'service_role';
+  /**
+   * The assurance level on the access token, as Supabase reports it.
+   *
+   * `aal1` is a password alone; `aal2` is a session where a second factor was
+   * answered. It defaults to `aal2` so that every test written before the
+   * restrictive policies existed keeps testing what it was written to test —
+   * a test about seats is not a test about authentication, and having a
+   * hundred of them start failing for a reason none of them mentions is how a
+   * suite stops being read.
+   *
+   * A test about the second step says `aal: 'aal1'` and means it.
+   */
+  readonly aal?: 'aal1' | 'aal2';
 }
 
 const dsnParts = () => {
@@ -32,7 +45,11 @@ export async function actingAs<T>(
   work: (client: Client) => Promise<T>,
 ): Promise<T> {
   const role = identity.role ?? 'authenticated';
-  const claims = JSON.stringify({ sub: identity.userId ?? null, role });
+  const claims = JSON.stringify({
+    sub: identity.userId ?? null,
+    role,
+    aal: identity.aal ?? 'aal2',
+  });
   await client.query('begin');
   try {
     await client.query('select set_config($1, $2, true)', ['request.jwt.claims', claims]);
@@ -63,7 +80,11 @@ export async function committingAs<T>(
   work: (client: Client) => Promise<T>,
 ): Promise<T> {
   const role = identity.role ?? 'authenticated';
-  const claims = JSON.stringify({ sub: identity.userId ?? null, role });
+  const claims = JSON.stringify({
+    sub: identity.userId ?? null,
+    role,
+    aal: identity.aal ?? 'aal2',
+  });
   await client.query('begin');
   try {
     await client.query('select set_config($1, $2, true)', ['request.jwt.claims', claims]);

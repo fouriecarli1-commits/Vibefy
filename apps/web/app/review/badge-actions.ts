@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -29,6 +30,10 @@ async function reviewerClient() {
   if (profile?.platform_role !== 'reviewer' && profile?.platform_role !== 'admin') {
     return { error: 'Only a VibefyCode reviewer can act on a badge.' as const };
   }
+  // Revocation is the one action in this product that is visible to the public
+  // within minutes. A restrictive policy refuses it without a second step; this
+  // is the sentence that says so.
+  if (!(await sessionPassedSecondStep())) return { error: SECOND_STEP_REQUIRED };
   return { supabase };
 }
 

@@ -3,10 +3,11 @@
 import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { verifyDnsTxt, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisation';
-import { canAccept, createInvitationToken, hashInvitationToken } from '@vibefycode/workspace';
+import { createInvitationToken } from '@vibefycode/workspace';
 import { renderInvitationEmail, resendFromEnvironment } from '@vibefycode/notify';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
+import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import type { ActionState } from '@/app/console/apps/actions';
 
 async function signedIn() {
@@ -89,6 +90,12 @@ export async function inviteMember(
   formData: FormData,
 ): Promise<ActionState> {
   const { supabase, user } = await signedIn();
+  // Letting another human read a customer's findings. A restrictive policy
+  // refuses the insert without a second step; this is the sentence. Withdrawing
+  // an invitation is deliberately not guarded — it reduces access, and a
+  // control standing between somebody and undoing their own mistake works
+  // against the thing it is for.
+  if (!(await sessionPassedSecondStep())) return { error: SECOND_STEP_REQUIRED };
   if (!user) return { error: 'You are signed out.' };
 
   const organisationId = String(formData.get('organisationId') ?? '');
@@ -185,6 +192,20 @@ export async function revokeInvitation(
  * and the signed-in address against the address it was sent to. A forwarded link
  * is a link that works for the wrong person.
  */
+/**
+ * Accepting an invitation.
+ *
+ * One call, because the whole exchange has to happen with a privilege the
+ * invited person does not have. Read directly, this never worked: the only
+ * policy on `invitations` wants `owner` or `admin` on the organisation, and
+ * somebody who has not joined holds no role in it — so the select returned
+ * nothing, `canAccept(null, ...)` said "That invitation link is not valid", and
+ * the colleague went off to check a link that was fine.
+ *
+ * `canAccept` is still the source of those sentences; `accept_invitation`
+ * raises the same ones, and a test holds the two to each other so one link can
+ * never be described two different ways.
+ */
 export async function acceptInvitation(
   _previous: ActionState,
   formData: FormData,
@@ -195,37 +216,10 @@ export async function acceptInvitation(
   const token = String(formData.get('token') ?? '');
   if (!token) return { error: 'That invitation link is not valid.' };
 
-  const { data: invitation } = await supabase
-    .from('invitations')
-    .select('id, organisation_id, email, role, accepted_at, revoked_at, expires_at')
-    .eq('token_sha256', hashInvitationToken(token))
-    .maybeSingle();
-
-  const verdict = canAccept(
-    invitation
-      ? {
-          email: String(invitation.email),
-          acceptedAt: invitation.accepted_at ? new Date(invitation.accepted_at) : null,
-          revokedAt: invitation.revoked_at ? new Date(invitation.revoked_at) : null,
-          expiresAt: new Date(invitation.expires_at),
-        }
-      : null,
-    user.email,
-  );
-  if (!verdict.ok) return { error: verdict.message };
-
-  const { error: membershipError } = await supabase.from('memberships').insert({
-    organisation_id: invitation!.organisation_id,
-    user_id: user.id,
-    role: invitation!.role,
-    invited_by: null,
-  });
-  if (membershipError) return { error: membershipError.message };
-
-  const { error } = await supabase
-    .from('invitations')
-    .update({ accepted_at: new Date().toISOString(), accepted_by: user.id })
-    .eq('id', invitation!.id);
+  const { error } = await supabase.rpc('accept_invitation', { token });
+  // The message is the function's own, which is the same sentence `canAccept`
+  // would have produced. Passing it through rather than replacing it is what
+  // stops the database and the UI disagreeing about why a link did not work.
   if (error) return { error: error.message };
 
   revalidatePath('/console');
@@ -234,6 +228,9 @@ export async function acceptInvitation(
 
 export async function changeRole(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const { supabase, user } = await signedIn();
+  // An admin who can promote is an owner with an extra step, so this is the
+  // escalation rather than the invitation.
+  if (!(await sessionPassedSecondStep())) return { error: SECOND_STEP_REQUIRED };
   if (!user) return { error: 'You are signed out.' };
 
   const membershipId = String(formData.get('membershipId') ?? '');

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -27,6 +28,18 @@ async function reviewerContext() {
   if (profile?.platform_role !== 'reviewer' && profile?.platform_role !== 'admin') {
     return { error: 'Only a VibefyCode reviewer can act on the queue.' as const };
   }
+  /*
+   * The second step, asked here so it can be explained.
+   *
+   * A review row is what stands in front of every badge this product will ever
+   * put on somebody's website, so a restrictive policy in the database refuses
+   * the insert without one. That refusal reads "new row violates row-level
+   * security policy for table reviews", which tells a reviewer nothing. This
+   * says what to do instead — and being in `reviewerContext` rather than in
+   * each of the three actions is the same reason the role check is: a fourth
+   * review action added later gets it without anybody remembering.
+   */
+  if (!(await sessionPassedSecondStep())) return { error: SECOND_STEP_REQUIRED };
   return { supabase, user };
 }
 
