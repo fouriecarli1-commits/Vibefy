@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { embedded } from '@/lib/embedded';
 import { recordSignUpConsents } from '@/lib/consent';
 
 export const metadata: Metadata = { title: 'Console' };
@@ -48,15 +49,48 @@ export default async function ConsolePage() {
 
   const { data: memberships, error } = await supabase
     .from('memberships')
-    .select('role, organisations (id, name, slug, account_type, is_personal)');
+    .select('role, organisations (id, name, slug, account_type, is_personal)')
+    .order('organisation_id');
 
   const { data: apps } = await supabase
     .from('apps')
     .select('id, name, primary_url, screening_status')
     .order('created_at', { ascending: false });
 
-  const { data: subscriptions } = await supabase.from('subscriptions').select('plan, status');
-  const live = subscriptions?.find((row) => ['active', 'trialing'].includes(String(row.status)));
+  /*
+   * The plan of one workspace, not of whichever subscription came back first.
+   *
+   * Row-level security lets a member read the subscriptions of every workspace
+   * they belong to, and this selected `plan, status` — without
+   * `organisation_id`, so there was nothing to scope by even in principle. A
+   * consultant in a client's Agency workspace saw "Plan: agency" on their own
+   * console, with that plan's depth and badge eligibility beside it.
+   *
+   * It was a display fault rather than an entitlement bypass, and saying so
+   * matters: what an account may actually do is decided by `resolvePlan(client,
+   * { organisationId, appId })` in the worker and in the server actions, scoped
+   * to one workspace and always so. Nobody got a run they had not paid for.
+   * They got a front door that disagreed with the thing enforcing it.
+   */
+  const workspaceOf = (row: { organisations: unknown }) =>
+    embedded<{ id: string; is_personal: boolean }>(
+      row.organisations as
+        | { id: string; is_personal: boolean }
+        | { id: string; is_personal: boolean }[]
+        | null,
+    );
+  const shownWorkspace =
+    (memberships ?? []).map(workspaceOf).find((org) => org?.is_personal)?.id ??
+    workspaceOf(memberships?.[0] ?? { organisations: null })?.id;
+
+  const { data: subscriptions } = await supabase
+    .from('subscriptions')
+    .select('organisation_id, plan, status');
+  const live = subscriptions?.find(
+    (row) =>
+      String(row.organisation_id) === String(shownWorkspace) &&
+      ['active', 'trialing'].includes(String(row.status)),
+  );
   const currentPlan = (live?.plan ?? 'free') as PlanTier;
   const entitlement = entitlementFor(currentPlan);
 

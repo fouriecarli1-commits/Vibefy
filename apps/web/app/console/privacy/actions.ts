@@ -36,18 +36,39 @@ export async function submitDataRequest(
     return { error: 'Say which processing you are objecting to.' };
   }
 
-  const { data: membership } = await supabase
+  /*
+   * The personal workspace, asked for by name.
+   *
+   * This read twenty memberships with no `order by` and then looked for
+   * `is_personal` in JavaScript — the thing being searched for, never told to
+   * the database — falling back to `rows[0]` when the search found nothing. A
+   * caller in more than twenty workspaces could have their personal one outside
+   * that window, and the request was then filed against an arbitrary
+   * organisation; the accounts with that many memberships are exactly the
+   * agencies and consultants, so the arbitrary one is somebody's client.
+   *
+   * It matters beyond the row. `organisation_id` grants nobody access here —
+   * `data_requests_select_own` is `user_id = auth.uid() or is_platform_admin()`
+   * — but `review/requests/[id]/export` copies it onto the audit row when a
+   * reviewer exports the subject's data, and `audit_log_select_members` scopes
+   * reads by exactly that column. Every member of the wrong workspace could then
+   * read that this person made a data-subject request, which kind, and how much
+   * data it covered.
+   */
+  const { data: personal } = await supabase
     .from('memberships')
-    .select('organisation_id, organisations (is_personal)')
-    .limit(20);
-  const rows = (membership ?? []) as unknown as {
-    organisation_id: string;
-    organisations: { is_personal: boolean } | null;
-  }[];
-  const personal = rows.find((row) => row.organisations?.is_personal) ?? rows[0];
+    .select('organisation_id, organisations!inner(is_personal)')
+    .eq('organisations.is_personal', true)
+    .limit(1)
+    .maybeSingle();
 
   const { error } = await supabase.from('data_requests').insert({
     user_id: user.id,
+    // Null rather than a guess. Every account gets a personal workspace at
+    // signup, so this should not happen — which is the reason the fallback must
+    // not invent one. An unknown workspace recorded as unknown is true; an
+    // unknown workspace recorded as somebody's client is not, and it is written
+    // into the record that exists to show the process was followed.
     organisation_id: personal?.organisation_id ?? null,
     request_type: requestType,
     details: details || null,

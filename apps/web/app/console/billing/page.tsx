@@ -17,6 +17,7 @@ import { serviceDetailFor } from '@vibefycode/billing';
 import { ActionForm } from '@/components/action-form';
 import { Disclosure, ServiceDetailBody } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
+import { embedded } from '@/lib/embedded';
 import { WideTable } from '@/components/wide-table';
 
 export const metadata: Metadata = { title: 'Billing' };
@@ -66,7 +67,10 @@ export default async function BillingPage({
 
   const { data: memberships } = await supabase
     .from('memberships')
-    .select('organisation_id, role, organisations (name)');
+    .select('organisation_id, role, organisations (name, is_personal)')
+    // Ordered, so that which workspace this page is about does not depend on the
+    // plan the database happened to choose.
+    .order('organisation_id');
   const { data: subscriptions } = await supabase
     .from('subscriptions')
     .select('organisation_id, plan, status, current_period_end');
@@ -78,9 +82,33 @@ export default async function BillingPage({
     .order('issued_at', { ascending: false })
     .limit(20);
 
-  const primary = memberships?.[0];
+  /*
+   * One workspace, and the same one in both lines.
+   *
+   * This was `memberships?.[0]` over an unordered read, and `live` was the first
+   * active subscription among *all* the workspaces the caller can see — two
+   * independent picks from two lists that both span every membership. A
+   * consultant with a free personal workspace and a client's Agency workspace
+   * got their own name above the client's plan and the client's allowances.
+   *
+   * A display fault rather than an entitlement bypass: `resolvePlan` decides
+   * what may actually happen and is scoped to one workspace. But this is the
+   * screen where somebody decides whether to pay, and a billing page that
+   * disagrees with itself costs a sale or a support ticket.
+   */
+  const primary =
+    memberships?.find(
+      (row) =>
+        embedded<{ is_personal: boolean }>(
+          row.organisations as { is_personal: boolean } | { is_personal: boolean }[] | null,
+        )?.is_personal,
+    ) ?? memberships?.[0];
   const organisationId = primary?.organisation_id as string | undefined;
-  const live = subscriptions?.find((row) => ['active', 'trialing'].includes(String(row.status)));
+  const live = subscriptions?.find(
+    (row) =>
+      String(row.organisation_id) === String(organisationId) &&
+      ['active', 'trialing'].includes(String(row.status)),
+  );
   const currentPlan = (live?.plan ?? 'free') as PlanTier;
   const entitlement = entitlementFor(currentPlan);
 
