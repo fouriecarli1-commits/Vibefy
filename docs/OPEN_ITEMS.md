@@ -14,7 +14,8 @@ codebase must appear here. Nothing leaves this list silently.
 | Trademark search for "VibefyCode" and "Verified by VibefyCode", classes 42 and 35 | Brand spend, launch, and now the public directory                      | See `BUSINESS_CHECKLIST.md`; a trust mark we do not own is not a trust mark                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **A vector original of the colour mark**                                          | Retiring the last of the reconstruction                                | Largely closed on 2026-08-25. The wordmark is now the supplied letterforms, and the mono masters are traced from the supplied silhouette. What remains is the **colour** mark: its ribbon weave is carried by continuous shading, which a trace flattens, so `packages/shared/src/brand.ts` still draws it. Closing it needs the mark drawn as geometry by a person — the trace in `brand/source/traced-mark.svg` is the right thing to hand them.                                                                                                                                                                                                                                                                                                                                                                                    |
 | Whether an owner may name themselves on their verification page                   | Nothing — the page is complete without it                              | The owner’s name came off the public page and off both anon-readable views on 2026-09-23: `organisations.name` is what somebody typed to open an account, the table defaults `account_type` to `individual`, and publishing it on an indexed page with a share card is publishing personal information nobody consented to publish. The page now identifies the application by its certified origin, which is what the reader arrived with. Some owners will _want_ to be named — an agency, a registered company. The mechanism for that already exists twice over (a builder profile has `published boolean not null default false`; a trust page has `published`), so if you want it, it is a `published_name` field the owner types and switches on, never the account name read behind their back. Say the word and it is small. |
-| A Google OAuth client, so the Google button appears at all                        | Signing in with Google, and nothing else                               | Code is finished and tested; the button is hidden behind `NEXT_PUBLIC_GOOGLE_SIGN_IN=on`. Four operator steps, set out under **Signing in with Google** below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| An OAuth app per sign-in provider you want                                        | Those providers' buttons, and nothing else                             | Nine are supported: Google, Apple, GitHub, Discord, X, Facebook, LinkedIn, Spotify, Twitch. Code is finished and tested. Each button appears on its own the moment its provider is enabled in Supabase — nothing to redeploy and no flag to set. Run `pnpm providers` to see which are on and what is left to do; three of them ask for more than an OAuth app and the command says which.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Official brand marks for the provider buttons                                     | Nothing — the buttons work and say the provider's name                 | There are no logos on them. Eight marks drawn from memory are eight subtly wrong logos, several of these companies publish licence terms about theirs, and Apple's are specific enough that a freehand "Sign in with Apple" button is a breach rather than an approximation. A product whose argument is that it does not redraw somebody else's mark cannot open with redrawn marks on its front door. This needs the real assets from each provider's own kit, and Apple's button rules read before its button is drawn.                                                                                                                                                                                                                                                                                                            |
 | An operator route to remove a second step for somebody who lost every device      | Nothing today; urgent the first time somebody enrols and loses a phone | Small in code, hard in policy: the rule for proving somebody is who they say they are is the whole item. Set out under **Removing a second step** below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Whether the second step should be required for an account that can issue a badge  | Nothing — it is optional and works                                     | A product decision about friction at the moment somebody pays. What it would cost to build, and the three places it would bite, are under **Requiring a second step** below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
@@ -99,7 +100,7 @@ Added 2026-09-23, after the sign-in surface was built out. Each is short in the
 table above because the table is an index; this is the part you would need to
 act on one.
 
-### Signing in with Google
+### Signing in with somebody else's account
 
 **Correcting what I told you first:** I said this needs the primary domain.
 That is not right, and it matters because it made the item look blocked behind
@@ -107,24 +108,34 @@ another item when it is not. Google's redirect URI points at _Supabase_, not at
 us, and that address exists today. What the domain affects is the consent
 screen Google shows your users, not whether the thing works.
 
-Four steps, in this order:
+Three steps in consoles this repository cannot reach, and then one command:
 
-1. **Google Cloud Console → APIs & Services → Credentials → Create OAuth client
-   ID → Web application.** The authorised redirect URI is Supabase's, not ours:
+1. **Create an OAuth app with the provider.** For Google that is Google Cloud
+   Console → APIs & Services → Credentials → Create OAuth client ID → Web
+   application. The authorised redirect URI is Supabase's, not ours, and it is
+   the same one for every provider:
    `https://<your-project-ref>.supabase.co/auth/v1/callback`. The project ref is
    in the Supabase URL you already have. Copy the client id and the client
    secret.
-2. **Supabase → Authentication → Providers → Google → enable**, and paste both
-   values.
+2. **Supabase → Authentication → Providers → the provider → enable**, and paste
+   both values.
 3. **Supabase → Authentication → URL Configuration.** The Site URL and the
    Redirect URLs list must include wherever the app is actually deployed, with
    the path: `https://<wherever>/auth/callback`. This is the step that is easy
    to miss, because everything up to it succeeds and the failure arrives at the
    very end of the flow, after Google has already said yes.
-4. **Set `NEXT_PUBLIC_GOOGLE_SIGN_IN=on`** in the platform's environment
-   variables. Until then the button is not rendered at all — not disabled,
-   absent — because a button that is always there and always fails teaches
-   people the product is broken.
+4. **Run `pnpm providers`.** There is no flag to set and nothing to redeploy:
+   the sign-in page asks Supabase which providers are on, cached for five
+   minutes, so the button appears by itself. That command is also how to find
+   out why it is not there — it prints which providers are enabled and, when
+   Google is not, these steps with your project's redirect URI filled in.
+
+   There was a flag, `NEXT_PUBLIC_GOOGLE_SIGN_IN=on`, and it was a mistake of
+   exactly the kind this product exists to find. Absent-rather-than-broken is
+   right for a visitor; for the person setting it up, a page that renders
+   nothing is indistinguishable from a feature that was never built, and Anré
+   asked twice where the Google sign-in was. Supabase already knows the answer,
+   so it is the one that gets asked.
 
 **Where the domain does come in.** Google's OAuth consent screen asks for an
 application name, a support email, a homepage and links to a privacy policy and

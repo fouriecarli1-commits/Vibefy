@@ -14,6 +14,7 @@ How to run, verify, debug and deploy VibefyCode. Written for one person with no 
 | `pnpm legal:registry` | Rehashes `/legal` into `legal/registry.json` — run after editing any legal document                       |
 | `pnpm db:reset`       | Drops and recreates the local Supabase database from migrations                                           |
 | `pnpm check:a11y`     | Builds, serves and scans every public page at desktop and phone width for WCAG 2.2 AA failures            |
+| `pnpm providers`      | Asks Supabase which sign-in providers are on, and prints what is left to do when Google is not            |
 | `pnpm check:design`   | The design survey, pointed at our own pages. A report, not a gate — `--why` prints the measurements       |
 | `pnpm db:audit`       | Prints a read-only query that tells a database which migrations it already has                            |
 | `pnpm db:catch-up`    | Prints a re-runnable version of the migrations from a given one onward, for a paste that failed halfway   |

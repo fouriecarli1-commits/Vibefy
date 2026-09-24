@@ -189,15 +189,22 @@ describe('a second step that is actually enforced', () => {
 });
 
 describe('signing up with a provider', () => {
-  it('is absent rather than broken where nobody configured it', () => {
+  it('is absent rather than broken where the provider is not enabled', () => {
     /*
-     * The client id, the secret and a redirect URI on a real domain are all
-     * operator work, and this product has no domain yet. A button that is
-     * always there and always fails teaches people the product is broken.
+     * Still absent rather than broken — a button that redirects to an error
+     * teaches people the product is broken. What changed is who is asked.
+     *
+     * It used to be `NEXT_PUBLIC_GOOGLE_SIGN_IN=on`, which is a second thing
+     * that can be wrong, and when it was wrong the page rendered nothing —
+     * indistinguishable from the feature never having been built. Anré asked
+     * twice where the Google sign-in was. Supabase publishes a boolean per
+     * provider, so the source of truth is now the thing that actually decides
+     * whether the button can work. See `tests/providers-enabled.test.ts`.
      */
     const gate = read('apps/web/components/provider-sign-in.tsx');
-    expect(gate).toContain("process.env.NEXT_PUBLIC_GOOGLE_SIGN_IN !== 'on'");
+    expect(gate).toContain('enabledProviders()');
     expect(gate).toContain('return null');
+    expect(gate).not.toContain('NEXT_PUBLIC_GOOGLE_SIGN_IN');
     // Decided on the server, so it is not a flag in the browser.
     expect(gate).not.toContain("'use client'");
   });
@@ -229,7 +236,7 @@ describe('signing up with a provider', () => {
   it('records nothing when somebody is only signing in', () => {
     // Clicking a button under the sentence that says so is the acceptance. A
     // sign-in is not one, so it carries nothing to record.
-    const button = read('apps/web/components/google-button.tsx');
+    const button = read('apps/web/components/provider-button.tsx');
     expect(button).toMatch(/mode === 'sign-up' && accepted/);
     const gate = read('apps/web/components/provider-sign-in.tsx');
     expect(gate).toMatch(/mode === 'sign-up' \? await declaredConsents\(\) : undefined/);

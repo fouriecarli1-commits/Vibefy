@@ -161,20 +161,35 @@ export async function measureGame(session: BrowserSession, url: string): Promise
   const page = session.page;
   await page.addInitScript(INSTRUMENTATION);
 
-  // Every response, with when it finished, so "before playable" is a fact about
-  // this load rather than an estimate.
-  //
-  // The timestamp is taken when the response finishes, not when `sizes()`
-  // resolves — that resolves a moment later, and on a throttled link it landed
-  // after the first frame and put a 900 KB atlas on the wrong side of the line,
-  // reporting 3 KB. The promises are awaited before anything is totalled.
-  const transfers: Promise<{ at: number; bytes: number } | null>[] = [];
+  /*
+   * Every response and what it weighed. *When* each one finished is asked of the
+   * page, not recorded here — see `resourceEnds` below.
+   *
+   * Which side of "before playable" a download falls on used to be decided by
+   * comparing two timestamps that are not on one clock, and it produced a wrong
+   * number often enough to look like a flaky test rather than a bug. Measured
+   * under four busy cores, a 900 KB atlas that the fixture provably downloads
+   * *before* it draws its first frame came out twenty milliseconds after it:
+   * `performance.timeOrigin` in the renderer and the origin behind Playwright's
+   * network timings are close but not the same, and twenty milliseconds of skew
+   * is all it takes when the two events are adjacent.
+   *
+   * Node's own `Date.now()` was worse again — it stamps when this process got
+   * round to the event, which under load is far later still.
+   *
+   * So the comparison moves entirely inside the page, where the Resource Timing
+   * entries and the first animation frame are both `performance.now()` in one
+   * renderer and one clock. The bytes stay here, because `sizes()` counts what
+   * crossed the wire including cross-origin responses the page's own timing
+   * reports as zero.
+   */
+  const transfers: Promise<{ url: string; bytes: number } | null>[] = [];
   page.on('requestfinished', (request) => {
-    const at = Date.now();
+    const url = request.url();
     transfers.push(
       request
         .sizes()
-        .then((sizes) => ({ at, bytes: sizes.responseBodySize }))
+        .then((sizes) => ({ url, bytes: sizes.responseBodySize }))
         .catch(() => null),
     );
   });
@@ -204,6 +219,8 @@ export async function measureGame(session: BrowserSession, url: string): Promise
 
   const limitations: string[] = [];
   let playableAt: number | null = null;
+  /** The first frame in the page's own clock, for comparing with its resources. */
+  let firstFramePageMs: number | null = null;
   let timerLoopAt: number | null = null;
   let loopSignal: LoopSignal = 'none';
   let previousTicks: number | null = null;
@@ -264,6 +281,10 @@ export async function measureGame(session: BrowserSession, url: string): Promise
         .evaluate(() => performance.timeOrigin)
         .catch(() => navigatedAt);
       playableAt = firstFrameAt === null ? Date.now() : Math.round(navigationStart + firstFrameAt);
+      // Kept in the page's own milliseconds as well. `playableAt` above is an
+      // epoch stamp for the report; this is the number the Resource Timing
+      // entries can actually be compared with.
+      firstFramePageMs = firstFrameAt;
       loopSignal = 'animation_frames';
       break;
     }
@@ -281,6 +302,30 @@ export async function measureGame(session: BrowserSession, url: string): Promise
   // Everything after this point is about a page with a loop in it. Which kind
   // of loop decides which figures exist, not whether the rest gets measured.
   const loopStartedAt = playableAt ?? timerLoopAt;
+
+  /*
+   * When each resource finished, in the page's clock, read before the second
+   * navigation replaces the document and its entries with it.
+   *
+   * `navigation` as well as `resource`, because the document that started
+   * everything is not a resource entry — leaving it out would drop the HTML
+   * from a weight that is about how much arrives before you can play.
+   */
+  const resourceEnds = await page
+    .evaluate(() => {
+      const ends: Record<string, number[]> = {};
+      const add = (name: string, responseEnd: number) => {
+        (ends[name] ??= []).push(responseEnd);
+      };
+      for (const entry of performance.getEntriesByType('navigation')) {
+        add(entry.name, (entry as PerformanceResourceTiming).responseEnd);
+      }
+      for (const entry of performance.getEntriesByType('resource')) {
+        add(entry.name, (entry as PerformanceResourceTiming).responseEnd);
+      }
+      return ends;
+    })
+    .catch(() => ({}) as Record<string, number[]>);
 
   const errorsBefore = session.pageErrors.length;
 
@@ -393,8 +438,48 @@ export async function measureGame(session: BrowserSession, url: string): Promise
     .catch(() => [] as string[]);
 
   const settled = (await Promise.all(transfers)).filter(
-    (transfer): transfer is { at: number; bytes: number } => transfer !== null,
+    (transfer): transfer is { url: string; bytes: number } => transfer !== null,
   );
+
+  /*
+   * How much arrived before the first frame.
+   *
+   * Both sides come from the page: a resource's `responseEnd` and the first
+   * frame are `performance.now()` in one renderer. The bytes come from
+   * Playwright, which sees what actually crossed the wire.
+   *
+   * Entries for one URL are consumed in order, because this page is navigated
+   * twice and the second load repeats the document. Taking the earliest match
+   * every time would count the second navigation's HTML as though it had
+   * arrived before the game started.
+   *
+   * A transfer with no entry to match is left out rather than guessed onto one
+   * side, and said out loud. Leaving it out understates the weight, which is the
+   * direction to err in for a figure that appears in a finding against somebody
+   * — and a lower bound nobody is told about is just a wrong number.
+   */
+  const remaining = new Map(Object.entries(resourceEnds).map(([url, ends]) => [url, [...ends]]));
+  let unmatched = 0;
+  let bytesBeforePlayable = 0;
+  for (const transfer of settled) {
+    if (firstFramePageMs === null) {
+      // Nothing became playable, so there is no line to be on either side of.
+      bytesBeforePlayable += transfer.bytes;
+      continue;
+    }
+    const ends = remaining.get(transfer.url);
+    const responseEnd = ends?.shift();
+    if (responseEnd === undefined) {
+      unmatched += 1;
+      continue;
+    }
+    if (responseEnd <= firstFramePageMs) bytesBeforePlayable += transfer.bytes;
+  }
+  if (unmatched > 0 && firstFramePageMs !== null) {
+    limitations.push(
+      `${unmatched} response${unmatched === 1 ? '' : 's'} could not be matched to the page's own timing, so ${unmatched === 1 ? 'it is' : 'they are'} left out of the weight before the game became playable. That figure is a lower bound.`,
+    );
+  }
 
   if (!throttled) {
     limitations.push(
@@ -407,9 +492,7 @@ export async function measureGame(session: BrowserSession, url: string): Promise
     becamePlayable: playableAt !== null,
     loopSignal,
     timeToPlayableMs: playableAt === null ? null : playableAt - navigatedAt,
-    bytesBeforePlayable: settled
-      .filter((transfer) => loopStartedAt === null || transfer.at <= loopStartedAt)
-      .reduce((total, transfer) => total + transfer.bytes, 0),
+    bytesBeforePlayable,
     framesDuringPlay: played.frames,
     listenerTypes,
     acceptsTouch:

@@ -300,35 +300,58 @@ describe('act 1: getting to the point where anything may be tested', () => {
  * Claims this journey's own request, whatever else is queued.
  *
  * `claimNextRequest` takes the oldest queued row in the whole table, which is
- * right for a worker and wrong for a test: vitest runs files in parallel
- * against one database, and `stranded-requests.test.ts` queues rows it must
- * leave behind by design — that is the thing it is about. So this journey could
- * claim somebody else's request, fail its first assertion, and cascade through
- * the three acts that build on it. It did, once every so often, and passing the
- * other times was luck rather than isolation.
+ * right for a worker and wrong for a test. Files share one database — they do
+ * not run at the same time, `vitest.config.ts` switches that off precisely so
+ * that the isolation suite's failures cannot depend on timing, but they do run
+ * in an order that varies — and `stranded-requests.test.ts` queues rows it must
+ * leave behind by design, because that is the thing it is about. So any file
+ * after it inherits them: this journey could claim somebody else's request, fail
+ * its first assertion, and cascade through the three acts that build on it. It
+ * did, and passing the other times was luck of the ordering rather than
+ * isolation.
  *
- * Anything that is not ours is put back exactly as it was — status, claim time
- * and attempt count — so the file it belongs to sees no difference. The real
- * claim path is still what is being exercised; the loop only decides which row
- * this test keeps.
+ * Foreign claims are **held** until ours is found, then all of them are put back
+ * at once. The first version of this released each one immediately and retried,
+ * which does not terminate: a released row is queued again and still the oldest,
+ * so the same row comes back for ever. Running the suite with the file order
+ * shuffled is what showed that — a fix that passed in one order and spun in
+ * another is not a fix.
+ *
+ * Everything held is restored exactly as it was, status, claim time and attempt
+ * count, so the file it belongs to sees no difference. `claimNextRequest` is
+ * still what does the claiming; the loop only decides which row this test keeps.
  */
 async function claimOurRequest(appId: string | undefined): Promise<ClaimedRequest> {
   // Said rather than asserted away. A journey that reaches here with no
   // application never got through act 1, and "cannot read appId of undefined"
   // is a worse way to learn that than this sentence.
   if (!appId) throw new Error('This journey has no application, so act 1 did not complete.');
-  for (let attempt = 0; attempt < 25; attempt += 1) {
-    const claimed = await withClient((client) => claimNextRequest(client));
-    if (!claimed) throw new Error('Nothing is queued, so this journey never queued its request.');
-    if (claimed.appId === appId) return claimed;
-    await db.query(
-      `update public.assessment_requests
-          set status = 'queued', claimed_at = null, attempts = attempts - 1
-        where id = $1`,
-      [claimed.id],
-    );
+
+  const held: ClaimedRequest[] = [];
+  const putBack = async () => {
+    for (const other of held) {
+      await db.query(
+        `update public.assessment_requests
+            set status = 'queued', claimed_at = null, attempts = attempts - 1
+          where id = $1`,
+        [other.id],
+      );
+    }
+  };
+
+  try {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const claimed = await withClient((client) => claimNextRequest(client));
+      if (!claimed) break;
+      if (claimed.appId === appId) return claimed;
+      held.push(claimed);
+    }
+  } finally {
+    await putBack();
   }
-  throw new Error(`Claimed 25 requests and none belonged to ${appId}.`);
+  throw new Error(
+    `Nothing queued belonged to ${appId}, after looking at ${held.length} other request(s).`,
+  );
 }
 
 describe('act 2: the first assessment, run for real', () => {

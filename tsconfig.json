@@ -11,7 +11,13 @@
     // their real exports instead of treating each one as `any`; checkJs stays off
     // because they are plain scripts, not typed modules.
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    // `@/` is how everything in `apps/web` imports its own modules, and a test
+    // that imports one of those modules pulls its imports in with it. Declared
+    // here so the app keeps one convention rather than two, the second existing
+    // only because the tests compile from a different root. It mirrors the alias
+    // in vitest.config.mts; a test asserts the two agree.
+    "paths": { "@/*": ["./apps/web/*"] }
   },
   "include": ["tests/**/*.ts", "tools/**/*.mts", "tools/**/*.ts", "vitest.config.mts"]
 }
