@@ -294,16 +294,30 @@ export async function issueBadgeFor(
 }
 
 /**
- * The verification origin, as the customer will see it in their own footer.
+ * The verification origin, as the customer will see it in their own footer — or
+ * null when this deployment has not been given a usable one.
  *
- * Falls back to the site URL, and then to nothing — an alert carrying a relative
- * path is less useful than one that says plainly it could not build the link.
+ * Falls back to the site URL, and then to null: an alert carrying a relative path
+ * is less useful than one that says plainly it could not build the link.
+ *
+ * HTTPS is required rather than preferred, because `badgeEmbedSnippet` refuses
+ * anything else and it is right to. The snippet goes on somebody else's website;
+ * a relative path there resolves against *their* domain, and an http:// one is a
+ * mixed-content block on any modern page.
+ *
+ * Exported and returning null so that one rule has two readers.
+ * `announceIssuedBadge` acts on it, and `startupWarnings` in main.ts reports it
+ * before anything has been issued — which is the half that was missing. Two
+ * copies of "is this origin usable" would disagree within a release, and the
+ * copy that disagreed quietly would be the one nobody is watching.
  */
-function verifyOrigin(): string {
-  return (process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(
-    /\/+$/,
-    '',
-  );
+export function announcementOrigin(
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  const origin = (env.NEXT_PUBLIC_VERIFY_URL ?? env.NEXT_PUBLIC_SITE_URL ?? '')
+    .trim()
+    .replace(/\/+$/, '');
+  return origin.startsWith('https://') ? origin : null;
 }
 
 async function announceIssuedBadge(
@@ -312,11 +326,13 @@ async function announceIssuedBadge(
   result: { badgeId: string; slug: string; publicId: string },
   log: (message: string, detail?: Record<string, unknown>) => void,
 ): Promise<void> {
-  const origin = verifyOrigin();
-  if (!origin.startsWith('https://')) {
+  const origin = announcementOrigin();
+  if (origin === null) {
     // `badgeEmbedSnippet` refuses to build a snippet against a non-HTTPS origin,
     // which is correct and would throw here. Saying so once beats a stack trace
-    // every thirty seconds on a deployment whose URL is not configured yet.
+    // every thirty seconds on a deployment whose URL is not configured yet — and
+    // `startupWarnings` says the same thing before the first badge, so this line
+    // is the fallback rather than the only notice.
     log('badge issued but not announced — no HTTPS verification origin configured', {
       badgeId: result.badgeId,
       needs: 'NEXT_PUBLIC_VERIFY_URL or NEXT_PUBLIC_SITE_URL',

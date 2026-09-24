@@ -912,15 +912,37 @@ no detail that reached us. The manual route needs eight fields and has no schema
 4. **Create.** The first build takes ten to fifteen minutes — it is pulling a browser image.
 
 **Reading the log.** A healthy worker is quiet: it polls every five seconds and prints nothing
-while the queue is empty. Two lines tell you it is alive and connected:
+while the queue is empty. That is the right design and it means startup is the only moment it can
+tell you what it is missing — afterwards, silence means both "fine" and "broken".
+
+So it says everything it cannot do, at once, in one read:
 
 ```
 email not configured — alerts will reach the console and phones only
+no model key — every submission waits for a reviewer at /review/screening
+no verification origin — badges will be issued and never announced
 ```
 
-That one is printed after the database pool is constructed, so seeing it means `SUPABASE_DB_URL`
-was accepted. What you must not see is `worker loop error` repeating — that is the connection
-string being wrong, usually the password still reading `[YOUR-PASSWORD]`.
+Each names the variable to set and what stops happening. They are printed after the database pool
+is constructed, so seeing any of them also means `SUPABASE_DB_URL` was accepted. **Seeing none of
+them is the goal**, and it is what a fully configured worker looks like.
+
+The third one is the one worth reading twice. Without an HTTPS verification origin the worker
+starts cleanly, runs cleanly, issues the badge and skips the announcement — so the owner is never
+told the badge they paid for exists, and until 2026-09-24 the only notice was one line per badge,
+after the fact. A bare `vibefycode.com` with no `https://` triggers it: the repair in
+`apps/web/lib/verify-origin.ts` does not reach this process, which has no request to infer an
+origin from.
+
+What you must not see is `worker loop error` repeating — that is the connection string being
+wrong, usually the password still reading `[YOUR-PASSWORD]`.
+
+**Typing the values into Render.** Two fields per variable, `Key` and `Value`, then **Save
+Changes** at the bottom, which starts a rebuild. Do not wrap `ALERT_EMAIL_FROM` in quotes:
+`.env.example` writes it as `"VibefyCode <alerts@vibefycode.com>"` because that is shell syntax
+for a file, and Render stores the field literally — the quotes end up inside the From header.
+`RESEND_API_KEY` and `ALERT_EMAIL_FROM` are also all-or-nothing: `resendFromEnvironment` returns
+null unless both are present, so one without the other sends exactly as much email as neither.
 
 **Proving it end to end** needs an application whose ownership has been verified, because nothing
 is assessed without an authorisation record. Add an app in the console, publish the DNS record or

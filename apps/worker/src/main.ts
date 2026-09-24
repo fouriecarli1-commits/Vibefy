@@ -21,7 +21,7 @@ import {
   RUN_TIMEOUT_MINUTES,
 } from './queue.ts';
 import { resolveArtefactStorage, sweepPendingReports } from './report.ts';
-import { sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
+import { announcementOrigin, sweepBadgeIssuance, sweepBadgeLifecycle } from './badge.ts';
 import {
   sweepBadgeExpiryWarnings,
   sweepSupersededRubric,
@@ -225,22 +225,71 @@ async function withRunTimeout<T>(work: Promise<T>, requestId: string): Promise<T
   }
 }
 
+/**
+ * Everything this worker cannot do, said before it goes quiet.
+ *
+ * A healthy worker prints nothing: it polls every five seconds and the queue is
+ * usually empty. That is the right design and it has one consequence — startup
+ * is the only moment it can tell anybody what it is missing, because afterwards
+ * silence means both "fine" and "broken".
+ *
+ * The third entry is the one that was absent. The announcement email telling a
+ * customer their badge exists needs an HTTPS origin, and without one the worker
+ * started cleanly, ran cleanly, issued the badge and then skipped the
+ * announcement with a line per badge. The owner was never told the badge they
+ * paid for existed, and the first anybody heard of it was the customer asking.
+ *
+ * The case that will actually happen is a bare `vibefycode.com` with no scheme.
+ * `originFrom` in `apps/web` repairs that, and the repair does not reach here:
+ * this process has no request to infer an origin from, which is precisely why it
+ * has to be told rather than left to work it out.
+ *
+ * A list rather than three `if`s so a deployment missing everything learns
+ * everything in one read of the log instead of one restart at a time.
+ */
+export function startupWarnings(
+  env: Record<string, string | undefined> = process.env,
+): { message: string; detail: Record<string, unknown> }[] {
+  const warnings: { message: string; detail: Record<string, unknown> }[] = [];
+
+  if (!resendFromEnvironment(env)) {
+    warnings.push({
+      message: 'email not configured — alerts will reach the console and phones only',
+      detail: { needs: 'RESEND_API_KEY and ALERT_EMAIL_FROM' },
+    });
+  }
+
+  if (!env.ANTHROPIC_API_KEY) {
+    warnings.push({
+      message: 'no model key — every submission waits for a reviewer at /review/screening',
+      detail: {
+        needs: 'ANTHROPIC_API_KEY',
+        effect: 'the deterministic intake filter still runs; nothing is cleared automatically',
+      },
+    });
+  }
+
+  if (announcementOrigin(env) === null) {
+    warnings.push({
+      message: 'no verification origin — badges will be issued and never announced',
+      detail: {
+        needs: 'NEXT_PUBLIC_SITE_URL (or NEXT_PUBLIC_VERIFY_URL), starting with https://',
+        found: env.NEXT_PUBLIC_VERIFY_URL ?? env.NEXT_PUBLIC_SITE_URL ?? '(unset)',
+        effect:
+          'the owner is never told the badge they paid for exists, and nothing else reports it',
+      },
+    });
+  }
+
+  return warnings;
+}
+
 export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }> {
   const pool = new Pool({ connectionString: requireEnv('SUPABASE_DB_URL'), max: 4 });
   const storage = resolveArtefactStorage();
   const emailProvider = resendFromEnvironment();
-  if (!emailProvider) {
-    log('email not configured — alerts will reach the console and phones only', {
-      needs: 'RESEND_API_KEY and ALERT_EMAIL_FROM',
-    });
-  }
+  for (const warning of startupWarnings()) log(warning.message, warning.detail);
   const screeningModel = screeningModelFactory();
-  if (!screeningModel) {
-    log('no model key — every submission waits for a reviewer at /review/screening', {
-      needs: 'ANTHROPIC_API_KEY',
-      effect: 'the deterministic intake filter still runs; nothing is cleared automatically',
-    });
-  }
   let running = true;
 
   const loop = async () => {
