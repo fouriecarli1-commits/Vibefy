@@ -20,15 +20,60 @@
  * business resolving them. Reading headers and choosing an origin are different
  * jobs; only the second one has rules worth pinning down.
  */
+function schemeFor(host: string): 'http' | 'https' {
+  // Localhost is the one place http is right, and getting it wrong there means
+  // the snippet is untestable on the machine it was written on.
+  return host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
+}
+
+/**
+ * An origin, from whatever a person actually typed into the variable.
+ *
+ * Two shapes get written there by anybody reading the name as "the site's
+ * address", and both used to be accepted unchanged:
+ *
+ *   · **A bare host** — `vibefycode.com`. Every caller builds
+ *     `${origin}/a/${slug}`, so that produced `vibefycode.com/a/abc`, which a
+ *     browser reads as a *relative* path: resolved against whatever page it
+ *     appears on, and in an embed snippet on a customer's website, against
+ *     *their* domain. `new URL()` on it throws outright.
+ *   · **A host with a path** — and `.env.example` shipped
+ *     `NEXT_PUBLIC_VERIFY_URL=http://localhost:3000/verify`, which made every
+ *     badge URL `/verify/a/${slug}`. The route is `/a/[slug]`. Every badge
+ *     anybody clicked was a 404.
+ *
+ * The scheme is not guessed: it is the same rule this file already applies to
+ * the request host. The path, query and fragment are dropped because the
+ * function returns an origin and every caller appends to it — a prefix was never
+ * supported by any route.
+ *
+ * An unparseable value falls through rather than being used. The request host is
+ * true by construction, and preferring a typo to a fact is how the placeholder
+ * domain reached a customer's website the first time.
+ */
+function configuredOrigin(configured: string | undefined): string | null {
+  const declared = configured?.trim();
+  if (!declared) return null;
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(declared)
+    ? declared
+    : `${schemeFor(declared)}://${declared}`;
+
+  try {
+    const url = new URL(withScheme);
+    if (!url.hostname) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
 export function originFrom(configured: string | undefined, host: string | null): string {
-  if (configured) return configured.replace(/\/+$/, '');
+  const declared = configuredOrigin(configured);
+  if (declared) return declared;
 
   if (host) {
-    // Localhost is the one place http is right, and getting it wrong there
-    // means the snippet is untestable on the machine it was written on.
-    const protocol =
-      host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
-    return `${protocol}://${host}`;
+    return `${schemeFor(host)}://${host}`;
   }
 
   // Nothing left to infer from. The snippet would be wrong either way, so it is

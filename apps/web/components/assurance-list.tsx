@@ -158,6 +158,24 @@ export function AssuranceList({ input }: { input: AssuranceInput }) {
                     </p>
                   )}
 
+                  {line.partialBecause !== null && (
+                    // How much of the question the mark above speaks for.
+                    //
+                    // `whatWeChecked` is printed in the past tense and covers
+                    // the whole question, so on a line where only part of it
+                    // was covered it promises more than happened. Printed here
+                    // rather than folded into that paragraph because the two
+                    // sentences come from different places — one is what we
+                    // always do, the other is what happened this time — and a
+                    // reader who cannot tell them apart cannot check either.
+                    <p className="max-w-prose text-sm text-muted">
+                      <strong className="font-medium text-ink">
+                        How much of this was covered:
+                      </strong>{' '}
+                      {line.partialBecause}
+                    </p>
+                  )}
+
                   {line.state !== 'not_tested' && (
                     <p className="max-w-prose text-sm text-muted">
                       <strong className="font-medium text-ink">What this does not mean:</strong>{' '}

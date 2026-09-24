@@ -89,9 +89,26 @@ export const REMEDIATION_OFFER = {
 /**
  * Whether a given reviewer is barred from reviewing a given application.
  *
- * The database enforces this with a trigger — this is the same rule stated in
- * TypeScript so the console can grey the button out and say why, rather than
- * letting somebody press it and meet a constraint violation.
+ * The database enforces this with a trigger. This is the same rule stated in
+ * TypeScript, and the honest note is that **nothing in `apps/web` calls it yet**
+ * — the sentence that used to be here said the console greys the button out,
+ * and the console does not.
+ *
+ * What a barred reviewer meets today is the trigger's own message, which is
+ * written to be read by a person: "Reviewer X was paid to work on this
+ * application and may not review its assessment. Independence policy, enforced
+ * here rather than on a form." `apps/web/app/review/actions.ts` returns
+ * `reviewError.message` unchanged, so it reaches them. That is a worse
+ * experience than a greyed button and a correct outcome, which is the right way
+ * round for a rule of this kind.
+ *
+ * Wiring it is not a two-line change, and the reason is a deliberate one:
+ * `remediation_workers` is readable only by a platform admin, because it names
+ * who was paid to touch whose application. A reviewer cannot read the recusal
+ * list, so a console that greyed the button out would need the list handed to it
+ * by something that can — and handing every reviewer that list to render a
+ * disabled button is a worse trade than the constraint violation. Recorded in
+ * docs/OPEN_ITEMS.md rather than guessed at here.
  */
 export function mayReview(
   reviewerId: string,

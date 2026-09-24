@@ -49,6 +49,13 @@ export class LocalReportStorage implements ArtefactStorage {
   constructor(private readonly root: string) {}
 
   async put(path: string, body: Buffer, _contentType: string): Promise<StoredReport> {
+    // Asked here first, and this is the method that most needed asking: `put`
+    // creates the directory before it writes, so a traversal does not merely
+    // read or delete something outside the root — it makes somewhere outside the
+    // root and leaves bytes in it. Every path handed to this today is built from
+    // UUIDs, so nothing escapes; the class stated this defence for `get` and
+    // `remove` and applied it to neither the dangerous one nor any test.
+    this.refuseTraversal(path);
     const full = join(this.root, path);
     await mkdir(dirname(full), { recursive: true });
     await writeFile(full, body);
@@ -295,11 +302,29 @@ export async function sweepPendingReports(
         continue;
       }
 
-      const plan = await resolvePlan(client, {
-        organisationId: row.organisation_id,
-        appId: row.app_id,
-      });
       try {
+        /*
+         * Inside the `try`, which is the whole of this correction.
+         *
+         * It used to be the line above it, and the comment in the `catch` below
+         * says what that cost: "one bad assessment must not stop the others" was
+         * true of everything the renderer could throw and false of everything
+         * the plan lookup could. `resolvePlan` reads `public.subscriptions`, so a
+         * statement timeout, a lost connection or a row the entitlement code
+         * does not recognise propagated out of the loop, out of this function
+         * past its `finally`, and took every assessment behind it along.
+         *
+         * Every sweep, for ever, and quietly: nothing counted the failure, so
+         * the attempts cap could not see it; nothing logged it, because the
+         * logging is in the `catch`; and `order by a.reviewed_at` kept the bad
+         * row at the front of the window. Rows ahead of it had already been
+         * generated, so the log of a sweep that threw looked much like the log of
+         * one that finished.
+         */
+        const plan = await resolvePlan(client, {
+          organisationId: row.organisation_id,
+          appId: row.app_id,
+        });
         await generateReport(client, storage, {
           assessmentId: row.id,
           tier: plan.entitlement.reportTier,

@@ -785,20 +785,41 @@ Written for someone with no local toolchain. Nothing here needs a terminal.
 4. **Set the environment variables** before the first deployment (Vercel → Settings →
    Environment Variables), for all three environments:
 
-   | Variable                        | Where it comes from                                          |
-   | ------------------------------- | ------------------------------------------------------------ |
-   | `NEXT_PUBLIC_SUPABASE_URL`      | Supabase → Settings → API → Project URL                      |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public                      |
-   | `SUPABASE_SERVICE_ROLE_KEY`     | Supabase → Settings → API → service_role                     |
-   | `SUPABASE_DB_URL`               | Supabase → Settings → Database → Connection string → URI     |
-   | `ANTHROPIC_API_KEY`             | console.anthropic.com → API Keys                             |
-   | `NEXT_PUBLIC_SITE_URL`          | The deployment's own URL — known only after the first deploy |
-   | `NEXT_PUBLIC_SUPPORT_EMAIL`     | Whatever address answers support today                       |
+   | Variable                        | Where it comes from                                                                   |
+   | ------------------------------- | ------------------------------------------------------------------------------------- |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | Supabase → Settings → API → Project URL                                               |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API → anon public                                               |
+   | `SUPABASE_DB_URL`               | Supabase → Settings → Database → Connection string → URI                              |
+   | `ANTHROPIC_API_KEY`             | console.anthropic.com → API Keys                                                      |
+   | `NEXT_PUBLIC_SITE_URL`          | `https://vibefycode.com`. A **full URL**: scheme, host, no trailing slash and no path |
 
    Everything else in `.env.example` may stay empty. A missing setting disables the feature it
    belongs to and says so; it does not break the build.
 
-5. **Deploy**, then set `NEXT_PUBLIC_SITE_URL` to the URL Vercel gave you and deploy again.
+   Two that used to be in this table are gone, for the same reason. `SUPABASE_SERVICE_ROLE_KEY`
+   is read by nothing — the console reaches the database through `SUPABASE_DB_URL` under the
+   caller's own identity, so this table was asking for a key that bypasses every policy in
+   exchange for no capability. `NEXT_PUBLIC_SUPPORT_EMAIL` is read by nothing either; the support
+   address is real and needed (see the mailboxes in `docs/DOMAIN.md`) and nothing renders it yet.
+   `tests/every-documented-variable-is-read.test.ts` fails if either list grows a name that
+   nothing reads and nothing explains.
+
+5. **Deploy**, then set `NEXT_PUBLIC_SITE_URL` to `https://vibefycode.com` — or, before the
+   domain is attached, to the URL Vercel gave you — and deploy again.
+
+   Two ways to get this wrong, both quiet:
+   - **The variable name.** Only `NEXT_PUBLIC_SITE_URL` is read. A name this codebase does not
+     read — `NEXT_PUBLIC_SITE_HOST`, say — sets nothing and reports nothing, and the console
+     falls back to the request origin, so most of the product keeps working and the worker's
+     badge announcements stop. Nothing on any page says why.
+   - **The shape.** It is a full URL. A bare `vibefycode.com` is a relative path once a slug is
+     appended to it, and in an embed snippet on a customer's own website it resolves against
+     _their_ domain. `originFrom` repairs both a bare host and a stray path since 2026-09-24, and
+     it is still not a thing to rely on.
+
+   The worker is a separate deployment and reads the same variable from its own environment. It
+   has no request to fall back on: without it, badges are issued and the announcement email is
+   skipped with `badge issued but not announced` in the log.
 
 ### What this deployment cannot do
 

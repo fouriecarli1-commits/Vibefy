@@ -268,6 +268,23 @@ export interface AssuranceLine {
   readonly notTestedBecause: string | null;
   /** True when a gate — not a finding — is what made this a problem. */
   readonly gateFailed: boolean;
+  /**
+   * Present only when `state` is `checked_found` and the coverage behind it was
+   * incomplete, naming what was not covered.
+   *
+   * A cross is never wrong, but `whatWeChecked` beside it is a sentence in the
+   * past tense claiming we did all of it. When the owner told us the question
+   * did not apply, or the rubric has a check for only half of it, or this run
+   * did not reach part of it, that sentence over-claims — so the shortfall is
+   * printed with the finding rather than left to be inferred from a symbol.
+   *
+   * The case worth reading twice is the first one. "The owner told us this does
+   * not apply, we checked anyway, and here is what came back" is the most
+   * valuable sentence this list can produce: it is a measurement contradicting
+   * a declaration, which is the entire reason anybody would trust a third party
+   * over a self-assessment.
+   */
+  readonly partialBecause: string | null;
 }
 
 const SEVERITY_ORDER: Readonly<Record<FindingSeverity, number>> = {
@@ -324,6 +341,60 @@ export function assuranceFor(input: AssuranceInput): AssuranceLine[] {
           ? `${unreached[0]!.because} It is not a pass.`
           : (claim.notTested?.(input) ?? null);
 
+    const findings = input.findings
+      .filter((finding) => claim.criteria.includes(finding.ruleId))
+      // `info` is an observation that scores nothing. It is not a problem and
+      // must not turn a tick into a cross, or every page with eleven type sizes
+      // would be reported to a visitor as a defect. It must not turn "not
+      // tested" into "something found" either, which is the same rule read from
+      // the other side.
+      .filter((finding) => finding.severity !== 'info')
+      .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
+
+    const gateFailed = claim.gate !== undefined && input.gateFailures.includes(claim.gate);
+
+    /*
+     * Evidence outranks every reason not to have looked.
+     *
+     * This ordering is the whole correction. The three reasons computed above —
+     * the owner saying the question does not apply, a rubric with no check for
+     * it, a run that did not reach it — all explain an *absence*, and each one
+     * used to be consulted before the findings were, so a finding that existed
+     * anyway was thrown away and replaced by the explanation for why there
+     * would not be one.
+     *
+     * The declaration case is the one that mattered. `payments` applies only if
+     * the owner ticked "takes payments", and `trust-checks.ts` raises SEC-12 on
+     * finding a card field in the application's own document, declaration or
+     * no declaration — correctly, because a declaration is a claim we go
+     * looking to confirm. So an owner who ticked the box wrong, or ticked it
+     * hopefully, got a public page reading "the owner says this application
+     * takes no payments, and we found no checkout to test" over a filed
+     * high-severity finding saying we found exactly that. The list is the only
+     * public surface a finding reaches, so nothing else contradicted it.
+     *
+     * A gap in coverage does not disappear here; it moves to `partialBecause`,
+     * where it qualifies the finding instead of replacing it.
+     */
+    if (findings.length > 0 || gateFailed) {
+      return {
+        claim,
+        state: 'checked_found' as const,
+        findings,
+        notTestedBecause: null,
+        gateFailed,
+        partialBecause: !applies
+          ? 'The owner told us this question does not apply to their application. It was checked anyway, and this is what came back — what an owner tells us about their own application is a claim we go looking to confirm, never a reason to stop looking.'
+          : unknown.length === claim.criteria.length
+            ? `Rubric version ${input.rubricVersion} has no check for this question yet. What is reported here is a gate the assessment failed, not an answer to the question itself.`
+            : unknown.length > 0
+              ? `Rubric version ${input.rubricVersion} has no check for part of this question yet, so this speaks only for the part it does check.`
+              : unreached.length > 0
+                ? `Part of this question was not reached. ${unreached[0]!.because}`
+                : (claim.notTested?.(input) ?? null),
+      };
+    }
+
     if (!applies || reason) {
       return {
         claim,
@@ -332,26 +403,17 @@ export function assuranceFor(input: AssuranceInput): AssuranceLine[] {
         notTestedBecause:
           reason ?? 'This question does not apply to this application, so it was not tested.',
         gateFailed: false,
+        partialBecause: null,
       };
     }
 
-    const findings = input.findings
-      .filter((finding) => claim.criteria.includes(finding.ruleId))
-      // `info` is an observation that scores nothing. It is not a problem and
-      // must not turn a tick into a cross, or every page with eleven type sizes
-      // would be reported to a visitor as a defect.
-      .filter((finding) => finding.severity !== 'info')
-      .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9));
-
-    const gateFailed = claim.gate !== undefined && input.gateFailures.includes(claim.gate);
-
     return {
       claim,
-      state:
-        findings.length > 0 || gateFailed ? ('checked_found' as const) : ('checked_clear' as const),
+      state: 'checked_clear' as const,
       findings,
       notTestedBecause: null,
       gateFailed,
+      partialBecause: null,
     };
   });
 }
