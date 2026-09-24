@@ -16,6 +16,32 @@ than anything else on the page:
 
 ---
 
+## 0. Where the DNS actually is, measured rather than assumed
+
+Checked from the outside on 2026-09-24, because three setup attempts had failed
+and nobody had established the one fact they all depend on:
+
+```
+NS   vibefycode.com  ->  launch1.spaceship.net, launch2.spaceship.net
+A    vibefycode.com  ->  34.216.117.25, 54.149.79.189  (ec2 us-west-2 — a parking page)
+MX   vibefycode.com  ->  none
+TXT  vibefycode.com  ->  none
+www / send / _dmarc   ->  none
+```
+
+**The domain is registered at Spaceship and still on Spaceship's default parking
+nameservers, and the zone is empty.** No verification record, no MX, nothing.
+
+That single fact explains every failure so far. Zoho's verification could not pass
+and Resend's could not either, not because either was configured wrongly but
+because there was no published record for them to read. **Every record goes in the
+Spaceship panel and nowhere else** — the nameservers are what decides that, and a
+record added at any other provider's panel is invisible to the entire internet.
+
+Establish this first, every time, before touching a provider's setup wizard. It
+costs one lookup and it is the difference between debugging a wizard and
+debugging nothing.
+
 ## 1. What the domain serves
 
 | Host                  | Serves                                             | Where it points                   |
