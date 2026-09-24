@@ -821,6 +821,53 @@ Written for someone with no local toolchain. Nothing here needs a terminal.
    has no request to fall back on: without it, badges are issued and the announcement email is
    skipped with `badge issued but not announced` in the log.
 
+### Which variable goes where, and which must never cross
+
+Three places hold environment variables and they are not interchangeable. Worked out from the
+code rather than from memory, because the two mistakes this prevents are both quiet ones: a
+variable missing where it is needed disables a feature and says so once, and a variable present
+where it is _not_ needed is a credential in an extra place it can leak from.
+
+**Vercel — the console and the public pages (`apps/web`)**
+
+| Variable                                                    | Needed                                                                                                   |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes                                                                                                      |
+| `SUPABASE_DB_URL`                                           | yes — through the **pooler**, see above                                                                  |
+| `NEXT_PUBLIC_SITE_URL`                                      | yes                                                                                                      |
+| `ANTHROPIC_API_KEY`                                         | only for the assistant at `/api/copilot`, which calls `new Anthropic()` and reads it implicitly          |
+| `STRIPE_*`, `PAYSTACK_*`                                    | when payments go live; without them the console says payments are not configured                         |
+| `RESEND_WEBHOOK_SECRET`                                     | for `POST /api/email/webhook`; without it that route answers 404 rather than accepting unsigned payloads |
+
+**Render — the worker (`apps/worker`)**
+
+| Variable                                                      | Needed                                                                                       |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `SUPABASE_DB_URL`                                             | yes, and it is the only one the worker refuses to start without — **direct**, not the pooler |
+| `ANTHROPIC_API_KEY`                                           | yes, or nothing is screened automatically                                                    |
+| `NEXT_PUBLIC_SITE_URL`                                        | yes, or badges are issued and never announced                                                |
+| `VIBEFYCODE_BADGE_SIGNING_KEY_B64`, `VIBEFYCODE_BADGE_KEY_ID` | yes, or no badge can be issued at all                                                        |
+| `RESEND_API_KEY`, `ALERT_EMAIL_FROM`                          | together, or no email                                                                        |
+| `ALERT_EMAIL_REPLY_TO`                                        | optional                                                                                     |
+
+**The two that must never cross.**
+
+`VIBEFYCODE_BADGE_SIGNING_KEY_B64` and `VIBEFYCODE_BADGE_KEY_ID` belong on Render and nowhere
+else. `packages/badge/src/keys.ts` says why: issuance needs a key and a deployment that only
+serves and verifies badges should not hold one. If that key leaks, every badge ever issued
+becomes forgeable, and the console gains nothing by holding it — verification needs only the
+public half, which is published.
+
+`RESEND_API_KEY` is the same shape. Email is sent by the worker alone, and
+`packages/notify/src/resend.ts` states it: the key never leaves that module and never reaches the
+browser or the phone. The console's only email concern is the inbound bounce webhook, which needs
+the _webhook secret_, a different value.
+
+**Vercel's three environments.** Set every one of the above for Production, Preview and
+Development unless there is a reason not to — a Preview deployment with no database is a preview
+that cannot be used to check anything. The exception is anything with money attached: point
+Preview and Development at Stripe and Paystack **test** keys, never the live ones.
+
 ### Supabase Pro, and the two settings that come with it
 
 The project is on Pro since 2026-09-24. Two things follow that are not automatic.
