@@ -83,9 +83,30 @@ for (const [id, label] of PROVIDERS) {
   console.log(`  ${external[id] === true ? 'on ' : 'off'}  ${label.padEnd(9)} ${id}`);
 }
 
+const redirect = `${url.replace(/\/+$/, '')}/auth/v1/callback`;
+
+/*
+ * Printed whether or not anything is off.
+ *
+ * This used to appear only in the block for providers that are not enabled, and
+ * the person who needs it most is the opposite one: somebody whose provider is
+ * on, whose button appears, and who gets `Error 400: redirect_uri_mismatch` from
+ * Google. That error means the URI in the provider's own console is not the one
+ * Supabase sends — almost always because the app's address was put there instead
+ * of Supabase's. The fix is one line, and it is this line.
+ */
+console.log('');
+console.log('The authorised redirect URI every provider needs, and the one people get wrong:');
+console.log(`  ${redirect}`);
+console.log('');
+console.log(
+  'It is Supabase\u2019s address, not this application\u2019s, and it is the same for all nine.',
+);
+console.log('`redirect_uri_mismatch` from a provider means its console does not have this,');
+console.log('character for character \u2014 no trailing slash, and https rather than http.');
+
 const off = PROVIDERS.filter(([id]) => external[id] !== true);
 if (off.length > 0) {
-  const redirect = `${url.replace(/\/+$/, '')}/auth/v1/callback`;
   console.log(
     [
       '',

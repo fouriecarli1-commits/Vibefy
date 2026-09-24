@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { recordProviderConsents } from '@/lib/consent';
+import { missingConsents, recordProviderConsents, recordSignUpConsents } from '@/lib/consent';
 
 /**
  * Exchanges the email confirmation code for a session. `next` is resolved
@@ -35,6 +35,30 @@ export async function GET(request: NextRequest) {
    * claim and is checked against the registry we publish now.
    */
   await recordProviderConsents(searchParams.get('accepted'));
+  // The password path carries its acceptance in the sign-up metadata, and this
+  // is the first authenticated moment it can be written down. Idempotent: the
+  // consents table is append-only and this finds an existing record.
+  await recordSignUpConsents();
+
+  /*
+   * Nobody reaches the console without an acceptance on record.
+   *
+   * Signing in with a provider *creates* an account when there is not one
+   * already, so the buttons on the sign-in page could produce an account with
+   * full access and nothing recording that anybody agreed to anything — the
+   * sign-up page is the only one that passes `accepted`, and a provider account
+   * has no sign-up metadata either.
+   *
+   * Asked here rather than on each console page: this is the one door every
+   * route that creates an account comes through, and a check on the far side is
+   * a check somebody adding the tenth provider next year has to remember.
+   */
+  const missing = await missingConsents();
+  if (missing.length > 0) {
+    const accept = new URL('/auth/accept', origin);
+    accept.searchParams.set('next', next);
+    return NextResponse.redirect(accept.toString());
+  }
 
   return NextResponse.redirect(`${origin}${next}`);
 }

@@ -307,6 +307,8 @@ describe('the scan keeps up with the pages', () => {
       'Needs a live invitation token, which does not exist outside a seeded database.',
     '/auth/new-password':
       'Redirects to /forgot-password without a session, so a scan of it scans that page. Its form is the same component the sign-in page is scanned with.',
+    '/auth/accept':
+      'Redirects to /sign-in without a session, so a scan of it scans that page. It is reached only from the auth callback, by an account that has just been created and has no acceptance on record.',
   };
 
   const scanned = (() => {
