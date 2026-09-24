@@ -98,11 +98,46 @@ export async function readAsAnon<T>(work: (client: PoolClient) => Promise<T>): P
   }
 }
 
-/** Writes made by the webhook endpoint, which has no signed-in user at all. */
+/**
+ * Writes made by the webhook endpoint, which has no signed-in user at all.
+ *
+ * In a transaction, and the reason is the whole of this function's history: it
+ * used to take a pooled client and hand it straight to `work`, so every caller
+ * ran on autocommit and a multi-statement handler could commit half of itself.
+ *
+ * `applyBillingEvent` is the one that made it serious. It inserts the provider's
+ * event into `public.billing_events` with `on conflict do nothing returning id` —
+ * the replay guard, and correct, because a retried event must not charge or
+ * reinstate anything twice — then applies the change, then marks the row handled.
+ * With no transaction, a failure in the second or third step left the guard
+ * committed. The provider retried, the insert conflicted, and the handler
+ * answered `duplicate: true, 'Already processed.'`, which the route reports as
+ * success to avoid a retry storm. **A customer paid, the subscription was never
+ * activated, and the guard meant to protect them is what made it permanent.**
+ * The only trace is `handled = false` on a table with an index built for that
+ * query and no code anywhere that runs it.
+ *
+ * The rollback is unconditional on failure and the commit is explicit, in that
+ * order, because the opposite mistake — a transaction that never commits — is an
+ * outage that loses every payment quietly rather than one. Both directions are
+ * held by tests/a-webhook-half-applied-is-not-a-duplicate.test.ts.
+ *
+ * It also makes this path usable through a transaction-mode connection pooler,
+ * which is what a serverless console should be talking to. Every other function
+ * in this file scopes its role with `set local` and `set_config(..., true)`,
+ * which is exactly what such a pooler requires; this was the one path with no
+ * transaction for anything to be scoped to.
+ */
 export async function writeAsService<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect();
   try {
-    return await work(client);
+    await client.query('begin');
+    const result = await work(client);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined);
+    throw error;
   } finally {
     client.release();
   }

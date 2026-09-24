@@ -4,6 +4,7 @@ import { priceFor } from '@vibefycode/engine';
 import { badgeEmbedJsx, badgeEmbedSnippet } from '@vibefycode/shared';
 import {
   COPILOT_CEILING_REACHED,
+  COPILOT_CEILING_UNREADABLE,
   COPILOT_CEILING_USD,
   COPILOT_CEILING_WINDOW_MINUTES,
   COPILOT_MODEL,
@@ -152,18 +153,46 @@ export async function POST(request: NextRequest) {
     },
   };
 
-  // The ceiling, checked before the money is spent rather than after.
-  //
-  // Read with the service role because it is a fact about the workspace rather
-  // than a row the customer owns — and because a customer who could not read
-  // their own ceiling would simply never be stopped by it.
+  /*
+   * The ceiling, checked before the money is spent rather than after.
+   *
+   * Read with the service role because it is a fact about the workspace rather
+   * than a row the customer owns — and because a customer who could not read
+   * their own ceiling would simply never be stopped by it.
+   *
+   * `null` means we could not read it, and that is not zero. This ended in
+   * `.catch(() => 0)`, so anything that made the figure unavailable — a
+   * connection the pool could not hand out, a statement timeout, the day
+   * somebody renames `assistant_spend_since` — turned a hard ceiling into no
+   * ceiling, for every request in every workspace, for as long as the condition
+   * lasted, with the model called each time and nothing written to say the check
+   * had been skipped. A script pointed at this endpoint is the thing the ceiling
+   * exists for, and it would have run into nothing.
+   *
+   * `Number.isFinite` is the same defect from the other side: `NaN >= 2` is
+   * false, so a spend figure that came back malformed also permitted the call.
+   */
   const spentThisHour = await writeAsService(async (client) => {
     const { rows } = await client.query<{ spend: string }>(
       `select public.assistant_spend_since($1, now() - ($2 || ' minutes')::interval) as spend`,
       [row.organisation_id, String(COPILOT_CEILING_WINDOW_MINUTES)],
     );
-    return Number(rows[0]?.spend ?? 0);
-  }).catch(() => 0);
+    const spend = Number(rows[0]?.spend ?? 0);
+    return Number.isFinite(spend) ? spend : null;
+  }).catch(() => null);
+
+  if (spentThisHour === null) {
+    // Refused rather than logged and continued. Refusing costs one customer one
+    // answer and says so; permitting costs money nobody agreed to spend, and the
+    // first anybody hears of it is an invoice.
+    console.error('copilot ceiling unreadable — refusing the call', {
+      organisationId: row.organisation_id,
+    });
+    return NextResponse.json(
+      { reply: COPILOT_CEILING_UNREADABLE, ceilingUnreadable: true },
+      { status: 503 },
+    );
+  }
 
   if (spentThisHour >= COPILOT_CEILING_USD) {
     return NextResponse.json(

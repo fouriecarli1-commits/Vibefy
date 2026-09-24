@@ -53,6 +53,20 @@ export const COPILOT_CEILING_WINDOW_MINUTES = 60;
 export const COPILOT_CEILING_REACHED =
   'This workspace has used its hour of assistant time. It resets within the hour, and nothing else about your assessment or your badge is affected — the limit is on me, not on you.';
 
+/**
+ * What a customer is told when we could not read the ceiling at all.
+ *
+ * A separate sentence from the one above, deliberately. Telling somebody they
+ * have used their hour when they have not makes them wait an hour for nothing,
+ * and it hides an incident that needs a person — the ceiling being unreadable
+ * means the database is not answering, which is not a fact about their usage.
+ *
+ * It quotes no figure, because there is no figure: the whole condition is that
+ * the number could not be obtained.
+ */
+export const COPILOT_CEILING_UNREADABLE =
+  'I could not check this workspace’s assistant allowance just now, so I have stopped rather than carry on without knowing. That is a fault on our side and not anything you did — try again in a moment, and nothing about your assessment or your badge is affected.';
+
 /** How much of the conversation is carried. Older turns fall away. */
 export const COPILOT_HISTORY_TURNS = 12;
 

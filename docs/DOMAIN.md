@@ -129,20 +129,26 @@ not the point — the point is that the list exists and has one honest number in
 because a business plan with no fixed costs is the one that runs out of money
 while the unit economics look fine.
 
-| Standing cost    | Per year   | Per month  | Basis                                                                                                                          |
-| ---------------- | ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `vibefycode.com` | **$9.08**  | **$0.76**  | Paid 2026-09-24. Renews annually.                                                                                              |
-| Zoho Mail        | to fill in | to fill in | Free for one mailbox on one domain with limits; four addresses may need the paid tier. Put the real number here once you pick. |
-| Vercel           | to fill in | to fill in | Free while it is one person and hobby usage. Becomes real at the first paid seat.                                              |
-| Supabase         | to fill in | to fill in | Free tier pauses an inactive project, which is a production incident rather than a saving.                                     |
-| Resend           | to fill in | to fill in | Free to a monthly volume; the first paid tier arrives with the customers.                                                      |
-| The worker host  | to fill in | to fill in | A machine that can hold Chromium open for minutes. Vercel functions cannot — see the runbook.                                  |
+| Standing cost    | Per year   | Per month  | Basis                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vibefycode.com` | **$9.08**  | **$0.76**  | Paid 2026-09-24. Renews annually.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Zoho Mail        | to fill in | to fill in | Free for one mailbox on one domain with limits; four addresses may need the paid tier. Put the real number here once you pick.                                                                                                                                                                                                                                                                                                                |
+| Vercel           | to fill in | to fill in | Free while it is one person and hobby usage. Becomes real at the first paid seat.                                                                                                                                                                                                                                                                                                                                                             |
+| Supabase Pro     | ~$300      | **$25**    | Upgraded 2026-09-24. $25 is the plan's base; compute above the included size and any add-on are billed on top, so confirm against the first invoice rather than this row. What it bought that matters: the project no longer pauses when idle, which on the free tier was a production incident dressed as a saving, and daily backups with a seven-day window now exist. Point-in-time recovery is a separate paid add-on and is **not** on. |
+| Resend           | to fill in | to fill in | Free to a monthly volume; the first paid tier arrives with the customers.                                                                                                                                                                                                                                                                                                                                                                     |
+| The worker host  | to fill in | to fill in | A machine that can hold Chromium open for minutes. Vercel functions cannot — see the runbook.                                                                                                                                                                                                                                                                                                                                                 |
 
 **Where this sits against the prices.** A limited assessment costs us about $1 to
 run (`config/pricing.json`, `ceilings.perRunCostUsd.limited`); a full one about
-$4, against $79 for the one-off deep report and $49 a month for Certified. So the
-domain is covered by **one free assessment's worth of margin, once a year** — and
-this table's job is not to be alarming, it is to stop the arithmetic on
+$4, against $79 for the one-off deep report and $49 a month for Certified.
+
+So the domain is covered by **one free assessment's worth of margin, once a year**.
+Supabase Pro is the number that actually matters now: **$25 a month is one
+Certified customer, or one deep report every three months.** That is the first
+real break-even this business has, and it is a low bar — which is worth saying
+plainly, because the temptation with a standing bill is to stop looking at it.
+
+The table exists to stop the arithmetic on
 `/admin/costs` from looking like the whole picture. That dashboard shows unit
 economics: cost per run against price per run. It does not know this table exists,
 which is correct — mixing a standing cost into a per-run margin makes both numbers

@@ -821,6 +821,40 @@ Written for someone with no local toolchain. Nothing here needs a terminal.
    has no request to fall back on: without it, badges are issued and the announcement email is
    skipped with `badge issued but not announced` in the log.
 
+### Supabase Pro, and the two settings that come with it
+
+The project is on Pro since 2026-09-24. Two things follow that are not automatic.
+
+**Auth email goes through Resend, not through Supabase.** Supabase's built-in
+sender is rate-limited to a handful of messages an hour on every plan, Pro
+included — it is there so development works, not so customers receive anything. A
+confirmation or password-reset email that silently does not arrive looks to the
+person waiting for it exactly like an account that does not exist, which is how
+this was found: the founder could not reset his own password. Set
+**Project Settings → Authentication → SMTP Settings** to the Resend credentials
+once `send.vibefycode.com` verifies, with a sender on that subdomain. Until then,
+assume any sign-up or reset email beyond the first few in an hour was dropped.
+
+**Which connection string.** `SUPABASE_DB_URL` is read by two very different
+processes and they want different endpoints.
+
+- **The console** (`apps/web`) runs as serverless functions that scale out, each
+  holding its own pool of up to five. Direct connections are capped by the compute
+  size, so that arithmetic runs out long before traffic does. It should use the
+  **transaction-mode pooler**. Every function in `apps/web/lib/sql.ts` scopes its
+  role with `set local` and `set_config(..., true)` and runs inside a transaction,
+  which is exactly what a transaction-mode pooler requires — `writeAsService` was
+  the one exception until 2026-09-24, and it is the one that could commit half a
+  webhook.
+- **The worker** holds one process with a pool of four for minutes at a time and
+  should connect **directly**. It is one long-lived client, not a crowd of short
+  ones, and it has nothing to gain from a pooler in between.
+
+**Backups.** Pro gives daily backups with a seven-day window. Point-in-time
+recovery is a separate paid add-on and is not on, so the recovery story for a bad
+migration is "yesterday", not "four minutes ago". Worth knowing before running one
+of the migrations in `docs/sql/OUTSTANDING.sql`, not after.
+
 ### What this deployment cannot do
 
 The assessment engine drives a real browser, and Vercel's functions cannot hold one open for the
