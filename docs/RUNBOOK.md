@@ -869,6 +869,11 @@ Running the worker means a machine that can hold a process and launch Chromium: 
 ### Deploying the worker to Render
 
 Done on 2026-08-26 and it worked first time. **Create it by hand, not from the Blueprint.**
+
+If Render's Projects view shows `Production is empty`, that is the project-and-environment layer
+rather than the service — a Background Worker created before Projects existed sits outside any of
+them and is still running. Check the **services list** before creating a second one: two workers
+against one database both claim from the same queue, which is not a failure and is not free.
 `render.yaml` is in the repository as the written record of these settings, and a test keeps it
 honest, but Render rejected it with "A Blueprint file was found, but there was an issue" and gave
 no detail that reached us. The manual route needs eight fields and has no schema to satisfy.
@@ -890,9 +895,20 @@ no detail that reached us. The manual route needs eight fields and has no schema
    The build context is the repository root, not `apps/worker`. The worker imports twelve
    workspace packages and cannot be built from its own directory alone.
 
-3. **Two environment variables.** `SUPABASE_DB_URL` (Supabase → Settings → Database → Connection
-   string → **URI**, with `[YOUR-PASSWORD]` replaced) and `ANTHROPIC_API_KEY`. Everything else may
-   stay empty; the worker logs once that email is not configured and carries on.
+3. **The environment variables.** Two are required and three more decide whether the worker can
+   finish what it starts.
+
+   | Variable               | Required    | What happens without it                                                                                                                                                                                                                             |
+   | ---------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `SUPABASE_DB_URL`      | yes         | Nothing runs. Supabase → Settings → Database → Connection string → **URI**, with `[YOUR-PASSWORD]` replaced. Use the **direct** connection here, not the pooler — this is one long-lived process, and the reasoning is under "Supabase Pro" above.  |
+   | `ANTHROPIC_API_KEY`    | yes         | The model stages fail and the assessment never completes.                                                                                                                                                                                           |
+   | `NEXT_PUBLIC_SITE_URL` | in practice | `https://vibefycode.com`. The worker has no request to infer an origin from, so without it a badge is issued and the announcement email is skipped with `badge issued but not announced` in the log. The customer is never told their badge exists. |
+   | `RESEND_API_KEY`       | in practice | No email at all. The worker says so once and carries on.                                                                                                                                                                                            |
+   | `ALERT_EMAIL_FROM`     | in practice | Same — and note the name. `VIBEFYCODE_EMAIL_FROM` was in `.env.example` for a while and is read by nothing, so a deployment that followed that file configured a key with no sender and sent nothing while looking configured.                      |
+
+   Everything else may stay empty. A missing setting disables the feature it belongs to and says
+   so once; it does not break the loop.
+
 4. **Create.** The first build takes ten to fifteen minutes — it is pulling a browser image.
 
 **Reading the log.** A healthy worker is quiet: it polls every five seconds and prints nothing
