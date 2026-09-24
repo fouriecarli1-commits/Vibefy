@@ -181,6 +181,42 @@ const LICENCE_FILENAMES = [
   'COPYING',
 ];
 
+/**
+ * SEC-10 said out loud when the dependency check did not run.
+ *
+ * Every other way this engine can fail to look at something already records it:
+ * the criteria behind a sign-in when there is no test account, SEC-12, SEC-13
+ * and PRI-07 when the browser pass dies, SEC-12 when no checkout is found.
+ * `assuranceFor` turns each into "not tested" on the visitor's list, because a
+ * criterion with no findings renders as a tick and a tick for something nobody
+ * looked at is the single failure this product cannot afford.
+ *
+ * This stage is the only one that answers SEC-10, and it produced none. The
+ * notes below it are careful — "their absence here is not a clean result" — and
+ * the visitor never sees a note. The free tier is URL-only, so **most
+ * assessments this product will ever run have no repository**, and SEC-10 sits
+ * in the same claim as SEC-13, which does run in the browser. Under rubric
+ * 1.1.0, which defines both, nothing stood between a free assessment and a tick
+ * on "is it running anything it should not be?" — under a sentence promising we
+ * had checked the declared dependencies for critical advisories.
+ *
+ * Rubric 1.0.0 hid it by defining SEC-10 and not SEC-13, so the missing-criteria
+ * rule caught the whole claim for the other half's absence. That was luck, and
+ * 1.1.0 spent it.
+ */
+function dependencyCheckNotRun(because: string): { criterion: string; because: string }[] {
+  return [{ criterion: 'SEC-10', because }];
+}
+
+const NO_REPOSITORY_AT_ALL =
+  'No repository was in scope for this assessment, so the declared dependencies were never read. Nothing is known about them either way.';
+
+const REPOSITORY_UNREADABLE =
+  'A repository was declared but could not be read, so the declared dependencies were never examined.';
+
+const NO_MANIFEST =
+  'This repository has no readable package.json, so there was no list of declared dependencies to check against known advisories.';
+
 export const staticIntakeStage: Stage = {
   id: 'static_intake',
 
@@ -205,6 +241,9 @@ export const staticIntakeStage: Stage = {
         stage: 'static_intake',
         status: unavailable === undefined ? 'skipped' : 'failed',
         findings: [],
+        notTested: dependencyCheckNotRun(
+          unavailable === undefined ? NO_REPOSITORY_AT_ALL : REPOSITORY_UNREADABLE,
+        ),
         notes: [
           unavailable === undefined
             ? 'No repository was provided, so static analysis did not run. Findings about secrets in source, dependency risk and licensing are outside the scope of this assessment.'
@@ -229,6 +268,7 @@ export const staticIntakeStage: Stage = {
         stage: 'static_intake',
         status: 'failed',
         findings: [],
+        notTested: dependencyCheckNotRun(NO_MANIFEST),
         notes: [
           ...notes,
           'No readable file was found under the repository path, so nothing was scanned. No findings here is the absence of a scan, not a clean result.',
@@ -236,6 +276,7 @@ export const staticIntakeStage: Stage = {
       };
     }
 
+    const notTested: { criterion: string; because: string }[] = [];
     const credentials = scanForCredentials(root, files, context);
     findings.push(...credentials.findings);
     if (credentials.examples) notes.push(credentials.examples);
@@ -246,7 +287,7 @@ export const staticIntakeStage: Stage = {
       );
     }
 
-    findings.push(...checkDependencies(root, context, notes));
+    findings.push(...checkDependencies(root, context, notes, notTested));
     findings.push(...checkLicence(root, context, notes));
     findings.push(...checkIgnoreHygiene(root, files, context, credentials.filesWithHits));
 
@@ -259,6 +300,7 @@ export const staticIntakeStage: Stage = {
         stage: 'static_intake',
         status: 'failed',
         findings,
+        ...(notTested.length === 0 ? {} : { notTested }),
         notes: [
           ...notes,
           'Every file found under the repository path failed to open, so the secret scan read nothing.',
@@ -266,7 +308,13 @@ export const staticIntakeStage: Stage = {
       };
     }
 
-    return { stage: 'static_intake', status: 'succeeded', findings, notes };
+    return {
+      stage: 'static_intake',
+      status: 'succeeded',
+      findings,
+      notes,
+      ...(notTested.length === 0 ? {} : { notTested }),
+    };
   },
 };
 
@@ -473,10 +521,16 @@ function scanForCredentials(root: string, files: string[], context: StageContext
   };
 }
 
-function checkDependencies(root: string, context: StageContext, notes: string[]): RawFinding[] {
+function checkDependencies(
+  root: string,
+  context: StageContext,
+  notes: string[],
+  notTested: { criterion: string; because: string }[],
+): RawFinding[] {
   const manifestPath = join(root, 'package.json');
   if (!existsSync(manifestPath)) {
     notes.push('No package.json was found, so the dependency check did not run.');
+    notTested.push(...dependencyCheckNotRun(NO_MANIFEST));
     return [];
   }
 
@@ -485,6 +539,7 @@ function checkDependencies(root: string, context: StageContext, notes: string[])
     manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   } catch {
     notes.push('package.json could not be read or parsed, so the dependency check did not run.');
+    notTested.push(...dependencyCheckNotRun(NO_MANIFEST));
     return [];
   }
 
