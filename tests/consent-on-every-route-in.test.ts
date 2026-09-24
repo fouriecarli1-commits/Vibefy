@@ -104,3 +104,36 @@ describe('the redirect URI, which is the thing people get wrong', () => {
     expect(printedAlways).toMatch(/no trailing slash/);
   });
 });
+
+describe('the other door, which is the one most people use', () => {
+  const form = read('apps/web/components/auth-form.tsx');
+
+  it('asks the same question after a password sign-in', () => {
+    /*
+     * `signInWithPassword` never touches the auth callback — it returns to the
+     * component and the component navigates. So the gate had a door it did not
+     * cover, and it is the door most people use.
+     */
+    expect(form).toContain('missingConsents()');
+    expect(form).toContain('/auth/accept?next=');
+  });
+
+  it('leaves no way to the console that skips it', () => {
+    // Both exits: the ordinary sign-in and the one after a second-step code.
+    // A third added later that pushes straight to /console is the bug this
+    // counts.
+    const calls = form.match(/await goOnward\(\);/g) ?? [];
+    expect(calls).toHaveLength(2);
+    expect(form).not.toMatch(/router\.push\(next \?\? '\/console'\)/);
+  });
+
+  it('matters for a version bump, not only for a new account', () => {
+    /*
+     * `missingConsents` compares against the version *now in force*, which is
+     * the point of bumping one. Asked only in the callback, every password
+     * customer would carry on without ever being shown the new wording and the
+     * bump would be a thing that happened to a file and to nobody else.
+     */
+    expect(form).toMatch(/version \*now in force\*/);
+  });
+});

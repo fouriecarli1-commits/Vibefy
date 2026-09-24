@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { decideSecondStep } from '@/lib/second-step';
+import { missingConsents } from '@/lib/consent';
 
 type Mode = 'sign-in' | 'sign-up';
 
@@ -145,7 +146,30 @@ export function AuthForm({
       return setStatus({ kind: 'idle' });
     }
 
-    router.push(next ?? '/console');
+    await goOnward();
+  }
+
+  /*
+   * Where a signed-in password account goes next.
+   *
+   * The auth callback asks the same question, and a password sign-in never goes
+   * through it — `signInWithPassword` returns here and this component navigates.
+   * So without this the gate has a door it does not cover, and it is the door
+   * most people use.
+   *
+   * It matters beyond the provider case that prompted it. `missingConsents`
+   * compares against the version *now in force*, so bumping the Terms or the
+   * Privacy Policy makes every existing account missing one — which is the point
+   * of bumping it. Asked only in the callback, every password customer would
+   * carry on without ever being shown the new wording, and the version bump
+   * would be a thing that happened to the file and to nobody else.
+   */
+  async function goOnward() {
+    const destination = next ?? '/console';
+    const missing = await missingConsents();
+    router.push(
+      missing.length > 0 ? `/auth/accept?next=${encodeURIComponent(destination)}` : destination,
+    );
     router.refresh();
   }
 
@@ -165,8 +189,7 @@ export function AuthForm({
         message: `${error.message} Codes change every thirty seconds — if the last one expired while you typed it, the next one will work.`,
       });
     }
-    router.push(next ?? '/console');
-    router.refresh();
+    await goOnward();
   }
 
   const busy = status.kind === 'busy';
