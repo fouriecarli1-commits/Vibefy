@@ -235,6 +235,50 @@ export function renderBadgeSvg(facts: BadgeRenderFacts): string {
 `;
 }
 
+/**
+ * The image served when we could not find out.
+ *
+ * A fifth state, and deliberately not a fifth badge. The four statuses are
+ * statements about a customer's assessment; this one is a statement about us —
+ * the database did not answer, the connection string is wrong, a query timed
+ * out. Printing "revoked" in that situation tells a visitor that somebody in
+ * good standing was struck off, which is a worse error than saying nothing.
+ *
+ * So it carries none of the artwork: no seal, no mark, no gradient, nothing that
+ * reads as endorsement in one direction or judgement in the other. A grey frame
+ * and a sentence. It is meant to look like what it is.
+ *
+ * It exists because the alternative is a broken image. `/badge/[file]` decided
+ * long ago that "an unknown badge id on someone's website should read as 'not
+ * verified', not as a broken image they might ignore" — and then handled only
+ * the unknown id, so every other failure returned a 500 with an HTML body and
+ * the customer's page rendered the `alt` attribute instead. Words where a trust
+ * mark used to be, with no way for the owner to tell whether we revoked them or
+ * our own database was down.
+ *
+ * Self-contained, like the others: no script, no external reference, no embedded
+ * font file, because an `<img>` on a third-party page will fetch nothing else.
+ */
+export function renderBadgeUnavailableSvg(sizePx?: number): string {
+  const label =
+    'VibefyCode: this badge\u2019s status could not be checked just now. This is a fault on our side and says nothing about the application \u2014 open the verification page to see its current standing.';
+  const size = sizePx ?? VIEWBOX;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}" role="img"
+     aria-label="${escapeXml(label)}" width="${size}" height="${size}">
+  <title>${escapeXml(label)}</title>
+  <rect x="24" y="24" width="${VIEWBOX - 48}" height="${VIEWBOX - 48}" rx="48"
+        fill="${PALETTE.mist}" stroke="${PALETTE.trace}" stroke-width="8"/>
+  <text x="${VIEWBOX / 2}" y="${VIEWBOX / 2 - 18}" text-anchor="middle"
+        font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        font-size="64" font-weight="600" fill="${PALETTE.ink}">VibefyCode</text>
+  <text x="${VIEWBOX / 2}" y="${VIEWBOX / 2 + 54}" text-anchor="middle"
+        font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        font-size="44" fill="${PALETTE.ink}">status unavailable</text>
+</svg>
+`;
+}
+
 /** The mark on its own, for the console, the app icon and the verification page. */
 export function renderMarkSvg(options: { mono?: boolean; onDark?: boolean } = {}): string {
   const mono = options.mono === true;

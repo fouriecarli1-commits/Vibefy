@@ -888,11 +888,20 @@ processes and they want different endpoints.
 - **The console** (`apps/web`) runs as serverless functions that scale out, each
   holding its own pool of up to five. Direct connections are capped by the compute
   size, so that arithmetic runs out long before traffic does. It should use the
-  **transaction-mode pooler**. Every function in `apps/web/lib/sql.ts` scopes its
+  **transaction-mode pooler**.
+
+  **Copy the pooler URI from Supabase; do not edit the direct one.** The pooler
+  uses a different host, a different port and — the part that catches people — a
+  different username: `postgres.<project-ref>`, not `postgres`. A direct URI with
+  the port changed authenticates as the wrong user and every query fails, which
+  on this deployment means every page that reads the database, including
+  `/badge/[file]`. Supabase prints the correct string under Settings → Database →
+  Connection string → Transaction pooler. Every function in `apps/web/lib/sql.ts` scopes its
   role with `set local` and `set_config(..., true)` and runs inside a transaction,
   which is exactly what a transaction-mode pooler requires — `writeAsService` was
   the one exception until 2026-09-24, and it is the one that could commit half a
   webhook.
+
 - **The worker** holds one process with a pool of four for minutes at a time and
   should connect **directly**. It is one long-lived client, not a crowd of short
   ones, and it has nothing to gain from a pooler in between.

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { renderBadgeSvg, type BadgeStatus } from '@vibefycode/badge';
+import { renderBadgeSvg, renderBadgeUnavailableSvg, type BadgeStatus } from '@vibefycode/badge';
 import { readAsAnon, writeAsService } from '@/lib/sql';
 
 /**
@@ -51,6 +51,60 @@ export async function GET(
     ? Math.min(Math.max(Math.round(requested), 64), 1024)
     : undefined;
 
+  /*
+   * Nothing on this path may fail to return a picture.
+   *
+   * The not-found branch below already decided this question, and wrote down
+   * why: "an unknown badge id on someone's website should read as 'not
+   * verified', not as a broken image they might ignore." That reasoning is
+   * right, and it covered exactly one failure. `readAsAnon` throws when the
+   * database will not answer — a wrong connection string, an exhausted pool, a
+   * statement timeout — and none of it was caught, so Next returned a 500 with
+   * an HTML body and the customer's page rendered the `alt` attribute. Words
+   * where a trust mark used to be, which is the outcome that comment forbids,
+   * arriving through the door it did not look at.
+   *
+   * Worse than it sounds: the owner cannot tell from a broken image whether we
+   * revoked them or our database is down, and the first thing anybody assumes is
+   * the former.
+   *
+   * Reported from a live embed before it was found by reading.
+   */
+  try {
+    return await serveBadge(request, id, sizePx);
+  } catch (error) {
+    // Logged, because the whole point is that this state is ours to fix and the
+    // customer cannot see it. A badge silently serving "unavailable" for a week
+    // would be the same defect one layer further down.
+    console.error('badge image could not be served', {
+      publicId: id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return new NextResponse(renderBadgeUnavailableSvg(sizePx), {
+      // Not 404: the badge is not what is missing. Not 500 with an HTML body,
+      // which is where this started.
+      status: 503,
+      headers: {
+        'content-type': 'image/svg+xml; charset=utf-8',
+        // The success and not-found paths cache for five minutes, which is what
+        // makes a revocation land quickly. Caching a transient failure for the
+        // same five minutes would pin one bad second across every embed of every
+        // badge on every site.
+        'cache-control': 'no-store',
+        'access-control-allow-origin': '*',
+        'content-security-policy':
+          "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",
+        'x-content-type-options': 'nosniff',
+      },
+    });
+  }
+}
+
+async function serveBadge(
+  request: NextRequest,
+  id: string,
+  sizePx: number | undefined,
+): Promise<NextResponse> {
   const badge = await readAsAnon(async (client) => {
     const { rows } = await client.query<{
       status: BadgeStatus;
