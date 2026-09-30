@@ -223,3 +223,45 @@ describe('the smaller two, because the rule is the rule', () => {
     ).toMatch(/row-level security/i);
   });
 });
+
+/**
+ * The twelfth, and the last one nothing was watching.
+ *
+ * Measured rather than noticed: opening all twelve own-name `with check`
+ * clauses at once and running the suite left eleven of them producing failures
+ * and this one silent. Every other rule in this file was written because
+ * somebody thought of it; this one is here because the mutation run asked which
+ * rules nothing would notice the loss of, and got an answer.
+ *
+ * It is the mildest of the twelve and it is still a rule. `created_by` on an
+ * organisation confers no authority — membership does that, through
+ * `is_org_member` and `is_org_admin`, and neither reads this column — so
+ * forging it does not let anybody into anything. What it does is put a false
+ * name on the record of who started a workspace, in a table whose rows outlive
+ * every session that touched them.
+ */
+describe('a workspace', () => {
+  it('is created in the creator’s name', async () => {
+    expect(
+      await attempt(
+        colleague.userId,
+        `insert into public.organisations (name, slug, account_type, created_by)
+         values ('Started By Somebody Else', $1, 'individual', $2)`,
+        [`own-name-org-${Date.now()}`, owner.userId],
+      ),
+    ).toMatch(/row-level security/i);
+  });
+
+  it('can be created in the creator’s own name, so the refusal is about the name', async () => {
+    // The direction the guard fails in silence: refusing everybody, and being
+    // found the day nobody can make a workspace.
+    expect(
+      await attempt(
+        colleague.userId,
+        `insert into public.organisations (name, slug, account_type, created_by)
+         values ('Started By Its Creator', $1, 'individual', $2)`,
+        [`own-name-org-ok-${Date.now()}`, colleague.userId],
+      ),
+    ).toBe('allowed');
+  });
+});
