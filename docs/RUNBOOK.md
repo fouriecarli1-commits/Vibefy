@@ -885,10 +885,22 @@ assume any sign-up or reset email beyond the first few in an hour was dropped.
 **Which connection string.** `SUPABASE_DB_URL` is read by two very different
 processes and they want different endpoints.
 
-- **The console** (`apps/web`) runs as serverless functions that scale out, each
-  holding its own pool of up to five. Direct connections are capped by the compute
-  size, so that arithmetic runs out long before traffic does. It should use the
-  **transaction-mode pooler**.
+- **The console** (`apps/web`) **must** use the **transaction-mode pooler**, and
+  "must" is measured rather than advised. `db.<project-ref>.supabase.co` publishes
+  **no A record at all** — only AAAA:
+
+  ```
+  db.<project-ref>.supabase.co   IPv4 (none)   IPv6 2a05:d014:…
+  ```
+
+  Vercel's functions have no IPv6 outbound, so the direct host is not slow or
+  capped from there, it is unreachable. Every query fails, which on this
+  deployment means every page that reads the database. The scaling argument is
+  also true — serverless functions scale out, each holding a pool of five, and
+  direct connections are capped by the compute size — but it is the second
+  reason, not the first.
+
+  The pooler hosts do publish A records, which is what makes them work.
 
   **Copy the pooler URI from Supabase; do not edit the direct one.** The pooler
   uses a different host, a different port and — the part that catches people — a
