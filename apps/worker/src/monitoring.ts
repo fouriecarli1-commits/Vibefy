@@ -52,6 +52,7 @@ import {
   type ScopePolicy,
 } from '@vibefycode/engine';
 import type { PoolClient } from 'pg';
+import { saidOnceADay } from './said-once.ts';
 
 type Logger = (message: string, detail?: Record<string, unknown>) => void;
 const noop: Logger = () => undefined;
@@ -627,11 +628,16 @@ export async function sweepScheduledReassessments(
       // a defect in the predicate above, so it is said out loud rather than
       // shrugged off — an unexplained skip is the thing this sweep is for.
       if (!isReassessmentDue(plan, lastAssessedAt, now)) {
-        log('cadence disagreement: the query selected an application the rule says is not due', {
-          appId: row.app_id,
-          plan,
-          lastAssessedAt: lastAssessedAt.toISOString(),
-        });
+        // Per application. A key naming only the sweep would let the first bad
+        // row silence every other bad row, which is the defect this guard is
+        // for, arriving through the guard.
+        if (notices.due(`cadence:${row.app_id}`, now)) {
+          log('cadence disagreement: the query selected an application the rule says is not due', {
+            appId: row.app_id,
+            plan,
+            lastAssessedAt: lastAssessedAt.toISOString(),
+          });
+        }
         continue;
       }
 
@@ -891,7 +897,31 @@ export async function sweepLiveness(
  * a successor nothing is actually scoring against yet, is worse than telling
  * them nothing for the hour it takes the other half to land.
  */
-export async function sweepSupersededRubric(pool: Poolish, log: Logger = noop): Promise<number> {
+/**
+ * Conditions in this file that last longer than one sweep.
+ *
+ * Both are states rather than moments. A rubric published without a matching
+ * deploy stays mismatched until somebody deploys; an application the query
+ * selects and the rule says is not due stays that way until the predicate or
+ * the row changes. On a five-minute beat each was two hundred and eighty-eight
+ * identical lines a day.
+ *
+ * The first is the worse one: while it holds, `sweepSupersededRubric` raises
+ * nothing at all, so the line announcing that a whole feature is off was the
+ * line burying itself.
+ */
+const notices = saidOnceADay();
+
+/** Forgets what has been said. Exported for tests, which share one process. */
+export function resetMonitoringNotices(): void {
+  notices.forget();
+}
+
+export async function sweepSupersededRubric(
+  pool: Poolish,
+  log: Logger = noop,
+  now: Date = new Date(),
+): Promise<number> {
   const client = await pool.connect();
   try {
     const { rows } = await client.query<{
@@ -930,11 +960,16 @@ export async function sweepSupersededRubric(pool: Poolish, log: Logger = noop): 
 
     const disagreement = rows.find((row) => row.current_version !== CURRENT_RUBRIC_VERSION);
     if (disagreement) {
-      log('rubric version disagreement — no superseded notices raised this sweep', {
-        databaseSaysCurrent: disagreement.current_version,
-        engineScoresAgainst: CURRENT_RUBRIC_VERSION,
-        note: 'a publish migration and a deploy have not both landed yet',
-      });
+      // Keyed by the pair, so a *different* disagreement tomorrow morning —
+      // a second publish, a rolled-back deploy — is said when it appears rather
+      // than swallowed by the first one's turn.
+      if (notices.due(`rubric:${disagreement.current_version}:${CURRENT_RUBRIC_VERSION}`, now)) {
+        log('rubric version disagreement — no superseded notices raised this sweep', {
+          databaseSaysCurrent: disagreement.current_version,
+          engineScoresAgainst: CURRENT_RUBRIC_VERSION,
+          note: 'a publish migration and a deploy have not both landed yet',
+        });
+      }
       return 0;
     }
 

@@ -10,6 +10,7 @@
  * Postgres, and every sweep is idempotent.
  */
 import type { ArtefactStorage } from './report.ts';
+import { saidOnceADay } from './said-once.ts';
 import {
   deletionRecordFor,
   dueForDeletion,
@@ -41,7 +42,7 @@ export interface SpendSweepResult {
 }
 
 /**
- * The day on which each spend threshold was last said out loud.
+ * The spend thresholds already said out loud today.
  *
  * This sweep runs every five minutes, and the conditions it reports are not
  * moments — they are states that last the rest of the day or the rest of the
@@ -49,42 +50,27 @@ export interface SpendSweepResult {
  * times over, which is not a louder warning than one sentence; it is a quieter
  * one, because the line that matters next is now buried under it.
  *
- * Keyed by UTC day so a threshold crossed again tomorrow is said again, and
- * kept in memory because it is a way of speaking rather than a record — the
- * numbers themselves are in `cost_records` and on the cost dashboard.
+ * The rule itself is in `said-once.ts`, because it was arrived at three times
+ * in two files before anybody wrote it down once.
  */
-const lastSaid = new Map<SpendTrigger, string>();
+const spendNotices = saidOnceADay();
 
 /** Forgets what has been said. Exported for tests, which share one process. */
 export function resetSpendNotices(): void {
-  lastSaid.clear();
+  spendNotices.forget();
 }
 
 /**
- * The day on which each overdue thing was last named.
+ * The overdue things already named today.
  *
- * The same decision as `lastSaid` above, and it should have been made at the
- * same time. `sweepGovernanceDeadlines` rides the five-minute monitoring beat
- * and logged a line per overdue row on every pass — and overdue is not a moment
- * either. A request that goes overdue stays overdue until a person handles it,
- * so one of them produced two hundred and eighty-eight identical lines a day.
- *
- * It is the worse of the two omissions. Spend has a dashboard that somebody
- * looking at spend is already on. An overdue POPIA or GDPR request has a
- * statutory deadline, no second surface, and this log is how an operator finds
- * out — so it is exactly the line that must not be buried, and it was the one
- * doing the burying.
- *
- * Keyed by the row's own id, not by the sweep, so one overdue request going
- * quiet never silences another. Keyed by UTC day as well, so each is named again
- * tomorrow: the clock keeps running, and a deadline that is mentioned once and
- * then goes silent reads as handled.
+ * Keyed by the row's own id, so one overdue request going quiet never silences
+ * another, and named again tomorrow because the clock keeps running.
  */
-const lastNamed = new Map<string, string>();
+const deadlineNotices = saidOnceADay();
 
 /** Forgets which overdue rows have been named. Exported for tests. */
 export function resetDeadlineNotices(): void {
-  lastNamed.clear();
+  deadlineNotices.forget();
 }
 
 /**
@@ -120,7 +106,6 @@ export async function sweepSpendCap(
     let paused = observation.alreadyPaused;
     let alerts = 0;
 
-    const today = now.toISOString().slice(0, 10);
     for (const action of actions) {
       if (action.kind === 'pause') {
         const inserted = await client.query(
@@ -143,8 +128,7 @@ export async function sweepSpendCap(
         // the tests read; the line is for a person, and a person reading the
         // same sentence every five minutes is a person who stops reading.
         alerts += 1;
-        if (lastSaid.get(action.trigger) !== today) {
-          lastSaid.set(action.trigger, today);
+        if (spendNotices.due(action.trigger, now)) {
           log('spend alert', { trigger: action.trigger, reason: action.reason });
         }
       }
@@ -336,21 +320,16 @@ export async function sweepGovernanceDeadlines(
     // Counted every pass, named once a day. The counts below are what callers
     // and the tests read; the lines are for a person, and a person reading the
     // same sentence every five minutes is a person who stops reading.
-    const today = now.toISOString().slice(0, 10);
-    const nameOnce = (key: string, message: string, detail: Record<string, unknown>): void => {
-      if (lastNamed.get(key) === today) return;
-      lastNamed.set(key, today);
-      log(message, detail);
-    };
 
     for (const row of overdueRequests) {
-      nameOnce(`request:${row.id}`, 'data-subject request overdue', {
-        requestId: row.id,
-        dueAt: row.due_at,
-      });
+      if (deadlineNotices.due(`request:${row.id}`, now)) {
+        log('data-subject request overdue', { requestId: row.id, dueAt: row.due_at });
+      }
     }
     for (const row of overdueAppeals) {
-      nameOnce(`appeal:${row.id}`, 'appeal overdue', { appealId: row.id, dueAt: row.due_at });
+      if (deadlineNotices.due(`appeal:${row.id}`, now)) {
+        log('appeal overdue', { appealId: row.id, dueAt: row.due_at });
+      }
     }
 
     return { overdueRequests: overdueRequests.length, overdueAppeals: overdueAppeals.length };
