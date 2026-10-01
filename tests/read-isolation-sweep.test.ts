@@ -87,6 +87,34 @@ const cases: Case[] = [
     params: () => [owner.organisationId],
   },
   {
+    /*
+     * Who paid us to help fix their application.
+     *
+     * The seventeenth, and the last read policy in the schema whose loss nothing
+     * noticed — found on 2026-10-01 by opening all forty-five at once and then,
+     * when that named two candidates, mutating only those two. `badge_events`
+     * turned out to be covered by `rls-isolation.test.ts` after all; this one
+     * was not covered anywhere.
+     *
+     * Worth a row of its own argument. These are commercial facts about other
+     * people: that a competitor hired us for repairs, on which application, and
+     * at what stage. It is also the table the whole independence wall is built
+     * on — `reject_review_by_remediation_worker` reads it to refuse a reviewer
+     * who was paid to change the thing they are reviewing — and a control whose
+     * input is readable by everybody is a control that leaks what it protects.
+     */
+    table: 'remediation_engagements',
+    seed: () =>
+      q(
+        `insert into public.remediation_engagements
+           (app_id, organisation_id, status, pricing_basis, summary)
+         values ($1, $2, 'accepted', 'fixed_fee', 'Two days on the sign-in flow.')`,
+        [appId, owner.organisationId],
+      ).then(() => undefined),
+    find: `select id from public.remediation_engagements where organisation_id = $1`,
+    params: () => [owner.organisationId],
+  },
+  {
     table: 'audit_log',
     seed: () =>
       q(
