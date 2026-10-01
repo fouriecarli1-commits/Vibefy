@@ -61,6 +61,33 @@ export function resetSpendNotices(): void {
 }
 
 /**
+ * The day on which each overdue thing was last named.
+ *
+ * The same decision as `lastSaid` above, and it should have been made at the
+ * same time. `sweepGovernanceDeadlines` rides the five-minute monitoring beat
+ * and logged a line per overdue row on every pass — and overdue is not a moment
+ * either. A request that goes overdue stays overdue until a person handles it,
+ * so one of them produced two hundred and eighty-eight identical lines a day.
+ *
+ * It is the worse of the two omissions. Spend has a dashboard that somebody
+ * looking at spend is already on. An overdue POPIA or GDPR request has a
+ * statutory deadline, no second surface, and this log is how an operator finds
+ * out — so it is exactly the line that must not be buried, and it was the one
+ * doing the burying.
+ *
+ * Keyed by the row's own id, not by the sweep, so one overdue request going
+ * quiet never silences another. Keyed by UTC day as well, so each is named again
+ * tomorrow: the clock keeps running, and a deadline that is mentioned once and
+ * then goes silent reads as handled.
+ */
+const lastNamed = new Map<string, string>();
+
+/** Forgets which overdue rows have been named. Exported for tests. */
+export function resetDeadlineNotices(): void {
+  lastNamed.clear();
+}
+
+/**
  * Applies the global daily ceiling.
  *
  * The pause is written to the database rather than held in this process,
@@ -306,11 +333,24 @@ export async function sweepGovernanceDeadlines(
       (row) => new Date(row.due_at).getTime() < now.getTime(),
     );
 
+    // Counted every pass, named once a day. The counts below are what callers
+    // and the tests read; the lines are for a person, and a person reading the
+    // same sentence every five minutes is a person who stops reading.
+    const today = now.toISOString().slice(0, 10);
+    const nameOnce = (key: string, message: string, detail: Record<string, unknown>): void => {
+      if (lastNamed.get(key) === today) return;
+      lastNamed.set(key, today);
+      log(message, detail);
+    };
+
     for (const row of overdueRequests) {
-      log('data-subject request overdue', { requestId: row.id, dueAt: row.due_at });
+      nameOnce(`request:${row.id}`, 'data-subject request overdue', {
+        requestId: row.id,
+        dueAt: row.due_at,
+      });
     }
     for (const row of overdueAppeals) {
-      log('appeal overdue', { appealId: row.id, dueAt: row.due_at });
+      nameOnce(`appeal:${row.id}`, 'appeal overdue', { appealId: row.id, dueAt: row.due_at });
     }
 
     return { overdueRequests: overdueRequests.length, overdueAppeals: overdueAppeals.length };
