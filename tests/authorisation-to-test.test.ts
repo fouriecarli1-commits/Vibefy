@@ -162,6 +162,78 @@ describe('the intensity ceiling is not negotiable', () => {
     await db.query('rollback');
   });
 
+  /**
+   * One flag at a time, and that is the whole point.
+   *
+   * The assertion above flips all four at once, so it passes against a
+   * constraint that checks only one of them — the insert violates four clauses,
+   * and removing three still leaves one violated. It looks like coverage of a
+   * four-part rule and is coverage of "at least one part survives".
+   *
+   * Measured rather than argued: dropping `allow_data_export` from the
+   * constraint and running the suite left that test green and these red, which
+   * is the difference between a guard that tells you something broke and one
+   * that tells you what.
+   *
+   * Each row below is a single legitimate-looking authorisation with exactly one
+   * permission the product never grants. The brief's rule is that nothing runs
+   * against a target without a verified authorisation record; these are the four
+   * things such a record may never say.
+   */
+  const alone: { flag: string; ceiling: Record<string, unknown>; because: string }[] = [
+    {
+      flag: 'non_destructive_only',
+      ceiling: { non_destructive_only: false },
+      because: 'the method ceiling is what keeps a run from changing anything',
+    },
+    {
+      flag: 'allow_data_modification',
+      ceiling: { allow_data_modification: true },
+      because: 'a customer cannot consent to us altering their data, and we do not ask',
+    },
+    {
+      flag: 'allow_data_export',
+      ceiling: { allow_data_export: true },
+      because: 'exporting a customer’s data is not something an assessment does',
+    },
+    {
+      flag: 'synthetic_accounts_only',
+      ceiling: { synthetic_accounts_only: false },
+      because: 'a real user’s credentials are never asked for, accepted or stored',
+    },
+  ];
+
+  for (const { flag, ceiling, because } of alone) {
+    it(`refuses an authorisation whose only fault is ${flag} — ${because}`, async () => {
+      const appId = await seedApp(db, account);
+      await db.query('begin');
+      const message = await expectRefusal(
+        db,
+        `insert into public.authorisations
+           (app_id, organisation_id, status, method, verified_at, scope_domains,
+            warranty_text_version, warranty_text_sha256, granted_by, intensity_ceiling)
+         values ($1, $2, 'verified', 'dns_txt', now(), array['example.test'], '1.0.0', $3, $4, $5)`,
+        [
+          appId,
+          account.organisationId,
+          sha256('warranty'),
+          account.userId,
+          // The other three are what the product always sets, so the row is
+          // ordinary apart from the one flag under test.
+          JSON.stringify({
+            non_destructive_only: true,
+            allow_data_modification: false,
+            allow_data_export: false,
+            synthetic_accounts_only: true,
+            ...ceiling,
+          }),
+        ],
+      );
+      expect(message).toMatch(/intensity_is_non_destructive/i);
+      await db.query('rollback');
+    });
+  }
+
   it('refuses a verified authorisation with an empty scope allowlist', async () => {
     const appId = await seedApp(db, account);
     await db.query('begin');
