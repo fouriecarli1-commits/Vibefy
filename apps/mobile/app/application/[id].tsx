@@ -32,23 +32,49 @@ interface AppRow {
 export default function ApplicationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [app, setApp] = useState<AppRow | null>(null);
+  /*
+   * `undefined` is "not read yet", `null` is "not there", and a failure is its
+   * own state. Three outcomes need three states: with only `null` for all of
+   * them, `if (!app) return <Loading />` showed a spinner for ever to anybody
+   * whose read failed, and showed the same spinner for an application that is
+   * genuinely not theirs.
+   */
+  const [app, setApp] = useState<AppRow | null | undefined>(undefined);
+  const [appError, setAppError] = useState<string | null>(null);
   const [history, setHistory] = useState<AssessmentSummary[]>([]);
   const [requests, setRequests] = useState<RequestSummary[]>([]);
+  /*
+   * Why the two lists are missing, where they are.
+   *
+   * They used to be read through `.catch(() => [])`, so a failure printed "No
+   * approved assessments yet" on an application that has been assessed, and
+   * offered a paid re-test while one was already queued — because the queued
+   * one was in the list that failed to load. One state for both, because they
+   * are one load and the screen has one thing to say about it.
+   */
+  const [listsError, setListsError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const { data } = await supabase
+    const { data, error: cause } = await supabase
       .from('apps')
       .select('id, organisation_id, name, primary_url, monitoring_enabled, last_seen_at')
       .eq('id', id)
       .maybeSingle();
-    setApp((data as AppRow | null) ?? null);
-    setHistory(await listAssessments(supabase, id).catch(() => []));
-    setRequests(await listRequests(supabase, id).catch(() => []));
+    // A read that failed is not an application that does not exist.
+    setAppError(cause ? cause.message : null);
+    setApp(cause ? undefined : ((data as AppRow | null) ?? null));
+
+    try {
+      setHistory(await listAssessments(supabase, id));
+      setRequests(await listRequests(supabase, id));
+      setListsError(null);
+    } catch (listCause) {
+      setListsError(listCause instanceof Error ? listCause.message : String(listCause));
+    }
   }, [id]);
 
   useFocusEffect(
@@ -57,9 +83,39 @@ export default function ApplicationScreen() {
     }, [load]),
   );
 
-  if (!app) return <Loading />;
+  if (appError !== null) {
+    return (
+      <View style={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.h2}>We could not load this application</Text>
+          <Text style={styles.muted}>
+            That is a fault on our side, not a change to your application. Pull down to try again.
+          </Text>
+          <Text style={styles.error}>{appError}</Text>
+          <View style={{ marginTop: spacing.sm }}>
+            <Button label="Try again" onPress={() => void load()} />
+          </View>
+        </View>
+      </View>
+    );
+  }
+  if (app === undefined) return <Loading />;
+  if (app === null) {
+    return (
+      <View style={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.h2}>Not found</Text>
+          <Text style={styles.muted}>
+            That application is not on this account, or it has been removed.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const live = requests.find((request) => ['queued', 'claimed'].includes(request.status));
+  // Not the first of an unordered twenty: `listAssessments` orders before it
+  // limits, so this is the newest assessment and the figure below is current.
   const latest = history[0];
 
   async function approveReTest() {
@@ -98,10 +154,16 @@ export default function ApplicationScreen() {
       <View style={styles.card}>
         <Text style={styles.h1}>{app.name}</Text>
         <Text style={styles.muted}>{app.primary_url}</Text>
-        {latest && (
-          <Text style={[styles.score, { color: scoreColour(latest.score) }]}>
-            {latest.score === null ? '—' : `${latest.score.toFixed(1)} / 100`}
-          </Text>
+        {listsError !== null ? (
+          // A dash here would read as "not scored". This application may well
+          // be scored; we could not read it.
+          <Text style={styles.muted}>Score could not be read just now.</Text>
+        ) : (
+          latest && (
+            <Text style={[styles.score, { color: scoreColour(latest.score) }]}>
+              {latest.score === null ? '—' : `${latest.score.toFixed(1)} / 100`}
+            </Text>
+          )
         )}
         <Text style={styles.muted}>
           {app.monitoring_enabled ? 'Monitored' : 'Not monitored'}
@@ -111,7 +173,15 @@ export default function ApplicationScreen() {
 
       <View style={styles.card}>
         <Text style={styles.h2}>Re-assessment</Text>
-        {live ? (
+        {listsError !== null ? (
+          // Offering a re-test here would be offering one without knowing
+          // whether one is already running, which is the state this card
+          // exists to show.
+          <Text style={styles.muted}>
+            We could not tell whether an assessment is already running, so this is not offered. Pull
+            down to try again.
+          </Text>
+        ) : live ? (
           <Text style={styles.muted}>
             An assessment is {live.status}. A human reviews the result before you see it — nothing
             is published before that.
@@ -133,7 +203,12 @@ export default function ApplicationScreen() {
 
       <View style={styles.card}>
         <Text style={styles.h2}>History</Text>
-        {history.length === 0 ? (
+        {listsError !== null ? (
+          <Text style={styles.error}>
+            The history could not be loaded, so this list is not empty — it is unknown. (
+            {listsError})
+          </Text>
+        ) : history.length === 0 ? (
           <Text style={styles.muted}>No approved assessments yet.</Text>
         ) : (
           history.map((assessment) => (

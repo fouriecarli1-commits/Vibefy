@@ -43,6 +43,8 @@ export default function ReportScreen() {
   const { assessmentId } = useLocalSearchParams<{ assessmentId: string }>();
   const [assessment, setAssessment] = useState<AssessmentRow | null>(null);
   const [findings, setFindings] = useState<FindingRow[]>([]);
+  /** Separate from `error`: the assessment loaded, the findings did not. */
+  const [findingsError, setFindingsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,11 +60,15 @@ export default function ReportScreen() {
       if (cause) setError(cause.message);
       setAssessment((data as AssessmentRow | null) ?? null);
 
-      const { data: rows } = await supabase
+      // The error was dropped here, so a failed read printed the score above
+      // with an empty findings list — which on a report reads as nothing
+      // having been found. The assessment read beside it has always said so.
+      const { data: rows, error: findingsCause } = await supabase
         .from('findings')
         .select('id, title, severity, dimension, description')
         .eq('assessment_id', assessmentId)
         .eq('is_published', true);
+      if (findingsCause) setFindingsError(findingsCause.message);
       setFindings((rows ?? []) as FindingRow[]);
     })();
   }, [assessmentId]);
@@ -120,7 +126,18 @@ export default function ReportScreen() {
       )}
 
       <View style={styles.card}>
-        <Text style={styles.h2}>Findings ({findings.length})</Text>
+        {/* The count is an assertion. `Findings (0)` on a failed read says
+            nothing was found, which is the one thing a report must not say
+            when it did not look. */}
+        <Text style={styles.h2}>
+          {findingsError === null ? `Findings (${findings.length})` : 'Findings'}
+        </Text>
+        {findingsError !== null && (
+          <Text style={styles.error}>
+            The findings could not be loaded, so this list is not empty — it is unknown. (
+            {findingsError})
+          </Text>
+        )}
         {findings.map((finding) => (
           <View key={finding.id} style={{ paddingVertical: spacing.xs }}>
             <Text style={styles.body}>{finding.title}</Text>

@@ -3,7 +3,7 @@
 Alles wat op jou wag, in volgorde. Niks hiervan kan ek vir jou doen nie — ek het
 nie toegang tot Vercel, Supabase, Render of Resend nie.
 
-Laas nagegaan 2026-10-01.
+Laas nagegaan 2026-10-05.
 
 ---
 
@@ -23,6 +23,28 @@ Die gebruikersnaam moet `postgres.laootpvjfsrvllmxjzgu` wees — met die punt. N
 `postgres` is die direkte een en dit werk nie.
 
 **Klaar as:** die badge is terug op futurebox.
+
+### Hoe jy nagaan of dit gewerk het
+
+Ek kan nie van my omgewing af by vibefycode.com uitkom nie — die netwerkbeleid
+blokkeer dit. Jy moet dit meet. Drie dinge, in hierdie volgorde:
+
+1. **Maak https://vibefycode.com oop.**
+   - Laai → die ontplooiing is gesond.
+   - "Application error" of 500 → die app bou nie, nie die databasis nie.
+
+2. **Maak https://vibefycode.com/directory oop.** Dit lees die databasis.
+   - Laai, selfs leeg → die konneksiestring werk.
+   - 500 of 'n fout → `SUPABASE_DB_URL` is steeds verkeerd.
+
+3. **Maak die futurebox-bladsy oop** waar die badge was.
+   - Badge wys → klaar.
+   - Grys raampie wat "status unavailable" sê → die app leef maar die databasis
+     antwoord nie. Dis die konneksiestring.
+   - Net woorde, geen prentjie → die roete self antwoord nie. Sê my.
+
+Sê my net watter van die drie breek, en by watter stap. Dan weet ek presies
+waar om te kyk.
 
 ## 2 · Resend — druk Verify
 

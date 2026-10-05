@@ -61,9 +61,9 @@ describe('a 404 is one finding, not seven', () => {
     // answered "no cancellation link" about the hosting platform's 404. The
     // whole report is assembled here rather than in `runPreflight`, so that
     // this is a thing a test can hold.
-    expect(preflightReport(notFoundPage, 'https://my-app.example/').map((entry) => entry.id)).toEqual([
-      'answers',
-    ]);
+    expect(
+      preflightReport(notFoundPage, 'https://my-app.example/').map((entry) => entry.id),
+    ).toEqual(['answers']);
   });
 });
 

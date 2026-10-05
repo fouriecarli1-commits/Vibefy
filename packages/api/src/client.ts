@@ -90,6 +90,18 @@ export async function listAssessments(
       'assessment_id, status, overall_score, rubric_version, assessed_at, score_delta, material_regression',
     )
     .eq('app_id', appId)
+    /*
+     * The window says which twenty it wants.
+     *
+     * `assessment_history` carries its own `order by`, and Postgres does not
+     * promise to keep a view's ordering once an outer query adds a limit — the
+     * day it stops is the day an index is added or a parallel plan is chosen,
+     * neither of which looks like a change to this file. The phone prints
+     * `history[0]` as the application's current score in large coloured type,
+     * so a window that chose its own twenty rows is an old score shown as
+     * today's. Its two neighbours in this file have always said it.
+     */
+    .order('assessed_at', { ascending: false })
     .limit(20);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
