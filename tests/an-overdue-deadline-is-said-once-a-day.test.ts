@@ -50,11 +50,21 @@ beforeAll(async () => {
   });
   account = await seedAccount(db, 'overdue-clock');
 
-  // One request, already past its deadline. `set_request_deadline` fills
-  // `due_at` on insert, so it is written explicitly here.
+  /*
+   * A fixed deadline, not one relative to the real clock.
+   *
+   * This read `now() - interval '3 days'` while every assertion below used a
+   * fake clock pinned to 2026-10-01. It passed on the day it was written and
+   * failed four days later, when the database's "three days ago" moved past the
+   * test's "now" and the request stopped being overdue — a fixture on one clock
+   * and an assertion on another, which is the shape of a test that works until
+   * the calendar moves.
+   *
+   * Both ends are fixed now, so this says the same thing in 2030.
+   */
   await db.query(
     `insert into public.data_requests (user_id, organisation_id, request_type, due_at)
-     values ($1, $2, 'access', now() - interval '3 days')`,
+     values ($1, $2, 'access', timestamptz '2026-09-01T00:00:00Z')`,
     [account.userId, account.organisationId],
   );
 });

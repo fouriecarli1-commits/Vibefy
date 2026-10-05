@@ -252,24 +252,24 @@ describe('a run that cannot reach the site', () => {
      * evidence against them.
      */
     const ours = whyItCouldNotBeRead(new TypeError("Cannot read properties of null (reading 'x')"));
-    expect(ours).toMatch(/fault of ours/i);
-    expect(ours).toMatch(/not a finding about this site/i);
-    expect(ours).not.toMatch(/offline|blocking/i);
+    expect(ours.detail).toMatch(/fault of ours/i);
+    expect(ours.detail).toMatch(/not a finding about this site/i);
+    expect(ours.detail).not.toMatch(/offline|blocking/i);
 
     // A real network failure still says what it always said.
     const theirs = whyItCouldNotBeRead(
       Object.assign(new TypeError('fetch failed'), { cause: new Error('ENOTFOUND') }),
     );
-    expect(theirs).toMatch(/could not be reached/i);
-    expect(theirs).not.toMatch(/fault of ours/i);
+    expect(theirs.detail).toMatch(/could not be reached/i);
+    expect(theirs.detail).not.toMatch(/fault of ours/i);
 
     // A timeout is the one thing we actually observed, so it is said plainly
     // and does not claim to know which of three reasons caused it.
     const timeout = whyItCouldNotBeRead(
       Object.assign(new Error('aborted'), { name: 'AbortError' }),
     );
-    expect(timeout).toMatch(/did not answer in time/i);
-    expect(timeout).not.toMatch(/fault of ours/i);
+    expect(timeout.detail).toMatch(/did not answer in time/i);
+    expect(timeout.detail).not.toMatch(/fault of ours/i);
   });
 
   it('refuses a private address before any request leaves', async () => {

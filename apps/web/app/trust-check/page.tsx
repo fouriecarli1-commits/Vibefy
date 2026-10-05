@@ -190,6 +190,17 @@ export default async function TrustCheckPage({
 
 function Result({ result }: { result: TrustCheckResult }) {
   const { summary } = result;
+  /*
+   * The high-weight questions actually missing, named rather than counted.
+   *
+   * `summary.highWeightMissing` is the same number and is kept for callers that
+   * want one; the bar below needs the questions themselves, because its sentence
+   * used to name three of the six and was therefore a sentence about a different
+   * page whenever one of the other three was the one missing.
+   */
+  const missingHighWeight = result.observations.filter(
+    (entry) => entry.weight === 'high' && entry.outcome === 'not_found',
+  );
 
   return (
     <section aria-labelledby="result-heading" className="space-y-5">
@@ -221,13 +232,23 @@ function Result({ result }: { result: TrustCheckResult }) {
         </div>
       </div>
 
-      {summary.highWeightMissing > 0 && (
+      {missingHighWeight.length > 0 && (
         <div className="bar" data-tone="warn">
           <p className="max-w-3xl text-sm">
-            <strong>{summary.highWeightMissing}</strong> of the questions that matter most before
-            paying — cancelling, contacting a person, and who the company is — were not answered on
-            that page. That does not mean the answers do not exist. It means they were not where
-            somebody deciding whether to pay would look.
+            {/*
+              The questions actually missing, named from the observations.
+
+              This sentence used to name three — cancelling, contacting a person
+              and who the company is — against a count over six: `encrypted` and
+              `recurring_payment` are high weight too, and so is `reachable`. A
+              site that was merely unencrypted was told it had not said how to
+              cancel, which is a sentence about a different page.
+            */}
+            <strong>{missingHighWeight.length}</strong> of the questions that matter most before
+            paying {missingHighWeight.length === 1 ? 'was' : 'were'} not answered on that page:{' '}
+            {missingHighWeight.map((entry) => entry.question.replace(/\?$/, '')).join('; ')}. That
+            does not mean the answers do not exist. It means they were not where somebody deciding
+            whether to pay would look.
           </p>
         </div>
       )}
