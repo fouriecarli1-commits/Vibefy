@@ -22,6 +22,10 @@
  */
 import { runChecks } from './checks.ts';
 import { fetchPublicPage, normaliseUrl } from './fetch.ts';
+// The same rule as the consumer check, not a second copy of it. A failure we
+// cannot attribute is ours until proven otherwise, and the builder is owed that
+// sentence as much as the stranger is.
+import { whyItCouldNotBeRead } from './run.ts';
 import { TrustCheckInputError, type Observation } from './types.ts';
 
 export type PreflightOutcome = 'ok' | 'missing' | 'unclear';
@@ -114,24 +118,34 @@ export function preflightItems(page: Page, requestedUrl: string): PreflightItem[
   const items: PreflightItem[] = [];
 
   // 1. It answered, and with something.
+  //
+  // An error page is a page. It has no title, no description, no viewport and
+  // no language — because it belongs to the hosting platform, not to the
+  // application. Answering the other six questions from those bytes told a
+  // builder to go and fix six things about somebody else's 404, when the one
+  // true finding was that the address does not work. Six wrong things to fix
+  // is how a free tool teaches people to stop running it.
+  if (page.status >= 400) {
+    return [
+      item(
+        'answers',
+        'Does the address work at all?',
+        'missing',
+        `The server answered ${page.status}. Anybody following this link sees an error page rather than your application, so there was nothing of yours here to look at — nothing below this was checked.`,
+        'Check the address you are sharing, and that whatever hosts it is running. Then run this again.',
+        [`HTTP ${page.status}`],
+      ),
+    ];
+  }
   items.push(
-    page.status >= 400
-      ? item(
-          'answers',
-          'Does the address work at all?',
-          'missing',
-          `The server answered ${page.status}. Anybody following this link sees an error page rather than your application.`,
-          'Check the address you are sharing, and that whatever hosts it is running.',
-          [`HTTP ${page.status}`],
-        )
-      : item(
-          'answers',
-          'Does the address work at all?',
-          'ok',
-          `The server answered ${page.status}, so the link works and a visitor gets a page rather than an error.`,
-          null,
-          [`HTTP ${page.status}`],
-        ),
+    item(
+      'answers',
+      'Does the address work at all?',
+      'ok',
+      `The server answered ${page.status}, so the link works and a visitor gets a page rather than an error.`,
+      null,
+      [`HTTP ${page.status}`],
+    ),
   );
 
   // 2. Encrypted, and it stays that way.
@@ -379,6 +393,42 @@ export function borrowedItems(observations: readonly Observation[]): PreflightIt
   });
 }
 
+/**
+ * Why there was no page, in words that do not blame the builder for our bugs.
+ *
+ * Every failure used to come out as `That address could not be opened:
+ * <message>` — so a `TypeError` thrown inside this package was shown to a
+ * builder, in a red bar, as a fact about their application. The consumer check
+ * beside this one was corrected for exactly that and this is the same rule
+ * read a second time rather than a second rule.
+ *
+ * Its own function, and exported, because the only other way to reach it is to
+ * make `fetchPublicPage` fail — and a sentence no test can read is a sentence
+ * that drifts back.
+ */
+export function preflightUnreachable(error: unknown): string {
+  // A refusal from `normaliseUrl` is already a sentence written for the person
+  // who typed the address. Wrapping it loses the only useful part.
+  if (error instanceof TrustCheckInputError) return error.message;
+  return whyItCouldNotBeRead(error).detail;
+}
+
+/**
+ * The whole report, assembled from one response.
+ *
+ * Separate from `runPreflight` so the assembling is a pure function a test can
+ * hold: the status gate below is the difference between one finding and ten,
+ * and it would otherwise only be reachable by fetching a real 404.
+ */
+export function preflightReport(page: Page, requestedUrl: string): PreflightItem[] {
+  const items = preflightItems(page, requestedUrl);
+  // `runChecks` reads the same bytes, so on an error page the three borrowed
+  // questions would answer "no cancellation link, no privacy policy, no way to
+  // reach you" about the hosting platform's 404.
+  if (page.status >= 400) return items;
+  return [...items, ...borrowedItems(runChecks(page))];
+}
+
 export async function runPreflight(
   rawUrl: string,
   now: Date = new Date(),
@@ -397,17 +447,11 @@ export async function runPreflight(
       checkedAt,
       items: [],
       summary: { ok: 0, missing: 0, unclear: 0 },
-      unreachable:
-        error instanceof TrustCheckInputError
-          ? error.message
-          : `That address could not be opened: ${error instanceof Error ? error.message : String(error)}`,
+      unreachable: preflightUnreachable(error),
     };
   }
 
-  const items: PreflightItem[] = [
-    ...preflightItems(page, requestedUrl),
-    ...borrowedItems(runChecks(page)),
-  ];
+  const items: PreflightItem[] = preflightReport(page, requestedUrl);
   return {
     requestedUrl,
     finalUrl: page.finalUrl,
