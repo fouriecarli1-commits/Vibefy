@@ -277,7 +277,13 @@ export async function issueBadge(
        -- assessment was scored against, and a literal is a fixture that breaks
        -- the first time a test needs a different version.
        (select rubric_version from public.assessments where id = $3),
-       82.5, now(), $6, $7, $8, 'key-2026-01',
+       -- Read from the assessment for the same reason as the rubric version
+       -- above, and now for a stronger one: the database refuses a badge whose
+       -- score differs from the assessment it was earned by. This fixture held
+       -- a literal 82.5 against an assessment approved at 82.4, and nothing
+       -- noticed for six weeks — which is how that rule came to be written.
+       (select overall_score from public.assessments where id = $3),
+       now(), $6, $7, $8, 'key-2026-01',
        $9, now() + make_interval(months => $10))
      returning id`,
     [
@@ -287,7 +293,7 @@ export async function issueBadge(
       slug,
       slug.replace(/-/g, '_') + '_publicid',
       'https://app.example.test',
-      JSON.stringify({ slug, score: 82.5 }),
+      JSON.stringify({ slug }),
       'signature-placeholder',
       input.consentId,
       input.expiresInMonths ?? 12,

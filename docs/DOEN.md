@@ -166,12 +166,14 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — ses migrasies
+## 4 · Supabase — sewe migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
 Die vyfde en sesde maak die meeste saak: die een keer 'n verwerping wat 'n
-goedkeuring magtig, die ander 'n betaling wat twee keer toegepas kan word.
+goedkeuring magtig, die ander 'n betaling wat twee keer toegepas kan word. Die
+sewende hou die telling op die badge en die telling in die verslag dieselfde —
+niks het dit voorheen gekeer nie.
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte

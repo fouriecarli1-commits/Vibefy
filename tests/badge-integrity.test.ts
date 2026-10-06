@@ -176,7 +176,12 @@ describe('badge history is evidence', () => {
       `insert into public.badges (
          app_id, organisation_id, assessment_id, slug, public_id, rubric_version, score,
          assessed_at, certified_origin, payload, signature, signing_key_id, licence_consent_id, expires_at
-       ) values ($1, $2, $3, 'duplicate-badge', 'duplicate_badge_publicid', '1.0.0', 90,
+       ) values ($1, $2, $3, 'duplicate-badge', 'duplicate_badge_publicid', '1.0.0',
+         -- The assessment's own score, so this reaches the index it is about.
+         -- A literal 90 against an assessment scored 82.5 is now refused one
+         -- rule earlier, by assert_badge_is_earned, and this test would pass
+         -- for the wrong reason while proving nothing about uniqueness.
+         (select overall_score from public.assessments where id = $3),
          now(), 'https://app.example.test', '{}'::jsonb, 'sig', 'key-2026-01', $4, now() + interval '6 months')`,
       [appId, owner.organisationId, assessmentId, consentId],
     );
