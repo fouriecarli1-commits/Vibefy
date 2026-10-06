@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { andTheRecordOfIt } from '@/lib/audit';
 import { headers } from 'next/headers';
 import { PLAN_TIERS, entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
@@ -109,7 +110,7 @@ export async function setPlan(_previous: ActionState, formData: FormData): Promi
 
   const entitlement = entitlementFor(plan);
   const { ip, userAgent } = await requestContext();
-  await supabase.from('audit_log').insert({
+  const { error: unrecorded } = await supabase.from('audit_log').insert({
     organisation_id: organisationId,
     actor_id: userId,
     actor_role: 'admin',
@@ -130,9 +131,12 @@ export async function setPlan(_previous: ActionState, formData: FormData): Promi
 
   revalidatePath('/admin/accounts');
   return {
-    notice: `${plan}: assessments run at ${entitlement.depth} depth, up to $${entitlement.maxRunCostUsd.toFixed(2)} a run, ${
-      entitlement.badgeEligible ? 'badge-eligible' : 'not badge-eligible'
-    }.`,
+    notice: andTheRecordOfIt(
+      `${plan}: assessments run at ${entitlement.depth} depth, up to $${entitlement.maxRunCostUsd.toFixed(2)} a run, ${
+        entitlement.badgeEligible ? 'badge-eligible' : 'not badge-eligible'
+      }.`,
+      unrecorded,
+    ),
   };
 }
 
@@ -179,7 +183,7 @@ export async function setPlatformRole(
   if (error) return { error: error.message };
 
   const { ip, userAgent } = await requestContext();
-  await supabase.from('audit_log').insert({
+  const { error: unrecorded } = await supabase.from('audit_log').insert({
     actor_id: userId,
     actor_role: 'admin',
     action: 'account.platform_role_set',
@@ -193,5 +197,5 @@ export async function setPlatformRole(
   });
 
   revalidatePath('/admin/accounts');
-  return { notice: `${String(target.email)} is now ${role}.` };
+  return { notice: andTheRecordOfIt(`${String(target.email)} is now ${role}.`, unrecorded) };
 }

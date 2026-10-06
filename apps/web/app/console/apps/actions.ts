@@ -140,18 +140,21 @@ export async function createApp(_previous: ActionState, formData: FormData): Pro
 
   if (error) return { error: error.message };
 
-  if (screening.verdict === 'refused') {
-    // Refusals are logged with their ground, per the Acceptable Use Policy.
-    await supabase.from('audit_log').insert({
-      organisation_id: organisationId,
-      actor_id: user.id,
-      action: 'app.screening_refused',
-      entity_type: 'app',
-      entity_id: data.id,
-      summary: screening.reasoning,
-      after_state: screening,
-    });
-  }
+  /*
+   * The refusal is logged by the database, on the row this just wrote.
+   *
+   * It used to be logged here, and it was not: the insert ran as the customer,
+   * the only insert policy on `audit_log` requires `is_platform_admin()`, and
+   * the result was discarded. So row-level security refused it every time from
+   * the day the admin console landed, and the comment above it said "Refusals
+   * are logged with their ground, per the Acceptable Use Policy" while no
+   * refusal at intake was being recorded at all.
+   *
+   * The table is right to be closed — a log its subject may write into is not
+   * evidence — so the writer moved rather than the policy.
+   * `apps_refusal_at_intake_is_written_down` fires on the insert above and
+   * reads `screening_notes`, which is the same sentence the customer is shown.
+   */
 
   redirect(`/console/apps/${data.id}`);
 }
