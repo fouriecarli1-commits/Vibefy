@@ -14,6 +14,7 @@ interface AssessmentRow {
   gate_failures: string[] | null;
   scope_statement: string | null;
   dimension_scores: { dimension: string; score: number; band?: string }[] | null;
+  not_tested: { criterion: string; because: string }[] | null;
   completed_at: string | null;
   created_at: string;
 }
@@ -38,6 +39,15 @@ interface FindingRow {
  * redaction that decides which is which lives in `packages/report`; rather than
  * reimplement it on a phone, this screen shows what every tier is entitled to
  * and sends people to the console for the rest.
+ *
+ * What it did not show, until it did: `assessments.not_tested`. The comment
+ * above said "the same rows the console renders" and the query selected eight
+ * of nine, so the one column that says what a run could not answer was missing
+ * from the one surface read on a phone — where a score gets read on its own.
+ * `packages/report` had to be corrected for the same omission once already, and
+ * the note on `ReportSource.notTested` sets out why: a report that is quiet
+ * about what it did not look at prints the strongest sentence in the document
+ * for free.
  */
 export default function ReportScreen() {
   const { assessmentId } = useLocalSearchParams<{ assessmentId: string }>();
@@ -53,7 +63,7 @@ export default function ReportScreen() {
       const { data, error: cause } = await supabase
         .from('assessments')
         .select(
-          'id, overall_score, rubric_version, certification_eligible, gate_failures, scope_statement, dimension_scores, completed_at, created_at',
+          'id, overall_score, rubric_version, certification_eligible, gate_failures, scope_statement, dimension_scores, not_tested, completed_at, created_at',
         )
         .eq('id', assessmentId)
         .maybeSingle();
@@ -124,6 +134,26 @@ export default function ReportScreen() {
           ))}
         </View>
       )}
+
+      {/* Before the findings, like the console and the verification page. A
+          list of defects read without it is a list somebody takes for the
+          whole picture. */}
+      <View style={styles.card}>
+        <Text style={styles.h2}>What this assessment did not cover</Text>
+        {(assessment.not_tested ?? []).length === 0 ? (
+          <Text style={styles.muted}>
+            Everything within the authorised scope was assessed, and the engine recorded no
+            criterion it could not answer.
+          </Text>
+        ) : (
+          (assessment.not_tested ?? []).map((entry) => (
+            <View key={entry.criterion} style={{ paddingVertical: spacing.xs }}>
+              <Text style={styles.body}>{entry.criterion}</Text>
+              <Text style={styles.muted}>{entry.because}</Text>
+            </View>
+          ))
+        )}
+      </View>
 
       <View style={styles.card}>
         {/* The count is an assertion. `Findings (0)` on a failed read says
