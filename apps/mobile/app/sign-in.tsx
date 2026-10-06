@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SSO_ROUTING_UNKNOWN, ssoRoutingFor } from '@vibefycode/shared';
 import { supabase } from '@/lib/supabase.ts';
 import { registerForPush } from '@/lib/push.ts';
 import { styles } from '@/lib/ui.tsx';
@@ -25,15 +26,25 @@ export default function SignInScreen() {
     setBusy(true);
     setError(null);
 
-    // The same domain-routing check the web sign-in makes. A workspace that has
-    // enforced single sign-on has done so precisely so a password is not another
-    // way in — including from a phone.
-    const { data: routing } = await supabase.rpc('sso_routing', { candidate_email: email });
-    const route = Array.isArray(routing) ? routing[0] : routing;
-    if (route?.email_domain) {
+    /*
+     * The same domain-routing check the web sign-in makes. A workspace that has
+     * enforced single sign-on has done so precisely so a password is not
+     * another way in — including from a phone.
+     *
+     * Through `ssoRoutingFor`, which is where that sentence became true. Both
+     * forms used to discard the lookup's error, so a failed call returned no
+     * data, the branch was skipped, and the password was accepted: the control
+     * was off exactly when the database could not answer.
+     */
+    const routing = await ssoRoutingFor(supabase, email);
+    if (routing.kind === 'unknown') {
+      setBusy(false);
+      return setError(SSO_ROUTING_UNKNOWN);
+    }
+    if (routing.kind === 'required') {
       setBusy(false);
       return setError(
-        `${route.email_domain} signs in through your organisation’s identity provider. Open the console in a browser to sign in.`,
+        `${routing.domain} signs in through your organisation’s identity provider. Open the console in a browser to sign in.`,
       );
     }
 

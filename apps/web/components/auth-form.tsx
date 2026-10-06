@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SSO_ROUTING_UNKNOWN, ssoRoutingFor } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/client';
 import { decideSecondStep } from '@/lib/second-step';
 import { missingConsents } from '@/lib/consent';
@@ -74,16 +75,23 @@ export function AuthForm({
     // Before a password is accepted, ask whether this address belongs to a
     // domain that requires single sign-on. A workspace that has enforced SSO has
     // done so precisely so that a password cannot be an alternative route in.
-    const { data: routing } = await supabase.rpc('sso_routing', { candidate_email: email });
-    const route = Array.isArray(routing) ? routing[0] : routing;
-    if (route?.email_domain) {
+    //
+    // Through `ssoRoutingFor`, which is where the sentence above became true.
+    // This used to discard the lookup's error, so a failed call returned no
+    // data, the branch was skipped, and the password was accepted — the control
+    // was off exactly when the database could not answer.
+    const routing = await ssoRoutingFor(supabase, email);
+    if (routing.kind === 'unknown') {
+      return setStatus({ kind: 'error', message: SSO_ROUTING_UNKNOWN });
+    }
+    if (routing.kind === 'required') {
       const { error: ssoError } = await supabase.auth.signInWithSSO({
-        domain: String(route.email_domain),
+        domain: routing.domain,
       });
       if (ssoError) {
         return setStatus({
           kind: 'error',
-          message: `${route.email_domain} signs in through your organisation’s identity provider, and password sign-in is refused for it. ${ssoError.message}`,
+          message: `${routing.domain} signs in through your organisation’s identity provider, and password sign-in is refused for it. ${ssoError.message}`,
         });
       }
       return setStatus({

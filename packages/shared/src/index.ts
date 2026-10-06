@@ -8,3 +8,4 @@ export * from './claim-check.ts';
 export * from './badge-usage.ts';
 export * from './contrast.ts';
 export * from './social-providers.ts';
+export * from './sso-routing.ts';
