@@ -9,18 +9,59 @@ Laas nagegaan 2026-10-05.
 
 ## 1 · Vercel — die badge is hierdeur af
 
-`SUPABASE_DB_URL` wys na die **direkte** databasis-gasheer. Dié gasheer het
-**geen IPv4-adres** nie, en Vercel se funksies kan nie oor IPv6 uitgaan nie. Elke
-navraag misluk. Daarom wys futurebox woorde in plaas van die badge.
+**Bevestig op 2026-10-06 uit die produksie-log:**
 
-1. Supabase → Settings → Database → Connection string → **Transaction pooler**
-2. Kopieer dit **heel**. Vervang net `[YOUR-PASSWORD]`.
-3. Vercel → Settings → Environment Variables → `SUPABASE_DB_URL` → plak → Save
+```
+getaddrinfo ENOTFOUND db.laootpvjfsrvllmxjzgu.supabase.co
+```
+
+`SUPABASE_DB_URL` is die **direkte** gasheer. Dié gasheer publiseer geen
+IPv4-adres nie en Vercel se funksies kan nie oor IPv6 uitgaan nie, so die adres
+word nie eers opgesoek nie. Elke navraag misluk voordat enige wagwoord gebruik
+word.
+
+### Kry die regte string
+
+1. Supabase → Settings → Database → **Connection string**
+2. Bo-aan die boks is keuses: **Direct connection** · **Transaction pooler** ·
+   **Session pooler**. Dit kan ook 'n aftrek-lysie wees wat "Direct connection"
+   sê.
+3. **Klik "Transaction pooler".** Die paneel wys standaard die direkte een — dit
+   is die hele strik.
+4. Kopieer dié een.
+
+Die string moet al drie hê:
+
+| Deel          | Moet wees                                 |
+| ------------- | ----------------------------------------- |
+| Gebruikersnaam | `postgres.laootpvjfsrvllmxjzgu` — met die punt |
+| Gasheer       | bevat `pooler.supabase.com`               |
+| Poort         | `6543`                                    |
+
+Bevat dit nog `db.laootpvjfsrvllmxjzgu.supabase.co`, is dit die verkeerde een.
+
+### Die wagwoord
+
+Die databasis het sy eie wagwoord, gestel toe die projek geskep is. Dit is
+**nie** jou Supabase-, GitHub- of Google-aanmelding nie. Supabase wys dit nooit
+— daarom staan daar `[YOUR-PASSWORD]`.
+
+Onseker? Settings → Database → **Reset database password**, en kies een met net
+letters en syfers. Dan is daar niks om te omskakel nie.
+
+Bevat die wagwoord `@`, `:`, `/`, `?`, `#`, `%`, `&` of 'n spasie, moet dit
+omgeskakel word (`@` word `%40`, ensovoorts). Daar moet presies **een** `@` in
+die hele string wees, net voor die gasheer.
+
+'n Nuwe wagwoord moet op **twee** plekke in: Vercel én Render.
+
+### Sit dit in
+
+1. Vercel → Settings → Environment Variables → `SUPABASE_DB_URL` → **Edit**
+2. Vervang die hele waarde. Vervang `[YOUR-PASSWORD]` — hakkies en al.
+3. Production, Preview en Development almal gemerk → **Save**
 4. Ook `NEXT_PUBLIC_SITE_URL` = `https://vibefycode.com`
 5. **Deployments → boonste → `⋯` → Redeploy**
-
-Die gebruikersnaam moet `postgres.laootpvjfsrvllmxjzgu` wees — met die punt. Net
-`postgres` is die direkte een en dit werk nie.
 
 **Klaar as:** die badge is terug op futurebox.
 
@@ -45,6 +86,24 @@ blokkeer dit. Jy moet dit meet. Drie dinge, in hierdie volgorde:
 
 Sê my net watter van die drie breek, en by watter stap. Dan weet ek presies
 waar om te kyk.
+
+## 1b · Futurebox — die embed wys na 'n dooie adres
+
+Aparte probleem van bo, en dit moet ná stap 1.
+
+Die snit op futurebox is in Augustus gekopieer en wys na
+`vibefy-web-lyart.vercel.app`, wat nie meer bestaan nie. Daarom wys daar net
+woorde, selfs al werk alles aan ons kant.
+
+Sodra die databasis antwoord:
+
+1. Teken in by `https://vibefycode.com/console`
+2. Gaan na die futurebox-toepassing se bladsy
+3. Onder **Your badge** → **Embed it**, kopieer die nuwe snit (dié een wys na
+   `vibefycode.com`)
+4. Vervang die ou snit op futurebox se bladsy
+
+**Klaar as:** die badge wys op futurebox.
 
 ## 2 · Resend — druk Verify
 
