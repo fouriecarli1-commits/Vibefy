@@ -50,7 +50,21 @@ export function whatIsWrongWithTheConnectionString(raw: string): string | null {
   const user = decodeURIComponent(url.username);
 
   if (/^db\..+\.supabase\.co$/i.test(host)) {
-    return `SUPABASE_DB_URL points at ${host}, the direct database host. It publishes no IPv4 address and these functions have no IPv6 outbound, so it cannot be reached from here at all. Copy the transaction pooler string instead: Supabase → Settings → Database → Connection string → Transaction pooler.`;
+    /*
+     * Two different things live on this hostname, and both are unreachable.
+     *
+     * Port 5432 is the direct connection. Port 6543 is the *dedicated* pooler,
+     * which Supabase offers on paid plans and which is a pooler in every sense
+     * except the one that matters here. Saying "the direct host" to somebody
+     * looking at a panel that says "Dedicated pooler" sends them away certain
+     * they already did this, which is a round-trip the sentence exists to
+     * prevent.
+     *
+     * The hostname publishes no A record, only AAAA. That is the whole fault,
+     * and it belongs to the name rather than to either port.
+     */
+    const dedicated = url.port === '6543';
+    return `SUPABASE_DB_URL points at ${host}, which is ${dedicated ? 'the dedicated pooler' : 'the direct connection'}. Both live on that hostname, and it publishes no IPv4 address — only IPv6, which these functions have no route to. Neither can be reached from here at all. The one that works is the shared pooler, whose host ends in pooler.supabase.com and whose username carries the project reference after a dot: Supabase → Connect → Shared pooler.`;
   }
 
   if (host.endsWith('pooler.supabase.com')) {
@@ -65,5 +79,26 @@ export function whatIsWrongWithTheConnectionString(raw: string): string | null {
     }
   }
 
+  return null;
+}
+
+/**
+ * What a refusal from the database means, where the words mislead.
+ *
+ * Separate from the check above because this reads what came back rather than
+ * what was sent. One case so far, and it earned its place in an evening: a
+ * password reset left a second service — the worker — retrying with the old
+ * one every few seconds, and Supabase's pooler tripped a breaker that blocks
+ * *everybody's* new connections. The console then failed with what looks
+ * exactly like its own bad password, while its password was fine, and the
+ * thing to fix was somewhere else entirely.
+ *
+ * Returns null for anything it does not recognise, so the raw message is never
+ * replaced by a guess.
+ */
+export function whyTheDatabaseRefused(message: string): string | null {
+  if (/circuit breaker|too many authentication failures/i.test(message)) {
+    return 'Supabase has temporarily blocked new connections after repeated failed logins, so this says nothing about the password used here. Something else is still trying with an old one — usually a second service such as the worker — and every retry pushes the block further out. Correct that service\u2019s password or stop it, then wait for the block to lift.';
+  }
   return null;
 }

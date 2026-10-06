@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { renderBadgeSvg, renderBadgeUnavailableSvg, type BadgeStatus } from '@vibefycode/badge';
+import { whyTheDatabaseRefused } from '@/lib/connection-string';
 import { readAsAnon, writeAsService } from '@/lib/sql';
 
 /**
@@ -76,9 +77,15 @@ export async function GET(
     // Logged, because the whole point is that this state is ours to fix and the
     // customer cannot see it. A badge silently serving "unavailable" for a week
     // would be the same defect one layer further down.
+    const detail = error instanceof Error ? error.message : String(error);
+    // Where the message misleads, the explanation travels beside it rather
+    // than replacing it. A tripped pooler breaker reads exactly like our own
+    // bad password and is not one.
+    const means = whyTheDatabaseRefused(detail);
     console.error('badge image could not be served', {
       publicId: id,
-      error: error instanceof Error ? error.message : String(error),
+      error: detail,
+      ...(means === null ? {} : { means }),
     });
     return new NextResponse(renderBadgeUnavailableSvg(sizePx), {
       // Not 404: the badge is not what is missing. Not 500 with an HTML body,

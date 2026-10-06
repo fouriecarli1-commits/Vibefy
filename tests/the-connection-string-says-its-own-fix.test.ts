@@ -14,7 +14,10 @@
  * deployment is worse than no alarm at all.
  */
 import { describe, expect, it } from 'vitest';
-import { whatIsWrongWithTheConnectionString } from '../apps/web/lib/connection-string.ts';
+import {
+  whatIsWrongWithTheConnectionString,
+  whyTheDatabaseRefused,
+} from '../apps/web/lib/connection-string.ts';
 
 /**
  * Assembled rather than written out.
@@ -35,11 +38,28 @@ const POOLER = dsn('postgres.laootpvjfsrvllmxjzgu', 'secret', POOLER_HOST);
 describe('what is wrong with the connection string', () => {
   it('names the direct host, and that it cannot be reached rather than that it is slow', () => {
     const said = whatIsWrongWithTheConnectionString(dsn('postgres', 'secret', DIRECT_HOST, 5432));
-    expect(said).toMatch(/direct database host/i);
-    expect(said).toMatch(/transaction pooler/i);
+    expect(said).toMatch(/direct connection/i);
+    expect(said).toMatch(/shared pooler/i);
     // The distinction the runbook had to be rewritten to make: it is not a
     // performance choice, the address does not resolve.
     expect(said).toMatch(/no IPv4|cannot be reached/i);
+  });
+
+  it('calls the dedicated pooler by its name, because the panel does', () => {
+    // Port 6543 on that hostname is the dedicated pooler, not the direct
+    // connection. Telling somebody looking at a panel headed "Dedicated
+    // pooler" that they have configured the direct connection sends them away
+    // certain they already did this.
+    const said = whatIsWrongWithTheConnectionString(dsn('postgres', 'secret', DIRECT_HOST, 6543));
+    expect(said).toMatch(/dedicated pooler/i);
+    expect(said).toMatch(/shared pooler/i);
+    expect(said).toMatch(/pooler\.supabase\.com/);
+  });
+
+  it('still calls port 5432 on that host the direct connection', () => {
+    expect(
+      whatIsWrongWithTheConnectionString(dsn('postgres', 'secret', DIRECT_HOST, 5432)),
+    ).toMatch(/direct connection/i);
   });
 
   it('names the username the pooler wants, and says a refusal is not a wrong password', () => {
@@ -104,5 +124,24 @@ describe('what is wrong with the connection string', () => {
   it('refuses something that is not a database address at all', () => {
     expect(whatIsWrongWithTheConnectionString('https://example.com')).toMatch(/postgresql:\/\//);
     expect(whatIsWrongWithTheConnectionString('not a url')).toMatch(/not a URL/i);
+  });
+});
+
+describe('what a refusal from the database means', () => {
+  it('says a tripped breaker is not a statement about this password', () => {
+    const said = whyTheDatabaseRefused(
+      'ClientHandler: circuit breaker open for operation: auth_error, too many authentication failures, new connections are temporarily blocked',
+    );
+    expect(said).toMatch(/says nothing about the password used here/i);
+    // The part that actually gets somebody out of it: the thing to fix is
+    // somewhere else, and retrying makes it worse.
+    expect(said).toMatch(/second service|worker/i);
+    expect(said).toMatch(/every retry|pushes the block/i);
+  });
+
+  it('leaves a message it does not recognise alone', () => {
+    // A guess here would replace a true error with a plausible wrong one.
+    expect(whyTheDatabaseRefused('password authentication failed for user "postgres"')).toBeNull();
+    expect(whyTheDatabaseRefused('connection terminated unexpectedly')).toBeNull();
   });
 });

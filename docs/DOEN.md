@@ -3,89 +3,102 @@
 Alles wat op jou wag, in volgorde. Niks hiervan kan ek vir jou doen nie — ek het
 nie toegang tot Vercel, Supabase, Render of Resend nie.
 
-Laas nagegaan 2026-10-05.
+Laas nagegaan 2026-10-06.
 
 ---
 
-## 1 · Vercel — die badge is hierdeur af
+## 1 · Die badge — drie stappe
 
-**Bevestig op 2026-10-06 uit die produksie-log:**
+Op 2026-10-06 uitgepluis tot op die bodem. Geen raaiwerk oor nie.
+
+**Wat verkeerd is:** Supabase bied twee poolers aan. Die een wat jou paneel
+standaard wys — **Dedicated pooler** — sit op `db.laootpvjfsrvllmxjzgu.supabase.co`,
+dieselfde gasheernaam as die direkte verbinding. Daardie naam publiseer **geen
+IPv4-adres** nie, net IPv6, en Vercel se funksies het geen IPv6-roete nie. Supabase
+se eie banier in daardie venster sê dit: _"Transaction pooler uses IPv6 by default."_
+
+Die **Shared pooler** is die een wat werk. Ander gasheer, ander gebruikersnaam.
+
+---
+
+### Stap A · Render eerste
+
+Doen hierdie vóór Vercel. Die werker probeer met 'n ou wagwoord inteken, en
+Supabase se pooler het 'n stroombreker getrek wat **alle** nuwe konneksies blokkeer
+— ook Vercel s'n. Solank dit loop, kan niks anders getoets word nie.
+
+Render → `vibefycode-worker` → **Environment** → `SUPABASE_DB_URL` → vervang net
+die stukkie tussen die `:` en die `@` met die huidige wagwoord → **Save Changes**.
+
+**Klaar as:** Render se Logs wys geen `password authentication failed` meer nie.
+
+Kry jy nie die wagwoord nie: Render → die diens → regs bo **⋯** → **Suspend
+Service**. Dit stop die hamer ook.
+
+---
+
+### Stap B · Supabase → die regte string
+
+1. Supabase → **Connect** (die knoppie bo-aan, langs die tak-kieser)
+2. Die venster wys standaard **Dedicated pooler**. Daar is 'n keuse — 'n tab of
+   'n aftrek-lysie. Kies **Shared pooler**.
+3. Kopieer daardie string.
+
+Hoe jy weet jy het die regte een:
+
+| Deel | Shared pooler (reg) | Dedicated pooler (werk nie) |
+| --- | --- | --- |
+| host | eindig op `pooler.supabase.com` | `db.laootpvjfsrvllmxjzgu.supabase.co` |
+| user | `postgres.laootpvjfsrvllmxjzgu` | `postgres` |
+| port | `6543` | `6543` |
+
+Die **user** is die vinnigste toets. Staan daar net `postgres`, is dit die
+verkeerde een.
+
+---
+
+### Stap C · Vercel
+
+1. Vercel → `vibefy-web` → Settings → **Environment Variables**
+2. `SUPABASE_DB_URL` → **⋯** → Edit → vervang die hele waarde met die shared
+   pooler-string, met die wagwoord ingevul (geen `[` `]` oor nie)
+3. Production, Preview, Development almal gemerk → **Save**
+4. **Deployments → boonste → ⋯ → Redeploy**, "Use existing Build Cache" ongemerk
+
+'n Nuwe waarde raak nooit 'n bestaande ontplooiing nie. Sonder die redeploy
+gebeur niks.
+
+---
+
+### Toets
+
+In 'n privaat venster:
 
 ```
-getaddrinfo ENOTFOUND db.laootpvjfsrvllmxjzgu.supabase.co
+https://vibefycode.com/badge/nonexistent-test-id.svg
 ```
 
-`SUPABASE_DB_URL` is die **direkte** gasheer. Dié gasheer publiseer geen
-IPv4-adres nie en Vercel se funksies kan nie oor IPv6 uitgaan nie, so die adres
-word nie eers opgesoek nie. Elke navraag misluk voordat enige wagwoord gebruik
-word.
+- **Badge wat "revoked" sê** → klaar. Gaan na stap 1b.
+- **Grys raampie** → Vercel → Logs (tyd-kieser op **Live**) → tref die bladsy
+  weer → klik die `/badge/...`-reël → maak die **Logs**-paneel onder oop.
 
-### Kry die regte string
+Die boodskap daar is nou 'n vol sin wat sê wat om te verander. Sy drie vorms:
 
-1. Supabase → Settings → Database → **Connection string**
-2. Bo-aan die boks is keuses: **Direct connection** · **Transaction pooler** ·
-   **Session pooler**. Dit kan ook 'n aftrek-lysie wees wat "Direct connection"
-   sê.
-3. **Klik "Transaction pooler".** Die paneel wys standaard die direkte een — dit
-   is die hele strik.
-4. Kopieer dié een.
+| Begin met | Beteken |
+| --- | --- |
+| `...which is the dedicated pooler` | Nog die verkeerde pooler — terug stap B |
+| `...uses the pooler host but the username "postgres"` | Shared pooler, verkeerde gebruikersnaam |
+| `...still contains [YOUR-PASSWORD]` | Die plekhouer is nie vervang nie |
+| `circuit breaker` of `too many authentication failures` | Render hamer nog — terug stap A |
 
-Die string moet al drie hê:
+### Nooit nodig nie
 
-| Deel          | Moet wees                                 |
-| ------------- | ----------------------------------------- |
-| Gebruikersnaam | `postgres.laootpvjfsrvllmxjzgu` — met die punt |
-| Gasheer       | bevat `pooler.supabase.com`               |
-| Poort         | `6543`                                    |
+- Die wagwoord weer reset. Dit was nooit die probleem nie.
+- Die **Enable IPv4 add-on** koop. Dit sou werk en dit kos maandeliks; die
+  gedeelde pooler is gratis en doen dieselfde.
+- Enigiets in die kode verander.
 
-Bevat dit nog `db.laootpvjfsrvllmxjzgu.supabase.co`, is dit die verkeerde een.
-
-### Die wagwoord
-
-Die databasis het sy eie wagwoord, gestel toe die projek geskep is. Dit is
-**nie** jou Supabase-, GitHub- of Google-aanmelding nie. Supabase wys dit nooit
-— daarom staan daar `[YOUR-PASSWORD]`.
-
-Onseker? Settings → Database → **Reset database password**, en kies een met net
-letters en syfers. Dan is daar niks om te omskakel nie.
-
-Bevat die wagwoord `@`, `:`, `/`, `?`, `#`, `%`, `&` of 'n spasie, moet dit
-omgeskakel word (`@` word `%40`, ensovoorts). Daar moet presies **een** `@` in
-die hele string wees, net voor die gasheer.
-
-'n Nuwe wagwoord moet op **twee** plekke in: Vercel én Render.
-
-### Sit dit in
-
-1. Vercel → Settings → Environment Variables → `SUPABASE_DB_URL` → **Edit**
-2. Vervang die hele waarde. Vervang `[YOUR-PASSWORD]` — hakkies en al.
-3. Production, Preview en Development almal gemerk → **Save**
-4. Ook `NEXT_PUBLIC_SITE_URL` = `https://vibefycode.com`
-5. **Deployments → boonste → `⋯` → Redeploy**
-
-**Klaar as:** die badge is terug op futurebox.
-
-### Hoe jy nagaan of dit gewerk het
-
-Ek kan nie van my omgewing af by vibefycode.com uitkom nie — die netwerkbeleid
-blokkeer dit. Jy moet dit meet. Drie dinge, in hierdie volgorde:
-
-1. **Maak https://vibefycode.com oop.**
-   - Laai → die ontplooiing is gesond.
-   - "Application error" of 500 → die app bou nie, nie die databasis nie.
-
-2. **Maak https://vibefycode.com/directory oop.** Dit lees die databasis.
-   - Laai, selfs leeg → die konneksiestring werk.
-   - 500 of 'n fout → `SUPABASE_DB_URL` is steeds verkeerd.
-
-3. **Maak die futurebox-bladsy oop** waar die badge was.
-   - Badge wys → klaar.
-   - Grys raampie wat "status unavailable" sê → die app leef maar die databasis
-     antwoord nie. Dis die konneksiestring.
-   - Net woorde, geen prentjie → die roete self antwoord nie. Sê my.
-
-Sê my net watter van die drie breek, en by watter stap. Dan weet ek presies
-waar om te kyk.
+---
 
 ## 1b · Futurebox — die embed wys na 'n dooie adres
 
