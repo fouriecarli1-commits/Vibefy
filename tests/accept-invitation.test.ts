@@ -62,7 +62,7 @@ afterAll(async () => {
   await db?.end();
 });
 
-const accept = async (userId: string, token: string, aal: 'aal1' | 'aal2' = 'aal1') => {
+const accept = async (userId: string | null, token: string, aal: 'aal1' | 'aal2' = 'aal1') => {
   try {
     await db.query('begin');
     await db.query('select set_config($1, $2, true)', [
@@ -153,6 +153,25 @@ describe('the refusals, in the words a person reads', () => {
     });
     const result = await accept(guest.userId, token);
     expect(!result.ok && result.message).toMatch(/expired on \d{4}-\d{2}-\d{2}/);
+  });
+
+  it('refuses a caller with no session, and tells them to sign in', async () => {
+    /*
+     * `if caller is null then` was the one guard in this function that nothing
+     * watched. Measured: opening it alone left all 2135 tests green.
+     *
+     * It is not an access hole — with the guard gone, `caller_email` comes back
+     * null and the address comparison below refuses anyway. It is a sentence,
+     * and the sentence is the whole reason this function exists rather than a
+     * set of policies. Without it a signed-out person is told the invitation
+     * was "sent to a different address", which is true of no address they have
+     * and sends them to ask a colleague to re-invite a link that was fine.
+     */
+    const guest = await seedAccount(db, 'accept-signed-out');
+    const token = await invite(guest.email);
+    const result = await accept(null, token);
+    expect(!result.ok && result.message).toMatch(/sign in/i);
+    expect(!result.ok && result.message).not.toMatch(/different address/i);
   });
 
   it('refuses somebody the link was forwarded to, without naming the addressee', async () => {

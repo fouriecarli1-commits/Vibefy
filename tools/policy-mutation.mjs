@@ -16,11 +16,12 @@
  * suite, and read the failures. Every policy in the class whose loss nothing
  * notices is a hole in the tests, not in the schema. Then delete the file.
  *
- * Three classes, because the failures are different:
+ * Four classes, because the failures are different:
  *
  *     node tools/policy-mutation.mjs reads    > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs writes   > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs triggers > supabase/migrations/29999999999999_mutate.sql
+ *     node tools/policy-mutation.mjs definers > supabase/migrations/29999999999999_mutate.sql
  *
  * `reads` opens every policy that scopes a select to a membership or to a
  * person: a hole there means one customer reading another's findings. `writes`
@@ -101,6 +102,83 @@ const CLASSES = {
           order by c.relname, t.tgname`,
     alter: (row) => `alter table public.${row.tablename} disable trigger ${row.policyname};`,
   },
+  definers: {
+    /*
+     * The authority check inside a `security definer` function.
+     *
+     * These run as the function's owner, which bypasses row-level security
+     * altogether — that is what they are for. So every policy measured by the
+     * three classes above is irrelevant inside one, and the guard at the top is
+     * the whole of the access control:
+     *
+     *     if not public.is_reviewer() then
+     *       raise exception 'Only a VibefyCode reviewer may ...';
+     *     end if;
+     *
+     * The mutation turns each such condition into `if false then`, which leaves
+     * the function doing exactly its job for a caller who should never have been
+     * able to ask. Everything else in the body is left alone, so a failure names
+     * the guard rather than the function.
+     */
+    sql: `select p.oid, p.proname, pg_get_functiondef(p.oid) as definition
+           from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.prosecdef
+            and pg_get_functiondef(p.oid) ilike '%raise exception%'
+            and (pg_get_functiondef(p.oid) ilike '%is_reviewer%'
+                 or pg_get_functiondef(p.oid) ilike '%is_platform_admin%'
+                 or pg_get_functiondef(p.oid) ilike '%is_org_admin%'
+                 or pg_get_functiondef(p.oid) ilike '%is_org_member%'
+                 or pg_get_functiondef(p.oid) ilike '%auth.uid()%')
+          order by p.proname`,
+    /*
+     * Rewrites the whole definition rather than patching it in place, because
+     * there is no `alter function ... set body` and a half-applied edit to a
+     * definer function is the worst thing this tool could leave behind.
+     *
+     * A guard is opened when either half of this schema's two spellings
+     * applies, and the first version of this class knew only one of them:
+     *
+     *   · the condition names an authority — `if not public.is_reviewer()`;
+     *   · or the `raise` inside it carries `insufficient_privilege`, which is
+     *     the errcode this schema uses for "you may not".
+     *
+     * The second was added after the first run reported "4 found" and mutated
+     * two. `accept_invitation` guards itself with `if caller is null` and with
+     * an address comparison, which is the function's whole point — a forwarded
+     * link must not work for whoever received it — and neither is an `if not`.
+     * A class that skips the guard it cannot phrase, and prints a clean result,
+     * is the defect this tool exists to find, committed by the tool.
+     *
+     * Everything else in the body is left exactly as it was, so a failure names
+     * the guard rather than the function. A check that is not about who is
+     * calling — `if previous is null then raise ... no_data_found` — is not
+     * touched.
+     */
+    alter: (row) => {
+      let opened = 0;
+      const neutralised = row.definition.replace(
+        // A line comment between `then` and the `raise` is ordinary in this
+        // schema — several guards explain themselves there, and the email
+        // comparison in `accept_invitation` is one — so it is skipped rather
+        // than treated as a different shape.
+        /\bif\s+(.+?)\s+then\s*((?:--[^\n]*\n\s*)*raise\s+exception[\s\S]*?;)\s*end\s+if\s*;/gi,
+        (whole, condition, raised) => {
+          const aboutTheCaller =
+            /is_reviewer|is_platform_admin|is_org_admin|is_org_member|auth\.uid\(\)|\bcaller\b/i.test(
+              condition,
+            ) || /insufficient_privilege/i.test(raised);
+          if (!aboutTheCaller) return whole;
+          opened += 1;
+          return `if false then ${raised} end if;`;
+        },
+      );
+      if (opened === 0) {
+        return `-- UNMUTATED ${row.proname}: no guard this class knows how to open. Read it by hand.`;
+      }
+      return `-- ${row.proname}: ${opened} guard(s) opened.\n${neutralised};`;
+    },
+  },
 };
 
 const which = process.argv[2] ?? 'reads';
@@ -135,6 +213,22 @@ const LABEL = {
   reads: 'read-scoping policies opened',
   writes: 'own-name with-check clauses opened',
   triggers: 'assertion triggers disabled',
+  definers: 'security definer functions found; their authority checks opened',
 };
 console.log(`-- ${rows.length} ${LABEL[which]}.`);
-for (const row of rows) console.log(chosen.alter(row));
+const statements = rows.map((row) => chosen.alter(row));
+for (const statement of statements) console.log(statement);
+
+/*
+ * An unmutated row is not a clean result.
+ *
+ * The first `definers` run printed "4 security definer functions found" and
+ * silently left two of them alone, which reads as "four were measured". Said
+ * at the end as well as inline, because the inline note scrolls away under a
+ * function definition and the count at the top is the line people quote.
+ */
+const skipped = statements.filter((statement) => statement.startsWith('-- UNMUTATED'));
+if (skipped.length > 0) {
+  console.log(`-- ${skipped.length} of ${rows.length} were NOT mutated and are NOT measured by this run:`);
+  for (const statement of skipped) console.log(`--   ${statement.replace('-- UNMUTATED ', '')}`);
+}
