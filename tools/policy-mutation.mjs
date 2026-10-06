@@ -21,7 +21,8 @@
  *     node tools/policy-mutation.mjs reads    > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs writes   > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs triggers > supabase/migrations/29999999999999_mutate.sql
- *     node tools/policy-mutation.mjs definers > supabase/migrations/29999999999999_mutate.sql
+ *     node tools/policy-mutation.mjs definers  > supabase/migrations/29999999999999_mutate.sql
+ *     node tools/policy-mutation.mjs recorders > supabase/migrations/29999999999999_mutate.sql
  *
  * `reads` opens every policy that scopes a select to a membership or to a
  * person: a hole there means one customer reading another's findings. `writes`
@@ -99,6 +100,31 @@ const CLASSES = {
            join pg_proc p on p.oid = t.tgfoid
           where n.nspname = 'public' and not t.tgisinternal
             and pg_get_functiondef(p.oid) ilike '%raise exception%'
+          order by c.relname, t.tgname`,
+    alter: (row) => `alter table public.${row.tablename} disable trigger ${row.policyname};`,
+  },
+  recorders: {
+    /*
+     * The triggers that write rather than refuse.
+     *
+     * `triggers` selects on `raise exception`, which is the right definition
+     * for the rules that make illegal states impossible — and it means a
+     * trigger whose whole job is to *record* something was in no class at all.
+     * The two that set a statutory deadline, the one that writes a badge's
+     * lifecycle to an append-only log, the one that records a refusal at
+     * intake: each is a promise the product publishes, and none of them raises.
+     *
+     * Expect `set_updated_at` to make up most of the list and most of the
+     * silence. That is not a hole worth closing; the four substantive ones are
+     * what this is for, and they are easy to pick out by name.
+     */
+    sql: `select c.relname as tablename, t.tgname as policyname
+           from pg_trigger t
+           join pg_class c on c.oid = t.tgrelid
+           join pg_namespace n on n.oid = c.relnamespace
+           join pg_proc p on p.oid = t.tgfoid
+          where n.nspname = 'public' and not t.tgisinternal
+            and pg_get_functiondef(p.oid) not ilike '%raise exception%'
           order by c.relname, t.tgname`,
     alter: (row) => `alter table public.${row.tablename} disable trigger ${row.policyname};`,
   },
@@ -214,6 +240,7 @@ const LABEL = {
   writes: 'own-name with-check clauses opened',
   triggers: 'assertion triggers disabled',
   definers: 'security definer functions found; their authority checks opened',
+  recorders: 'recording triggers disabled',
 };
 console.log(`-- ${rows.length} ${LABEL[which]}.`);
 const statements = rows.map((row) => chosen.alter(row));
@@ -229,6 +256,8 @@ for (const statement of statements) console.log(statement);
  */
 const skipped = statements.filter((statement) => statement.startsWith('-- UNMUTATED'));
 if (skipped.length > 0) {
-  console.log(`-- ${skipped.length} of ${rows.length} were NOT mutated and are NOT measured by this run:`);
+  console.log(
+    `-- ${skipped.length} of ${rows.length} were NOT mutated and are NOT measured by this run:`,
+  );
   for (const statement of skipped) console.log(`--   ${statement.replace('-- UNMUTATED ', '')}`);
 }
