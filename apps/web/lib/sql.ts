@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
+import { whatIsWrongWithTheConnectionString } from './connection-string.ts';
 
 /**
  * Direct SQL, still under row-level security.
@@ -23,6 +24,21 @@ function getPool(): Pool {
       'SUPABASE_DB_URL is not set. The console needs it to read reports under the caller’s identity.',
     );
   }
+  /*
+   * Said here rather than left to `pg` to discover.
+   *
+   * `pg` reports what it met — `getaddrinfo ENOTFOUND db.<ref>.supabase.co`,
+   * or `password authentication failed for user "postgres"` — and both are
+   * true and neither says what to do. An outage on 2026-10-06 took four
+   * rounds of guess, deploy and wait for exactly that reason, and every one
+   * of those failures was visible in the string before a socket was opened.
+   *
+   * It throws rather than warns because every one of these means no query
+   * will succeed. The badge route catches it and serves the unavailable
+   * frame, so the message reaches the log and the visitor sees a picture.
+   */
+  const wrong = whatIsWrongWithTheConnectionString(connectionString);
+  if (wrong) throw new Error(wrong);
   pool = new Pool({ connectionString, max: 5, idleTimeoutMillis: 10_000 });
   return pool;
 }
