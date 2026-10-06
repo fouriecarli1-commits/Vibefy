@@ -37,6 +37,13 @@
 -- 1. A badge carries its assessment's score
 -- -----------------------------------------------------------------------------
 
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_score_is_not_pulled_from_under_a_badge')
+--
+-- Said rather than guessed. The first pattern that matches is
+-- `create or replace function public.assert_badge_is_earned`, which has
+-- existed since August — so the audit would have reported this migration
+-- as already applied, to somebody about to run eight of them by hand.
+
 create or replace function public.assert_badge_is_earned()
 returns trigger
 language plpgsql
