@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { priceIn } from '@vibefycode/billing';
 import { CEILINGS } from '@vibefycode/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { createClient } from '@/lib/supabase/server';
@@ -185,7 +186,9 @@ export default async function CostsPage() {
               {[...byDepth.entries()].map(([depth, stats]) => {
                 const mean = stats.total / stats.runs;
                 const tier = tierByDepth.get(depth);
-                const price = tier?.priceUsd ?? null;
+                // Through the billing package, so this table and the checkout
+                // cannot disagree about whether a tier has a dollar price.
+                const price = tier ? priceIn(tier, 'USD') : null;
                 const margin =
                   price === null ? null : price === 0 ? -mean : ((price - mean) / price) * 100;
                 return (

@@ -7,9 +7,11 @@ import {
   PLAN_TIERS,
   currencyForCountry,
   entitlementFor,
+  priceIn,
   usageMeters,
   type Currency,
   type PlanTier,
+  type PricedTier,
 } from '@vibefycode/billing';
 import { headers } from 'next/headers';
 import { startCheckout } from './actions';
@@ -51,8 +53,10 @@ export default async function BillingPage({
   const guessedCountry = headerList.get('x-vercel-ip-country');
   const billingCountry = (billed ?? guessedCountry ?? 'US').toUpperCase();
   const currency: Currency = currencyForCountry(billingCountry);
-  const priceOf = (tier: { priceUsd: number | null; priceZar: number | null }) =>
-    currency === 'ZAR' ? tier.priceZar : tier.priceUsd;
+  // The same rule the checkout applies, read rather than restated. It was
+  // spelled out here, in `plansPricedIn` and in `priceForPlan`, and two of the
+  // three had already drifted on whether an absent key is a price.
+  const priceOf = (tier: PricedTier) => priceIn(tier, currency);
   const priceLabel = (amount: number) =>
     new Intl.NumberFormat('en-GB', {
       style: 'currency',
@@ -352,7 +356,7 @@ export default async function BillingPage({
                       {app && <input type="hidden" name="appId" value={app} />}
                     </ActionForm>
                   )}
-                  {price === null && tier.priceUsd !== null && (
+                  {price === null && priceIn(tier, 'USD') !== null && (
                     // Sold elsewhere, not here. Said plainly rather than hidden,
                     // because a plan that vanishes when you change country looks
                     // like a bug.
