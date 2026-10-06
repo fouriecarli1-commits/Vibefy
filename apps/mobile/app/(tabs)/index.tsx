@@ -30,6 +30,16 @@ export default function ApplicationsScreen() {
   const router = useRouter();
   const [apps, setApps] = useState<AppSummary[] | null>(null);
   const [urgent, setUrgent] = useState<AlertSummary[]>([]);
+  /*
+   * Why the urgent list is empty, where it is empty for a reason.
+   *
+   * It was read through `.catch(() => [])`, so a failure showed no critical
+   * alerts and said nothing — on the screen whose comment says these are
+   * "surfaced on the screen they open, not left in a tab they have no reason
+   * to visit". The catch itself is right: a failed alert read must not blank
+   * the list of applications beside it. What was missing is the sentence.
+   */
+  const [alertsError, setAlertsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,7 +48,11 @@ export default function ApplicationsScreen() {
       setApps(await listApps(supabase));
       // Surfaced on the screen they open, not left in a tab they have no reason
       // to visit. A push notification only reaches someone who allowed them.
-      const alerts = await listAlerts(supabase, 20).catch(() => []);
+      const alerts = await listAlerts(supabase, 20).catch((cause: unknown) => {
+        setAlertsError(cause instanceof Error ? cause.message : String(cause));
+        return [] as AlertSummary[];
+      });
+      if (alerts.length > 0) setAlertsError(null);
       setUrgent(
         alerts.filter((alert) => alert.severity === 'critical' && !alert.readAt).slice(0, 3),
       );
@@ -76,6 +90,12 @@ export default function ApplicationsScreen() {
         ListHeaderComponent={
           <View style={{ gap: spacing.sm }}>
             {error && <Text style={styles.error}>{error}</Text>}
+            {alertsError !== null && (
+              <Text style={styles.error}>
+                Alerts could not be loaded, so anything urgent is not shown here. Pull down to try
+                again.
+              </Text>
+            )}
             {urgent.map((alert) => (
               <View
                 key={alert.alertId}

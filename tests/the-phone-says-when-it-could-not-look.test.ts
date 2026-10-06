@@ -41,6 +41,7 @@ const source = (path: string) =>
 
 const application = source('apps/mobile/app/application/[id].tsx');
 const report = source('apps/mobile/app/report/[assessmentId].tsx');
+const applications = source('apps/mobile/app/(tabs)/index.tsx');
 
 describe('the application screen', () => {
   it('tells apart loading, not there, and could not be read', () => {
@@ -71,5 +72,28 @@ describe('the report screen', () => {
     const read = /const \{[^}]*\} = await supabase\s*\n\s*\.from\('findings'\)/.exec(report);
     expect(read, 'the findings read moved or changed shape').not.toBeNull();
     expect(read![0]).toMatch(/error/);
+  });
+});
+
+describe('the list of applications', () => {
+  it('says so when the urgent alerts could not be read', () => {
+    /*
+     * This one keeps its catch, and should. A failed alert read must not blank
+     * the list of applications beside it, which is what the screen is for.
+     *
+     * What was missing is the sentence. The comment above that read says these
+     * are "surfaced on the screen they open, not left in a tab they have no
+     * reason to visit" — so showing none of them, silently, is the one outcome
+     * it was written to prevent.
+     */
+    expect(applications).toMatch(/alertsError/);
+    expect(applications).toMatch(/Alerts could not be loaded/i);
+  });
+
+  it('still shows the applications when only the alerts failed', () => {
+    // The catch stays, and the error state is separate from the one that
+    // governs the list itself.
+    expect(applications).toMatch(/\.catch\(/);
+    expect(applications).toMatch(/setApps\(/);
   });
 });
