@@ -7,6 +7,26 @@ Laas nagegaan 2026-10-06.
 
 ---
 
+## 0 · Stel die databasiswagwoord nuut
+
+Op 2026-10-06 het die wagwoord in 'n skermskoot in die gespreksvenster beland —
+Supabase se "Connect"-venster wys dit in gewone teks in die konneksiestring, en
+daardie skermskoot is gestuur.
+
+Niemand anders het dit gesien nie, en niks dui op misbruik nie. Maar 'n wagwoord
+wat buite 'n wagwoordbestuurder beland het, is nie meer 'n geheim nie, en die
+bouopdrag se eie reël is dat ons nie die diens kan wees wat geloofsbriewe lek nie.
+
+Supabase → Settings → Database → **Reset database password**. Kies een met net
+letters en syfers.
+
+Daarna gaan dit op twee plekke in: Vercel en Render, soos in stap A en C hieronder.
+Doen hierdie eerste, dan is daar net een rondte.
+
+**Klaar as:** die nuwe wagwoord is in 'n wagwoordbestuurder, en in albei panele.
+
+---
+
 ## 1 · Die badge — drie stappe
 
 Op 2026-10-06 uitgepluis tot op die bodem. Geen raaiwerk oor nie.
