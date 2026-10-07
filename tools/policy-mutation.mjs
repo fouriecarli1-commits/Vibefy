@@ -24,6 +24,7 @@
  *     node tools/policy-mutation.mjs definers  > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs recorders > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs checks    > supabase/migrations/29999999999999_mutate.sql
+ *     node tools/policy-mutation.mjs uniques   > supabase/migrations/29999999999999_mutate.sql
  *
  * `reads` opens every policy that scopes a select to a membership or to a
  * person: a hole there means one customer reading another's findings. `writes`
@@ -132,6 +133,49 @@ const CLASSES = {
           order by c.relname, con.conname`,
     alter: (row) =>
       `alter table public.${row.tablename} drop constraint if exists ${row.policyname};`,
+  },
+  uniques: {
+    /*
+     * The uniqueness rules, which are the other half of the layer with no code.
+     *
+     * `checks` refuses a row whose own columns are wrong. A unique index refuses
+     * a row because of a row that is already there, which is how this schema
+     * says "only one of these may be live": one active badge per application,
+     * one live authorisation superseding another, one live invitation per email
+     * address, one default policy profile, one live spend pause — the worker's
+     * own comment leans on that one in as many words, "the partial unique index
+     * means two workers crossing the line at once produce one pause, not two".
+     *
+     * And the idempotency ones, which are the same rule pointed at somebody
+     * else's retries: a provider event id, an invoice, a subscription, an alert
+     * dedupe key. Dropping one of those does not corrupt a row; it lets a
+     * replayed webhook be applied twice.
+     *
+     * Primary keys are left alone. They are the shape of a table rather than a
+     * rule about it, and dropping them fails everything at once, which drowns
+     * what this is looking for — the same reason `checks` leaves not-null
+     * constraints out.
+     *
+     * A unique index may be backed by a constraint or stand on its own, so the
+     * mutation has to try both and swallow the one that does not apply.
+     */
+    sql: `select c.relname as tablename, i.relname as policyname,
+                 exists (
+                   select 1 from pg_constraint con
+                    where con.conindid = idx.indexrelid
+                 ) as from_constraint
+            from pg_index idx
+            join pg_class i on i.oid = idx.indexrelid
+            join pg_class c on c.oid = idx.indrelid
+            join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public'
+             and idx.indisunique
+             and not idx.indisprimary
+           order by c.relname, i.relname`,
+    alter: (row) =>
+      row.from_constraint
+        ? `alter table public.${row.tablename} drop constraint if exists ${row.policyname};`
+        : `drop index if exists public.${row.policyname};`,
   },
   recorders: {
     /*
@@ -272,7 +316,14 @@ const LABEL = {
   definers: 'security definer functions found; their authority checks opened',
   recorders: 'recording triggers disabled',
   checks: 'check constraints dropped',
+  uniques: 'uniqueness rules dropped',
 };
+// A class added without a label printed "26 undefined.", which is a header
+// somebody would paste into a decision entry.
+if (!LABEL[which]) {
+  console.error(`No label for class "${which}". Add one to LABEL in this file.`);
+  process.exit(1);
+}
 console.log(`-- ${rows.length} ${LABEL[which]}.`);
 const statements = rows.map((row) => chosen.alter(row));
 for (const statement of statements) console.log(statement);
