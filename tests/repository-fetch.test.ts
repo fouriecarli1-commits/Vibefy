@@ -14,7 +14,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -263,5 +263,74 @@ describe('the assessment that reads it', () => {
     expect(source).toMatch(/repositoryPath: repository\?\.path \?\? null/);
     // Decision 008. In a `finally`, so a run that throws still takes it away.
     expect(source).toMatch(/} finally \{[\s\S]{0,400}?await repository\?\.dispose\(\);/);
+  });
+});
+
+/**
+ * The one place this product runs a subprocess with a customer's string in it.
+ *
+ * `clone` spawns `git` with no shell, so there is no shell injection to have.
+ * What there is, is argument injection: `git` reads anything beginning with a
+ * dash as a flag, and `--upload-pack=<command>` makes it run one.
+ *
+ * `repositoryUrlOrRefuse` already stops it, and that was worth measuring rather
+ * than assuming: `new URL('-upload-pack=touch /tmp/pwned')` throws, so the
+ * refusal is "it is not a URL". True, and incidental — the safety rested on a
+ * parser's behaviour rather than on a rule. `git clone` offers the rule for one
+ * token, so the arguments now carry `--` and everything after it is a path
+ * whatever it starts with.
+ *
+ * `ext::sh -c id` is the shape worth knowing about separately. It *does* parse,
+ * as protocol `ext:`, and `ext` is a git transport that executes its argument.
+ * The https check refuses it, and nothing said so until now.
+ */
+describe('the subprocess boundary', () => {
+  const refuses = (url: string) => {
+    try {
+      repositoryUrlOrRefuse(url);
+      return null;
+    } catch (error) {
+      return error instanceof RepositoryRefusedError ? error.reason : String(error);
+    }
+  };
+
+  it('refuses a string that git would read as a flag', () => {
+    expect(refuses('-upload-pack=touch /tmp/pwned')).toMatch(/not a URL/);
+    expect(refuses('--config=core.sshCommand=id')).toMatch(/not a URL/);
+  });
+
+  it('refuses git’s own transports, which do parse as URLs', () => {
+    // `ext` runs its argument as a command; `ssh` and `git` reach a network we
+    // did not authorise. All three are refused by the scheme check rather than
+    // by anything about dashes.
+    expect(refuses('ext::sh -c id')).toMatch(/only https/);
+    expect(refuses('git://github.com/owner/repo')).toMatch(/only https/);
+  });
+
+  it('passes the URL after a double dash, so a flag is impossible rather than unreachable', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'packages/engine/src/runtime/repository.ts'),
+      'utf8',
+    )
+      // The comment beside it quotes the attack.
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/^[ \t]*\/\/.*$/gm, ' ');
+    const args = /'--recurse-submodules=no',[\s\S]{0,400}?path,/.exec(source)?.[0] ?? '';
+    expect(args).toContain("'--',");
+    expect(args.indexOf("'--',")).toBeLessThan(args.indexOf('url,'));
+  });
+
+  it('still hands git nothing from our own environment but a path and a home', () => {
+    // Six variables, named. Handing it `process.env` would hand it every secret
+    // in the runner, which PART 6.2 forbids in as many words.
+    const source = readFileSync(
+      join(process.cwd(), 'packages/engine/src/runtime/repository.ts'),
+      'utf8',
+    );
+    expect(source).toContain("GIT_TERMINAL_PROMPT: '0'");
+    expect(source).toContain("GIT_ASKPASS: '/bin/false'");
+    expect(source).toContain("GIT_CONFIG_NOSYSTEM: '1'");
+    expect(source).toContain("GIT_CONFIG_GLOBAL: '/dev/null'");
+    expect(source).not.toContain('...process.env');
   });
 });

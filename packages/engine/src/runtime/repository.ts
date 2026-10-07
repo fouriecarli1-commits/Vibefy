@@ -209,6 +209,16 @@ function clone(
         // Submodules are other people's repositories at other people's URLs,
         // and none of them is the one the customer declared.
         '--recurse-submodules=no',
+        // Everything after this is a path, never a flag.
+        //
+        // `url` has already been through `repositoryUrlOrRefuse`, so a string
+        // beginning with a dash cannot reach here: `new URL('-upload-pack=…')`
+        // throws and the refusal is "it is not a URL". That is true and it is
+        // incidental — the safety rests on a parser's behaviour rather than on
+        // a rule, and `git clone` offers the rule for one token. `ext::sh -c id`
+        // is the other shape worth knowing about: it *does* parse, as protocol
+        // `ext:`, and is refused by the https check.
+        '--',
         url,
         path,
       ],
