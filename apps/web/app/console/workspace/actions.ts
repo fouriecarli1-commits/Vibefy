@@ -357,10 +357,18 @@ export async function savePolicyProfile(
     created_by: user.id,
   };
 
-  const { error } = profileId
-    ? await supabase.from('policy_profiles').update(row).eq('id', profileId)
-    : await supabase.from('policy_profiles').insert(row);
+  // Asked for on both branches. "Saved" is the whole notice, and an update
+  // that matched nothing is not an error.
+  const { data: saved, error } = profileId
+    ? await supabase
+        .from('policy_profiles')
+        .update(row)
+        .eq('id', profileId)
+        .select('id')
+        .maybeSingle()
+    : await supabase.from('policy_profiles').insert(row).select('id').maybeSingle();
   if (error) return { error: error.message };
+  if (!saved) return { error: 'That profile was not saved. It is not one you can change.' };
 
   revalidatePath(`/console/workspace/${organisationId}/policies`);
   return {
@@ -405,11 +413,16 @@ export async function assignPolicyProfile(
 
   const appId = String(formData.get('appId') ?? '');
   const profileId = String(formData.get('profileId') ?? '');
-  const { error } = await supabase
+  const { data: applied, error } = await supabase
     .from('apps')
     .update({ policy_profile_id: profileId || null })
-    .eq('id', appId);
+    .eq('id', appId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  // A profile decides whether an application passes a workspace's own floors,
+  // so "applied" and "removed" are both statements somebody acts on.
+  if (!applied) return { error: 'That application was not changed.' };
 
   revalidatePath(`/console/apps/${appId}`);
   return { notice: profileId ? 'Profile applied.' : 'Profile removed.' };
@@ -559,11 +572,16 @@ export async function verifySsoDomain(
     return { error: outcome.detail };
   }
 
-  const { error } = await supabase
+  // `setSsoEnforcement` below has always asked; this one did not, and the two
+  // decide the same thing between them.
+  const { data: verified, error } = await supabase
     .from('sso_connections')
     .update({ domain_verified_at: new Date().toISOString() })
-    .eq('id', connectionId);
+    .eq('id', connectionId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!verified) return { error: 'You are not permitted to change that connection.' };
 
   revalidatePath(`/console/workspace/${connection.organisation_id}/sso`);
   return {

@@ -48,7 +48,7 @@ export async function approveSponsorship(
   const note = String(formData.get('note') ?? '').trim();
   if (!id) return { error: 'No placement was named.' };
 
-  const { error } = await supabase
+  const { data: approved, error } = await supabase
     .from('sponsorships')
     .update({
       status: 'live',
@@ -56,10 +56,15 @@ export async function approveSponsorship(
       reviewed_at: new Date().toISOString(),
       review_note: note || 'Approved.',
     })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
   // The one-per-surface trigger speaks in English on purpose; a customer-facing
   // sentence about an overlapping period is more useful than "unique_violation".
   if (error) return { error: error.message };
+  // An update that matched nothing is not an error, and "live" is a statement
+  // about what is on the directory.
+  if (!approved) return { error: 'That placement was not changed. It may already be decided.' };
 
   revalidatePath('/admin/sponsorships');
   return { notice: 'That placement is live.' };
@@ -83,7 +88,7 @@ export async function rejectSponsorship(
     };
   }
 
-  const { error } = await supabase
+  const { data: rejected, error } = await supabase
     .from('sponsorships')
     .update({
       status: 'rejected',
@@ -91,8 +96,11 @@ export async function rejectSponsorship(
       reviewed_at: new Date().toISOString(),
       review_note: note,
     })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!rejected) return { error: 'That placement was not changed. It may already be decided.' };
 
   revalidatePath('/admin/sponsorships');
   return { notice: 'Turned down, with the reason recorded.' };
@@ -109,8 +117,14 @@ export async function endSponsorship(
   const id = String(formData.get('id') ?? '');
   if (!id) return { error: 'No placement was named.' };
 
-  const { error } = await supabase.from('sponsorships').update({ status: 'ended' }).eq('id', id);
+  const { data: ended, error } = await supabase
+    .from('sponsorships')
+    .update({ status: 'ended' })
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!ended) return { error: 'That placement was not changed. It may already be ended.' };
 
   revalidatePath('/admin/sponsorships');
   return { notice: 'That placement has been taken down.' };

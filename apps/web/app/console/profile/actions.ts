@@ -96,12 +96,18 @@ export async function setBuilderProfilePublished(
   const organisationId = String(formData.get('organisationId') ?? '');
   const published = String(formData.get('published') ?? '') === 'true';
 
-  const { error } = await supabase
+  // The changed row, asked for. The two sentences below are about what
+  // anybody holding the address can read, and an update that matched nothing
+  // is not an error.
+  const { data: changed, error } = await supabase
     .from('builder_profiles')
     .update({ published })
-    .eq('organisation_id', organisationId);
+    .eq('organisation_id', organisationId)
+    .select('handle')
+    .maybeSingle();
 
   if (error) return { error: `That could not be changed: ${error.message}` };
+  if (!changed) return { error: 'That page is not yours to change, so nothing was changed.' };
 
   revalidatePath('/console/profile');
   return {

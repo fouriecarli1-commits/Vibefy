@@ -98,15 +98,24 @@ export async function setPlan(_previous: ActionState, formData: FormData): Promi
     return { notice: `That workspace is already on ${plan}.` };
   }
 
+  // Asked for on both branches: an update that matched nothing is not an
+  // error, and the notice below states the plan, the depth and the spend
+  // ceiling this workspace now runs under.
   const write = existing
     ? await supabase
         .from('subscriptions')
         .update({ plan, status: 'active' })
         .eq('id', existing.id as string)
+        .select('id')
+        .maybeSingle()
     : await supabase
         .from('subscriptions')
-        .insert({ organisation_id: organisationId, plan, status: 'active' });
+        .insert({ organisation_id: organisationId, plan, status: 'active' })
+        .select('id')
+        .maybeSingle();
   if (write.error) return { error: write.error.message };
+  if (!write.data)
+    return { error: 'That workspace was not changed, so its plan stands as it was.' };
 
   const entitlement = entitlementFor(plan);
   const { ip, userAgent } = await requestContext();

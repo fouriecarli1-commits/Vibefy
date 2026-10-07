@@ -53,11 +53,28 @@ export async function revokeBadge(
     };
   }
 
-  const { error } = await context.supabase
+  /*
+   * The changed row, asked for.
+   *
+   * An update that matches nothing is not an error — row-level security
+   * filters the rows the statement can see rather than refusing it — and the
+   * sentence below is the most consequential this product can say to a
+   * reviewer: that a mark has stopped reading as verified everywhere it is
+   * displayed. Said about a badge that was not touched, it leaves a live mark
+   * on somebody's website and a reviewer who believes it is gone.
+   */
+  const { data: revoked, error } = await context.supabase
     .from('badges')
     .update({ status: 'revoked', revoked_at: new Date().toISOString(), revocation_reason: reason })
-    .eq('id', badgeId);
+    .eq('id', badgeId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!revoked)
+    return {
+      error:
+        'That badge was not changed. It may already be revoked, or it is not one you can act on.',
+    };
 
   revalidatePath('/review/badges');
   return {
@@ -77,15 +94,22 @@ export async function suspendBadge(
   const reason = String(formData.get('reason') ?? '').trim();
   if (reason.length < 10) return { error: 'Say why, in a sentence.' };
 
-  const { error } = await context.supabase
+  const { data: suspended, error } = await context.supabase
     .from('badges')
     .update({
       status: 'suspended',
       suspended_at: new Date().toISOString(),
       suspension_reason: reason,
     })
-    .eq('id', badgeId);
+    .eq('id', badgeId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!suspended)
+    return {
+      error:
+        'That badge was not changed. It may already be suspended, or it is not one you can act on.',
+    };
 
   revalidatePath('/review/badges');
   return {
@@ -101,11 +125,18 @@ export async function reinstateBadge(
   if ('error' in context) return { error: context.error };
 
   const badgeId = String(formData.get('badgeId') ?? '');
-  const { error } = await context.supabase
+  const { data: reinstated, error } = await context.supabase
     .from('badges')
     .update({ status: 'active', suspended_at: null, suspension_reason: null })
-    .eq('id', badgeId);
+    .eq('id', badgeId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!reinstated)
+    return {
+      error:
+        'That badge was not changed. It may already be active, or it is not one you can act on.',
+    };
 
   revalidatePath('/review/badges');
   return {

@@ -90,9 +90,17 @@ export async function setTrustPagePublished(
   const appId = String(formData.get('appId') ?? '');
   const published = String(formData.get('published') ?? '') === 'true';
 
-  const { error } = await supabase.from('trust_pages').update({ published }).eq('app_id', appId);
+  // The changed row, asked for: an update that matched nothing is not an
+  // error, and the sentence below says what a stranger can now see.
+  const { data: changed, error } = await supabase
+    .from('trust_pages')
+    .update({ published })
+    .eq('app_id', appId)
+    .select('app_id')
+    .maybeSingle();
 
   if (error) return { error: `That could not be changed: ${error.message}` };
+  if (!changed) return { error: 'That page is not yours to change, so nothing was changed.' };
 
   revalidatePath(`/console/apps/${appId}/trust`);
   return {

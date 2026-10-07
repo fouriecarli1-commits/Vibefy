@@ -73,19 +73,32 @@ export async function approveAssessment(
   });
   if (reviewError) return { error: reviewError.message };
 
-  const { error } = await supabase
+  /*
+   * The changed row, asked for.
+   *
+   * An update that matches nothing is not an error — row-level security
+   * filters the rows the statement can see rather than refusing it — and all
+   * three of these actions then say something to the reviewer about what the
+   * customer can now see. The review row is already written at this point, so
+   * a silent no-op leaves a review in the log and an assessment that never
+   * moved, which is the one state the gate below exists to make impossible.
+   */
+  const { data: approved, error } = await supabase
     .from('assessments')
     .update({
       status: 'approved',
       certification_eligible: certificationEligible,
       reviewed_at: new Date().toISOString(),
     })
-    .eq('id', assessmentId);
+    .eq('id', assessmentId)
+    .select('id')
+    .maybeSingle();
 
   // The certification gate is enforced in the database too, so a reviewer who
   // ticks the box on an assessment carrying a critical security finding is
   // refused rather than trusted.
   if (error) return { error: error.message };
+  if (!approved) return { error: 'That assessment was not changed, so it has not been approved.' };
 
   revalidatePath('/review');
   return { notice: 'Approved. The customer can see the report now.' };
@@ -130,11 +143,15 @@ export async function adjustAssessment(
   });
   if (reviewError) return { error: reviewError.message };
 
-  const { error } = await supabase
+  const { data: adjusted, error } = await supabase
     .from('assessments')
     .update({ overall_score: newScore, reviewed_at: new Date().toISOString() })
-    .eq('id', assessmentId);
+    .eq('id', assessmentId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!adjusted)
+    return { error: 'That assessment was not changed, so the score stands as it was.' };
 
   revalidatePath(`/review/${assessmentId}`);
   return { notice: 'Adjustment recorded, with your reason, permanently.' };
@@ -170,11 +187,14 @@ export async function rejectAssessment(
   });
   if (reviewError) return { error: reviewError.message };
 
-  const { error } = await supabase
+  const { data: rejected, error } = await supabase
     .from('assessments')
     .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
-    .eq('id', assessmentId);
+    .eq('id', assessmentId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!rejected) return { error: 'That assessment was not changed, so it has not been rejected.' };
 
   revalidatePath('/review');
   return { notice: 'Rejected, with your reason recorded. The customer can appeal.' };
