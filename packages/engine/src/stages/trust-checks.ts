@@ -330,6 +330,28 @@ export function trustFindings(
         'Publish an address a person actually reads, on a page a visitor can reach without an account. A no-reply address is not a contact route.',
       evidenceIds: evidence,
     });
+  } else if (measurements.contactOutcome === 'unclear') {
+    /*
+     * Not a finding, and not a pass either.
+     *
+     * `unclear` means nothing was found and something was ambiguous: a company
+     * name with no registration number, a string that might be a telephone
+     * number and might be a reference. That is the ordinary shape of a small
+     * company's landing page, and raising a finding on it would accuse
+     * somebody of what we could not establish.
+     *
+     * Silence would be worse. This file's own header says why: the
+     * verification page turns "no findings against this criterion" into a
+     * tick, so saying nothing publishes a pass on "can somebody reach a person
+     * here?" for a page where we could not tell. SEC-12 above was corrected
+     * for exactly this and said so in its note; PRI-07, one criterion along in
+     * the same file, was still doing it.
+     */
+    notTested.push({
+      criterion: 'PRI-07',
+      because:
+        'Something on the page points at a way to reach somebody — a company name, or a string that may be a telephone number — but none of it was definite enough to count as a route. Whether a visitor can actually reach a person here was not established.',
+    });
   }
 
   return { findings, notTested };
