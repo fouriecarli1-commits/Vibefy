@@ -80,7 +80,7 @@
       "requiresConsent": true,
       "consentDocumentType": "privacy_policy",
       "isDraft": true,
-      "sha256": "e050af724d9f4887c7190c88160a01785660c44bbb161a0a70e50efdb125bac3"
+      "sha256": "e998147ac7551b1a4c208bdac735ae3d1bba17f1dc3882a7f888b1dcd5dca35c"
     },
     "rating-methodology-and-independence.md": {
       "version": "1.1.0-draft",

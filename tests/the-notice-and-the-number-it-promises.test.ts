@@ -35,10 +35,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { RETENTION_DAYS } from '../packages/engine/src/runtime/evidence.ts';
 
-const policy = readFileSync(
-  join(import.meta.dirname, '..', 'legal/privacy-policy.md'),
-  'utf8',
-);
+const policy = readFileSync(join(import.meta.dirname, '..', 'legal/privacy-policy.md'), 'utf8');
 
 /** The retention cell of the row whose first cell names this text. */
 function retentionCellFor(what: string): string {
@@ -63,9 +60,9 @@ function daysIn(cell: string): number | null {
  * test in this file.
  */
 const NAMED_IN_THE_POLICY: Readonly<Record<keyof typeof RETENTION_DAYS, string>> = {
-  http_exchange: 'HTTP exchanges',
-  console_log: 'Console logs',
-  dom_snapshot: 'DOM snapshots',
+  http_exchange: 'HTTP exchanges from your application',
+  console_log: 'Console logs from your application',
+  dom_snapshot: 'DOM snapshots of your application',
   screenshot: 'Screenshots and browser traces',
   playwright_trace: 'Screenshots and browser traces',
   header_scan: 'Header scans, dependency reports',
@@ -77,7 +74,7 @@ const NAMED_IN_THE_POLICY: Readonly<Record<keyof typeof RETENTION_DAYS, string>>
 describe('what the Privacy Policy promises about each kind', () => {
   it('is a document this test can read, with a retention column', () => {
     expect(policy).toContain('for how long');
-    expect(daysIn(retentionCellFor('HTTP exchanges'))).not.toBeNull();
+    expect(daysIn(retentionCellFor('HTTP exchanges from your application'))).not.toBeNull();
   });
 
   for (const [kind, named] of Object.entries(NAMED_IN_THE_POLICY) as [
