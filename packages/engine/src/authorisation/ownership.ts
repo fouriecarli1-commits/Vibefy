@@ -175,7 +175,41 @@ export async function verifyWellKnownFile(
     };
   }
 
-  const addresses = await lookup(host, { all: true }).catch(() => []);
+  /*
+   * Whose fault it is, in the sentence the customer reads.
+   *
+   * This was `.catch(() => [])` into a zero-length check, so every way a
+   * lookup can fail came out as "`host` does not resolve" — a statement about
+   * their DNS drawn from a failure that may be entirely ours: a resolver that
+   * timed out, a nameserver that answered SERVFAIL, no network at all. The
+   * outcome is the same either way and correctly so, because an unverified host
+   * must not be tested; what is not the same is where they go to fix it, and
+   * sending somebody to their registrar over our own timeout costs them an
+   * afternoon.
+   *
+   * `verifyDnsTxt`, forty lines up, already says "No TXT records could be read
+   * for ${host}: ${message}". The two were written together and only one of
+   * them said what happened.
+   */
+  let addresses: { address: string }[];
+  try {
+    addresses = await lookup(host, { all: true });
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    // ENOTFOUND and NXDOMAIN are the host's answer: there is no such name.
+    // Everything else is the lookup itself failing, and says so.
+    const theirs = code === 'ENOTFOUND' || code === 'NXDOMAIN' || code === 'ENODATA';
+    return {
+      verified: false,
+      method: 'well_known_file',
+      host,
+      checkedAt,
+      detail: theirs
+        ? `${host} does not resolve.`
+        : `${host} could not be looked up (${code ?? (error instanceof Error ? error.message : String(error))}), so whether it resolves was not established. This is on our side or the network between us, not necessarily yours.`,
+      observed: [],
+    };
+  }
   if (addresses.length === 0) {
     return {
       verified: false,
