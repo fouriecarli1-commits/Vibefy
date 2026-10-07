@@ -3,7 +3,15 @@
 Alles wat op jou wag, in volgorde. Niks hiervan kan ek vir jou doen nie — ek het
 nie toegang tot Vercel, Supabase, Render of Resend nie.
 
-Laas nagegaan 2026-10-06.
+Laas nagegaan 2026-10-07.
+
+> **Hoekom dit nou dringender is.** Solank die databasis onbereikbaar is, sê
+> `/verify` vir enigiemand wat 'n kliënt se badge natrek: _"VibefyCode has never
+> issued that badge — treat the mark as unverified"_, met 'n skakel om dit te
+> rapporteer. Dit was 'n `.catch(() => null)` wat "die lees het misluk" en "so 'n
+> badge bestaan nie" dieselfde ding gemaak het. Die kode is reg — dit sê nou dat
+> dit 'n fout aan ons kant is en dat niks vasgestel is nie — maar dit help eers
+> wanneer jy stap 3 hieronder doen en Vercel herontplooi.
 
 ---
 
