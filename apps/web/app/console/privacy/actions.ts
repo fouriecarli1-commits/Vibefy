@@ -1,7 +1,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { REQUEST_KINDS, refusalIsAnswerable, type RequestType } from '@vibefycode/governance';
+import {
+  REQUEST_KINDS,
+  canTransition,
+  refusalIsAnswerable,
+  statusesThatMayBecome,
+  type RequestStatus,
+  type RequestType,
+} from '@vibefycode/governance';
 import { createClient } from '@/lib/supabase/server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -157,6 +164,21 @@ export async function resolveDataRequest(
   if (!['verifying', 'in_progress', 'completed', 'refused'].includes(status)) {
     return { error: 'Unknown status.' };
   }
+  /*
+   * Where the request has to be now for this move to be legal.
+   *
+   * The check above is about the target and says nothing about the row. The
+   * transition table in `@vibefycode/governance` was consulted by nothing but
+   * its own test, so a completed request could be reopened and a refused one
+   * completed — and the comment on `completed: []` says what that means: "a
+   * deadline that can be restarted, which is the same as no deadline".
+   *
+   * Given to the statement rather than checked first, so there is no window
+   * between reading the status and writing it. An illegal move matches no row
+   * and falls into the branch below that already exists for a write that
+   * changed nothing.
+   */
+  const legalFrom = statusesThatMayBecome(status as RequestStatus);
   if (status === 'refused' && !refusalIsAnswerable(refusalBasis)) {
     return {
       error:
@@ -186,10 +208,25 @@ export async function resolveDataRequest(
       completed_at: ['completed', 'refused'].includes(status) ? new Date().toISOString() : null,
     })
     .eq('id', requestId)
+    .in('status', legalFrom)
     .select('id')
     .maybeSingle();
   if (error) return { error: error.message };
   if (!recorded) {
+    // Which of the two it was, asked for only on the failure path. "Not
+    // changed" covers a row this reviewer cannot see and a move the state
+    // machine forbids, and those need different things done about them.
+    const { data: current } = await supabase
+      .from('data_requests')
+      .select('status')
+      .eq('id', requestId)
+      .maybeSingle();
+    const from = current?.status as RequestStatus | undefined;
+    if (from !== undefined && !canTransition(from, status as RequestStatus)) {
+      return {
+        error: `This request is ${from.replace('_', ' ')}, and that cannot become ${status.replace('_', ' ')}. A completed or refused request is final — reopening one would restart a statutory clock that has already been answered.`,
+      };
+    }
     return { error: 'That request was not changed, so it is still open and still due.' };
   }
 

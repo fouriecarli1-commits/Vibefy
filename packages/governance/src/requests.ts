@@ -92,6 +92,26 @@ export function canTransition(from: RequestStatus, to: RequestStatus): boolean {
 }
 
 /**
+ * The statuses a request may be in for a move to `to` to be legal.
+ *
+ * `canTransition` needs to know where the row is now, and the reviewer's form
+ * does not — it posts a target status and an id. So the rule is turned around
+ * and given to the statement: the update filters on these, an illegal move
+ * matches no row, and the action's existing "that request was not changed"
+ * branch catches it. One statement, so there is no window between reading the
+ * status and writing it.
+ *
+ * Until this existed, `canTransition` and the table behind it were called by
+ * nothing but their own test, while `resolveDataRequest` checked only that the
+ * *target* was a known status. A completed request could be reopened and a
+ * refused one completed — and the comment on `completed: []` says what that
+ * means: "a deadline that can be restarted, which is the same as no deadline".
+ */
+export function statusesThatMayBecome(to: RequestStatus): RequestStatus[] {
+  return (Object.keys(TRANSITIONS) as RequestStatus[]).filter((from) => canTransition(from, to));
+}
+
+/**
  * A refusal must name its lawful basis.
  *
  * The database enforces this too, with a check constraint. Both, because
