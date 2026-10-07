@@ -5,9 +5,20 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-07.
 
-> **Daar is nou tien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
-> agt was reeds daar; die negende en tiende is bygevoeg op 2026-10-07 en staan
-> onderaan `docs/sql/OUTSTANDING.sql`.
+> **Daar is nou elf SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
+> agt was reeds daar; die negende, tiende en elfde is bygevoeg op 2026-10-07 en
+> staan onderaan `docs/sql/OUTSTANDING.sql`.
+>
+> **Die elfde is die dringendste ding in hierdie dokument, die badge inkluis.**
+> 'n Kliënt kon hul eie telling skryf. Gemeet met 'n gewone kliënt se
+> aanmeldteken, sonder enige bladsy — net Supabase se eie API: 'n nuwe
+> assessering met `status = 'awaiting_review'`, `overall_score = 100` en
+> `certification_eligible = true`, en ook 'n bestaande assessering van 39 wat na
+> 99 herskryf is. `awaiting_review` is presies die status wat die
+> beoordelaarsbladsy lys, so so 'n ry gaan voor 'n mens wat 100 sien en geen
+> bevindinge nie. Niks in die produk het hierdie reg nodig nie — die enjin skryf
+> assesserings op sy eie verbinding, en 'n kliënt vra een aan deur
+> `assessment_requests`. Die migrasie neem die reg weg.
 >
 > Die negende verander drie vreemde-sleutels op `cost_records` sodat 'n
 > werkruimte-verwydering nie die finansiële rekords saamneem wat die
@@ -194,7 +205,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — tien migrasies
+## 4 · Supabase — elf migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
@@ -205,7 +216,8 @@ niks het dit voorheen gekeer nie. Die agtste laat die databasis 'n weiering by
 inname neerskryf; die bedienerhandeling het dit probeer en is elke keer deur
 row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van ses
 funksies wat ons koste- en sitplekgetalle aan 'n onaangemelde besoeker gegee
-het.
+het. **Die elfde maak die meeste saak van almal:** dit keer dat 'n kliënt hul
+eie telling skryf. Doen daardie een eerste.
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte

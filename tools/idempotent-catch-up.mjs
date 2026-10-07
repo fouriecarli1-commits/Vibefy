@@ -84,6 +84,12 @@ function idempotent(sql) {
     'alter table $1 add column if not exists ',
   );
   out = out.replace(/drop constraint (?!if exists)/gi, 'drop constraint if exists ');
+  // A policy that is dropped and not replaced. `replaceTriggersAndPolicies`
+  // guards the drop it writes itself, but the first migration to remove a
+  // policy outright — the one that stopped a customer writing their own score —
+  // failed on its second run with `policy ... does not exist`, which reads like
+  // a broken database rather than a step already taken.
+  out = out.replace(/drop policy (?!if exists)/gi, 'drop policy if exists ');
   // There is no `add constraint if not exists`, so a second run fails with
   // "constraint ... already exists" — found by running the output twice, like
   // everything else in this file. Guarded on the constraint name against the
