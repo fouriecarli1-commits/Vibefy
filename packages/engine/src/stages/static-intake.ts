@@ -249,14 +249,65 @@ const MAX_FILE_BYTES = 1_000_000;
 const MAX_FILES = 20_000;
 
 /**
+ * Whether a JSON Web Token's payload claims the `service_role`.
+ *
+ * Supabase publishes two keys in this shape from the same project. The anon key
+ * is designed to sit in the browser and is protected by row-level security; the
+ * service-role key bypasses it entirely. Only the `role` claim tells them
+ * apart, and a JWT payload is base64url rather than encrypted, so reading it
+ * needs no secret and proves nothing about the signature.
+ *
+ * Returns false for anything that will not decode. A token we cannot read is
+ * not a token we can accuse somebody over.
+ */
+function isServiceRoleToken(token: string): boolean {
+  const payload = token.split('.')[1];
+  if (payload === undefined) return false;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      role?: unknown;
+    };
+    return claims.role === 'service_role';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Credential shapes specific enough that a match is a live key rather than a
- * false alarm. Deliberately the same list the scanner over our own repository
- * uses — we hold ourselves to the standard we score customers against.
+ * false alarm.
+ *
+ * The comment here used to claim this was "the same list the scanner over our
+ * own repository uses". It was not: `tools/secret-scan.mjs` had thirteen
+ * patterns and this had nine, and the four it was missing were a JSON Web
+ * Token, an OpenAI key, a Stripe webhook signing secret, and AWS temporary
+ * credentials, whose key id begins ASIA rather than AKIA.
+ *
+ * The first mattered most, because of who the customers are: a vibe-coded
+ * application is very often Next.js on Supabase, and a Supabase service-role
+ * key bypasses every row-level policy the database has. It is the worst single
+ * credential in that stack and this scan could not see it.
+ *
+ * `confirm` is why it can see it now without wrecking every honest Supabase
+ * application. A project publishes two keys in the same JWT shape, and the anon
+ * one belongs in the browser — flagging the shape alone would have capped every
+ * correct Supabase app at 39 through GATE-EXPOSED-SECRET. A JWT payload is
+ * base64url rather than encrypted, so the `role` claim reads without any
+ * secret, and only `service_role` is reported. A token that will not decode is
+ * left alone: a guess here costs a stranger their badge.
+ *
+ * One pattern is deliberately not carried across. "A long opaque value assigned
+ * to a secret-looking name" earns its place in our own repository, where it
+ * runs beside a placeholder filter and a reviewed `secret-scan-allow`
+ * suppression. A customer's repository has neither, and without them any
+ * 24-character constant becomes a capped score.
  */
 const CREDENTIAL_PATTERNS: readonly {
   pattern: RegExp;
   label: string;
   severity: RawFinding['severity'];
+  /** A second question asked of the matched text, where the shape is not enough. */
+  confirm?: (match: string) => boolean;
 }[] = [
   { pattern: /sk-ant-[A-Za-z0-9_-]{16,}/, label: 'an Anthropic API key', severity: 'critical' },
   {
@@ -269,7 +320,29 @@ const CREDENTIAL_PATTERNS: readonly {
     label: 'a Stripe test secret key',
     severity: 'medium',
   },
-  { pattern: /\bAKIA[0-9A-Z]{16}\b/, label: 'an AWS access key id', severity: 'critical' },
+  {
+    // ASIA is a temporary key id. Short-lived is not the same as harmless: it
+    // is valid until it expires, and our own scanner has looked for it all along.
+    pattern: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/,
+    label: 'an AWS access key id',
+    severity: 'critical',
+  },
+  {
+    pattern: /\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b/,
+    label: 'an OpenAI API key',
+    severity: 'critical',
+  },
+  {
+    pattern: /\bwhsec_[A-Za-z0-9]{16,}\b/,
+    label: 'a Stripe webhook signing secret',
+    severity: 'high',
+  },
+  {
+    pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/,
+    label: 'a Supabase service-role key, which bypasses every row-level policy',
+    severity: 'critical',
+    confirm: isServiceRoleToken,
+  },
   { pattern: /\bAIza[0-9A-Za-z_-]{35}\b/, label: 'a Google API key', severity: 'high' },
   {
     pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})\b/,
@@ -277,7 +350,7 @@ const CREDENTIAL_PATTERNS: readonly {
     severity: 'critical',
   },
   {
-    pattern: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
+    pattern: /-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----/,
     label: 'a private key',
     severity: 'critical',
   },
@@ -589,8 +662,11 @@ function scanForCredentials(root: string, files: string[], context: StageContext
       continue;
     }
     contents.split('\n').forEach((line, index) => {
-      for (const { pattern, label, severity } of CREDENTIAL_PATTERNS) {
-        if (pattern.test(line)) {
+      for (const { pattern, label, severity, confirm } of CREDENTIAL_PATTERNS) {
+        const match = pattern.exec(line);
+        // The shape is the first question; `confirm` is the second, where a
+        // shape is shared by a credential and a value meant to be public.
+        if (match !== null && (confirm === undefined || confirm(match[0]))) {
           const hit = { file: relativePath, line: index + 1, label, severity };
           if (isExample) inExamples.push(hit);
           else hits.push(hit);

@@ -20,7 +20,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const SECRET_PATTERNS = [
   { name: 'Anthropic API key', pattern: /sk-ant-[A-Za-z0-9_-]{20,}/ },
-  { name: 'OpenAI API key', pattern: /\bsk-[A-Za-z0-9]{32,}\b/ },
+  { name: 'OpenAI API key', pattern: /\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b/ },
   { name: 'Stripe live secret key', pattern: /\b[rs]k_live_[A-Za-z0-9]{16,}\b/ },
   { name: 'Stripe test secret key', pattern: /\b[rs]k_test_[A-Za-z0-9]{16,}\b/ },
   { name: 'Stripe webhook signing secret', pattern: /\bwhsec_[A-Za-z0-9]{16,}\b/ },
