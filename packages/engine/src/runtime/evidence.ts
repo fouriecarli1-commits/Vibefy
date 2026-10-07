@@ -67,11 +67,109 @@ export interface CaptureInput {
 const REDACTION_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
   { pattern: /sk-ant-[A-Za-z0-9_-]{16,}/g, label: 'ANTHROPIC_KEY' },
   { pattern: /\b[rs]k_(?:live|test)_[A-Za-z0-9]{12,}\b/g, label: 'STRIPE_KEY' },
-  { pattern: /\bAKIA[0-9A-Z]{16}\b/g, label: 'AWS_KEY' },
+  // ASIA as well as AKIA: a temporary key is valid until it expires.
+  { pattern: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, label: 'AWS_KEY' },
   { pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, label: 'JWT' },
   { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, label: 'PRIVATE_KEY' },
+  /*
+   * The rest, brought level with the two other lists of credential shapes in
+   * this repository.
+   *
+   * `tools/secret-scan.mjs` has thirteen and the engine's own scanner nine.
+   * This had six, and every shape it was missing is one the scanner would raise
+   * as a critical finding in a customer's repository — so a key we would fail
+   * them for was a key we would store. The lists are kept separate on purpose
+   * (the linter runs dependency-free, the scanner scores customers, this one
+   * protects our own database) and held level by their tests.
+   */
+  {
+    pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})\b/g,
+    label: 'GITHUB_TOKEN',
+  },
+  { pattern: /\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b/g, label: 'OPENAI_KEY' },
+  { pattern: /\bAIza[0-9A-Za-z_-]{35}\b/g, label: 'GOOGLE_KEY' },
+  { pattern: /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g, label: 'SLACK_TOKEN' },
+  { pattern: /\bwhsec_[A-Za-z0-9]{16,}\b/g, label: 'STRIPE_WEBHOOK_SECRET' },
+  {
+    pattern: /postgres(?:ql)?:\/\/[^\s:@/]+:(?!password@|postgres@)[^\s:@/]{6,}@/g,
+    label: 'DATABASE_URL',
+  },
+  // POSSIBLE_PAN last, because it is the loosest and would otherwise eat the
+  // digits inside a more specific shape before that shape is tried.
   { pattern: /\b\d{13,19}\b(?=[^\d]|$)/g, label: 'POSSIBLE_PAN' },
 ];
+
+/**
+ * Headers whose value is a credential and nothing else.
+ *
+ * Taken out whole: unlike a cookie, no finding is about any part of these.
+ */
+const SENSITIVE_HEADERS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'x-api-key',
+  'x-auth-token',
+  'api-key',
+]);
+
+/**
+ * A cookie header with the values out and the names and attributes left in.
+ *
+ * SEC-11's finding is about a cookie's *attributes*, which are named in the
+ * cookie specification and are not claims about anything:
+ * vibefycode-copy-lint-allow: the cookie attribute names below are a
+ * specification's vocabulary, not a statement about an application
+ * `HttpOnly`, `Secure`, `SameSite`. A reviewer confirming that finding reads
+ * the artefact, so this is
+ * deliberately not a blanket removal: the name and every attribute stay, and
+ * only the value goes, which is the one part no finding is about and the only
+ * part that is a live credential.
+ *
+ * undici joins several `set-cookie` headers with `, `, so the split looks for a
+ * comma followed by something that looks like the start of a new cookie rather
+ * than for every comma — a cookie's `Expires` attribute contains one.
+ */
+function redactCookieHeader(value: string): string {
+  return value
+    .split(/,\s*(?=[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/)
+    .map((cookie) => {
+      const equals = cookie.indexOf('=');
+      if (equals < 0) return cookie;
+      const semicolon = cookie.indexOf(';');
+      const name = cookie.slice(0, equals);
+      const secret = semicolon < 0 ? cookie.slice(equals + 1) : cookie.slice(equals + 1, semicolon);
+      const attributes = semicolon < 0 ? '' : cookie.slice(semicolon);
+      return `${name}=[REDACTED:COOKIE:${secret.length}chars]${attributes}`;
+    })
+    .join(', ');
+}
+
+/**
+ * A header map with nothing in it we have no right to keep.
+ *
+ * Every response header used to reach the evidence store as it arrived,
+ * `set-cookie` included, and none of the patterns above matches a session
+ * cookie. So a customer's application that set one on any page we fetched had
+ * that value written into our `evidence` table in plaintext, with ninety days
+ * on the `http_exchange` kind. PART 6.2 says not to store a customer's real
+ * credentials, and an exposed session cookie is a finding we would raise
+ * against them.
+ *
+ * The raw map is still what the header checks read — they take it from the
+ * `ScopedResponse`, not from the artefact — so this is applied at the capture
+ * call and changes nothing a finding is drawn from.
+ */
+export function redactHeaders(headers: Readonly<Record<string, string>>): Record<string, string> {
+  const storable: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    const key = name.toLowerCase();
+    if (key === 'set-cookie' || key === 'cookie') storable[name] = redactCookieHeader(value);
+    else if (SENSITIVE_HEADERS.has(key)) {
+      storable[name] = `[REDACTED:${key.toUpperCase().replace(/-/g, '_')}:${value.length}chars]`;
+    } else storable[name] = value;
+  }
+  return storable;
+}
 
 /**
  * The same, through every string in a value, leaving everything else alone.

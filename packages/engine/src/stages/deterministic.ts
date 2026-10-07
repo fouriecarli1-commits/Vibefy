@@ -17,6 +17,7 @@ import { crawlForTheExit } from './exit-checks.ts';
 import { scoreExit } from '@vibefycode/trustcheck';
 import { gameFindings, measureGame } from './game-checks.ts';
 import { classifyStop } from '../runtime/stop.ts';
+import { redactHeaders } from '../runtime/evidence.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
 /**
@@ -264,7 +265,10 @@ export const deterministicChecksStage: Stage = {
     const headerScan = context.evidence.capture({
       kind: 'header_scan',
       summary: `Response headers from ${url}`,
-      body: { url: root.url, status: root.status, headers: root.headers },
+      // Same rule as the exchange artefact: a cookie's name and attributes are
+      // what SEC-11 is about, and its value is a live credential of somebody
+      // else's that we have no reason to keep for ninety days.
+      body: { url: root.url, status: root.status, headers: redactHeaders(root.headers) },
     }).id;
 
     findings.push(...transportChecks(url, root, headerScan));

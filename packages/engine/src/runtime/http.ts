@@ -29,6 +29,7 @@ import {
   ScopeViolationError,
   waitForRateSlot,
 } from './scope.ts';
+import { redactHeaders } from './evidence.ts';
 import type { EvidenceStore } from './evidence.ts';
 import { classifyStop } from './stop.ts';
 
@@ -200,7 +201,10 @@ export class ScopedHttp {
           request: { method, url: currentUrl, redirectChain },
           response: {
             status: response.status,
-            headers,
+            // The values a finding is never about, out before storage. The
+            // raw map stays on the `ScopedResponse` below, which is what the
+            // header checks read.
+            headers: redactHeaders(headers),
             bodyPreview: keepBody ? body.slice(0, 4000) : null,
             bodyRetained: keepBody,
             bodyLength: body.length,
