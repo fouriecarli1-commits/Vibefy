@@ -26,22 +26,8 @@ export default async function VerifyPage({
 }) {
   const { badge: badgeId } = await searchParams;
 
-  const record = badgeId
-    ? await readAsAnon(async (client) => {
-        const { rows } = await client.query<{
-          payload: Record<string, unknown>;
-          signature: string;
-          status: string;
-          slug: string;
-          certified_origin: string;
-        }>(
-          `select payload, signature, status, slug, certified_origin
-             from public.badge_verification where public_id = $1`,
-          [badgeId],
-        );
-        return rows[0] ?? null;
-      }).catch(() => null)
-    : null;
+  const lookup = badgeId ? await lookUpBadge(badgeId) : null;
+  const record = lookup?.kind === 'issued' ? lookup.record : null;
 
   const result = record
     ? verifyBadge(
@@ -77,13 +63,25 @@ export default async function VerifyPage({
         </button>
       </form>
 
-      {badgeId && !record && (
+      {lookup?.kind === 'never_issued' && (
         <section role="alert" className="rounded-xl border border-line p-5">
           <h2 className="font-semibold text-bad">VibefyCode has never issued that badge</h2>
           <p className="mt-2 text-sm text-muted">
             No badge with that identifier exists. If you were shown a VibefyCode mark linking to it,
             treat the mark as unverified — and please{' '}
             <Link href="/legal/ip-takedown">tell us where you saw it</Link>.
+          </p>
+        </section>
+      )}
+
+      {lookup?.kind === 'unavailable' && (
+        <section role="alert" className="rounded-xl border border-line p-5">
+          <h2 className="font-semibold text-warn">We could not check that badge just now</h2>
+          <p className="mt-2 text-sm text-muted">
+            This is a fault on our side: our records would not answer, so we cannot tell you
+            anything about this identifier either way. Please try again in a few minutes. Do not
+            read this as a statement about the mark you were shown — we have not established
+            anything about it.
           </p>
         </section>
       )}
@@ -173,4 +171,50 @@ export default async function VerifyPage({
       </section>
     </div>
   );
+}
+
+/**
+ * Three answers, because the old two could not be told apart.
+ *
+ * This read ended in `.catch(() => null)`, and `null` was rendered as "VibefyCode
+ * has never issued that badge … treat the mark as unverified — and please tell
+ * us where you saw it." So a connection the pool could not hand out, a statement
+ * timeout, or the database being unreachable made this product accuse a paying
+ * customer of displaying a fraudulent mark, to a stranger, and invite that
+ * stranger to report them for it — on the strength of our own read failing.
+ *
+ * It is the same defect `loadAssurance` on `/a/[slug]` was corrected for the
+ * night before, one route over, and it was missed because that fix was reasoned
+ * about per page rather than swept for.
+ */
+type BadgeLookup =
+  | { kind: 'issued'; record: BadgeRecord }
+  | { kind: 'never_issued' }
+  | { kind: 'unavailable' };
+
+interface BadgeRecord {
+  payload: Record<string, unknown>;
+  signature: string;
+  status: string;
+  slug: string;
+  certified_origin: string;
+}
+
+async function lookUpBadge(badgeId: string): Promise<BadgeLookup> {
+  try {
+    const record = await readAsAnon(async (client) => {
+      const { rows } = await client.query<BadgeRecord>(
+        `select payload, signature, status, slug, certified_origin
+           from public.badge_verification where public_id = $1`,
+        [badgeId],
+      );
+      return rows[0] ?? null;
+    });
+    return record === null ? { kind: 'never_issued' } : { kind: 'issued', record };
+  } catch {
+    // Deliberately carries no detail to the page. What went wrong on our side
+    // is ours to read in the logs; a visitor needs to know only that we did not
+    // establish anything.
+    return { kind: 'unavailable' };
+  }
 }
