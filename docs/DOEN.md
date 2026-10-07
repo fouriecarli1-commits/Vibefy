@@ -5,6 +5,14 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-07.
 
+> **Daar is nou nege SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
+> agt was reeds daar; die negende is bygevoeg op 2026-10-07 en staan onderaan
+> `docs/sql/OUTSTANDING.sql`. Dit verander drie vreemde-sleutels op
+> `cost_records` sodat 'n werkruimte-verwydering nie die finansiële rekords
+> saamneem wat die bewaarskedule sê ons sewe jaar moet hou nie. Niks in die
+> produk vee 'n werkruimte uit, so dit is nie dringend nie — dit is 'n valstrik
+> vir die dag dat iemand dit met die hand doen.
+
 > **Hoekom dit nou dringender is.** Solank die databasis onbereikbaar is, sê
 > `/verify` vir enigiemand wat 'n kliënt se badge natrek: _"VibefyCode has never
 > issued that badge — treat the mark as unverified"_, met 'n skakel om dit te
