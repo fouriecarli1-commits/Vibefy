@@ -23,6 +23,7 @@
  *     node tools/policy-mutation.mjs triggers > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs definers  > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs recorders > supabase/migrations/29999999999999_mutate.sql
+ *     node tools/policy-mutation.mjs checks    > supabase/migrations/29999999999999_mutate.sql
  *
  * `reads` opens every policy that scopes a select to a membership or to a
  * person: a hole there means one customer reading another's findings. `writes`
@@ -102,6 +103,35 @@ const CLASSES = {
             and pg_get_functiondef(p.oid) ilike '%raise exception%'
           order by c.relname, t.tgname`,
     alter: (row) => `alter table public.${row.tablename} disable trigger ${row.policyname};`,
+  },
+  checks: {
+    /*
+     * Every `check` constraint on a table in `public`.
+     *
+     * The other classes measure things that run: a policy is consulted, a
+     * trigger fires, a definer function is called. A check constraint is the
+     * layer with no code in it — it makes a state impossible by refusing the
+     * row, and a later migration can drop one in a line with nothing anywhere
+     * saying so.
+     *
+     * The schema leans on them for real rules, not only shapes: a revoked badge
+     * must carry a reason of at least ten characters, an expiry must be bounded
+     * at twelve months, a public id must match the pattern the badge URL is
+     * built from, and the four-part ceiling constraint that decision 734 found
+     * was being tested one flag at a time.
+     *
+     * Not-null constraints are left alone. They are a different question and
+     * dropping them all at once produces failures about shape rather than about
+     * rules, which drowns what this is looking for.
+     */
+    sql: `select c.relname as tablename, con.conname as policyname
+           from pg_constraint con
+           join pg_class c on c.oid = con.conrelid
+           join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and con.contype = 'c'
+          order by c.relname, con.conname`,
+    alter: (row) =>
+      `alter table public.${row.tablename} drop constraint if exists ${row.policyname};`,
   },
   recorders: {
     /*
@@ -241,6 +271,7 @@ const LABEL = {
   triggers: 'assertion triggers disabled',
   definers: 'security definer functions found; their authority checks opened',
   recorders: 'recording triggers disabled',
+  checks: 'check constraints dropped',
 };
 console.log(`-- ${rows.length} ${LABEL[which]}.`);
 const statements = rows.map((row) => chosen.alter(row));
