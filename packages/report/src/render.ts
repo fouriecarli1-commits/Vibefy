@@ -135,6 +135,39 @@ function wordFor(status: string): string {
   }
 }
 
+/**
+ * The evidence for a finding, or why there is none to show.
+ *
+ * A finding with no evidence used to print nothing at all, which is the right
+ * shape for a free report — evidence is a paid-tier view and its absence there
+ * is redaction, said elsewhere in the document's own words — and the wrong
+ * shape for a paid one, where it leaves an assertion with a gap under it.
+ *
+ * The gap is retention. The Privacy Policy keeps screenshots and traces for
+ * thirty days by default, the sweep deletes the artefact, `finding_evidence`
+ * cascades away, and the block simply stops appearing after a month.
+ *
+ * Saying *why* is possible because of a gate rather than a guess.
+ * `assert_findings_have_evidence` refuses to move an assessment into
+ * `awaiting_review`, `approved` or `published` while any published finding has
+ * none — so a published finding with no evidence rows had evidence when the
+ * assessment was approved, and the only thing that can have happened since is
+ * that we deleted it. That is a property of every report, not a reading of
+ * this one.
+ */
+function evidenceBlock(showEvidence: boolean, finding: ReportFinding): string {
+  if (!showEvidence) return '';
+  if (finding.evidence.length === 0) {
+    return `<div class="evidence"><strong>Evidence.</strong> No longer held. Every published finding is evidenced before an assessment can be approved, so this one was — and the artefact has since been deleted under the retention schedule in the Privacy Policy. The deletion is recorded with the artefact\u2019s hash.</div>`;
+  }
+  return `<div class="evidence"><strong>Evidence.</strong> ${finding.evidence
+    .map(
+      (artefact) =>
+        `${escapeHtml(artefact.kind.replace(/_/g, ' '))} \u2014 ${escapeHtml(artefact.summary)} <code>${artefact.sha256.slice(0, 12)}\u2026</code>`,
+    )
+    .join('<br>')}</div>`;
+}
+
 export function renderReport(source: ReportSource, tier: ReportTier): RenderedReport {
   const view = redactForTier(source, tier);
   const fingerprint = scoreFingerprint(source);
@@ -155,16 +188,7 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
             ? `<div class="remediation"><strong>What to do.</strong> ${escapeHtml(finding.remediation)}</div>`
             : ''
         }
-        ${
-          view.showEvidence && finding.evidence.length > 0
-            ? `<div class="evidence"><strong>Evidence.</strong> ${finding.evidence
-                .map(
-                  (artefact) =>
-                    `${escapeHtml(artefact.kind.replace(/_/g, ' '))} — ${escapeHtml(artefact.summary)} <code>${artefact.sha256.slice(0, 12)}…</code>`,
-                )
-                .join('<br>')}</div>`
-            : ''
-        }
+        ${evidenceBlock(view.showEvidence, finding)}
       </article>`,
     )
     .join('\n');
