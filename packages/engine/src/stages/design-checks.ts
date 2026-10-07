@@ -95,8 +95,18 @@ const PLACEHOLDER_PATTERNS = [
 ];
 
 export interface ColourPair {
-  readonly foreground: string;
-  readonly background: string;
+  /**
+   * The colour a visitor's screen shows, as sRGB hex, or null where the browser
+   * could not paint it.
+   *
+   * Resolved in the page by a canvas rather than parsed here. A translucent
+   * foreground is already composited over the background behind it.
+   */
+  readonly foreground: string | null;
+  readonly background: string | null;
+  /** What the stylesheet said, so a finding can name something the author recognises. */
+  readonly rawForeground: string;
+  readonly rawBackground: string;
   readonly fontSizePx: number;
   readonly bold: boolean;
   readonly sample: string;
@@ -173,6 +183,51 @@ const SURVEY = `(() => {
     return getComputedStyle(document.body).backgroundColor || 'rgb(255, 255, 255)';
   };
 
+  /*
+   * A colour as the visitor's screen shows it, resolved by the browser.
+   *
+   * \`getComputedStyle\` does not normalise a colour outside sRGB: Chromium
+   * returns \`oklch(0.55 0.02 250)\`, \`color(display-p3 …)\` and \`lab(…)\`
+   * verbatim, and a \`color-mix\` resolves to \`oklch\`. The hex parser on the
+   * other side of this only read \`rgb()\` and \`rgba()\`, returned null for
+   * everything else, and \`unreadableText\` read null as "readable" — so a page
+   * built with Tailwind v4, whose default palette is oklch, raised no contrast
+   * finding at all. Measured in Chromium before this was written.
+   *
+   * A canvas resolves whatever the browser can paint, which is the right
+   * authority: the question is what a person sees. It also composites a
+   * translucent foreground over the background actually behind it, which the
+   * old code refused to guess at — correctly, because guessing was the wrong
+   * way to get it. Painting is not guessing.
+   *
+   * \`fillStyle\` keeps its previous value when a colour will not parse, so it
+   * is set to a sentinel first and the sentinel is what "could not read this"
+   * looks like.
+   */
+  const swatch = document.createElement('canvas');
+  swatch.width = 1;
+  swatch.height = 1;
+  const ink = swatch.getContext('2d', { willReadFrequently: true });
+  const asSrgb = (colour, over) => {
+    if (!ink || !colour) return null;
+    try {
+      ink.clearRect(0, 0, 1, 1);
+      if (over) {
+        ink.fillStyle = '#000000';
+        ink.fillStyle = over;
+        ink.fillRect(0, 0, 1, 1);
+      }
+      ink.fillStyle = '#010203';
+      ink.fillStyle = colour;
+      if (ink.fillStyle === '#010203') return null;
+      ink.fillRect(0, 0, 1, 1);
+      const data = ink.getImageData(0, 0, 1, 1).data;
+      return '#' + [data[0], data[1], data[2]].map((v) => v.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+      return null;
+    }
+  };
+
   const hasOwnText = (element) =>
     [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim().length > 1);
 
@@ -210,9 +265,16 @@ const SURVEY = `(() => {
       textColours.add(style.color);
       const background = opaqueBackground(element);
       backgrounds.add(background);
+      // Resolved here, in the page, rather than parsed afterwards. The
+      // foreground is composited over the background actually behind it, so a
+      // translucent one is the colour a visitor sees rather than something
+      // nobody could judge.
+      const resolvedBackground = asSrgb(background, null);
       pairs.push({
-        foreground: style.color,
-        background,
+        foreground: asSrgb(style.color, resolvedBackground || background),
+        background: resolvedBackground,
+        rawForeground: style.color,
+        rawBackground: background,
         fontSizePx: Math.round(parseFloat(style.fontSize)),
         bold: Number(style.fontWeight) >= 700,
         sample: (element.textContent || '').trim().slice(0, 60),
@@ -320,15 +382,6 @@ const SURVEY = `(() => {
     bodyText: document.body.innerText.slice(0, 20000),
   };
 })();`;
-
-function toHex(colour: string): string | null {
-  const match = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(colour);
-  if (!match) return null;
-  // A translucent foreground cannot be judged without compositing it, and
-  // guessing at the result would produce a contrast figure nobody could check.
-  if (match[4] !== undefined && Number(match[4]) < 0.95) return null;
-  return `#${[1, 2, 3].map((index) => Number(match[index]).toString(16).padStart(2, '0')).join('')}`;
-}
 
 /**
  * Left edges that are nearly, but not quite, each other.
@@ -510,12 +563,26 @@ export async function measureDesign(session: BrowserSession): Promise<DesignMeas
 /** Text nobody can read, using the same arithmetic the contrast gate uses. */
 export function unreadableText(measurements: DesignMeasurements): ColourPair[] {
   return measurements.colourPairs.filter((pair) => {
-    const foreground = toHex(pair.foreground);
-    const background = toHex(pair.background);
-    if (!foreground || !background) return false;
+    if (pair.foreground === null || pair.background === null) return false;
     const large = pair.fontSizePx >= 24 || (pair.fontSizePx >= 18.66 && pair.bold);
-    return contrastRatio(foreground, background) < CONTRAST_MIN[large ? 'large' : 'normal'];
+    return (
+      contrastRatio(pair.foreground, pair.background) < CONTRAST_MIN[large ? 'large' : 'normal']
+    );
   });
+}
+
+/**
+ * Pairs the browser could not paint, which is not the same as pairs that pass.
+ *
+ * `unreadableText` returns false for one of these, because accusing somebody of
+ * a contrast failure we did not measure is worse than missing it. That makes it
+ * a gap in coverage, and the stage says so in its notes rather than letting a
+ * page with colours nobody could read look like a page that was checked.
+ */
+export function unmeasurableText(measurements: DesignMeasurements): ColourPair[] {
+  return measurements.colourPairs.filter(
+    (pair) => pair.foreground === null || pair.background === null,
+  );
 }
 
 /**
@@ -675,7 +742,7 @@ export function designFindings(
       severity: 'medium',
       confidence: 'high',
       title: `${unreadable.length} passage${unreadable.length === 1 ? '' : 's'} of text below the readable contrast threshold`,
-      description: `Text is rendered in ${worst.foreground} on ${worst.background}, which is below the WCAG 2.2 AA threshold of ${CONTRAST_MIN.normal}:1 for text of that size. The first instance reads “${worst.sample}”. Low-contrast text is legible on the screen it was designed on and disappears on a phone outdoors.`,
+      description: `Text is rendered in ${worst.rawForeground} on ${worst.rawBackground} — ${worst.foreground} on ${worst.background} as a screen shows it — which is below the WCAG 2.2 AA threshold of ${CONTRAST_MIN.normal}:1 for text of that size. The first instance reads “${worst.sample}”. Low-contrast text is legible on the screen it was designed on and disappears on a phone outdoors.`,
       remediation:
         'Darken the text or lighten what is behind it until the ratio passes. This is arithmetic rather than judgement — the same calculation is in the standard.',
       evidenceIds: evidence,

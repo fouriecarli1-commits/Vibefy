@@ -11,7 +11,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { ScopedHttp, type ScopedResponse } from '../runtime/http.ts';
 import { BrowserSession, MOBILE_VIEWPORT } from '../runtime/browser.ts';
-import { designFindings, measureDesign } from './design-checks.ts';
+import { designFindings, measureDesign, unmeasurableText } from './design-checks.ts';
 import { measureTrust, trustFindings } from './trust-checks.ts';
 import { crawlForTheExit } from './exit-checks.ts';
 import { scoreExit } from '@vibefycode/trustcheck';
@@ -464,8 +464,22 @@ export const deterministicChecksStage: Stage = {
         const found = designFindings(design, [desktopShot]);
         for (const finding of found) designTitles.add(finding.title);
         findings.push(...found);
+        // Colour pairs the browser could not paint. `unreadableText` leaves
+        // these alone, because accusing somebody of a contrast failure nobody
+        // measured is worse than missing it — which makes them a gap in
+        // coverage rather than a pass, and the note has to say so.
+        const unmeasurable = unmeasurableText(design);
+        if (unmeasurable.length > 0) {
+          notes.push(
+            `${unmeasurable.length} text colour pair(s) could not be resolved to a colour a screen shows (for example ${unmeasurable[0]!.rawForeground} on ${unmeasurable[0]!.rawBackground}), so their contrast was not measured. That is not a pass.`,
+          );
+        }
         notes.push(
-          `Design survey: ${design.fontSizesPx.length} text sizes, ${design.fontFamilies.length} typefaces, ${design.buttonStyles.length} button styles, ${Math.round(design.spacingsOnGrid * 100)}% of spacing on a 4px grid.`,
+          `Design survey: ${design.fontSizesPx.length} text sizes, ${design.fontFamilies.length} typefaces, ${design.buttonStyles.length} button styles, ${
+            design.spacingsPx.length === 0
+              ? 'no spacing measured'
+              : `${Math.round(design.spacingsOnGrid * 100)}% of spacing on a 4px grid`
+          }.`,
         );
       } catch (error) {
         rethrowIfStop(error);
