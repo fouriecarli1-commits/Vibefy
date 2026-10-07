@@ -15,6 +15,13 @@
 --     destroys its own domain reputation, and then none of the notices arrive.
 -- =============================================================================
 
+-- audit-marker: to_regclass('public.email_suppressions') is not null
+--
+-- Said rather than guessed. This migration drops and recreates
+-- `alert_deliveries`, which `20260822160000_mobile` created, so the audit's
+-- first matching pattern would have reported it as applied whether it had run
+-- or not. `email_suppressions` is new here.
+
 create type public.alert_channel as enum ('push', 'email');
 
 -- Restated rather than altered: the table is append-only with a trigger that

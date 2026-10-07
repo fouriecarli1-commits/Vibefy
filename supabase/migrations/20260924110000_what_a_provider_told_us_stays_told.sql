@@ -38,6 +38,14 @@
 -- refused.
 -- =============================================================================
 
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='billing_events_only_handled_changes' and pg_get_functiondef(p.oid) like '%new.provider is distinct from old.provider%')
+--
+-- Said rather than guessed. This migration *replaces* `billing_events_only_handled_changes`,
+-- which `20260822120000_billing_events` created, so the audit's first
+-- matching pattern would have reported this as applied whether it had run
+-- or not. The marker reads the body instead, for the one clause this
+-- migration adds.
+
 create or replace function public.billing_events_only_handled_changes()
 returns trigger
 language plpgsql

@@ -3144,6 +3144,13 @@ grant execute on function public.spending_is_paused() to authenticated;
 --     destroys its own domain reputation, and then none of the notices arrive.
 -- =============================================================================
 
+-- audit-marker: to_regclass('public.email_suppressions') is not null
+--
+-- Said rather than guessed. This migration drops and recreates
+-- `alert_deliveries`, which `20260822160000_mobile` created, so the audit's
+-- first matching pattern would have reported it as applied whether it had run
+-- or not. `email_suppressions` is new here.
+
 create type public.alert_channel as enum ('push', 'email');
 
 -- Restated rather than altered: the table is append-only with a trigger that
@@ -4074,6 +4081,14 @@ on conflict (version) do nothing;
 -- when there is no assessment to attach it to. `organisation_id` stays
 -- mandatory: unattributable spend is still someone's spend.
 -- =============================================================================
+
+-- audit-marker: exists (select 1 from information_schema.columns where table_schema='public' and table_name='cost_records' and column_name='assessment_id' and is_nullable='YES')
+--
+-- Said rather than guessed. This migration *replaces*
+-- `free_tier_spend_since`, which `20260822180000_governance_operations`
+-- created, so the audit's first matching pattern would have reported it as
+-- applied whether it had run or not. What it actually does is let a cost
+-- record exist without an assessment, which is the thing to look for.
 
 alter table public.cost_records alter column assessment_id drop not null;
 
@@ -6930,6 +6945,14 @@ alter policy remediation_workers_admin on public.remediation_workers to authenti
 -- transition.test.ts, four failures on the four opposite-action combinations.
 -- =============================================================================
 
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_human_review' and pg_get_functiondef(p.oid) like '%r.action::text = new.status::text%')
+--
+-- Said rather than guessed. This migration *replaces* `assert_human_review`,
+-- which `20260822092000_assessments` created, so the audit's first
+-- matching pattern would have reported this as applied whether it had run
+-- or not. The marker reads the body instead, for the one clause this
+-- migration adds.
+
 create or replace function public.assert_human_review()
 returns trigger
 language plpgsql
@@ -7007,6 +7030,14 @@ $$;
 -- told.test.ts, three failures on the three columns, the other four already
 -- refused.
 -- =============================================================================
+
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='billing_events_only_handled_changes' and pg_get_functiondef(p.oid) like '%new.provider is distinct from old.provider%')
+--
+-- Said rather than guessed. This migration *replaces* `billing_events_only_handled_changes`,
+-- which `20260822120000_billing_events` created, so the audit's first
+-- matching pattern would have reported this as applied whether it had run
+-- or not. The marker reads the body instead, for the one clause this
+-- migration adds.
 
 create or replace function public.billing_events_only_handled_changes()
 returns trigger

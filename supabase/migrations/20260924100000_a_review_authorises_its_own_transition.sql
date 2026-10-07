@@ -52,6 +52,14 @@
 -- transition.test.ts, four failures on the four opposite-action combinations.
 -- =============================================================================
 
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_human_review' and pg_get_functiondef(p.oid) like '%r.action::text = new.status::text%')
+--
+-- Said rather than guessed. This migration *replaces* `assert_human_review`,
+-- which `20260822092000_assessments` created, so the audit's first
+-- matching pattern would have reported this as applied whether it had run
+-- or not. The marker reads the body instead, for the one clause this
+-- migration adds.
+
 create or replace function public.assert_human_review()
 returns trigger
 language plpgsql

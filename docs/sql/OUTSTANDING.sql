@@ -8,6 +8,7 @@
 -- 20260923110000_second_step_at_the_action.sql
 -- =============================================================================
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='session_passed_second_step')
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='session_passed_second_step')
 -- =============================================================================
 -- A second step, required at the action rather than at the door.
 --
@@ -157,6 +158,7 @@ create policy memberships_need_second_step_update on public.memberships
 -- =============================================================================
 -- 20260923120000_accept_invitation.sql
 -- =============================================================================
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='accept_invitation')
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='accept_invitation')
 -- =============================================================================
 -- Accepting an invitation, which has never once worked.
@@ -323,6 +325,7 @@ grant execute on function public.accept_invitation(text) to authenticated;
 -- 20260923130000_create_workspace.sql
 -- =============================================================================
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='create_workspace')
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='create_workspace')
 -- =============================================================================
 -- Creating a shared workspace, which has never once worked either.
 --
@@ -456,6 +459,7 @@ grant execute on function public.create_workspace(text, text, public.account_typ
 -- 20260923140000_name_the_role.sql
 -- =============================================================================
 -- audit-marker: not exists (select 1 from pg_policies where schemaname='public' and 'public' = any(roles))
+-- audit-marker: not exists (select 1 from pg_policies where schemaname='public' and 'public' = any(roles))
 -- =============================================================================
 -- Two policies that never named the role they apply to.
 --
@@ -545,6 +549,14 @@ alter policy remediation_workers_admin on public.remediation_workers to authenti
 -- transition.test.ts, four failures on the four opposite-action combinations.
 -- =============================================================================
 
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_human_review' and pg_get_functiondef(p.oid) like '%r.action::text = new.status::text%')
+--
+-- Said rather than guessed. This migration *replaces* `assert_human_review`,
+-- which `20260822092000_assessments` created, so the audit's first
+-- matching pattern would have reported this as applied whether it had run
+-- or not. The marker reads the body instead, for the one clause this
+-- migration adds.
+
 create or replace function public.assert_human_review()
 returns trigger
 language plpgsql
@@ -582,7 +594,7 @@ $$;
 -- =============================================================================
 -- 20260924110000_what_a_provider_told_us_stays_told.sql
 -- =============================================================================
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='billing_events_only_handled_changes' and pg_get_functiondef(p.oid) like '%new.received_at is distinct from old.received_at%')
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='billing_events_only_handled_changes' and pg_get_functiondef(p.oid) like '%new.provider is distinct from old.provider%')
 -- =============================================================================
 -- "Everything else about the event is immutable" made true.
 --
@@ -623,6 +635,14 @@ $$;
 -- refused.
 -- =============================================================================
 
+-- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='billing_events_only_handled_changes' and pg_get_functiondef(p.oid) like '%new.provider is distinct from old.provider%')
+--
+-- Said rather than guessed. This migration *replaces* `billing_events_only_handled_changes`,
+-- which `20260822120000_billing_events` created, so the audit's first
+-- matching pattern would have reported this as applied whether it had run
+-- or not. The marker reads the body instead, for the one clause this
+-- migration adds.
+
 create or replace function public.billing_events_only_handled_changes()
 returns trigger
 language plpgsql
@@ -646,7 +666,6 @@ begin
   return new;
 end;
 $$;
-
 
 -- =============================================================================
 -- 20261006200000_one_score_wherever_it_is_read.sql

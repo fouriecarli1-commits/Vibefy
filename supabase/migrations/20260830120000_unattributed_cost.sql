@@ -17,6 +17,14 @@
 -- mandatory: unattributable spend is still someone's spend.
 -- =============================================================================
 
+-- audit-marker: exists (select 1 from information_schema.columns where table_schema='public' and table_name='cost_records' and column_name='assessment_id' and is_nullable='YES')
+--
+-- Said rather than guessed. This migration *replaces*
+-- `free_tier_spend_since`, which `20260822180000_governance_operations`
+-- created, so the audit's first matching pattern would have reported it as
+-- applied whether it had run or not. What it actually does is let a cost
+-- record exist without an assessment, which is the thing to look for.
+
 alter table public.cost_records alter column assessment_id drop not null;
 
 comment on column public.cost_records.assessment_id is
