@@ -193,6 +193,62 @@ export function runIsOrphaned(): string | null {
   return orphanedRun;
 }
 
+/*
+ * A sweep that has not finished, and how long it has been going.
+ *
+ * `once` below refuses to start a sweep whose previous run is still going, for
+ * a reason written out beside it: two runs can both read a row as un-acted-on
+ * and both act on it, which is a second re-assessment somebody pays for. What
+ * it did not do is bound how long a run may take. A promise that never settles
+ * kept its name for the life of the process, and every later tick logged
+ * "sweep still running, skipping this tick" — which reads as busy.
+ *
+ * Nine sweeps go through that guard. Any one of them hanging — a pool with no
+ * client left to hand out, a liveness probe with no timeout, a query with no
+ * statement timeout — stopped that sweep permanently, and the only signal was a
+ * line saying it was working.
+ *
+ * It is the same problem `withRunTimeout` exists for, and it gets the same
+ * answer for the same reason. A promise cannot be cancelled, so releasing the
+ * name would let a second run start beside the stuck one; ending the process so
+ * a fresh worker starts clean is the only move that does not risk the double
+ * run the guard exists to prevent.
+ */
+const sweepsRunning = new Map<string, number>();
+
+/**
+ * Longer than any sweep should take, by a wide margin.
+ *
+ * Not a tick or two: the response to this is to end the process, so a sweep
+ * that is merely slow must never reach it. Fifteen minutes is three monitoring
+ * beats and thirty report beats.
+ */
+export const SWEEP_STUCK_AFTER_MS = 15 * 60_000;
+
+export function noteSweepStarted(name: string, at: number = Date.now()): void {
+  if (!sweepsRunning.has(name)) sweepsRunning.set(name, at);
+}
+
+export function noteSweepFinished(name: string): void {
+  sweepsRunning.delete(name);
+}
+
+/** The longest-running sweep that has passed the bound, or null where none has. */
+export function stuckSweep(now: number = Date.now()): { name: string; forMs: number } | null {
+  let worst: { name: string; forMs: number } | null = null;
+  for (const [name, startedAt] of sweepsRunning) {
+    const forMs = now - startedAt;
+    if (forMs <= SWEEP_STUCK_AFTER_MS) continue;
+    if (!worst || forMs > worst.forMs) worst = { name, forMs };
+  }
+  return worst;
+}
+
+/** Test seam: forgets every running sweep so a later case starts clean. */
+export function clearStuckSweep(): void {
+  sweepsRunning.clear();
+}
+
 /** Test seam: forgets an orphaned run so a later case starts clean. */
 export function clearOrphanedRun(): void {
   orphanedRun = null;
@@ -307,6 +363,18 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
           running = false;
           break;
         }
+        // The same judgement about a sweep. "Still running" after fifteen
+        // minutes is not busy, and every tick after that one was skipping the
+        // sweep under a line that said it was working.
+        const stuck = stuckSweep();
+        if (stuck) {
+          log('worker stopping: a sweep has not finished and cannot be cancelled', {
+            sweep: stuck.name,
+            forSeconds: Math.round(stuck.forMs / 1000),
+          });
+          running = false;
+          break;
+        }
         if (!did) await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       } catch (error) {
         log('worker loop error', { error: String(error) });
@@ -339,9 +407,13 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
       return;
     }
     running_sweeps.add(name);
+    noteSweepStarted(name);
     void work()
       .catch((error) => log(`${name} sweep failed`, { error: String(error) }))
-      .finally(() => running_sweeps.delete(name));
+      .finally(() => {
+        running_sweeps.delete(name);
+        noteSweepFinished(name);
+      });
   };
 
   const sweep = setInterval(() => {
