@@ -106,6 +106,88 @@ export function evaluateSpend(
   return actions;
 }
 
+/**
+ * What the free tier can cost one account, from the plan's own shape.
+ *
+ * `freeTierPerAccountMonthlyUsd` is a figure and nothing else: nothing in
+ * `evaluateSpend`, in a migration, or on the enqueue path reads it. What
+ * actually limits a free account is three numbers in its entitlement — how many
+ * applications it may hold, how long it must wait between assessments of one,
+ * and the per-run cost ceiling the engine enforces before every model call.
+ *
+ * Both answers are here because they differ, and the difference is the finding.
+ * A new account can assess all three of its applications on the day it signs
+ * up; the cooldown only starts biting afterwards.
+ */
+export interface FreeTierShape {
+  readonly maxApps: number;
+  /** Null where the plan sets none, which is the same as not waiting at all. */
+  readonly cooldownDays: number | null;
+  readonly maxRunCostUsd: number;
+}
+
+/** Every application assessed at once, which is what a new account can do. */
+export function freeTierFirstMonthUsd(shape: FreeTierShape): number {
+  return shape.maxApps * shape.maxRunCostUsd;
+}
+
+/** The same once the cooldown is running, which is every month after the first. */
+export function freeTierSteadyMonthUsd(shape: FreeTierShape): number {
+  if (shape.cooldownDays === null || shape.cooldownDays <= 0) {
+    return freeTierFirstMonthUsd(shape);
+  }
+  return shape.maxApps * shape.maxRunCostUsd * (30 / shape.cooldownDays);
+}
+
+export interface PublishedCeiling {
+  readonly label: string;
+  readonly valueUsd: number;
+  /**
+   * What applies this figure. Never empty, and that is the point: a number with
+   * nothing applying it is not a ceiling, and the cost dashboard laid all three
+   * out identically with no way to tell which was which.
+   */
+  readonly appliedBy: string;
+}
+
+/**
+ * The three ceilings PART 9 asks for, each with what applies it.
+ *
+ * Here rather than in the page, so that what the dashboard says about them is
+ * something a test can read.
+ */
+export function publishedCeilings(
+  freeTier: FreeTierShape,
+  ceilings: SpendCeilings = CEILINGS,
+): PublishedCeiling[] {
+  const money = (value: number) => `$${value.toFixed(2)}`;
+  return [
+    {
+      label: 'Global daily spend',
+      valueUsd: ceilings.globalDailyUsd,
+      appliedBy:
+        'Applied automatically. Crossing it writes a row to spend_pauses, and the worker claims no new work while a pause is live. Lifting one is deliberate and needs a person.',
+    },
+    {
+      label: 'Free-tier weekly budget',
+      valueUsd: ceilings.freeTierWeeklyAlertUsd,
+      appliedBy:
+        'Applied as an alert, deliberately not as a pause: the free tier is a marketing cost, and stopping it silently would look to a prospective customer like a broken product.',
+    },
+    {
+      label: 'Free tier, per account per month',
+      valueUsd: ceilings.freeTierPerAccountMonthlyUsd,
+      appliedBy:
+        `Nothing applies it. What limits a free account is its plan: ${freeTier.maxApps} applications, ` +
+        `one assessment each per ${freeTier.cooldownDays ?? 0} days, ${money(freeTier.maxRunCostUsd)} a run. ` +
+        `That is ${money(freeTierSteadyMonthUsd(freeTier))} a month once the cooldown is running and ` +
+        `${money(freeTierFirstMonthUsd(freeTier))} in the first month, when all three can be assessed at once — ` +
+        `so this figure is right from month two and exceeded in month one. Whether to enforce it, raise it, ` +
+        `or lower the application limit is in docs/OPEN_ITEMS.md.`,
+    },
+  ];
+}
+
 /** Midnight UTC today, and seven days back. One definition, so two callers cannot disagree. */
 export function spendWindows(now: Date = new Date()): { dayStart: Date; weekStart: Date } {
   const dayStart = new Date(

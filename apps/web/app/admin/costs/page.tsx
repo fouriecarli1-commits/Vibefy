@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { priceIn } from '@vibefycode/billing';
-import { CEILINGS } from '@vibefycode/governance';
+import { entitlementFor, priceIn } from '@vibefycode/billing';
+import { publishedCeilings } from '@vibefycode/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { createClient } from '@/lib/supabase/server';
 import { WideTable } from '@/components/wide-table';
@@ -72,6 +72,14 @@ export default async function CostsPage() {
   }
 
   const money = (value: number) => `$${value.toFixed(4)}`;
+  // What limits a free account is its plan, not the figure beside it. Read from
+  // the entitlement so the panel cannot disagree with what the engine enforces.
+  const free = entitlementFor('free');
+  const ceilingPanel = publishedCeilings({
+    maxApps: free.maxApps ?? 0,
+    cooldownDays: free.cooldownDays,
+    maxRunCostUsd: free.maxRunCostUsd,
+  });
   const ceilings = pricing.ceilings.perRunCostUsd as Record<string, number>;
   const tierByDepth = new Map(pricing.tiers.map((tier) => [tier.depth, tier]));
 
@@ -92,21 +100,21 @@ export default async function CostsPage() {
         <h2 id="ceilings" className="text-xl font-semibold">
           Ceilings
         </h2>
+        {/*
+          Each figure says what applies it.
+
+          Three numbers in the same type, laid out identically, read as three
+          ceilings of the same kind. Two of these are applied by something and
+          one is not, and the panel gave its only reader no way to tell which.
+        */}
         <dl className="grid gap-4 sm:grid-cols-3">
-          {[
-            { label: 'Global daily spend', value: `$${CEILINGS.globalDailyUsd.toFixed(2)}` },
-            {
-              label: 'Free-tier weekly budget',
-              value: `$${CEILINGS.freeTierWeeklyAlertUsd.toFixed(2)}`,
-            },
-            {
-              label: 'Free tier, per account per month',
-              value: `$${CEILINGS.freeTierPerAccountMonthlyUsd.toFixed(2)}`,
-            },
-          ].map((item) => (
+          {ceilingPanel.map((item) => (
             <div key={item.label} className="rounded-xl border border-line p-5">
               <dt className="text-sm text-muted">{item.label}</dt>
-              <dd className="mt-1 text-2xl font-bold tracking-tight">{item.value}</dd>
+              <dd className="mt-1 text-2xl font-bold tracking-tight">
+                ${item.valueUsd.toFixed(2)}
+              </dd>
+              <dd className="mt-2 text-sm text-muted">{item.appliedBy}</dd>
             </div>
           ))}
         </dl>

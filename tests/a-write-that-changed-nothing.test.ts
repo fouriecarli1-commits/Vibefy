@@ -26,7 +26,7 @@
  * write in those files, so the fifteenth is caught rather than found.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Client } from 'pg';
 import { actingAs, connect } from './setup/client.ts';
@@ -97,6 +97,39 @@ describe('every action that reports a write', () => {
     'apps/web/app/review/actions.ts',
     'apps/web/app/review/badge-actions.ts',
   ];
+
+  /**
+   * The same set, found rather than named.
+   *
+   * The comment above is right that a glob would quietly start covering a file
+   * nobody looked at. It is the other direction that was unguarded: a *tenth*
+   * action file, added next month with a write and a sentence about it, is
+   * covered by nothing and the list cannot tell anybody. So the list stays
+   * hand-written and is compared against what is on disk — a new file fails
+   * this test by name, and adding it to `REPORTERS` is the decision the comment
+   * asks for, made deliberately rather than by a pattern.
+   */
+  const discovered = (): string[] => {
+    const found: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(join(process.cwd(), dir), { withFileTypes: true })) {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!entry.name.endsWith('.ts')) continue;
+        const text = source(path);
+        if (/\.from\('[^']+'\)\s*\.(?:update\(|delete\(\))/.test(text)) found.push(path);
+      }
+    };
+    walk('apps/web/app');
+    return found.sort();
+  };
+
+  it('covers every file under apps/web/app that writes through PostgREST', () => {
+    expect(discovered()).toEqual([...REPORTERS].sort());
+  });
 
   /** `.update(` and `.delete()` on a Supabase builder, not on a hash. */
   const writes = (text: string) => [

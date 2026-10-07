@@ -66,11 +66,11 @@ Service**. Dit stop die hamer ook.
 
 Hoe jy weet jy het die regte een:
 
-| Deel | Shared pooler (reg) | Dedicated pooler (werk nie) |
-| --- | --- | --- |
+| Deel | Shared pooler (reg)             | Dedicated pooler (werk nie)           |
+| ---- | ------------------------------- | ------------------------------------- |
 | host | eindig op `pooler.supabase.com` | `db.laootpvjfsrvllmxjzgu.supabase.co` |
-| user | `postgres.laootpvjfsrvllmxjzgu` | `postgres` |
-| port | `6543` | `6543` |
+| user | `postgres.laootpvjfsrvllmxjzgu` | `postgres`                            |
+| port | `6543`                          | `6543`                                |
 
 Die **user** is die vinnigste toets. Staan daar net `postgres`, is dit die
 verkeerde een.
@@ -104,12 +104,12 @@ https://vibefycode.com/badge/nonexistent-test-id.svg
 
 Die boodskap daar is nou 'n vol sin wat sê wat om te verander. Sy drie vorms:
 
-| Begin met | Beteken |
-| --- | --- |
-| `...which is the dedicated pooler` | Nog die verkeerde pooler — terug stap B |
-| `...uses the pooler host but the username "postgres"` | Shared pooler, verkeerde gebruikersnaam |
-| `...still contains [YOUR-PASSWORD]` | Die plekhouer is nie vervang nie |
-| `circuit breaker` of `too many authentication failures` | Render hamer nog — terug stap A |
+| Begin met                                               | Beteken                                 |
+| ------------------------------------------------------- | --------------------------------------- |
+| `...which is the dedicated pooler`                      | Nog die verkeerde pooler — terug stap B |
+| `...uses the pooler host but the username "postgres"`   | Shared pooler, verkeerde gebruikersnaam |
+| `...still contains [YOUR-PASSWORD]`                     | Die plekhouer is nie vervang nie        |
+| `circuit breaker` of `too many authentication failures` | Render hamer nog — terug stap A         |
 
 ### Nooit nodig nie
 

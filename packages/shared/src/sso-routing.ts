@@ -46,11 +46,21 @@ export type SsoRoutingOutcome =
 export const SSO_ROUTING_UNKNOWN =
   'We could not check whether your address belongs to an organisation that requires single sign-on, so a password cannot be accepted right now. Try again in a moment.';
 
+/**
+ * What this needs of a client, and no more.
+ *
+ * `PromiseLike` rather than `Promise`, because Supabase's `rpc` returns a
+ * `PostgrestFilterBuilder` — a thenable that awaits like a promise and is not
+ * one. Declaring `Promise` here typechecked in this package and in the root
+ * project, and failed in `apps/web` and `apps/mobile`, the two callers. Both
+ * run their own `tsc` under `pnpm -r typecheck`, so `pnpm verify` was red from
+ * the moment this interface was written and the root typecheck said nothing.
+ */
 interface RoutingCaller {
   rpc(
     name: 'sso_routing',
     args: { candidate_email: string },
-  ): Promise<{ data: unknown; error: { message: string } | null }>;
+  ): PromiseLike<{ data: unknown; error: { message: string } | null }>;
 }
 
 export async function ssoRoutingFor(

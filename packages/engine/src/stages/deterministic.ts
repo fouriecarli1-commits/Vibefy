@@ -35,6 +35,50 @@ function rethrowIfStop(error: unknown): void {
   if (classifyStop(error) !== null) throw error;
 }
 
+/*
+ * Which criteria each pass in this stage answers.
+ *
+ * The browser pass already recorded SEC-12, SEC-13 and PRI-07 when it died,
+ * under a note saying what is absent from this stage is absent because it was
+ * not examined. That was right and it was three ninths of the job: the pass
+ * answers nine criteria, and five other failures in this file recorded nothing
+ * at all — the initial request, the trust survey's own catch, the design
+ * survey's at each width, and the game pass.
+ *
+ * A `failed` stage status does not cover for it. The pipeline turns that into a
+ * note, and `assuranceFor` reads `notTested` and nothing else, so a criterion
+ * with no finding and no entry is a tick however the stage ended.
+ *
+ * These are compared against the rule ids in the helper modules by
+ * tests/the-stage-that-failed-and-said-nothing.test.ts, so a criterion added to
+ * one of them without being added here goes red rather than silently ticking
+ * the next time that pass fails.
+ */
+
+/** Read from the loaded page by this file itself. UX-03 is the WCAG 2.2 AA scan. */
+export const BROWSER_PASS_CRITERIA: readonly string[] = ['PRD-02', 'UX-02', 'UX-03'];
+/** From `measureTrust` and `trustFindings`. */
+export const TRUST_SURVEY_CRITERIA: readonly string[] = ['SEC-12', 'SEC-13', 'PRI-07'];
+/** From `measureDesign` and `designFindings`. */
+export const DESIGN_SURVEY_CRITERIA: readonly string[] = ['UX-04', 'UX-06', 'UX-07'];
+/** From `measureGame` and `gameFindings`, and only where the owner said it is a game. */
+export const GAME_PASS_CRITERIA: readonly string[] = [
+  'FI-01',
+  'FI-07',
+  'FI-08',
+  'PRD-02',
+  'PRD-05',
+  'PRD-06',
+];
+
+/** The same sentence for every criterion a pass did not reach. */
+function notReached(
+  criteria: readonly string[],
+  because: string,
+): { criterion: string; because: string }[] {
+  return criteria.map((criterion) => ({ criterion, because }));
+}
+
 /**
  * Paths that should never be reachable, and what it means when they are.
  *
@@ -185,11 +229,24 @@ export const deterministicChecksStage: Stage = {
       // respond, and returning `failed` for it had the pipeline retry — which
       // is the one thing it promises never to do with a ceiling.
       rethrowIfStop(error);
+      // Nothing was read, so nothing may tick. With a repository in scope the
+      // static-intake stage still succeeds, which means the assessment comes
+      // out `completed` rather than `failed` — and before this, nine criteria
+      // ticked on a target that never answered.
       return {
         stage: 'deterministic_checks',
         status: 'failed',
         findings: [],
         notes: [`The application did not respond at ${url}.`],
+        notTested: notReached(
+          [
+            ...BROWSER_PASS_CRITERIA,
+            ...TRUST_SURVEY_CRITERIA,
+            ...DESIGN_SURVEY_CRITERIA,
+            ...(context.target.isGame ? GAME_PASS_CRITERIA : []),
+          ],
+          `The application did not respond at ${url}, so nothing this criterion is read from was observed.`,
+        ),
         error: error instanceof Error ? error.message : String(error),
       };
     }
@@ -379,6 +436,12 @@ export const deterministicChecksStage: Stage = {
         notes.push(
           `The trust survey did not complete: ${error instanceof Error ? error.message : String(error)}`,
         );
+        notTested.push(
+          ...notReached(
+            TRUST_SURVEY_CRITERIA,
+            'The trust survey did not complete, so what this criterion is read from was not observed.',
+          ),
+        );
       }
 
       /*
@@ -408,6 +471,12 @@ export const deterministicChecksStage: Stage = {
         rethrowIfStop(error);
         notes.push(
           `The design survey did not complete: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        notTested.push(
+          ...notReached(
+            DESIGN_SURVEY_CRITERIA,
+            'The design survey did not complete, so what this criterion is read from was not observed.',
+          ),
         );
       }
 
@@ -532,16 +601,17 @@ export const deterministicChecksStage: Stage = {
       notes.push(
         `The browser pass did not complete, so nothing was looked at in a browser: no accessibility scan, no check of the layout at phone width, no console errors and no design survey. What is absent from this stage is absent because it was not examined. (${browserPassError})`,
       );
-      // Including the three criteria rubric 1.1.0 added, every one of which is
-      // read from the loaded page. Absent findings against them are absent
-      // because nothing was read, and the page must not tick them.
-      for (const criterion of ['SEC-12', 'SEC-13', 'PRI-07']) {
-        notTested.push({
-          criterion,
-          because:
-            'The page could not be loaded in a browser, so nothing this criterion is read from was observed.',
-        });
-      }
+      // Every criterion this pass answers, which is nine and not three. The
+      // three named here before were the ones rubric 1.1.0 had just added, and
+      // picking them was a response to that change rather than to the pass:
+      // the accessibility scan, the layout at phone width and the design
+      // survey are all read from the page too, and all three were ticking.
+      notTested.push(
+        ...notReached(
+          [...BROWSER_PASS_CRITERIA, ...TRUST_SURVEY_CRITERIA, ...DESIGN_SURVEY_CRITERIA],
+          'The page could not be loaded in a browser, so nothing this criterion is read from was observed.',
+        ),
+      );
     } finally {
       // Before close, because the trace is only written when tracing stops and
       // that needs the context still open.
@@ -609,6 +679,12 @@ export const deterministicChecksStage: Stage = {
         notes.push(
           `The game pass did not complete, so none of what a game is judged on was measured: ${error instanceof Error ? error.message : String(error)}`,
         );
+        notTested.push(
+          ...notReached(
+            GAME_PASS_CRITERIA,
+            'The game pass did not complete, so nothing this criterion is read from was observed.',
+          ),
+        );
       } finally {
         await gameSession.close();
       }
@@ -662,6 +738,13 @@ export const deterministicChecksStage: Stage = {
     // `failed` here says is that the dimensions this stage is responsible for
     // were not examined, so their silence is not evidence of anything.
     const didItsJob = browserPassCompleted && gamePassCompleted;
+    // One entry per criterion. A pass can fail inside its own catch and the
+    // enclosing one can fail afterwards, and the visitor is owed one sentence
+    // about a criterion, not two.
+    const seen = new Set<string>();
+    const oncePerCriterion = notTested.filter((entry) =>
+      seen.has(entry.criterion) ? false : (seen.add(entry.criterion), true),
+    );
     return {
       stage: 'deterministic_checks',
       status: didItsJob ? 'succeeded' : 'failed',
@@ -669,7 +752,7 @@ export const deterministicChecksStage: Stage = {
       notes,
       ...(didItsJob || browserPassError === null ? {} : { error: browserPassError }),
       ...(exitMeasurement === undefined ? {} : { exitMeasurement }),
-      ...(notTested.length === 0 ? {} : { notTested }),
+      ...(oncePerCriterion.length === 0 ? {} : { notTested: oncePerCriterion }),
     };
   },
 };

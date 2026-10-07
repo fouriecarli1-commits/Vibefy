@@ -51,19 +51,40 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
 
       # Ordered cheapest-and-most-important first, so a leaked credential or an
-      # over-claiming string fails in seconds rather than after the test suite.
+      # over-claiming string is the first thing in the log rather than the last.
+      #
+      # Every gate carries `if: ${{ !cancelled() }}`, and that is not decoration.
+      # Without it a failure in one step skips every step after it, and the run's
+      # single red mark says nothing about which gates passed. On 2026-10-07 the
+      # ninety-nine most recent runs on `main` were ninety-three failures, six
+      # cancelled and no successes, back to 2026-09-21 — because the brand step
+      # failed eleventh and formatting, typecheck, tests, schema, the legal
+      # register and the stub check were all skipped behind it. A typecheck error
+      # sat in `main` for a day with nothing saying so. The job still fails; it
+      # now says what for. Held by tests/the-gate-that-hid-the-others.test.ts.
       - name: Secret scan
+        if: ${{ !cancelled() }}
         run: pnpm check:secrets
 
       - name: Copy lint — no over-claiming language
+        if: ${{ !cancelled() }}
         run: pnpm check:copy
 
       - name: Colour contrast — WCAG 2.2 AA
+        if: ${{ !cancelled() }}
         run: pnpm check:contrast
 
       - name: Brand assets are current
+        if: ${{ !cancelled() }}
+        # The full build, not `--svg-only`. The flag skipped the raster section,
+        # which is what writes the badge artwork `.webp` files — and
+        # `apps/web/public/brand` is gitignored, so a fresh checkout has none and
+        # `check:brand` on the next line could never pass. It is the check that
+        # proves the badge a customer embeds is the supplied artwork rather than
+        # a drawing of it, so weakening it was never the answer. The flag saved
+        # 3.8 seconds and cost every gate behind this one.
         run: |
-          pnpm brand:build --svg-only
+          pnpm brand:build
           git diff --exit-code -- brand/svg || {
             echo "::error::brand/svg is out of date. Run 'pnpm brand:build' and commit the result."
             exit 1
@@ -71,24 +92,36 @@ jobs:
           pnpm check:brand
 
       - name: Formatting
+        if: ${{ !cancelled() }}
         run: pnpm format:check
 
       - name: Typecheck
+        if: ${{ !cancelled() }}
+        # `pnpm -r typecheck && tsc --noEmit`: every workspace project's own tsc
+        # and then the root. The two disagree — `apps/web` resolves modules as a
+        # bundler does and the root as node does — so the root alone is half the
+        # gate, and the half that misses what a page actually compiles against.
         run: pnpm typecheck
 
       - name: Tests
+        if: ${{ !cancelled() }}
         run: pnpm test
 
       - name: Schema file matches the migrations
+        if: ${{ !cancelled() }}
         run: pnpm check:schema
 
       - name: Legal register is complete
+        if: ${{ !cancelled() }}
         # Missing from CI entirely until 2026-08-25 — the one gate `pnpm verify`
         # ran that nothing on the server did. Nobody noticed, because no run had
-        # ever got far enough to notice anything.
+        # ever got far enough to notice anything. The same sentence was true
+        # again six weeks later, of six gates at once, which is why the `if:`
+        # above every one of these is there now.
         run: pnpm legal:registry
 
       - name: Fail if any STUB_ is undocumented
+        if: ${{ !cancelled() }}
         # Spelled as the script rather than as the command it happens to run, so
         # `pnpm verify` and this file cannot drift into meaning different things.
         run: pnpm check:stubs
