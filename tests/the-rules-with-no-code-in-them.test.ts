@@ -57,9 +57,10 @@ const insertApp = (over: Record<string, unknown>) => {
     ...over,
   };
   const keys = Object.keys(row);
+  const values: Record<string, unknown> = row;
   return db.query(
     `insert into public.apps (${keys.join(', ')}) values (${keys.map((_, i) => `$${i + 1}`).join(', ')})`,
-    keys.map((key) => row[key]),
+    keys.map((key) => values[key]),
   );
 };
 
@@ -148,9 +149,10 @@ describe('an invitation in two states at once', () => {
       ...over,
     };
     const keys = Object.keys(row);
+    const values: Record<string, unknown> = row;
     return db.query(
       `insert into public.invitations (${keys.join(', ')}) values (${keys.map((_, i) => `$${i + 1}`).join(', ')})`,
-      keys.map((key) => row[key]),
+      keys.map((key) => values[key]),
     );
   };
 

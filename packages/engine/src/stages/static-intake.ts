@@ -26,7 +26,7 @@
  * like a statement about the whole repository.
  */
 import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+import { basename, extname, join, relative } from 'node:path';
 import advisoryData from '../data/advisories.json' with { type: 'json' };
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
@@ -106,18 +106,139 @@ const TEXT_EXTENSIONS = new Set([
   '.cer',
   '.p8',
   '.asc',
+  // Measured, not guessed. `.mts` was nine files in our own repository while
+  // `.mjs` and `.cjs` were both on this list, and there is no reading under
+  // which it is a different kind of file. The rest are the types where a
+  // committed credential is a documented pattern rather than a hypothesis:
+  // deploy scripts under a name `.sh` does not cover, notebooks, Terraform's
+  // other extension, and the template languages that embed configuration.
+  '.mts',
+  '.cts',
+  '.bash',
+  '.zsh',
+  '.ksh',
+  '.ps1',
+  '.psm1',
+  '.bat',
+  '.cmd',
+  '.ipynb',
+  '.hcl',
+  '.erb',
+  '.ejs',
+  '.hbs',
+  '.njk',
+  '.mustache',
+  '.tpl',
+  '.jsonc',
+  '.json5',
+  '.lua',
+  '.ex',
+  '.exs',
+  '.pl',
+  '.scala',
+  '.groovy',
+  '.sbt',
+  '.m',
+  '.mm',
+  '.css',
+  '.scss',
+  '.less',
+  '.csv',
+  '.tsv',
+  '.service',
+  '.rst',
 ]);
 /** Files whose whole name is the signal; `extname` gives these nothing to match on. */
 const SCANNED_FILENAMES = new Set([
   'Dockerfile',
   'Procfile',
+  'Makefile',
+  'makefile',
+  'GNUmakefile',
+  'Jenkinsfile',
   '.npmrc',
   '.netrc',
   '.pgpass',
+  '.htpasswd',
+  '.pypirc',
+  '.my.cnf',
+  '.dockercfg',
+  'credentials',
   'id_rsa',
   'id_dsa',
   'id_ecdsa',
   'id_ed25519',
+]);
+
+/**
+ * Types this scan does not read and does not report not reading.
+ *
+ * The coverage note counts files dropped on their type, because the allowlist
+ * was the one narrowing the stage never mentioned. A note saying thousands of
+ * files went unread would be true and useless — it is images and fonts — and a
+ * reader who learns to skip one sentence skips the next one too. So these are
+ * set aside from the count, and everything else is named.
+ */
+const KNOWN_BINARY = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.ico',
+  '.avif',
+  '.bmp',
+  '.tif',
+  '.tiff',
+  '.svg',
+  '.pdf',
+  '.zip',
+  '.gz',
+  '.tar',
+  '.tgz',
+  '.bz2',
+  '.xz',
+  '.7z',
+  '.rar',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.ttc',
+  '.otf',
+  '.eot',
+  '.mp3',
+  '.mp4',
+  '.wav',
+  '.mov',
+  '.webm',
+  '.avi',
+  '.ogg',
+  '.jar',
+  '.war',
+  '.class',
+  '.so',
+  '.dylib',
+  '.dll',
+  '.exe',
+  '.bin',
+  '.wasm',
+  '.pyc',
+  '.pyo',
+  '.o',
+  '.a',
+  '.lib',
+  '.node',
+  '.db',
+  '.sqlite',
+  '.sqlite3',
+  '.map',
+  '.tsbuildinfo',
+  '.psd',
+  '.sketch',
+  '.fig',
+  '.dat',
+  '.pack',
+  '.idx',
 ]);
 const MAX_FILE_BYTES = 1_000_000;
 /**
@@ -287,7 +408,7 @@ export const staticIntakeStage: Stage = {
       );
     }
 
-    findings.push(...checkDependencies(root, context, notes, notTested));
+    findings.push(...checkDependencies(root, files, context, notes, notTested));
     findings.push(...checkLicence(root, context, notes));
     findings.push(...checkIgnoreHygiene(root, files, context, credentials.filesWithHits));
 
@@ -325,6 +446,8 @@ interface Walk {
   readonly tooLarge: number;
   readonly unreadableDirectories: number;
   readonly truncated: boolean;
+  /** Extension to count, for files dropped on their type and not known binary. */
+  readonly skippedTypes: ReadonlyMap<string, number>;
 }
 
 function walk(root: string): Walk {
@@ -333,6 +456,7 @@ function walk(root: string): Walk {
   let tooLarge = 0;
   let unreadableDirectories = 0;
   let truncated = false;
+  const skippedTypes = new Map<string, number>();
 
   const visit = (dir: string): void => {
     if (truncated) return;
@@ -364,7 +488,16 @@ function walk(root: string): Walk {
         visit(full);
         continue;
       }
-      if (!stats.isFile() || !scannable(entry)) continue;
+      if (!stats.isFile()) continue;
+      if (!scannable(entry)) {
+        // Dropped on its type. Counted here so the notes can say so; an image
+        // or a font is set aside, because naming every asset is noise.
+        const extension = extname(entry).toLowerCase();
+        if (extension !== '' && !KNOWN_BINARY.has(extension)) {
+          skippedTypes.set(extension, (skippedTypes.get(extension) ?? 0) + 1);
+        }
+        continue;
+      }
       if (stats.size > MAX_FILE_BYTES) {
         tooLarge += 1;
         continue;
@@ -375,7 +508,7 @@ function walk(root: string): Walk {
   };
 
   visit(root);
-  return { files, symlinks, tooLarge, unreadableDirectories, truncated };
+  return { files, symlinks, tooLarge, unreadableDirectories, truncated, skippedTypes };
 }
 
 function scannable(name: string): boolean {
@@ -404,6 +537,18 @@ function coverageGap(walked: Walk): string | null {
   }
   if (walked.truncated) {
     clauses.push(`the walk stopped at ${MAX_FILES} files`);
+  }
+  const skippedOnType = [...walked.skippedTypes.values()].reduce((sum, count) => sum + count, 0);
+  if (skippedOnType > 0) {
+    const types = [...walked.skippedTypes.entries()]
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .slice(0, 8)
+      .map(([extension]) => extension);
+    clauses.push(
+      `${skippedOnType} file(s) were of a type this scan does not read (${types.join(', ')}${
+        walked.skippedTypes.size > types.length ? ', …' : ''
+      })`,
+    );
   }
   if (clauses.length === 0) return null;
   return `Not everything was covered: ${clauses.join('; ')}. Nothing in them was scanned, which is not evidence that there was nothing there.`;
@@ -521,69 +666,149 @@ function scanForCredentials(root: string, files: string[], context: StageContext
   };
 }
 
+/**
+ * Every `package.json` the walk found, nearest the root first.
+ *
+ * The check used to open `<root>/package.json` and report on the repository. For
+ * a single-package repository that is the same thing; for a workspace it is not,
+ * and a workspace is what a vibe-coded application very often is — the root
+ * manifest holds the toolchain and `apps/web` holds what ships. Measured on our
+ * own repository: 13 of 57 declared dependencies are in the root manifest.
+ *
+ * `files` comes from the walk, which already skips `node_modules`. That matters
+ * here more than anywhere else: every installed package carries a manifest, and
+ * reading those would charge the customer for what their dependencies depend
+ * on, which is not what SEC-10 asks.
+ */
+function manifestsUnder(root: string, files: readonly string[]): string[] {
+  return files
+    .filter((file) => basename(file) === 'package.json')
+    .sort((left, right) => depthOf(root, left) - depthOf(root, right) || left.localeCompare(right));
+}
+
+function depthOf(root: string, file: string): number {
+  return relative(root, file).split(/[\\/]/).length;
+}
+
+/**
+ * A ceiling on manifests read. A repository is customer input and a generated
+ * tree can carry thousands; where it bites, the notes say so, because a count
+ * of what was read with no mention of what was not reads as the whole tree.
+ */
+const MAX_MANIFESTS = 100;
+
 function checkDependencies(
   root: string,
+  files: readonly string[],
   context: StageContext,
   notes: string[],
   notTested: { criterion: string; because: string }[],
 ): RawFinding[] {
-  const manifestPath = join(root, 'package.json');
-  if (!existsSync(manifestPath)) {
+  const found = manifestsUnder(root, files);
+  const manifestPaths = found.slice(0, MAX_MANIFESTS);
+  if (manifestPaths.length === 0) {
     notes.push('No package.json was found, so the dependency check did not run.');
     notTested.push(...dependencyCheckNotRun(NO_MANIFEST));
     return [];
   }
 
-  let manifest: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-  try {
-    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  } catch {
-    notes.push('package.json could not be read or parsed, so the dependency check did not run.');
+  /** What each manifest declares, kept per manifest so a finding can say where. */
+  const declaredIn = new Map<string, Record<string, string>>();
+  const unparsable: string[] = [];
+  for (const path of manifestPaths) {
+    let manifest: {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    try {
+      manifest = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      unparsable.push(relative(root, path));
+      continue;
+    }
+    declaredIn.set(relative(root, path), { ...manifest.dependencies, ...manifest.devDependencies });
+  }
+
+  // Not one manifest opened. The old single-manifest check said this and it is
+  // still the honest answer: there was no list of declared dependencies to read.
+  if (declaredIn.size === 0) {
+    notes.push(
+      `${unparsable.length} package.json file(s) could not be read or parsed, so the dependency check did not run.`,
+    );
     notTested.push(...dependencyCheckNotRun(NO_MANIFEST));
     return [];
   }
 
-  const declared = { ...manifest.dependencies, ...manifest.devDependencies };
+  const declared: Record<string, string> = {};
+  for (const entry of declaredIn.values()) Object.assign(declared, entry);
   const locked = readLockfile(root);
   if (locked !== null) notes.push(`Resolved ${locked.source} for the versions actually installed.`);
+
+  notes.push(
+    `Read ${declaredIn.size} manifest(s) for declared dependencies (${[...declaredIn.keys()]
+      .slice(0, 5)
+      .join(', ')}${declaredIn.size > 5 ? ', …' : ''}).`,
+  );
+  // A manifest we could not parse might have declared the affected version. The
+  // check ran, so SEC-10 is not untested — but the coverage was short of the
+  // tree and the note has to say which part.
+  if (unparsable.length > 0) {
+    notes.push(
+      `${unparsable.length} package.json file(s) could not be parsed and were not read (${unparsable
+        .slice(0, 5)
+        .join(', ')}). Nothing they declare was checked.`,
+    );
+  }
+  if (found.length > manifestPaths.length) {
+    notes.push(
+      `The repository carries ${found.length} package.json file(s); the dependency check read the ${MAX_MANIFESTS} nearest the root. The rest were not read.`,
+    );
+  }
 
   const matched: {
     name: string;
     declared: string;
+    /** Which manifest declared it, so the customer knows where to go. */
+    manifest: string;
     /** The version the lockfile resolves, where there is one to read. */
     installed: string | null;
     advisory: Advisory;
     certain: boolean;
   }[] = [];
 
-  for (const [name, range] of Object.entries(declared)) {
-    const installed = locked?.versions.get(name) ?? null;
-    for (const advisory of ADVISORIES) {
-      if (advisory.package !== name) continue;
-      // The lockfile is the answer where there is one: it says which version is
-      // on disk, which is the question. Without it the range is all there is,
-      // and a caret permits an affected version and a fixed one alike.
-      if (installed !== null) {
-        if (!below(installed, advisory.vulnerable)) continue;
-        matched.push({ name, declared: range, installed, advisory, certain: true });
-        continue;
-      }
-      if (permitsVulnerable(range, advisory.vulnerable)) {
-        matched.push({
-          name,
-          declared: range,
-          installed: null,
-          advisory,
-          certain: isPinned(range),
-        });
+  for (const [manifest, entries] of declaredIn) {
+    for (const [name, range] of Object.entries(entries)) {
+      const installed = locked?.versions.get(name) ?? null;
+      for (const advisory of ADVISORIES) {
+        if (advisory.package !== name) continue;
+        // The lockfile is the answer where there is one: it says which version is
+        // on disk, which is the question. Without it the range is all there is,
+        // and a caret permits an affected version and a fixed one alike.
+        if (installed !== null) {
+          if (!below(installed, advisory.vulnerable)) continue;
+          matched.push({ name, declared: range, manifest, installed, advisory, certain: true });
+          continue;
+        }
+        if (permitsVulnerable(range, advisory.vulnerable)) {
+          matched.push({
+            name,
+            declared: range,
+            manifest,
+            installed: null,
+            advisory,
+            certain: isPinned(range),
+          });
+        }
       }
     }
   }
 
   const artefact = context.evidence.capture({
     kind: 'dependency_report',
-    summary: `Dependency manifest — ${Object.keys(declared).length} declared, ${matched.length} matched a known advisory`,
+    summary: `Dependency manifests — ${declaredIn.size} read, ${Object.keys(declared).length} package(s) declared, ${matched.length} matched a known advisory`,
     body: {
+      manifests: [...declaredIn.keys()],
+      unparsableManifests: unparsable,
       declared,
       matched,
       coverage:
@@ -599,9 +824,28 @@ function checkDependencies(
     return [];
   }
 
-  const worst = matched.some((entry) => entry.advisory.severity === 'critical')
-    ? 'critical'
-    : 'high';
+  // The advisory's own rating, not a default. This used to read "critical where
+  // any entry is critical, high otherwise", which was right for nine of the ten
+  // curated entries and inflated the tenth — express, rated medium — by a step.
+  // An inflated severity costs the customer points in security_posture, and
+  // saying something the evidence does not is the same defect either way round.
+  const rated = matched.map((entry) => advisorySeverity(entry.advisory));
+  const unrecognised = [
+    ...new Set(
+      matched
+        .filter((entry, index) => !rated[index]!.recognised)
+        .map((entry) => `${entry.advisory.id} (${entry.advisory.severity})`),
+    ),
+  ];
+  if (unrecognised.length > 0) {
+    notes.push(
+      `${unrecognised.length} advisor(y/ies) carry a severity this engine does not recognise (${unrecognised.join(', ')}) and were reported at high. Their real rating may be lower or higher.`,
+    );
+  }
+  const worst = rated.reduce(
+    (current, entry) => (rank(entry.severity) > rank(current) ? entry.severity : current),
+    rated[0]!.severity,
+  );
   // A pinned version that sits inside an advisory's range is affected. A caret
   // or tilde range permits an affected version and a fixed one alike, and which
   // is installed is decided by a lockfile this check does not read — so a match
@@ -617,10 +861,10 @@ function checkDependencies(
       description: `${matched
         .map((entry) =>
           entry.installed !== null
-            ? `${entry.name}@${entry.installed}, which is what your lockfile installs (${entry.advisory.id}: ${entry.advisory.summary})`
+            ? `${entry.name}@${entry.installed}, which is what your lockfile installs, declared in ${entry.manifest} (${entry.advisory.id}: ${entry.advisory.summary})`
             : `${entry.name}@${entry.declared}${
                 entry.certain ? '' : ', a range that permits an affected version,'
-              } (${entry.advisory.id}: ${entry.advisory.summary})`,
+              } declared in ${entry.manifest} (${entry.advisory.id}: ${entry.advisory.summary})`,
         )
         .join(
           '; ',
@@ -857,6 +1101,29 @@ function checkIgnoreHygiene(
   ];
 }
 
+const SEVERITIES: readonly RawFinding['severity'][] = ['info', 'low', 'medium', 'high', 'critical'];
+
 function rank(severity: RawFinding['severity']): number {
-  return ['info', 'low', 'medium', 'high', 'critical'].indexOf(severity);
+  return SEVERITIES.indexOf(severity);
+}
+
+/**
+ * An advisory's published rating on the scale a finding uses.
+ *
+ * `recognised` is the point of the return shape. A rating we cannot place has
+ * to become something, and the conservative choice is `high` — but a silent
+ * default is how the express entry was wrong for a month, so the caller is told
+ * and puts it in the notes rather than deciding on the customer's behalf.
+ */
+function advisorySeverity(advisory: Advisory): {
+  severity: RawFinding['severity'];
+  recognised: boolean;
+} {
+  const lowered = advisory.severity.trim().toLowerCase();
+  // OSV and GitHub both publish `moderate` where this scale says `medium`.
+  const named = lowered === 'moderate' ? 'medium' : lowered;
+  const match = SEVERITIES.find((candidate) => candidate === named);
+  return match === undefined
+    ? { severity: 'high', recognised: false }
+    : { severity: match, recognised: true };
 }
