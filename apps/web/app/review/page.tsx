@@ -93,6 +93,39 @@ export default async function ReviewQueuePage() {
     byAssessment.set(key, list);
   }
 
+  /*
+   * The score a badge is currently standing on, per application.
+   *
+   * `previousScore` drives the `large_move` attention rule, whose own sentence
+   * says why it matters: "a move this size is either a real change in the
+   * application or a difference in what the run reached. Which one it is
+   * decides whether a badge should move." Nothing in `apps/` set it, so the
+   * rule could not fire — the same shape as `syntheticCredentials` on the
+   * pipeline, an optional field with a branch, an id in a union, a passing test
+   * and no caller.
+   *
+   * Approved or published only. A draft, a failed run or one still awaiting
+   * review is not a number anybody relied on, and comparing against it would
+   * raise attention over a move that never happened in public.
+   */
+  const appIds = [...new Set((queue ?? []).map((assessment) => assessment.app_id as string))];
+  const { data: priorScores } = appIds.length
+    ? await supabase
+        .from('assessments')
+        .select('app_id, overall_score, created_at')
+        .in('app_id', appIds)
+        .in('status', ['approved', 'published'])
+        .not('overall_score', 'is', null)
+        .order('created_at', { ascending: false })
+    : { data: [] };
+  // Ordered newest first, so the first row seen for an application is its most
+  // recent reviewed score.
+  const lastReviewedScore = new Map<string, number>();
+  for (const row of priorScores ?? []) {
+    const key = row.app_id as string;
+    if (!lastReviewedScore.has(key)) lastReviewedScore.set(key, Number(row.overall_score));
+  }
+
   const failedByAssessment = new Map<string, string[]>();
   for (const row of stages ?? []) {
     const key = row.assessment_id as string;
@@ -112,6 +145,7 @@ export default async function ReviewQueuePage() {
         gateFailures: (assessment.gate_failures as string[]) ?? [],
         findings: byAssessment.get(id) ?? [],
         failedStages: failedByAssessment.get(id) ?? [],
+        previousScore: lastReviewedScore.get(assessment.app_id as string) ?? null,
       }),
     };
   });

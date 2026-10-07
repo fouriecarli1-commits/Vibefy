@@ -76,6 +76,26 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     .eq('assessment_id', id)
     .order('created_at', { ascending: false });
 
+  /*
+   * The score a badge for this application is currently standing on.
+   *
+   * `previousScore` drives the `large_move` attention rule — "a move this size
+   * is either a real change in the application or a difference in what the run
+   * reached. Which one it is decides whether a badge should move." Nothing in
+   * `apps/` set it, so the rule could not fire. Approved or published only: a
+   * draft or a failed run is not a number anybody relied on.
+   */
+  const { data: prior } = await supabase
+    .from('assessments')
+    .select('overall_score')
+    .eq('app_id', assessment.app_id as string)
+    .in('status', ['approved', 'published'])
+    .not('overall_score', 'is', null)
+    .neq('id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const app = assessment.apps as unknown as {
     name: string;
     primary_url: string;
@@ -108,6 +128,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     failedStages: (runs ?? [])
       .filter((run) => String(run.status) !== 'succeeded')
       .map((run) => String(run.stage)),
+    previousScore: prior?.overall_score === undefined ? null : Number(prior.overall_score),
   });
 
   return (
