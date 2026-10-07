@@ -60,6 +60,23 @@ export interface SubjectExport {
    */
   readonly publicationDecisions: readonly Record<string, unknown>[];
   readonly dataRequests: readonly Record<string, unknown>[];
+  /**
+   * Appeals this person submitted, and the answer they were given.
+   *
+   * The appeals policy promises *them* written reasons within fourteen days,
+   * whether the appeal succeeds or not. A promise made to a person is a record
+   * addressed to that person, which is the same reasoning that puts
+   * `dataRequests` here.
+   */
+  readonly appeals: readonly Record<string, unknown>[];
+  /**
+   * The moment they accepted an authorisation-to-test warranty.
+   *
+   * Text version, hash, timestamp, IP and user agent — the same fields as a
+   * consent and theirs for the same reason. The scope the authorisation grants
+   * belongs to the workspace and is not here.
+   */
+  readonly authorisationsAccepted: readonly Record<string, unknown>[];
   readonly notIncluded: readonly OmittedCategory[];
   /** Written to be read by the person, not by us. */
   readonly readMe: string;
@@ -101,6 +118,87 @@ export const NOT_INCLUDED: readonly OmittedCategory[] = [
     category: 'Analytics and behavioural records',
     reason: 'Not held. We do not record which pages you opened, which emails you read, or when.',
   },
+  {
+    category: 'Workspace and platform records that name you as the person who acted',
+    reason:
+      'A review decision, a workspace or policy profile you created, an invitation you sent, an assessment somebody requested, a badge or listing event, a spending pause somebody lifted: each is a record about a workspace resource that happens to say who acted. A workspace owner exports these from the workspace audit export. Handing them out here would disclose a colleague’s records, and an invitation carries somebody else’s email address.',
+  },
+  {
+    category: 'Push notification device tokens',
+    reason:
+      'Held only while a device is signed in, and deleted when it signs out. The token is a key for sending to that device rather than anything about you — the same reasoning as a password hash: exporting it would tell you nothing you do not know and make one more copy of something worth stealing. Sign the device out to remove it, or ask and we will remove it for you.',
+  },
+  {
+    category: 'Remediation worker assignments',
+    reason:
+      'Where you do remediation work for us, the record of which jobs you are assigned to is an operational record of ours rather than a profile of you. Ask and we will tell you what it says.',
+  },
+];
+
+/**
+ * Every table that holds a reference to a person, and where it ends up.
+ *
+ * `'exported'` means a query in `assembleSubjectExport` reads it. Anything else
+ * is the `NOT_INCLUDED` category the person is shown instead.
+ *
+ * This map exists because the rule at the top of this file — "every export
+ * names the categories that were considered and left out" — had nothing holding
+ * it. Measured against the live schema: twenty-four tables carry a foreign key
+ * to `public.users`, the export read six, and eighteen were neither read nor
+ * covered by anything the person is told about. The rule was true of the
+ * categories somebody had thought of.
+ *
+ * `tests/the-table-the-export-never-looked-at.test.ts` reads the foreign keys
+ * from the database and fails on a table that is in neither column, so a table
+ * added next month is accounted for deliberately or the suite says so.
+ */
+export const ACCOUNTED_FOR: Readonly<Record<string, string>> = {
+  users: 'exported',
+  memberships: 'exported',
+  consents: 'exported',
+  apps: 'exported',
+  builder_profile_apps: 'exported',
+  data_requests: 'exported',
+  // Their own grounds, in their own words, and the written outcome the appeals
+  // policy promises them. `data_requests` is exported for that reason and this
+  // is the same shape.
+  appeals: 'exported',
+  // The acceptance record: text version, hash, timestamp, IP, user agent — the
+  // same fields as a consent, exported for the same reason, and listed in the
+  // Privacy Policy as held about this person for ten years. The scope of the
+  // authorisation belongs to the workspace and is not here.
+  authorisations: 'exported',
+  // A decision about publication, which is what `publicationDecisions` is for.
+  directory_listings: 'exported',
+
+  audit_log: 'Workspace and platform records that name you as the person who acted',
+  audit_exports: 'Workspace and platform records that name you as the person who acted',
+  assessments: 'Assessment results, findings, reports and badges',
+  assessment_requests: 'Assessment results, findings, reports and badges',
+  reviews: 'Workspace and platform records that name you as the person who acted',
+  badge_events: 'Workspace and platform records that name you as the person who acted',
+  listing_events: 'Workspace and platform records that name you as the person who acted',
+  invitations: 'Workspace and platform records that name you as the person who acted',
+  organisations: 'Workspace and platform records that name you as the person who acted',
+  policy_profiles: 'Workspace and platform records that name you as the person who acted',
+  sso_connections: 'Workspace and platform records that name you as the person who acted',
+  spend_pauses: 'Workspace and platform records that name you as the person who acted',
+  sponsorships: 'Workspace and platform records that name you as the person who acted',
+  device_tokens: 'Push notification device tokens',
+  remediation_workers: 'Remediation worker assignments',
+};
+
+/** The tables a query in `assembleSubjectExport` reads. Held against the map above. */
+export const EXPORTED_TABLES: readonly string[] = [
+  'users',
+  'memberships',
+  'consents',
+  'apps',
+  'builder_profile_apps',
+  'data_requests',
+  'appeals',
+  'authorisations',
+  'directory_listings',
 ];
 
 const READ_ME = [
@@ -115,6 +213,11 @@ const READ_ME = [
   '`publicationDecisions` is each time you chose to show one of your applications on',
   'a public page. The page itself is not here — it belongs to the workspace and it is',
   'already public — but the decision, with your name against it, is yours.',
+  '',
+  '`appeals` is any appeal you filed about an assessment, with your grounds and the',
+  'written answer you were given. `authorisationsAccepted` is each time you accepted an',
+  'authorisation-to-test warranty, with the version and hash of the text as it stood,',
+  'so you can prove what you warranted the same way you can prove what you consented to.',
   '',
   '`notIncluded` lists what was considered and left out, and why. Read it. An export',
   'that silently omits a category looks complete, and leaves you with no way to know',
@@ -206,11 +309,22 @@ export async function assembleSubjectExport(
   const publicationDecisions = await sql.query<Record<string, unknown>>(
     // Not the page, which is the workspace's and is public anyway — the
     // decision, which is this person's and is not recorded anywhere else.
-    `select c.organisation_id, c.app_id, a.name as app_name, c.consented_at
+    // Both kinds of decision, because both are an act by this person and
+    // neither is recorded anywhere else they can reach. Showing an application
+    // on a builder profile was already here; taking one out of the public
+    // directory is the same kind of act and was in no column of this export.
+    `select 'shown on a builder profile' as decision,
+            c.organisation_id, c.app_id, a.name as app_name, c.consented_at as decided_at
        from public.builder_profile_apps c
        join public.apps a on a.id = c.app_id
       where c.consented_by = $1
-      order by c.consented_at`,
+      union all
+     select 'opted out of the public directory' as decision,
+            d.organisation_id, d.app_id, a.name as app_name, d.opted_out_at as decided_at
+       from public.directory_listings d
+       join public.apps a on a.id = d.app_id
+      where d.opted_out_by = $1
+      order by decided_at`,
     [subjectId],
   );
 
@@ -219,6 +333,29 @@ export async function assembleSubjectExport(
             due_at, completed_at, created_at
        from public.data_requests where user_id = $1
       order by created_at`,
+    [subjectId],
+  );
+
+  const appeals = await sql.query<Record<string, unknown>>(
+    // Their words and the answer they were given. The assessment the appeal is
+    // about is not here — see `notIncluded`.
+    `select id, status, grounds, resolution, due_at, resolved_at, created_at
+       from public.appeals where submitted_by = $1
+      order by created_at`,
+    [subjectId],
+  );
+
+  const authorisationsAccepted = await sql.query<Record<string, unknown>>(
+    // The acceptance, not the authorisation. `scope_domains`, `third_parties`
+    // and the rest describe what the workspace authorised us to test and are
+    // workspace records; these columns are the record of this person agreeing.
+    `select a.id, p.name as app_name, a.method, a.warranty_text_version,
+            a.warranty_text_sha256, a.accepted_ip::text as accepted_ip,
+            a.accepted_user_agent, a.created_at
+       from public.authorisations a
+       join public.apps p on p.id = a.app_id
+      where a.granted_by = $1
+      order by a.created_at`,
     [subjectId],
   );
 
@@ -232,6 +369,8 @@ export async function assembleSubjectExport(
     applications: applications.rows,
     publicationDecisions: publicationDecisions.rows,
     dataRequests: dataRequests.rows,
+    appeals: appeals.rows,
+    authorisationsAccepted: authorisationsAccepted.rows,
     notIncluded: NOT_INCLUDED,
     readMe: READ_ME,
   };
