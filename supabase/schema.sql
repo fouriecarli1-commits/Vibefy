@@ -7347,3 +7347,97 @@ alter table public.cost_records
   add constraint cost_records_assessment_run_id_fkey
     foreign key (assessment_run_id) references public.assessment_runs(id) on delete set null;
 
+-- ===========================================================================
+-- 20261008010000_a_grant_nobody_wrote.sql
+-- ===========================================================================
+
+-- audit-marker: not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'spend_since' and has_function_privilege('anon', p.oid, 'execute'))
+--
+-- A grant nobody wrote, on the figure a reviewer may not see.
+--
+-- `cost_records` carries RLS restricting select to platform admins, and
+-- `tests/money.test.ts` holds that rule under the heading "is invisible to
+-- customers and to reviewers alike". The reason is written down in the costs
+-- dashboard: a reviewer who can see what an assessment cost us is a reviewer
+-- with a commercial signal in front of them.
+--
+-- Measured on the test database, as the `anon` role, over PostgREST's own
+-- entry point:
+--
+--     spend_since        = 2.310345
+--     free_tier_spend    = 122.310345
+--     spending_is_paused = false
+--
+-- Not a bug in a policy. Postgres grants EXECUTE on a new function to PUBLIC
+-- by default, and PostgREST publishes every `public`-schema function as
+-- `/rpc/<name>`. A `security definer` function therefore arrives on the
+-- internet, reading its tables as the owner, unless a migration takes the
+-- grant away. Every other sensitive one here does:
+--
+--     revoke all on function public.sso_routing(text) from public;
+--     revoke all on function public.accept_invitation(text) from public, anon;
+--     revoke all on function public.assistant_spend_since(uuid, timestamptz) from public, anon;
+--     revoke all on function public.record_screening_decision(...) from public, anon;
+--     revoke all on function public.set_platform_role(...) from public, anon;
+--
+-- These seven did not. `spending_is_paused` is the clearest case of how it
+-- happens: `20260822180000_governance_operations` ends with
+--
+--     grant execute on function public.spending_is_paused() to authenticated;
+--
+-- and nothing else. A grant written on its own line reads like the whole
+-- story — as though naming who may call it also said who may not.
+--
+-- ## Why none of the seven needs a grant back
+--
+-- The spend trio has exactly one caller, `apps/worker/src/governance.ts`, and
+-- it holds a `pg` PoolClient on `SUPABASE_DB_URL` — the owner role, which has
+-- EXECUTE by ownership and not by grant. `assistant_spend_since` is the one
+-- the customer-facing copilot route calls, and it is already revoked and
+-- already granted to `authenticated`, scoped to the caller's own
+-- organisation. The platform-wide figure has no customer-facing caller at all.
+--
+-- `seats_used` and `seats_for_organisation` are called only from inside
+-- `assert_seat_available`, `accept_invitation` and `create_workspace`, all
+-- three `security definer`; a nested call inside a definer function is checked
+-- against the owner, not the caller.
+--
+-- `platform_role_of` is called only from inside `is_reviewer` and
+-- `is_platform_admin`, same reasoning. `app_has_remediation` appears only in
+-- the `badge_verification`, `listed_badges` and `directory` views, which are
+-- `security_invoker = false` and so resolve it as the view owner.
+--
+-- Measured rather than argued: with all seven revoked, `anon` still reads
+-- badge_verification (76 rows), directory (6), listed_badges (6),
+-- trust_page_public (1) and builder_profile_public (2); `authenticated` still
+-- reads the views and still evaluates `is_platform_admin` and `is_reviewer`
+-- identically to before; and the owner still gets `spend_since = 2.310345`.
+--
+-- ## What is deliberately left alone
+--
+-- `is_org_member`, `has_org_role`, `is_platform_admin`, `is_reviewer` and
+-- `shares_org_with` stay callable by `anon`. RLS policy expressions are
+-- evaluated as the current role, and these appear in 37, 17, 18, 25 and 1
+-- policies respectively — revoking them would break every anon-facing read in
+-- the product. What was checked before leaving them: each reads only
+-- `memberships` or `users`, each answers only about the caller, and for an
+-- unauthenticated caller — `auth.uid()` null — the answer is false or null,
+-- both of which exclude the row.
+--
+-- `sso_routing` stays granted to `anon` on purpose: the sign-in form has to
+-- ask where to send an email address before anyone is signed in.
+--
+-- The trigger functions — `assert_seat_available`, `handle_new_auth_user`,
+-- `record_a_refusal_at_intake`, `record_badge_event`, `record_listing_event`,
+-- `reject_review_by_remediation_worker` — keep their default grant because
+-- Postgres refuses a direct call regardless: "trigger functions can only be
+-- called as triggers", measured.
+
+revoke all on function public.spend_since(timestamptz) from public, anon, authenticated;
+revoke all on function public.free_tier_spend_since(timestamptz) from public, anon, authenticated;
+revoke all on function public.spending_is_paused() from public, anon, authenticated;
+revoke all on function public.seats_used(uuid) from public, anon, authenticated;
+revoke all on function public.seats_for_organisation(uuid) from public, anon, authenticated;
+revoke all on function public.platform_role_of(uuid) from public, anon, authenticated;
+revoke all on function public.app_has_remediation(uuid) from public, anon, authenticated;
+

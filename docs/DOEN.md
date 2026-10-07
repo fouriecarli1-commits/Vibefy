@@ -5,13 +5,25 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-07.
 
-> **Daar is nou nege SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
-> agt was reeds daar; die negende is bygevoeg op 2026-10-07 en staan onderaan
-> `docs/sql/OUTSTANDING.sql`. Dit verander drie vreemde-sleutels op
-> `cost_records` sodat 'n werkruimte-verwydering nie die finansiële rekords
-> saamneem wat die bewaarskedule sê ons sewe jaar moet hou nie. Niks in die
-> produk vee 'n werkruimte uit, so dit is nie dringend nie — dit is 'n valstrik
-> vir die dag dat iemand dit met die hand doen.
+> **Daar is nou tien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
+> agt was reeds daar; die negende en tiende is bygevoeg op 2026-10-07 en staan
+> onderaan `docs/sql/OUTSTANDING.sql`.
+>
+> Die negende verander drie vreemde-sleutels op `cost_records` sodat 'n
+> werkruimte-verwydering nie die finansiële rekords saamneem wat die
+> bewaarskedule sê ons sewe jaar moet hou nie. Niks in die produk vee 'n
+> werkruimte uit, so dit is nie dringend nie — dit is 'n valstrik vir die dag
+> dat iemand dit met die hand doen.
+>
+> **Die tiende maak wel saak, en hoe gouer hoe beter.** Postgres gee EXECUTE op
+> 'n nuwe funksie by verstek aan almal, en Supabase publiseer elke funksie in
+> `public` as `/rpc/<naam>` op die internet. Sewe funksies wat met die eienaar
+> se regte lees — dus verby elke RLS-reël — was dus vir enigiemand sonder
+> rekening beskikbaar. Gemeet: `spend_since` gee $2.31 terug aan die `anon`-rol,
+> teen 'n tabel waarvan die reël sê selfs 'n beoordelaar dit nie mag sien nie.
+> Die migrasie neem daardie regte weg. Niks in die produk roep die sewe deur
+> Supabase nie — die werker praat direk met die databasis as die eienaar — so
+> daar is niks wat dit kan breek nie.
 
 > **Hoekom dit nou dringender is.** Solank die databasis onbereikbaar is, sê
 > `/verify` vir enigiemand wat 'n kliënt se badge natrek: _"VibefyCode has never
@@ -182,7 +194,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — agt migrasies
+## 4 · Supabase — tien migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
@@ -191,7 +203,9 @@ goedkeuring magtig, die ander 'n betaling wat twee keer toegepas kan word. Die
 sewende hou die telling op die badge en die telling in die verslag dieselfde —
 niks het dit voorheen gekeer nie. Die agtste laat die databasis 'n weiering by
 inname neerskryf; die bedienerhandeling het dit probeer en is elke keer deur
-row-level security geweier, stil.
+row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van sewe
+funksies wat ons koste- en sitplekgetalle aan 'n onaangemelde besoeker gegee
+het.
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte
