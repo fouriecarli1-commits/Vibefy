@@ -130,19 +130,45 @@ export async function setAppOnProfile(
   const appId = String(formData.get('appId') ?? '');
   const shown = String(formData.get('shown') ?? '') === 'true';
 
-  const { error } = shown
-    ? await supabase.from('builder_profile_apps').insert({
-        organisation_id: organisationId,
-        app_id: appId,
-        consented_by: user.id,
-      })
+  /*
+   * The removal asks what it removed, because "Removed from your page" is a
+   * statement about what a stranger can see.
+   *
+   * A delete that matches no rows is not an error: row-level security filters
+   * the rows the statement can see rather than refusing it, so a row this
+   * caller may not touch comes back exactly like one that was deleted. On a
+   * page whose whole design is that every application on it was switched on
+   * one at a time, telling somebody it is off when it is on is the one wrong
+   * answer.
+   *
+   * The insert needs no such check: it either writes the row or errors.
+   */
+  const { data: changed, error } = shown
+    ? await supabase
+        .from('builder_profile_apps')
+        .insert({
+          organisation_id: organisationId,
+          app_id: appId,
+          consented_by: user.id,
+        })
+        .select('app_id')
+        .maybeSingle()
     : await supabase
         .from('builder_profile_apps')
         .delete()
         .eq('organisation_id', organisationId)
-        .eq('app_id', appId);
+        .eq('app_id', appId)
+        .select('app_id')
+        .maybeSingle();
 
   if (error) return { error: `That could not be changed: ${error.message}` };
+  if (!changed) {
+    return {
+      error: shown
+        ? 'That application could not be added to your page.'
+        : 'That application is not yours to take off this page, so nothing was changed. It is still shown.',
+    };
+  }
 
   revalidatePath('/console/profile');
   return { notice: shown ? 'Added to your page.' : 'Removed from your page.' };

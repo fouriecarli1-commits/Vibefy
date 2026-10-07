@@ -263,13 +263,23 @@ export async function removeMember(
   if (!user) return { error: 'You are signed out.' };
 
   const membershipId = String(formData.get('membershipId') ?? '');
-  const { data: membership } = await supabase
+  /*
+   * The deleted row, asked for, because a delete that removed nothing is not
+   * an error.
+   *
+   * Row-level security filters the rows the statement can see rather than
+   * refusing it, so a membership this caller may not touch comes back exactly
+   * like one that was removed: no error, nothing done. This used to answer
+   * "Removed. Their access ends immediately." to both. `changeRole` directly
+   * above has always asked; the two were written together and only one of them
+   * did.
+   */
+  const { data: removed, error } = await supabase
     .from('memberships')
-    .select('organisation_id')
+    .delete()
     .eq('id', membershipId)
+    .select('organisation_id')
     .maybeSingle();
-
-  const { error } = await supabase.from('memberships').delete().eq('id', membershipId);
   // The database refuses to remove the last owner. That message is the useful one.
   if (error) {
     return {
@@ -278,8 +288,9 @@ export async function removeMember(
         : error.message,
     };
   }
+  if (!removed) return { error: 'You are not permitted to remove that membership.' };
 
-  if (membership) revalidatePath(`/console/workspace/${membership.organisation_id}/team`);
+  revalidatePath(`/console/workspace/${removed.organisation_id}/team`);
   return { notice: 'Removed. Their access ends immediately.' };
 }
 
@@ -367,8 +378,17 @@ export async function deletePolicyProfile(
 
   const profileId = String(formData.get('profileId') ?? '');
   const organisationId = String(formData.get('organisationId') ?? '');
-  const { error } = await supabase.from('policy_profiles').delete().eq('id', profileId);
+  // Asked for, like the membership delete above: a profile this caller may not
+  // delete comes back with no error and no row, and the sentence below is a
+  // statement about what applications are now measured against.
+  const { data: deleted, error } = await supabase
+    .from('policy_profiles')
+    .delete()
+    .eq('id', profileId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!deleted) return { error: 'You are not permitted to delete that profile.' };
 
   revalidatePath(`/console/workspace/${organisationId}/policies`);
   return {
