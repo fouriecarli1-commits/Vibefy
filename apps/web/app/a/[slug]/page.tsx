@@ -56,8 +56,27 @@ interface BadgeRecord {
  * a row the reader owns, and a reader who could only see what they own could
  * not see this at all.
  */
-async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
-  return writeAsService(async (client) => {
+/**
+ * Three answers, not two.
+ *
+ * `null` used to mean both "this badge has no assessment behind it" and "the
+ * read failed", because the whole call ended in `.catch(() => null)`. The page
+ * renders the list only when it has one, so a failure removed it and left
+ * everything below — and everything below is the score, the dimensions and the
+ * criteria, which the comment above this function says is written for the owner
+ * rather than for the person who clicked a mark on a stranger's website.
+ *
+ * So a database blip degraded this page to exactly the thing its design
+ * rejects: a number with no plain-language answer beside it, and nothing saying
+ * the answer was missing.
+ */
+type AssuranceLoad =
+  | { readonly kind: 'ready'; readonly input: AssuranceInput }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'unavailable' };
+
+async function loadAssurance(slug: string): Promise<AssuranceLoad> {
+  return writeAsService(async (client): Promise<AssuranceLoad> => {
     const { rows } = await client.query<{
       app_name: string;
       rubric_version: string;
@@ -80,7 +99,7 @@ async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
       [slug],
     );
     const row = rows[0];
-    if (!row) return null;
+    if (!row) return { kind: 'none' };
 
     const findings = await client.query<{ rubric_rule_id: string; severity: string }>(
       `select f.rubric_rule_id, f.severity::text as severity
@@ -101,7 +120,7 @@ async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
       rubricCriteria = [];
     }
 
-    return {
+    const input: AssuranceInput = {
       appName: row.app_name,
       assessedOn: row.assessed_on,
       rubricVersion: row.rubric_version,
@@ -119,7 +138,8 @@ async function loadAssurance(slug: string): Promise<AssuranceInput | null> {
         personalData: row.processes_personal_data,
       },
     };
-  }).catch(() => null);
+    return { kind: 'ready', input };
+  }).catch(() => ({ kind: 'unavailable' }) as const);
 }
 
 interface TrustPage {
@@ -311,7 +331,24 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           person who clicked a mark on a stranger's website is not that person.
           They have one question — is this all right? — and a score of 88.6 does
           not answer it. */}
-      {assurance && <AssuranceList input={assurance} />}
+      {assurance.kind === 'ready' && <AssuranceList input={assurance.input} />}
+      {assurance.kind === 'unavailable' && (
+        /* Said, rather than left out.
+         *
+         * Everything below this point is the score, the dimensions and the
+         * criteria — written for the owner of an application, as the comment
+         * above says. Dropping the list and keeping those turns this into a
+         * number with no plain-language answer beside it, which is the page
+         * this design exists to not be. */
+        <section role="alert" className="rounded-xl border border-line-strong p-5">
+          <h2 className="font-semibold">The plain-language answers are not loading</h2>
+          <p className="mt-2 text-sm text-muted">
+            This mark is live and everything below is what the assessment found. The list that
+            answers the questions in plain words could not be read just now — that is a fault on our
+            side, not a change to this application. Reload in a moment.
+          </p>
+        </section>
+      )}
 
       {badge.owner_has_remediation && (
         <section role="note" className="rounded-xl border border-line p-5">
