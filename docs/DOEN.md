@@ -17,13 +17,13 @@ Laas nagegaan 2026-10-07.
 >
 > **Die tiende maak wel saak, en hoe gouer hoe beter.** Postgres gee EXECUTE op
 > 'n nuwe funksie by verstek aan almal, en Supabase publiseer elke funksie in
-> `public` as `/rpc/<naam>` op die internet. Sewe funksies wat met die eienaar
-> se regte lees — dus verby elke RLS-reël — was dus vir enigiemand sonder
-> rekening beskikbaar. Gemeet: `spend_since` gee $2.31 terug aan die `anon`-rol,
-> teen 'n tabel waarvan die reël sê selfs 'n beoordelaar dit nie mag sien nie.
-> Die migrasie neem daardie regte weg. Niks in die produk roep die sewe deur
-> Supabase nie — die werker praat direk met die databasis as die eienaar — so
-> daar is niks wat dit kan breek nie.
+> `public` as `/rpc/<naam>` op die internet. Ses funksies wat met die eienaar se
+> regte lees — dus verby elke RLS-reël — was dus vir enigiemand sonder rekening
+> beskikbaar. Gemeet: `spend_since` gee $2.31 terug aan die `anon`-rol, teen 'n
+> tabel waarvan die reël sê selfs 'n beoordelaar dit nie mag sien nie. Die
+> migrasie neem daardie regte weg. Niks in die produk roep die ses deur Supabase
+> nie — die werker praat direk met die databasis as die eienaar — so daar is
+> niks wat dit kan breek nie.
 
 > **Hoekom dit nou dringender is.** Solank die databasis onbereikbaar is, sê
 > `/verify` vir enigiemand wat 'n kliënt se badge natrek: _"VibefyCode has never
@@ -203,7 +203,7 @@ goedkeuring magtig, die ander 'n betaling wat twee keer toegepas kan word. Die
 sewende hou die telling op die badge en die telling in die verslag dieselfde —
 niks het dit voorheen gekeer nie. Die agtste laat die databasis 'n weiering by
 inname neerskryf; die bedienerhandeling het dit probeer en is elke keer deur
-row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van sewe
+row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van ses
 funksies wat ons koste- en sitplekgetalle aan 'n onaangemelde besoeker gegee
 het.
 

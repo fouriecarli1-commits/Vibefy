@@ -7380,7 +7380,7 @@ alter table public.cost_records
 --     revoke all on function public.record_screening_decision(...) from public, anon;
 --     revoke all on function public.set_platform_role(...) from public, anon;
 --
--- These seven did not. `spending_is_paused` is the clearest case of how it
+-- Seven did not. `spending_is_paused` is the clearest case of how it
 -- happens: `20260822180000_governance_operations` ends with
 --
 --     grant execute on function public.spending_is_paused() to authenticated;
@@ -7388,7 +7388,7 @@ alter table public.cost_records
 -- and nothing else. A grant written on its own line reads like the whole
 -- story — as though naming who may call it also said who may not.
 --
--- ## Why none of the seven needs a grant back
+-- ## Why six of the seven need no grant back
 --
 -- The spend trio has exactly one caller, `apps/worker/src/governance.ts`, and
 -- it holds a `pg` PoolClient on `SUPABASE_DB_URL` — the owner role, which has
@@ -7403,15 +7403,14 @@ alter table public.cost_records
 -- against the owner, not the caller.
 --
 -- `platform_role_of` is called only from inside `is_reviewer` and
--- `is_platform_admin`, same reasoning. `app_has_remediation` appears only in
--- the `badge_verification`, `listed_badges` and `directory` views, which are
--- `security_invoker = false` and so resolve it as the view owner.
+-- `is_platform_admin`. A nested call inside a `security definer` function is
+-- checked against that function's owner, measured: with `platform_role_of`
+-- revoked, `anon` still evaluates both wrappers exactly as before.
 --
--- Measured rather than argued: with all seven revoked, `anon` still reads
--- badge_verification (76 rows), directory (6), listed_badges (6),
--- trust_page_public (1) and builder_profile_public (2); `authenticated` still
--- reads the views and still evaluates `is_platform_admin` and `is_reviewer`
--- identically to before; and the owner still gets `spend_since = 2.310345`.
+-- Measured rather than argued: with these six revoked, `anon` still reads
+-- every public view, `authenticated` still evaluates `is_platform_admin` and
+-- `is_reviewer` identically to before, the whole test suite passes, and the
+-- owner still gets `spend_since = 2.310345`.
 --
 -- ## What is deliberately left alone
 --
@@ -7427,6 +7426,28 @@ alter table public.cost_records
 -- `sso_routing` stays granted to `anon` on purpose: the sign-in form has to
 -- ask where to send an email address before anyone is signed in.
 --
+-- `app_has_remediation` stays too, and it was in this list until the
+-- accessibility scan caught it. `badge_verification` projects it as
+-- `owner_has_remediation`, and a view declared `security_invoker = false`
+-- shields the privileges on its underlying *tables* — not EXECUTE on a
+-- function in its own select list, which is still checked against whoever is
+-- asking. So revoking it turned every public verification page into an HTTP
+-- 500: `permission denied for function app_has_remediation`.
+--
+-- The reason that is acceptable to leave granted, rather than a hole to patch
+-- another way: the boolean it returns is published content. The brief requires
+-- a remediation client to be disclosed on the very page that reads it, and the
+-- view hands the same value to every visitor. Calling it directly tells you
+-- nothing the page does not, for any application whose id you already have.
+--
+-- Worth recording how the wrong answer survived three measurements: the first
+-- two asked `select count(*) from public.badge_verification`, and Postgres
+-- prunes a column nobody projected, so the function was never evaluated. The
+-- third asked `select count(*) from (select * from ... limit 50) s`, and the
+-- planner prunes through a subquery too. Only `select owner_has_remediation
+-- from public.badge_verification limit 1` actually runs the function. A
+-- measurement that cannot fail is not a measurement.
+--
 -- The trigger functions — `assert_seat_available`, `handle_new_auth_user`,
 -- `record_a_refusal_at_intake`, `record_badge_event`, `record_listing_event`,
 -- `reject_review_by_remediation_worker` — keep their default grant because
@@ -7439,5 +7460,4 @@ revoke all on function public.spending_is_paused() from public, anon, authentica
 revoke all on function public.seats_used(uuid) from public, anon, authenticated;
 revoke all on function public.seats_for_organisation(uuid) from public, anon, authenticated;
 revoke all on function public.platform_role_of(uuid) from public, anon, authenticated;
-revoke all on function public.app_has_remediation(uuid) from public, anon, authenticated;
 

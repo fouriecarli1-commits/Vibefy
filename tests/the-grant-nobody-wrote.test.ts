@@ -34,6 +34,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
 import { actingAs, connect } from './setup/client.ts';
+import { seedBadgedApp } from './setup/seed.ts';
 
 /**
  * Functions `anon` may execute although they read a table `anon` may not read,
@@ -41,6 +42,14 @@ import { actingAs, connect } from './setup/client.ts';
  */
 const DELIBERATELY_ANON_CALLABLE: Readonly<Record<string, string>> = {
   sso_routing: 'grant execute on function public.sso_routing(text) to anon, authenticated',
+  // `badge_verification` projects this as `owner_has_remediation`, and a view
+  // declared `security_invoker = false` shields the privileges on its
+  // underlying tables — not EXECUTE on a function in its own select list,
+  // which is still checked against whoever is asking. Revoking it returned
+  // HTTP 500 on every public verification page. Safe to leave because the
+  // boolean is published content: the brief requires a remediation client to
+  // be disclosed on the very page that reads it.
+  app_has_remediation: 'left with its default grant — projected by public.badge_verification',
 };
 
 interface DefinerRow {
@@ -147,12 +156,34 @@ describe('the figure a reviewer may not see', () => {
       `select public.seats_used(gen_random_uuid())`,
       `select public.seats_for_organisation(gen_random_uuid())`,
       `select public.platform_role_of(gen_random_uuid())`,
-      `select public.app_has_remediation(gen_random_uuid())`,
     ]) {
       await actingAs(db, { role: 'anon' }, async (client) => {
         await expect(client.query(sql), sql).rejects.toThrow(/permission denied/i);
       });
     }
+  });
+
+  it('still projects the column a public view computes from a definer function', async () => {
+    /*
+     * The case that caught the first version of the migration, and the reason
+     * it reads a column rather than counting rows: `select count(*)` lets
+     * Postgres prune a column nobody projected, and it prunes through a
+     * subquery too, so neither form evaluates the function at all. Three
+     * measurements in a row came back clean on a view that was about to start
+     * returning `permission denied for function app_has_remediation` to every
+     * visitor.
+     */
+    // Seeds its own badge rather than trusting whatever the reset left behind.
+    // A view with no rows never evaluates anything in its select list, which is
+    // the same way the defect hid in the first place.
+    const { slug } = await seedBadgedApp(db, 'anon-grant');
+    await actingAs(db, { role: 'anon' }, async (client) => {
+      const { rows } = await client.query(
+        `select owner_has_remediation from public.badge_verification where slug = $1`,
+        [slug],
+      );
+      expect(rows.length, 'the seeded badge is not in badge_verification').toBe(1);
+    });
   });
 
   it('still answers the owner, which is the only caller there is', async () => {
