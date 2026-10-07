@@ -92,7 +92,8 @@ export interface GameMeasurements {
   /** Null where the listeners could not be read. Only `false` is an accusation. */
   readonly acceptsTouch: boolean | null;
   readonly pausesWhenHidden: boolean | null;
-  readonly persistedKeysAfterReload: readonly string[];
+  /** Null where the page would not answer after the reload, which is not "none". */
+  readonly persistedKeysAfterReload: readonly string[] | null;
   readonly wroteOnlyToSessionStorage: boolean;
   readonly errorsDuringPlay: readonly string[];
   /**
@@ -433,13 +434,30 @@ export async function measureGame(session: BrowserSession, url: string): Promise
   const errorsDuringPlay = session.pageErrors.slice(errorsBefore);
 
   await session.goto(url, 'domcontentloaded');
+  // Null, not an empty list, for the reason given eighty lines above: an empty
+  // list of keys says the reload left nothing behind, and that goes into the
+  // measurements artefact a paying customer reads. No finding is raised off it
+  // today — `wroteOnlyToSessionStorage` is computed from `storageBefore` and
+  // guarded on it — which made this a false statement in evidence rather than a
+  // false accusation. It was still a false statement in evidence.
   const storageAfter = await page
     .evaluate(() => Object.keys(window.localStorage))
-    .catch(() => [] as string[]);
+    .catch(() => null);
+  if (storageAfter === null) {
+    limitations.push(
+      'After the reload the page would not report what it had stored, so whether the game keeps progress across a visit was not established.',
+    );
+  }
 
-  const settled = (await Promise.all(transfers)).filter(
+  const resolved = await Promise.all(transfers);
+  const settled = resolved.filter(
     (transfer): transfer is { url: string; bytes: number } => transfer !== null,
   );
+  // A transfer whose size would not read was filtered away and counted nowhere.
+  // `unmatched` below counts transfers with no *timing* entry and says so; this
+  // is the same gap in the other input, and the comment above it applies
+  // word for word: a lower bound nobody is told about is just a wrong number.
+  const unsized = resolved.length - settled.length;
 
   /*
    * How much arrived before the first frame.
@@ -474,6 +492,11 @@ export async function measureGame(session: BrowserSession, url: string): Promise
       continue;
     }
     if (responseEnd <= firstFramePageMs) bytesBeforePlayable += transfer.bytes;
+  }
+  if (unsized > 0) {
+    limitations.push(
+      `${unsized} response${unsized === 1 ? '' : 's'} would not report ${unsized === 1 ? 'its' : 'their'} size, so ${unsized === 1 ? 'it is' : 'they are'} left out of the weight before the game became playable. That figure is a lower bound.`,
+    );
   }
   if (unmatched > 0 && firstFramePageMs !== null) {
     limitations.push(
