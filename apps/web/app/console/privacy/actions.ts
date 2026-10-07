@@ -167,7 +167,16 @@ export async function resolveDataRequest(
     return { error: 'Say what was done, in a sentence they can hold us to.' };
   }
 
-  const { error } = await supabase
+  /*
+   * The changed row, asked for.
+   *
+   * An update that matches nothing is not an error — row-level security
+   * filters the rows the statement can see rather than refusing it — and
+   * "Recorded." would then be said about a data-subject request that is still
+   * open, with a statutory clock still running, to an operator who believes
+   * they have answered it.
+   */
+  const { data: recorded, error } = await supabase
     .from('data_requests')
     .update({
       status,
@@ -176,8 +185,13 @@ export async function resolveDataRequest(
       handled_by: user.id,
       completed_at: ['completed', 'refused'].includes(status) ? new Date().toISOString() : null,
     })
-    .eq('id', requestId);
+    .eq('id', requestId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!recorded) {
+    return { error: 'That request was not changed, so it is still open and still due.' };
+  }
 
   revalidatePath('/review/requests');
   return { notice: 'Recorded.' };
@@ -208,7 +222,7 @@ export async function resolveAppeal(
     };
   }
 
-  const { error } = await supabase
+  const { data: recorded, error } = await supabase
     .from('appeals')
     .update({
       status,
@@ -216,8 +230,15 @@ export async function resolveAppeal(
       resolved_by: user.id,
       resolved_at: status === 'under_review' ? null : new Date().toISOString(),
     })
-    .eq('id', appealId);
+    .eq('id', appealId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  // "Permanently" is the word that makes this one matter: an operator who
+  // reads it stops looking, and the fourteen-day clock keeps running.
+  if (!recorded) {
+    return { error: 'That appeal was not changed, so it is still open and still due.' };
+  }
 
   revalidatePath('/review/appeals');
   return { notice: 'Recorded, with the reasons, permanently.' };
@@ -245,12 +266,17 @@ export async function setAlertEmailLevel(
   if (!['all', 'critical_only'].includes(level)) return { error: 'Unknown setting.' };
 
   // The grant on public.users is column-level, so this action could not change
-  // anyone's platform role or email even if it tried to.
-  const { error } = await supabase
+  // anyone's platform role or email even if it tried to. Asked for all the
+  // same: the sentences below say what will and will not reach somebody's
+  // inbox, and an update that matched nothing is not an error.
+  const { data: changed, error } = await supabase
     .from('users')
     .update({ alert_email_level: level })
-    .eq('id', user.id);
+    .eq('id', user.id)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!changed) return { error: 'That setting was not changed.' };
 
   revalidatePath('/console/privacy');
   return {

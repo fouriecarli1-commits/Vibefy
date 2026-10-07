@@ -88,6 +88,8 @@ describe('every action that reports a write', () => {
    */
   const REPORTERS = [
     'apps/web/app/admin/accounts/actions.ts',
+    'apps/web/app/console/alerts/actions.ts',
+    'apps/web/app/console/privacy/actions.ts',
     'apps/web/app/admin/sponsorships/actions.ts',
     'apps/web/app/console/apps/[id]/trust/actions.ts',
     'apps/web/app/console/profile/actions.ts',
@@ -106,9 +108,57 @@ describe('every action that reports a write', () => {
       // A write whose result is read only for `error` cannot tell a refusal
       // from a change: row-level security filters the rows the statement can
       // see rather than refusing it, so nothing happened and nothing was said.
+      /*
+       * A write may say for itself that changing nothing is the right answer.
+       *
+       * `markAllAlertsRead` is the case: nothing unread is exactly what "All
+       * caught up." describes, and forcing it to check would be inventing a
+       * refusal out of success. The marker goes on the line above the write,
+       * in the same shape as this repo's other two opt-outs, and it has to
+       * carry a reason — a bare switch is one somebody adds to make a test go
+       * quiet.
+       */
+      const withComments = readFileSync(join(process.cwd(), path), 'utf8');
+      const lines = withComments.split('\n');
+      /*
+       * The marker has to be in the comment block directly above the write it
+       * exempts.
+       *
+       * A first version looked back four hundred characters, which let the
+       * marker on `markAlertRead` exempt `markAllAlertsRead` fifteen lines
+       * later — one opt-out quietly covering a write nobody wrote it for,
+       * which is the class of defect this whole file is about, committed in
+       * the test. Caught by mutating the marker and watching nothing fail.
+       *
+       * A second counted three lines, which is a different arbitrary number
+       * and missed a three-line comment. The walk goes up to the blank line
+       * instead, which is where one of these statements and its explanation
+       * actually begin.
+       */
+      const exempt = (statement: string) => {
+        const before = withComments.slice(0, withComments.indexOf(statement));
+        let line = before.split('\n').length - 1;
+        /*
+         * Upwards to the blank line above the statement, collecting whatever is
+         * there. A blank line or a finished statement ends the walk, so a
+         * marker cannot reach past the write it was written for — and the walk
+         * starts inside the chain, because the match begins at `.from(` rather
+         * than at the `const`.
+         */
+        const block: string[] = [];
+        while (line > 0) {
+          const text = lines[line - 1] ?? '';
+          if (text.trim() === '' || /[;}]\s*$/.test(text)) break;
+          block.push(text);
+          line -= 1;
+        }
+        return block.some((text) => /\/\/\s*no-op-is-fine:\s*\S+/.test(text));
+      };
+
       const found = writes(source(path));
       expect(found.length, `${path} has no writes to check`).toBeGreaterThan(0);
       for (const [index, statement] of found.entries()) {
+        if (exempt(statement[0])) continue;
         expect(statement[0], `${path} write #${index + 1}`).toMatch(/\.select\(/);
       }
     });

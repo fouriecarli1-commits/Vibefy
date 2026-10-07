@@ -25,6 +25,9 @@ export async function markAlertRead(
   const alertId = String(formData.get('alertId') ?? '');
   if (!alertId) return { error: 'No alert given.' };
 
+  // no-op-is-fine: `.is('read_at', null)` means a second click changes
+  // nothing, and "Marked read. It stays in the history." is still true of an
+  // alert that was already read.
   const { error } = await supabase
     .from('alerts')
     .update({ read_at: new Date().toISOString() })
@@ -46,6 +49,7 @@ export async function markAllAlertsRead(
   } = await supabase.auth.getUser();
   if (!user) return { error: 'You are signed out.' };
 
+  // no-op-is-fine: nothing unread is exactly what "All caught up." describes.
   const { error } = await supabase
     .from('alerts')
     .update({ read_at: new Date().toISOString() })
@@ -76,11 +80,17 @@ export async function setMonitoring(
   const appId = String(formData.get('appId') ?? '');
   const enabled = String(formData.get('enabled') ?? '') === 'on';
 
-  const { error } = await supabase
+  // Asked for: "Monitoring is off. Your badge is not renewed by us and runs to
+  // its expiry date" is a statement about what we will and will not do, and an
+  // update that matched nothing is not an error.
+  const { data: changed, error } = await supabase
     .from('apps')
     .update({ monitoring_enabled: enabled })
-    .eq('id', appId);
+    .eq('id', appId)
+    .select('id')
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!changed) return { error: 'That application was not changed.' };
 
   revalidatePath(`/console/apps/${appId}`);
   return {
