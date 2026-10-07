@@ -49,13 +49,25 @@ export function badgeAltText(facts: ScopeStatementFacts): string {
 }
 
 /**
- * Permitted ways to describe the mark. Anything outside this list is an
- * extension of the certification mark and is rejected by tools/copy-lint.mjs.
+ * Permitted ways to describe the mark.
+ *
+ * Anything outside this list extends the certification mark, which the brief
+ * forbids outright, and `MARK_EXTENSION_PATTERN` in `tools/copy-lint.mjs`
+ * refuses it. That linter runs under plain `node` so that it still works when
+ * an install does not, which means it cannot import this constant and carries
+ * its own copy of these three forms in the message it prints. The two copies
+ * are joined by `tests/the-permitted-forms-of-the-mark.test.ts` — until that
+ * test existed, this constant occurred exactly once in the repository and had
+ * already drifted: it named rubric v1.0.0 while 1.1.0 was in force.
+ *
+ * A permitted form is a shape, so the version is a placeholder. A list that
+ * names a version goes stale the next time one is published, and this is the
+ * one place a reader goes to find out what they may write.
  */
 export const PERMITTED_MARK_PHRASES = [
   'Verified by VibefyCode',
   'VibefyCode-assessed',
-  'VibefyCode Rubric v1.0.0 — score X/100',
+  'VibefyCode Rubric vX — score N/100',
 ] as const;
 
 /**
