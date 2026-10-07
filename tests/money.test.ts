@@ -13,7 +13,6 @@ import {
   costOfCall,
   DEFAULT_MODEL,
   priceFor,
-  TRIAGE_MODEL,
 } from '../packages/engine/src/runtime/cost.ts';
 import { actingAs, connect, expectRefusal } from './setup/client.ts';
 import { makeReviewer, seedAccount, seedAssessment, type SeededAccount } from './setup/seed.ts';
@@ -34,15 +33,21 @@ afterAll(async () => {
 });
 
 describe('what a run costs us', () => {
-  it('has a price on file for every model this code will actually call', async () => {
-    // `priceFor` throws on an unpriced model — "an unpriced model is an
-    // unmetered bill" — which is the right behaviour and arrives at the worst
-    // possible time: partway through a run somebody has already paid for. The
-    // two models the engine reaches for by name are checked here instead, where
-    // it costs nothing.
-    for (const model of [DEFAULT_MODEL, TRIAGE_MODEL]) {
-      expect(() => priceFor(model), `no price on file for ${model}`).not.toThrow();
-    }
+  it('has a price on file for the model a request falls back to', async () => {
+    /*
+     * `priceFor` throws on an unpriced model — "an unpriced model is an
+     * unmetered bill" — which is the right behaviour and arrives at the worst
+     * possible time: partway through a run somebody has already paid for.
+     *
+     * This checked `[DEFAULT_MODEL, TRIAGE_MODEL]`, a hand-written pair of
+     * constants, under "every model this code will actually call". It was not
+     * every model: the choice lives in each prompt's front matter, and nothing
+     * read `TRIAGE_MODEL` at all. The complete version is in
+     * `tests/a-prompt-naming-a-model-we-cannot-price.test.ts`, which reads the
+     * bundles. What is left here is the fallback, which no prompt names and
+     * that file therefore cannot see.
+     */
+    expect(() => priceFor(DEFAULT_MODEL), `no price on file for ${DEFAULT_MODEL}`).not.toThrow();
   });
 
   it('prices a call from the published rates rather than a rounded guess', async () => {

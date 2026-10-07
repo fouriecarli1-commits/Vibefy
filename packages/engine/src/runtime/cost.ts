@@ -42,9 +42,28 @@ export const MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
   'claude-haiku-4-5': { input: 1, output: 5, ...STANDARD_CACHE },
 };
 
+/**
+ * The model a request falls back to when neither the caller nor the prompt names
+ * one.
+ *
+ * Every prompt bundle in `prompts/` declares its own model in front matter, and
+ * `loadPrompt` refuses one that does not — so in practice this is reached only
+ * by a caller that passes no prompt. It is deliberately the expensive one: a
+ * cheap default would silently downgrade a stage somebody forgot to configure,
+ * and a quiet downgrade of the model behind a published finding is worse than a
+ * bill.
+ *
+ * There was a `TRIAGE_MODEL = 'claude-haiku-4-5'` here too, under "deterministic
+ * triage and summarisation do not need the expensive model". Nothing read it:
+ * the choice lives in each prompt's front matter, where
+ * `prohibited-use-screening.md` does name haiku. It was a second place a model
+ * is named, which is the shape that lets two statements of one rule drift — and
+ * the sentence was already not true of summarisation, because `synthesis.md`
+ * declares opus. Whether the narrative a customer reads should be written by a
+ * cheaper model is a cost-against-quality decision and is in
+ * `docs/OPEN_ITEMS.md`, not a constant nothing consults.
+ */
 export const DEFAULT_MODEL = 'claude-opus-5';
-/** Deterministic triage and summarisation do not need the expensive model. */
-export const TRIAGE_MODEL = 'claude-haiku-4-5';
 
 export interface TokenUsage {
   readonly inputTokens: number;
