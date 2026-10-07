@@ -6,7 +6,7 @@
  * a model's suggestion and a request actually leaving the machine.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   BrowserSession,
@@ -21,6 +21,34 @@ import {
   policyFromAuthorisation,
 } from '../packages/engine/src/index.ts';
 import { startVulnerableApp } from './fixtures/vulnerable-app.ts';
+
+/** Every TypeScript file that ships, which is everything outside `tests/`. */
+function shippedSources(): { path: string; source: string }[] {
+  const found: { path: string; source: string }[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === '.next') continue;
+        walk(full);
+      } else if (/\.(ts|tsx|mts)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+        found.push({ path: full, source: readFileSync(full, 'utf8') });
+      }
+    }
+  };
+  for (const root of ['packages', 'apps']) walk(join(process.cwd(), root));
+  return found;
+}
+
+/**
+ * The code, without the comments.
+ *
+ * Every source-text rule in this suite needs this, and this one more than most:
+ * the comment above the method being looked for names it.
+ */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+}
 
 const policy = {
   allowedHosts: ['kettle.example'],
@@ -203,33 +231,35 @@ describe('the client enforces the address, not only the URL', () => {
     const source = readFileSync(join(process.cwd(), 'packages/engine/src/runtime/http.ts'), 'utf8');
     expect(source).toContain('createScopedDispatcher(guard)');
     expect(source).toContain('dispatcher: this.dispatcher');
-    // Nothing in the engine or the worker calls the global installer, so it
-    // cannot be what the address check depends on.
-    expect(source.indexOf('this.dispatcher = createScopedDispatcher')).toBeLessThan(
-      source.indexOf('installGlobalDispatcher()'),
-    );
+  });
+
+  it('has nothing calling the global installer, which is what that claim rests on', () => {
+    /*
+     * The claim, asserted rather than stated.
+     *
+     * This test used to compare two `indexOf` values in one file — which checks
+     * the order the methods are written in and nothing else — under a comment
+     * reading "nothing in the engine or the worker calls the global installer,
+     * so it cannot be what the address check depends on". That sentence is the
+     * load-bearing one and it was not checked.
+     *
+     * It matters in both directions. If something called it, the per-request
+     * dispatcher would stop being the whole story, and a guard built for a
+     * finished run would govern whatever the process did next — the worker runs
+     * one assessment at a time, so the next thing is somebody else's. And
+     * `ownership.ts` fetches a challenge file from a host that has no
+     * authorisation yet, by design; a global install would have the scope guard
+     * refuse the very request that establishes scope.
+     */
+    const callers = shippedSources()
+      .filter(({ source }) => /\binstallGlobalDispatcher\s*\(\s*\)/.test(stripComments(source)))
+      .filter(({ source }) => !/installGlobalDispatcher\(\): void/.test(source))
+      .map(({ path }) => relative(process.cwd(), path));
+    expect(callers).toEqual([]);
   });
 });
 
 describe('the private-network escape hatch', () => {
-  /** Every TypeScript file that ships, which is everything outside `tests/`. */
-  function shippedSources(): { path: string; source: string }[] {
-    const found: { path: string; source: string }[] = [];
-    const walk = (dir: string) => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          if (entry.name === 'node_modules' || entry.name === '.next') continue;
-          walk(full);
-        } else if (/\.(ts|tsx|mts)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
-          found.push({ path: full, source: readFileSync(full, 'utf8') });
-        }
-      }
-    };
-    for (const root of ['packages', 'apps']) walk(join(process.cwd(), root));
-    return found;
-  }
-
   it('is not opened by anything that ships', () => {
     // `allowPrivateNetworkForTesting` turns off the one check a URL allowlist
     // cannot make: whether the address a host resolves to is somewhere we are
