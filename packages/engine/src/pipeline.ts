@@ -17,7 +17,12 @@
  * nothing ever wrote to it, so it was always empty, and an always-empty typed
  * field is a claim about the system that is not true.
  */
-import { scoreAssessment, type ScoringInput, type ScoringResult } from '@vibefycode/rubric';
+import {
+  getRubric,
+  scoreAssessment,
+  type ScoringInput,
+  type ScoringResult,
+} from '@vibefycode/rubric';
 import { scopeStatement, NON_RELIANCE_LEGEND, AI_DISCLOSURE } from '@vibefycode/shared';
 import type { CostRecord } from './runtime/cost.ts';
 import { classifyStop, stopNote, STOP_LABEL, type StopReason } from './runtime/stop.ts';
@@ -146,9 +151,49 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     if (result.status === 'aborted') stopped = result.stopReason;
   }
 
-  const findings = stageResults.flatMap((result) => result.findings);
   const notes: string[] = stageResults.flatMap((result) => result.notes);
   const notTested: { criterion: string; because: string }[] = [];
+
+  /*
+   * The criterion id, written the way the rubric writes it.
+   *
+   * `findingSchema` enumerates `dimension` and `severity`; `ruleId` is the one
+   * free string, described to the model as "for example SEC-05 or FI-01". A
+   * deterministic stage writes it as a literal and is always right. A model
+   * stage picks it, and `assuranceFor` matches a finding to a claim with
+   * `claim.criteria.includes` — so `SEC-4` instead of `SEC-04` belongs to no
+   * claim, appears nowhere on the page, and leaves "are its keys exposed?"
+   * reading as a tick over a critical finding saying they are. Measured; one
+   * missing zero. `GATE-EXPOSED-SECRET` names SEC-04 by hand too, so it also
+   * does not fire.
+   *
+   * Done here rather than in the stage because it is one place for every stage,
+   * and because the rubric version is a fact about the run.
+   */
+  const knownCriteria = getRubric(rubricVersion).dimensions.flatMap((dimension) =>
+    dimension.criteria.map((criterion) => criterion.id),
+  );
+  const placement = placeCriteria(
+    stageResults.flatMap((result) => result.findings),
+    knownCriteria,
+  );
+  const findings = placement.placed;
+  if (placement.corrected.length > 0) {
+    notes.push(
+      `${placement.corrected.length} finding(s) named their criterion in a form the rubric does not use and were filed against the criterion they meant (${placement.corrected
+        .map((entry) => `${entry.from} → ${entry.to}`)
+        .join(', ')}).`,
+    );
+  }
+  if (placement.unplaceable.length > 0) {
+    // Not dropped: the finding is real and its dimension scores it. But no
+    // claim carries it, so the only honest thing is to say so — a finding that
+    // reaches the report and not the public list is the kind of gap this
+    // product exists to refuse in other people's software.
+    notes.push(
+      `${placement.unplaceable.length} criterion id(s) in this run match nothing in rubric ${rubricVersion} (${placement.unplaceable.join(', ')}). The findings against them are reported and scored in their dimension, and no plain-language claim carries them.`,
+    );
+  }
 
   /*
    * The half of an application that is behind a sign-in.
@@ -357,4 +402,62 @@ async function runStageWithRetry(
       notes: ['The stage produced no result.'],
     }
   );
+}
+
+/**
+ * Files each finding against the criterion it names, where the rubric knows it.
+ *
+ * Three normalisations and no guessing: trimmed, upper-cased, and the number
+ * zero-padded to a width the rubric actually uses. `SEC-4` and `SEC-04` are the
+ * same criterion written two ways. `SEC-99` and `SEC-09` are not — one of them
+ * does not exist — so padding stops at the widths the rubric itself has and an
+ * id that still matches nothing is returned untouched and reported.
+ *
+ * Nothing is dropped. A finding is a thing somebody observed and evidenced, and
+ * the worst outcome here is to lose it because its label was written oddly.
+ */
+export function placeCriteria(
+  findings: readonly RawFinding[],
+  knownCriteria: readonly string[],
+): {
+  placed: RawFinding[];
+  corrected: { from: string; to: string }[];
+  unplaceable: string[];
+} {
+  const known = new Set(knownCriteria);
+  /** The digit widths the rubric uses, so padding cannot invent a width. */
+  const widths = new Set(
+    knownCriteria
+      .map((id) => /-(\d+)$/.exec(id)?.[1]?.length)
+      .filter((width): width is number => width !== undefined),
+  );
+
+  const place = (ruleId: string): string | null => {
+    const trimmed = ruleId.trim().toUpperCase();
+    if (known.has(trimmed)) return trimmed;
+    const parts = /^([A-Z]+)-0*(\d+)$/.exec(trimmed);
+    if (!parts) return null;
+    for (const width of widths) {
+      const candidate = `${parts[1]}-${parts[2]!.padStart(width, '0')}`;
+      if (known.has(candidate)) return candidate;
+    }
+    return null;
+  };
+
+  const placed: RawFinding[] = [];
+  const corrected: { from: string; to: string }[] = [];
+  const unplaceable: string[] = [];
+
+  for (const finding of findings) {
+    const resolved = place(finding.ruleId);
+    if (resolved === null) {
+      if (!unplaceable.includes(finding.ruleId)) unplaceable.push(finding.ruleId);
+      placed.push(finding);
+      continue;
+    }
+    if (resolved !== finding.ruleId) corrected.push({ from: finding.ruleId, to: resolved });
+    placed.push({ ...finding, ruleId: resolved });
+  }
+
+  return { placed, corrected, unplaceable };
 }
