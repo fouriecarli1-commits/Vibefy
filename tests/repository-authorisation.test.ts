@@ -118,8 +118,18 @@ describe('what the code does with it', () => {
     // repository, so the report would have said the authorisation did not
     // cover a repository the customer had declared and accepted the warranty
     // for — found by reading the flow rather than by a test failing.
-    const verified = actions.slice(actions.indexOf('export async function verifyAuthorisation'));
-    expect(verified).toMatch(/repository_url: pending\.repository_url/);
+    //
+    // It used to look for `repository_url: pending.repository_url`, an object
+    // literal going through the customer's own client. That insert moved to the
+    // owner's connection when a customer turned out to be able to write their
+    // own verified authorisation, so what is read now is the column list and
+    // the parameter — with the comments stripped first, because the paragraph
+    // above this one explains the rule in words that would match it.
+    const code = withoutComments(actions);
+    const verified = code.slice(code.indexOf('export async function verifyAuthorisation'));
+    const insert = verified.slice(0, verified.indexOf('revalidatePath'));
+    expect(insert).toMatch(/repository_url,/);
+    expect(insert).toMatch(/pending\.repository_url,/);
   });
 
   it('leaves it off a withdrawal, which covers nothing', () => {
@@ -149,3 +159,20 @@ describe('what the code does with it', () => {
     expect(actions).toMatch(/repository_url: declaredRepository \|\| null/);
   });
 });
+
+/**
+ * The file with its comments taken out.
+ *
+ * Every source-text assertion in this repository needs it: a comment that
+ * explains a rule contains the words the rule is written in, so a test looking
+ * for the rule finds its own explanation and passes having read nothing. Line
+ * comments go first, so a line comment containing a star followed by a slash
+ * cannot end a block early.
+ */
+function withoutComments(source: string): string {
+  return source
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+}

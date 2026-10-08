@@ -5,9 +5,19 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-08.
 
-> **Daar is nou twaalf SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
-> agt was reeds daar; die negende tot twaalfde is bygevoeg op 2026-10-07 en
+> **Daar is nou dertien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
+> se agt was reeds daar; die negende tot dertiende is bygevoeg op 2026-10-07 en
 > 2026-10-08, en staan onderaan `docs/sql/OUTSTANDING.sql`.
+>
+> **Die dertiende is die ernstigste van die drie, en die enigste waar iemand
+> anders as die kliënt skade kry.** 'n Werkruimte-eienaar kon self 'n
+> "verified" magtiging skryf, vir 'n domein wat nie hulle s'n is nie. Gemeet:
+> `status = 'verified'`, `verification_target = 'competitor.example'`, en
+> `app_is_authorised_for_testing` gee toe **true** — die funksie wat die werker
+> "die harde hek" noem. Die DNS-bewys werk; dit was net nie op die pad nie. Die
+> migrasie maak dit 'n eienskap van die ry: jy mag vra, en jy mag terugtrek;
+> net ons mag sê dit is bewys. Dit keer ook dat 'n magtiging meer domeine dek
+> as wat bewys is.
 >
 > **Die twaalfde is 'n tweelingbroer van die elfde, en net so dringend.** 'n
 > Werkruimte-eienaar kon hul eie toepassing "cleared" maak onder die
@@ -215,7 +225,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — twaalf migrasies
+## 4 · Supabase — dertien migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
@@ -226,9 +236,11 @@ niks het dit voorheen gekeer nie. Die agtste laat die databasis 'n weiering by
 inname neerskryf; die bedienerhandeling het dit probeer en is elke keer deur
 row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van ses
 funksies wat ons koste- en sitplekgetalle aan 'n onaangemelde besoeker gegee
-het. **Die elfde en twaalfde maak die meeste saak van almal:** die een keer dat
-'n kliënt hul eie telling skryf, die ander dat hulle hul eie toepassing
-goedkeur onder die Aanvaarbare-Gebruik-beleid. Doen daardie twee eerste.
+het. **Die elfde, twaalfde en dertiende maak die meeste saak van almal:** die
+een keer dat 'n kliënt hul eie telling skryf, die tweede dat hulle hul eie
+toepassing goedkeur onder die Aanvaarbare-Gebruik-beleid, die derde dat hulle
+self sê hulle besit 'n domein. Doen daardie drie eerste, en die dertiende
+eerste van almal.
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte

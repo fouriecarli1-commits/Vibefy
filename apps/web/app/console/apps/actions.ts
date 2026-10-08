@@ -345,42 +345,99 @@ export async function verifyAuthorisation(
   if (error || !pending) return { error: error?.message ?? 'No authorisation to verify.' };
   if (pending.status === 'verified') return { notice: 'This application is already verified.' };
 
+  /*
+   * Who may grant one, asked as the caller.
+   *
+   * The row below is written on our own connection, because
+   * `authorisations_are_verified_by_us` refuses a `verified` row from any role
+   * a browser can reach — so the authority check that used to be the insert
+   * policy's job has to be made here instead. It is the policy's own
+   * predicate, evaluated against this request's claims, which is the nearest
+   * thing to leaving it where it was.
+   */
+  const mayGrant = await readAsUser(user.id, async (client) => {
+    const { rows } = await client.query<{ ok: boolean }>(
+      `select public.has_org_role($1, array['owner', 'admin']::public.org_role[]) as ok`,
+      [pending.organisation_id],
+    );
+    return rows[0]?.ok === true;
+  });
+  if (!mayGrant) {
+    return { error: 'Only an owner or an admin of this workspace can authorise testing.' };
+  }
+
   const outcome = await verifyOwnership(
     pending.verification_target as string,
     pending.verification_token as string,
   );
   if (!outcome.verified) return { error: outcome.detail };
 
+  /*
+   * The scope, re-derived from the host that was just proved.
+   *
+   * This carried `pending.scope_domains` forward unchanged, which was fine as
+   * long as the pending row could only have come from the form — where step
+   * one runs the same filter. It could not: a pending row written straight
+   * through PostgREST could name a target the customer does own and a scope
+   * they do not, and pressing Verify would then carry the forged scope into a
+   * properly verified row. `authorisations_scope_within_verified_target` now
+   * refuses such a row outright; this is the half that keeps the refusal from
+   * being the first time anybody notices.
+   */
+  const { allowed } = permittedScopeFor(
+    pending.verification_target as string,
+    (pending.scope_domains as string[] | null) ?? [],
+  );
+  if (allowed.length === 0) {
+    return {
+      error:
+        'None of the domains on this authorisation is covered by the host that was verified. Start the authorisation again and declare the host you proved, or a subdomain of it.',
+    };
+  }
+
   const { ip, userAgent } = await requestContext();
-  const { error: insertError } = await supabase.from('authorisations').insert({
-    app_id: appId,
-    organisation_id: pending.organisation_id,
-    supersedes_id: pending.id,
-    status: 'verified',
-    method: outcome.method,
-    verification_token: pending.verification_token,
-    verification_target: pending.verification_target,
-    verified_at: outcome.checkedAt,
-    scope_domains: pending.scope_domains,
-    scope_exclusions: pending.scope_exclusions,
-    third_parties: pending.third_parties,
-    // Carried forward with the rest of the scope. The verified row supersedes
-    // the pending one and is the row the runner reads, so leaving this behind
-    // would authorise the domain and quietly drop the repository — the static
-    // stage would then say the authorisation does not cover a repository the
-    // customer had declared and accepted the warranty for.
-    repository_url: pending.repository_url,
-    warranty_text_version: pending.warranty_text_version,
-    warranty_text_sha256: pending.warranty_text_sha256,
-    granted_by: user.id,
-    accepted_ip: ip,
-    accepted_user_agent: userAgent,
-    // Twelve months is the outside limit; a stale authorisation is as much of a
-    // liability as a stale badge.
-    expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+  const { error: insertError } = await writeAsService(async (client) => {
+    try {
+      await client.query(
+        `insert into public.authorisations
+           (app_id, organisation_id, supersedes_id, status, method, verification_token,
+            verification_target, verified_at, scope_domains, scope_exclusions, third_parties,
+            repository_url, warranty_text_version, warranty_text_sha256, granted_by,
+            accepted_ip, accepted_user_agent, expires_at)
+         values ($1, $2, $3, 'verified', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                 $16, now() + interval '365 days')`,
+        [
+          appId,
+          pending.organisation_id,
+          pending.id,
+          outcome.method,
+          pending.verification_token,
+          pending.verification_target,
+          outcome.checkedAt,
+          allowed,
+          pending.scope_exclusions ?? [],
+          pending.third_parties ?? [],
+          // Carried forward with the rest of the scope. The verified row
+          // supersedes the pending one and is the row the runner reads, so
+          // leaving this behind would authorise the domain and quietly drop
+          // the repository — the static stage would then say the authorisation
+          // does not cover a repository the customer had declared and accepted
+          // the warranty for.
+          pending.repository_url,
+          pending.warranty_text_version,
+          pending.warranty_text_sha256,
+          user.id,
+          ip,
+          userAgent,
+        ],
+      );
+      return { error: null as string | null };
+    } catch (cause) {
+      return { error: cause instanceof Error ? cause.message : String(cause) };
+    }
   });
 
-  if (insertError) return { error: insertError.message };
+  if (insertError) return { error: insertError };
 
   revalidatePath(`/console/apps/${appId}`);
   return { notice: `Verified — ${outcome.detail}` };

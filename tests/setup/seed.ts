@@ -110,15 +110,26 @@ export async function seedAuthorisation(
     expiresAt?: string | null;
     /** The repository this authorisation covers. The runner clones only this. */
     repositoryUrl?: string;
+    /**
+     * The host the proof was found at. Defaults to the first scope domain,
+     * because `authorisations_scope_within_verified_target` holds that a
+     * verified authorisation covers the host it proved and its subdomains —
+     * and because a fixture that says otherwise is describing a row the
+     * product may not produce. This was hard-coded to `example.test` while one
+     * caller asked for a `localhost` scope, so the fixture authorised a host
+     * nothing had been proved about and no test said a word.
+     */
+    verificationTarget?: string;
   } = {},
 ): Promise<string> {
   const status = overrides.status ?? 'verified';
+  const scopeDomains = overrides.scopeDomains ?? ['example.test'];
   const { rows } = await client.query<{ id: string }>(
     `insert into public.authorisations (
        app_id, organisation_id, status, method, verification_target, verified_at,
        scope_domains, warranty_text_version, warranty_text_sha256, granted_by, expires_at,
        repository_url
-     ) values ($1, $2, $3::text::public.authorisation_status, 'dns_txt', 'example.test',
+     ) values ($1, $2, $3::text::public.authorisation_status, 'dns_txt', $9,
        case when $3::text = 'verified' then now() else null end,
        $4, '1.0.0', $5, $6, $7, $8)
      returning id`,
@@ -126,11 +137,12 @@ export async function seedAuthorisation(
       appId,
       account.organisationId,
       status,
-      overrides.scopeDomains ?? ['example.test'],
+      scopeDomains,
       sha256('authorisation-warranty-1.0.0'),
       account.userId,
       overrides.expiresAt ?? null,
       overrides.repositoryUrl ?? null,
+      overrides.verificationTarget ?? scopeDomains[0] ?? 'example.test',
     ],
   );
   return rows[0]!.id;
