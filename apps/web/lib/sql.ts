@@ -1,5 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
-import { whatIsWrongWithTheConnectionString } from './connection-string.ts';
+import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from './connection-string.ts';
 
 /**
  * Direct SQL, still under row-level security.
@@ -44,6 +44,39 @@ function getPool(): Pool {
 }
 
 /**
+ * Connects, and says what a refusal means when the message does not.
+ *
+ * `whyTheDatabaseRefused` has existed since the outage it was written for and
+ * was called in exactly one place: `app/badge/[file]/route.ts`, the badge
+ * *image* route. So when Supabase's pooler tripped its breaker after a password
+ * reset — which reads character for character like our own bad password — the
+ * badge image explained it in the log and the verification page, the trust
+ * page, the console and every report did not. Those are the pages somebody
+ * looks at when the badge is grey, and they were the ones saying nothing.
+ *
+ * Logged rather than thrown differently. Every caller here already handles its
+ * own failure carefully — `/verify` has three states and one of them exists to
+ * avoid accusing a customer of fraud over an unreachable database — and none
+ * of that should change because the log gained a sentence.
+ */
+async function connectAndExplainRefusals(): Promise<PoolClient> {
+  try {
+    return await getPool().connect();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    const means = whyTheDatabaseRefused(detail);
+    // The explanation travels beside the message rather than replacing it: the
+    // original is what somebody will search for, and the sentence is what tells
+    // them it is not the thing it looks like.
+    console.error('the database refused a connection', {
+      error: detail,
+      ...(means === null ? {} : { means }),
+    });
+    throw error;
+  }
+}
+
+/**
  * Runs `work` inside a transaction as the given user. The transaction is always
  * rolled back: nothing that reads a report should be writing anything, and a
  * read path that cannot commit cannot accidentally mutate.
@@ -52,7 +85,7 @@ export async function readAsUser<T>(
   userId: string,
   work: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
-  const client = await getPool().connect();
+  const client = await connectAndExplainRefusals();
   try {
     await client.query('begin read only');
     await client.query('select set_config($1, $2, true)', [
@@ -79,7 +112,7 @@ export async function writeAsUser<T>(
   userId: string,
   work: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
-  const client = await getPool().connect();
+  const client = await connectAndExplainRefusals();
   try {
     await client.query('begin');
     await client.query('select set_config($1, $2, true)', [
@@ -103,7 +136,7 @@ export async function writeAsUser<T>(
  * `anon` role, so a mistake here can only expose what is already published.
  */
 export async function readAsAnon<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await getPool().connect();
+  const client = await connectAndExplainRefusals();
   try {
     await client.query('begin read only');
     await client.query('set local role anon');
@@ -145,7 +178,7 @@ export async function readAsAnon<T>(work: (client: PoolClient) => Promise<T>): P
  * transaction for anything to be scoped to.
  */
 export async function writeAsService<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await getPool().connect();
+  const client = await connectAndExplainRefusals();
   try {
     await client.query('begin');
     const result = await work(client);
