@@ -280,6 +280,33 @@ const cases: Case[] = [
     find: `select app_id from public.builder_profile_apps where organisation_id = $1`,
     params: () => [owner.organisationId],
   },
+  {
+    /*
+     * The seventeenth, found by running the same mutation a month later.
+     *
+     * Forty-five read-scoping policies now; forty-four produce a failure
+     * somewhere and `audit_exports_read_admins` produced none, narrowed to that
+     * one policy on its own. It arrived after this file was written, which is
+     * the whole way a hand-kept list of tables goes stale — so the guard below
+     * now reads the catalogue rather than trusting anybody to remember.
+     *
+     * A row here says which workspace produced a disclosure, who asked for it,
+     * over what period, how many rows it held and the digest of the file. Read
+     * across workspaces it is a list of who is under audit pressure and when.
+     */
+    table: 'audit_exports',
+    seed: async () => {
+      await q(
+        `insert into public.audit_exports
+           (organisation_id, requested_by, kind, format, row_count, sha256,
+            period_start, period_end)
+         values ($1, $2, 'audit_log', 'csv', 12, $3, now() - interval '30 days', now())`,
+        [owner.organisationId, owner.userId, 'e'.repeat(64)],
+      );
+    },
+    find: `select sha256 from public.audit_exports where organisation_id = $1`,
+    params: () => [owner.organisationId],
+  },
 ];
 
 describe('a signed-in stranger reading another workspace', () => {
@@ -337,5 +364,78 @@ describe('the tables keyed to a person rather than a workspace', () => {
       return rows.length;
     });
     expect(self).toBe(1);
+  });
+});
+
+/**
+ * Where every other read-scoping policy's loss is noticed, measured by opening
+ * it and reading the failure. Not asserted from reading the tests: a test can
+ * name a table, exercise it as the database owner — which bypasses policies —
+ * and look like coverage.
+ *
+ * Recorded 2026-10-08, by `node tools/policy-mutation.mjs reads` and three
+ * narrowing runs.
+ */
+const COVERED_ELSEWHERE: Readonly<Record<string, string>> = {
+  apps: 'rls-isolation.test.ts',
+  assessments: 'rls-isolation.test.ts',
+  badge_events: 'rls-isolation.test.ts',
+  badges: 'rls-isolation.test.ts',
+  evidence: 'rls-isolation.test.ts',
+  finding_evidence: 'rls-isolation.test.ts',
+  findings: 'rls-isolation.test.ts',
+  memberships: 'rls-isolation.test.ts',
+  organisations: 'rls-isolation.test.ts',
+  reports: 'rls-isolation.test.ts',
+  assessment_runs: 'review-queue-visibility.test.ts',
+  appeals: 'governance.test.ts',
+  data_requests: 'governance.test.ts',
+  retention_deletions: 'governance.test.ts',
+  consents: 'governance-through-rls.test.ts',
+  invitations: 'accept-invitation.test.ts',
+  subscriptions: 'admin-console.test.ts',
+  assessment_requests: 'queue.test.ts',
+  builder_profiles: 'builder-profile.test.ts',
+};
+
+describe('the list of tables, kept by the catalogue rather than by memory', () => {
+  it('leaves no read-scoping policy that nothing would notice the loss of', async () => {
+    /*
+     * The same query `tools/policy-mutation.mjs reads` uses to choose what to
+     * open. `audit_exports` is in this file because a mutation run found it;
+     * this is here so the next one does not need a mutation run to be found.
+     *
+     * A new table arriving with a membership-scoped select policy fails here
+     * until somebody either adds a case above or names the file that covers
+     * it — and naming a file is a claim worth making only after watching that
+     * file fail against the opened policy.
+     */
+    const { rows } = await db.query<{ tablename: string }>(`
+      select distinct tablename from pg_policies
+       where schemaname = 'public' and permissive = 'PERMISSIVE'
+         and cmd in ('SELECT', 'ALL') and 'authenticated' = any(roles)
+         and (qual like '%is_org_member%' or qual like '%auth.uid()%'
+              or qual like '%has_org_role%')
+       order by tablename
+    `);
+
+    expect(
+      rows.length,
+      'the catalogue query found nothing, so this proves nothing',
+    ).toBeGreaterThan(30);
+
+    const swept = new Set(cases.flatMap((entry) => entry.table.split(' and ')));
+    swept.add('users');
+    const unwatched = rows
+      .map((row) => row.tablename)
+      .filter((table) => !swept.has(table) && COVERED_ELSEWHERE[table] === undefined);
+
+    expect(
+      unwatched,
+      'a table scopes its reads to a membership and nothing in the suite would notice if it ' +
+        'stopped. Add a case to this file, or name the test that covers it in COVERED_ELSEWHERE ' +
+        'after watching that test fail against the opened policy:\n  ' +
+        unwatched.join('\n  '),
+    ).toEqual([]);
   });
 });
