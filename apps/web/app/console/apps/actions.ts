@@ -16,7 +16,7 @@ import { RepositoryRefusedError, repositoryUrlOrRefuse } from '@vibefycode/engin
 import { decideAssessmentRequest, resolvePlan } from '@vibefycode/billing';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
-import { readAsUser } from '@/lib/sql';
+import { readAsUser, writeAsService } from '@/lib/sql';
 
 /**
  * The version and exact bytes of a legal document, at the moment it is accepted.
@@ -125,14 +125,6 @@ export async function createApp(_previous: ActionState, formData: FormData): Pro
       // about the rubric, the score or the badge — a game is held to the same
       // published criteria as everything else.
       is_game: formData.get('isGame') === 'on',
-      screening_status:
-        screening.verdict === 'refused'
-          ? 'refused'
-          : screening.verdict === 'cleared'
-            ? 'cleared'
-            : 'pending',
-      screening_notes: `${screening.verdict} (${screening.source}, ${screening.confidence} confidence): ${screening.reasoning}`,
-      screened_at: new Date().toISOString(),
       created_by: user.id,
     })
     .select('id')
@@ -141,7 +133,53 @@ export async function createApp(_previous: ActionState, formData: FormData): Pro
   if (error) return { error: error.message };
 
   /*
-   * The refusal is logged by the database, on the row this just wrote.
+   * The verdict, written by us rather than by the account it is about.
+   *
+   * This insert used to carry `screening_status`, `screening_notes` and
+   * `screened_at`, which meant the Acceptable Use verdict was written by the
+   * customer's own access token. Measured against a refused application, as a
+   * workspace owner and nothing else: `update public.apps set screening_status
+   * = 'cleared'` returned `UPDATE 1`. `screening_status` is the gate
+   * `run-assessment.ts` reads before anything runs, so that was the path by
+   * which a refused application gets assessed, scored and badged.
+   *
+   * `20261008030000` revokes those three columns from `authenticated`, so the
+   * insert above now gets the default — `pending`, which is where an
+   * unscreened submission belongs — and the verdict goes in here, on the
+   * owner's connection, through the same kind of door the worker's sweep and
+   * the reviewer already use.
+   *
+   * Not fatal if it fails. The application exists and is `pending`, which
+   * means a reviewer sees it at /review/screening and nothing runs against it
+   * until they do, which is the side of the gate to fail towards. Saying so is
+   * still worth a line
+   * in the log, because an intake screen that silently stops recording its
+   * reasoning leaves every reviewer reading an empty note.
+   */
+  const verdict =
+    screening.verdict === 'refused'
+      ? 'refused'
+      : screening.verdict === 'cleared'
+        ? 'cleared'
+        : 'pending';
+  try {
+    await writeAsService(async (client) => {
+      await client.query('select public.record_intake_screening($1, $2, $3)', [
+        data.id,
+        verdict,
+        `${screening.verdict} (${screening.source}, ${screening.confidence} confidence): ${screening.reasoning}`,
+      ]);
+    });
+  } catch (screeningError) {
+    console.error('intake screening was not recorded', {
+      appId: data.id,
+      verdict,
+      error: screeningError instanceof Error ? screeningError.message : String(screeningError),
+    });
+  }
+
+  /*
+   * The refusal is logged by the database, inside the call above.
    *
    * It used to be logged here, and it was not: the insert ran as the customer,
    * the only insert policy on `audit_log` requires `is_platform_admin()`, and
@@ -151,9 +189,12 @@ export async function createApp(_previous: ActionState, formData: FormData): Pro
    * refusal at intake was being recorded at all.
    *
    * The table is right to be closed — a log its subject may write into is not
-   * evidence — so the writer moved rather than the policy.
-   * `apps_refusal_at_intake_is_written_down` fires on the insert above and
-   * reads `screening_notes`, which is the same sentence the customer is shown.
+   * evidence — so the writer moved rather than the policy. It moved twice:
+   * first to `apps_refusal_at_intake_is_written_down`, a trigger on an insert
+   * that arrived already refused, and now to `record_intake_screening`, which
+   * writes the same entry from the same sentence the customer is shown. The
+   * trigger is still there and still correct; the insert above no longer
+   * reaches it, because a customer may no longer write that column at all.
    */
 
   redirect(`/console/apps/${data.id}`);

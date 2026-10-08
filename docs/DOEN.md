@@ -3,11 +3,21 @@
 Alles wat op jou wag, in volgorde. Niks hiervan kan ek vir jou doen nie — ek het
 nie toegang tot Vercel, Supabase, Render of Resend nie.
 
-Laas nagegaan 2026-10-07.
+Laas nagegaan 2026-10-08.
 
-> **Daar is nou elf SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
-> agt was reeds daar; die negende, tiende en elfde is bygevoeg op 2026-10-07 en
-> staan onderaan `docs/sql/OUTSTANDING.sql`.
+> **Daar is nou twaalf SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md` se
+> agt was reeds daar; die negende tot twaalfde is bygevoeg op 2026-10-07 en
+> 2026-10-08, en staan onderaan `docs/sql/OUTSTANDING.sql`.
+>
+> **Die twaalfde is 'n tweelingbroer van die elfde, en net so dringend.** 'n
+> Werkruimte-eienaar kon hul eie toepassing "cleared" maak onder die
+> Aanvaarbare-Gebruik-beleid. Gemeet teen 'n toepassing wat 'n beoordelaar
+> geweier het: `update public.apps set screening_status = 'cleared'` het
+> `UPDATE 1` gegee. Daardie kolom is die hek wat keer dat ons iets assesseer en
+> badge wat ons geweier het. Dieselfde reël het ook toegelaat dat 'n eienaar die
+> teller terugstel wat hul badge opskort as hul werf af is. Die migrasie gee die
+> sewe kolomme wat óns skryf net vir ons, en die uitspraak word nou deur ons
+> bediener geskryf, nie deur die kliënt se aanmeldteken nie.
 >
 > **Die elfde is die dringendste ding in hierdie dokument, die badge inkluis.**
 > 'n Kliënt kon hul eie telling skryf. Gemeet met 'n gewone kliënt se
@@ -205,7 +215,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — elf migrasies
+## 4 · Supabase — twaalf migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
@@ -216,8 +226,9 @@ niks het dit voorheen gekeer nie. Die agtste laat die databasis 'n weiering by
 inname neerskryf; die bedienerhandeling het dit probeer en is elke keer deur
 row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van ses
 funksies wat ons koste- en sitplekgetalle aan 'n onaangemelde besoeker gegee
-het. **Die elfde maak die meeste saak van almal:** dit keer dat 'n kliënt hul
-eie telling skryf. Doen daardie een eerste.
+het. **Die elfde en twaalfde maak die meeste saak van almal:** die een keer dat
+'n kliënt hul eie telling skryf, die ander dat hulle hul eie toepassing
+goedkeur onder die Aanvaarbare-Gebruik-beleid. Doen daardie twee eerste.
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte
