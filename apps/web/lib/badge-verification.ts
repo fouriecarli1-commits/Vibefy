@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sayItAgain } from './said-recently.ts';
 import { readAsAnon } from './sql.ts';
 
 /**
@@ -103,13 +104,19 @@ export async function lookUpBadgeVerification(publicId: string): Promise<BadgeVe
     // Said at error level, not warn. The badge is being served from the spare
     // route, which means the main one is down, and the only thing worse than a
     // grey badge is a working one over a fault nobody is told about.
-    console.error('badge verification fell back to the Supabase API', {
-      publicId,
-      direct: detail,
-      means:
-        'SUPABASE_DB_URL could not answer, so this row came over HTTPS with the public key ' +
-        'instead. The badge works; the connection string still needs fixing.',
-    });
+    //
+    // Once a minute, though, and keyed on the failure rather than on the badge:
+    // this can hold for days, and a line per impression per embed would bury
+    // the one line that matters under the traffic it is measuring.
+    if (sayItAgain(`fallback:${detail}`)) {
+      console.error('badge verification fell back to the Supabase API', {
+        publicId,
+        direct: detail,
+        means:
+          'SUPABASE_DB_URL could not answer, so this row came over HTTPS with the public key ' +
+          'instead. The badge works; the connection string still needs fixing.',
+      });
+    }
 
     const api = createClient(url, key, { auth: { persistSession: false } });
     const { data, error: apiError } = await api

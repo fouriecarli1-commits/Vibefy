@@ -1,5 +1,6 @@
 import { Pool, type PoolClient } from 'pg';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from './connection-string.ts';
+import { sayItAgain } from './said-recently.ts';
 
 /**
  * Direct SQL, still under row-level security.
@@ -65,13 +66,19 @@ async function connectAndExplainRefusals(): Promise<PoolClient> {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     const means = whyTheDatabaseRefused(detail);
-    // The explanation travels beside the message rather than replacing it: the
-    // original is what somebody will search for, and the sentence is what tells
-    // them it is not the thing it looks like.
-    console.error('the database refused a connection', {
-      error: detail,
-      ...(means === null ? {} : { means }),
-    });
+    // Once a minute, not once a request. The badge can now be served from
+    // Supabase's API while this connection is down, so the state can last for
+    // days and every impression on every customer's site would write a line.
+    // Keyed on the message so a different failure still gets said at once.
+    if (sayItAgain(`refused:${detail}`)) {
+      // The explanation travels beside the message rather than replacing it:
+      // the original is what somebody will search for, and the sentence is
+      // what tells them it is not the thing it looks like.
+      console.error('the database refused a connection', {
+        error: detail,
+        ...(means === null ? {} : { means }),
+      });
+    }
     throw error;
   }
 }
