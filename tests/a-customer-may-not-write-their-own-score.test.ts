@@ -168,16 +168,39 @@ describe('what must still work', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('still lets a customer ask for one, which is their whole write path', async () => {
+  it('still lets a customer cancel a request, which is what is left of their write path', async () => {
+    /*
+     * This asserted that the customer could insert into
+     * `assessment_requests` — "their whole write path" at the time, and the
+     * reason the eleventh migration could close `assessments` without closing
+     * the door a customer actually needs.
+     *
+     * `20261008080000` then closed that one too, for the same reason as this
+     * file's own finding: the depth, the plan, the ceiling and whether a
+     * re-test credit is spent are `decideAssessmentRequest`'s answer, and a
+     * customer could name their own — measured at `plan=certified`,
+     * `depth=continuous`, `ceiling=999`. `requestAssessment` writes the row on
+     * our connection now.
+     *
+     * So what is left of the customer's write path on the queue is the one
+     * transition `assessment_requests_cancel_members` permits, and that is
+     * what this asserts instead.
+     */
     const { appId } = await seedAssessment(db, customer);
+    await db.query(
+      `insert into public.assessment_requests
+         (app_id, organisation_id, requested_by, depth, plan_at_request, max_run_cost_usd)
+       values ($1, $2, $3, 'limited', 'free', 1.00)`,
+      [appId, customer.organisationId, customer.userId],
+    );
     await committingAs(db, { userId: customer.userId }, async (client) => {
-      const { rows } = await client.query<{ id: string }>(
-        `insert into public.assessment_requests
-           (app_id, organisation_id, requested_by, depth, plan_at_request, max_run_cost_usd)
-         values ($1, $2, $3, 'limited', 'free', 1.00) returning id`,
-        [appId, customer.organisationId, customer.userId],
+      const { rows } = await client.query<{ status: string }>(
+        `update public.assessment_requests set status = 'cancelled'
+          where app_id = $1 returning status`,
+        [appId],
       );
-      expect(rows.length, 'a customer can no longer request an assessment').toBe(1);
+      expect(rows.length, 'a customer can no longer cancel their own request').toBe(1);
+      expect(rows[0]?.status).toBe('cancelled');
     });
   });
 });

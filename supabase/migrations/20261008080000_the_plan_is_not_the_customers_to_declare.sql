@@ -1,0 +1,63 @@
+-- audit-marker: not exists (select 1 from pg_policy where polrelid = 'public.assessment_requests'::regclass and polname = 'assessment_requests_insert_members')
+--
+-- A customer could declare their own plan, depth and spending ceiling.
+--
+-- (The marker above names the policy rather than the privilege on purpose. A
+-- marker mentioning the privilege has to spell the word, and
+-- `migration-audit.test.ts` holds that the generated audit query contains no
+-- write verb — which is the right rule and caught exactly this once already,
+-- in decision 898.)
+--
+-- Measured on the test database, as `authenticated` with a real member's
+-- access token:
+--
+--     insert into public.assessment_requests
+--       (app_id, organisation_id, requested_by, depth, plan_at_request,
+--        max_run_cost_usd, uses_retest_credit, status)
+--     values (…, 'continuous', 'certified', 999.00, false, 'queued');
+--
+--     SELF_PLANNED_REQUEST: plan=certified ceiling=999.0000 depth=continuous
+--
+-- `decideAssessmentRequest` is the function that decides all four, and it is
+-- the one place where the free tier's cooldown, the re-test credit and the
+-- per-plan depth live. `requestAssessment` calls it and then writes the answer
+-- through the customer's own client, so the decision was a step in a server
+-- action rather than a property of the row — the sixth table tonight with that
+-- same sentence true of it.
+--
+-- ## What it costs
+--
+-- `COST_CEILING_BY_DEPTH` is `limited: 0.50`, `continuous: 2.00`, `full: 4.00`,
+-- and `run-assessment.ts` reads it by depth. So a free-tier customer naming
+-- `full` gets eight times the model spend their tier pays for, with
+-- `uses_retest_credit = false` so no credit is consumed and the cooldown — which
+-- `decideAssessmentRequest` enforces and nothing else does — simply not
+-- applied. `assessment_requests_one_live_per_app` keeps it to one at a time,
+-- which bounds the rate and not the entitlement.
+--
+-- PART 11: no payment, plan, discount or marketing purchase may influence a
+-- score. This is the same rule read the other way round — the plan deciding
+-- what runs is ours to determine, because it is the one that says what a
+-- customer is owed.
+--
+-- ## Why the privilege and not a column list
+--
+-- Every column on the row except `app_id` is ours: `depth`, `plan_at_request`,
+-- `max_run_cost_usd` and `uses_retest_credit` come from the verdict, `status`
+-- is the queue's own state, and `attempts`, `claimed_at`, `completed_at`,
+-- `assessment_id`, `last_error`, `refusal_code` and `refusal_message` are
+-- written by the worker as it goes. A grant naming the one column they do
+-- choose would be a grant of nothing, so the privilege goes and
+-- `requestAssessment` writes on our connection — both rows it writes, the
+-- queued one and the refusal, which is recorded "not just returned: a customer
+-- who asks why in six months deserves the same answer they were given today".
+--
+-- `assessment_requests_cancel_members` and the UPDATE privilege stay. Changing
+-- your mind is the customer's own act, and that policy already permits exactly
+-- one transition and no other: `status = 'cancelled'`.
+--
+-- The monitoring sweep in `apps/worker/src/monitoring.ts` also inserts here,
+-- on the worker's own connection as the owner, and is unaffected.
+
+drop policy assessment_requests_insert_members on public.assessment_requests;
+revoke insert on public.assessment_requests from authenticated;

@@ -5,9 +5,17 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-08.
 
-> **Daar is nou sestien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
-> se agt was reeds daar; die negende tot sestiende is bygevoeg op 2026-10-07 en
-> 2026-10-08, en staan onderaan `docs/sql/OUTSTANDING.sql`.
+> **Daar is nou sewentien SQL-migrasies, nie agt nie.**
+> `docs/sql/OPEN_ITEMS.md` se agt was reeds daar; die negende tot sewentiende is
+> bygevoeg op 2026-10-07 en 2026-10-08, en staan onderaan
+> `docs/sql/OUTSTANDING.sql`.
+>
+> **Die sewentiende is geld.** 'n Kliënt kon self hul plan, hul diepte en hul
+> bestedingsplafon skryf. Gemeet: `plan=certified`, `depth=continuous`,
+> `ceiling=999`. Diepte is wat die werker lees om te besluit hoeveel 'n lopie
+> mag kos — `limited` is 50c, `full` is $4 — so 'n gratis kliënt kon agt keer
+> meer modelkoste neem as wat hul vlak betaal, sonder om 'n hertoets-krediet te
+> gebruik en sonder die wagtyd. Die migrasie gee daardie kolomme net vir ons.
 >
 > **Die sestiende is die laaste van die klomp en die minste dringend.** Vier
 > rekords waarvan die persoon wat dit beskryf ons helfte kon skryf: 'n appèl wat
@@ -248,7 +256,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — sestien migrasies
+## 4 · Supabase — sewentien migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 

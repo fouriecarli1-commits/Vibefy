@@ -220,7 +220,12 @@ describe('the smaller two, because the rule is the rule', () => {
          values ($1, $2, 'limited', 'free', 1.00, $3)`,
         [appId, owner.organisationId, owner.userId],
       ),
-    ).toMatch(/row-level security/i);
+      // `row-level security` until `20261008080000` revoked INSERT on
+      // `assessment_requests` from `authenticated` — the depth, the plan and
+      // the ceiling are `decideAssessmentRequest`'s answer, and a customer
+      // could name their own. The own-name clause is still in the policy and
+      // should still be the reason if the privilege ever comes back.
+    ).toMatch(/row-level security|permission denied/i);
   });
 });
 

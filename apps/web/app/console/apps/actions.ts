@@ -590,38 +590,85 @@ export async function requestAssessment(
 
   const { verdict, plan } = decision;
 
+  /*
+   * Both rows are written on our own connection, because every column on them
+   * except `app_id` is ours.
+   *
+   * `decideAssessmentRequest` decides the depth, the plan, the ceiling and
+   * whether a re-test credit is spent, and it is the one place the free tier's
+   * cooldown lives. This used to write that answer through the customer's own
+   * client, so the decision was a step in this function rather than a property
+   * of the row. Measured as a member and nothing else: `depth = 'continuous'`,
+   * `plan_at_request = 'certified'`, `max_run_cost_usd = 999` — and `full` is
+   * eight times the model spend a free tier pays for.
+   *
+   * So the authority check is asked here instead, as the insert policy's own
+   * predicate against this request's claims. It is `is_org_member` rather than
+   * the read above, because `apps_select_members` also admits a reviewer and a
+   * reviewer has no business queueing somebody's assessment.
+   */
+  const mayRequest = await readAsUser(user.id, async (client) => {
+    const { rows } = await client.query<{ ok: boolean }>(`select public.is_org_member($1) as ok`, [
+      decision.organisationId,
+    ]);
+    return rows[0]?.ok === true;
+  });
+  if (!mayRequest) {
+    return { error: 'Only a member of this workspace can request an assessment.' };
+  }
+
   if (!verdict.allowed) {
     // The refusal is recorded, not just returned: a customer who asks why in six
     // months deserves the same answer they were given today.
-    await supabase.from('assessment_requests').insert({
-      app_id: appId,
-      organisation_id: decision.organisationId,
-      requested_by: user.id,
-      depth: verdict.depth,
-      status: 'refused',
-      plan_at_request: plan.plan,
-      max_run_cost_usd: verdict.maxRunCostUsd,
-      refusal_code: verdict.refusal?.code,
-      refusal_message: verdict.refusal?.message,
+    await writeAsService(async (client) => {
+      await client.query(
+        `insert into public.assessment_requests
+           (app_id, organisation_id, requested_by, depth, status, plan_at_request,
+            max_run_cost_usd, refusal_code, refusal_message)
+         values ($1, $2, $3, $4, 'refused', $5, $6, $7, $8)`,
+        [
+          appId,
+          decision.organisationId,
+          user.id,
+          verdict.depth,
+          plan.plan,
+          verdict.maxRunCostUsd,
+          verdict.refusal?.code ?? null,
+          verdict.refusal?.message ?? null,
+        ],
+      );
     });
     return { error: verdict.refusal?.message ?? 'This assessment cannot run right now.' };
   }
 
-  const { error } = await supabase.from('assessment_requests').insert({
-    app_id: appId,
-    organisation_id: decision.organisationId,
-    requested_by: user.id,
-    depth: verdict.depth,
-    plan_at_request: plan.plan,
-    uses_retest_credit: verdict.usesReTestCredit,
-    max_run_cost_usd: verdict.maxRunCostUsd,
+  const error = await writeAsService(async (client) => {
+    try {
+      await client.query(
+        `insert into public.assessment_requests
+           (app_id, organisation_id, requested_by, depth, plan_at_request,
+            uses_retest_credit, max_run_cost_usd)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          appId,
+          decision.organisationId,
+          user.id,
+          verdict.depth,
+          plan.plan,
+          verdict.usesReTestCredit,
+          verdict.maxRunCostUsd,
+        ],
+      );
+      return null as string | null;
+    } catch (cause) {
+      return cause instanceof Error ? cause.message : String(cause);
+    }
   });
 
   if (error) {
     return {
-      error: error.message.includes('one_live_per_app')
+      error: error.includes('one_live_per_app')
         ? 'An assessment of this application is already queued or running.'
-        : error.message,
+        : error,
     };
   }
 
