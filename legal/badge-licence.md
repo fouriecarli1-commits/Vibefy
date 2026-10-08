@@ -21,7 +21,7 @@
 > version is accepted.
 
 "Verified by VibefyCode" and the VibefyCode badge device (together, the **Mark**) are trade marks of
-[LEGAL_ENTITY]. Where your application has been assessed, met the published threshold, and been
+FUTUREBOXSTUDIO (PTY) LTD (registration number 2026/714071/07). Where your application has been assessed, met the published threshold, and been
 approved by a human reviewer, we grant you a **limited, non-exclusive, non-transferable,
 revocable licence** to display the Mark for that application, for the period stated on the
 badge, on the domain recorded as its certified origin.
@@ -31,7 +31,8 @@ company generally, your marketing claims about security, or any successor applic
 
 ## 2. How the Mark is displayed
 
-1. **Served from us.** The badge is rendered from `verify.[PRIMARY_DOMAIN]` on every load. You
+1. **Served from us.** The badge is rendered from the verification origin published on the
+   verification page — `vibefycode.com` today — on every load. You
    may not host, cache, screenshot, re-draw or otherwise reproduce it as a file you control.
    Rendering it ourselves is what makes revocation take effect within minutes.
 2. **Always linked.** Every instance of the Mark must link to that application's verification

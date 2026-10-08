@@ -9,7 +9,8 @@
 
 ## 1. Who is responsible
 
-[LEGAL_ENTITY], [JURISDICTION], is the controller of the personal data described here. Contact
+FUTUREBOXSTUDIO (PTY) LTD (registration number 2026/714071/07), [JURISDICTION], is the controller
+of the personal data described here. Contact
 [CONTACT_EMAIL]. Where a data protection officer or EU/UK representative is required, their
 details will be published here before launch.
 

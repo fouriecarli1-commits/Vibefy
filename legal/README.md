@@ -9,9 +9,15 @@
 
 Written to a **GDPR-grade baseline**, the strictest common standard across the markets under
 consideration. A jurisdiction layer (`VIBEFYCODE_JURISDICTION` = `gdpr` | `uae_pdpl` | `za_popia` |
-`us`) selects variants of the data-protection clauses without rewriting the documents. The
-entity and governing law are not yet decided; every placeholder reading `[JURISDICTION]`,
-`[LEGAL_ENTITY]` or `[PRIMARY_DOMAIN]` is resolved before launch, not before building.
+`us`) selects variants of the data-protection clauses without rewriting the documents.
+
+The **entity is decided**: VibefyCode is a product of
+FUTUREBOXSTUDIO (PTY) LTD (registration number 2026/714071/07), and every document that names
+an entity now names that one. The **governing law is not**, and neither is the published contact
+address: every placeholder reading `[JURISDICTION]` or `[CONTACT_EMAIL]` is still waiting on a
+decision, and a South African private company does not by itself settle either — a governing-law
+clause is a commercial choice, and POPIA rather than the GDPR baseline would change the
+data-protection clauses throughout.
 
 ## The documents
 

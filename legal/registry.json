@@ -40,7 +40,7 @@
       "requiresConsent": true,
       "consentDocumentType": "badge_licence",
       "isDraft": true,
-      "sha256": "de9d3a48bf62e4df684f755b3448561885a6b30519c9d1df98472b5cdcc5bfb0"
+      "sha256": "b22fd5037378fc17034aabec5e09ef86e62d64e056fd3c1c05d3d2f5d7233d24"
     },
     "cookie-notice.md": {
       "version": "1.0.0-draft",
@@ -80,7 +80,7 @@
       "requiresConsent": true,
       "consentDocumentType": "privacy_policy",
       "isDraft": true,
-      "sha256": "e998147ac7551b1a4c208bdac735ae3d1bba17f1dc3882a7f888b1dcd5dca35c"
+      "sha256": "ec15fd079888fd17c685efb7921e84b89da30516c29d1cc9714dfaf89858104c"
     },
     "rating-methodology-and-independence.md": {
       "version": "1.1.0-draft",
@@ -112,7 +112,7 @@
       "requiresConsent": true,
       "consentDocumentType": "terms_of_service",
       "isDraft": true,
-      "sha256": "5fe24184edde22010112ada628260641a6024efb4df66b3bfaa2ecb016bdd8fe"
+      "sha256": "fa7fc870d6fa5232ce92229041cac9427edb131d780f5fe861f4146ba7e23426"
     }
   }
 }

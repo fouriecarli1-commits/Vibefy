@@ -96,3 +96,26 @@ export const REMEDIATION_CLIENT_DISCLOSURE =
 
 export const MARKETING_CLIENT_DISCLOSURE =
   'This application’s owner is also a client of our marketing services. That relationship had no part in this assessment: the score is produced by the published rubric from evidence, reviewed by a person, and there is no path by which any payment can change it.';
+
+/**
+ * Who operates VibefyCode.
+ *
+ * One constant rather than a string in a footer, because it has to read
+ * identically in the Terms, the privacy policy, a report and an invoice. A
+ * trust product that will not say plainly who stands behind it is asking for
+ * more faith than it offers.
+ *
+ * Whether a company registered in South Africa must show its registered name
+ * and registration number on a *website* — rather than only on letters, order
+ * forms, invoices and receipts, which the Companies Act does enumerate — is a
+ * question for counsel, and it is in `docs/OPEN_ITEMS.md`. Showing it is the
+ * answer either way: the cost of showing it when it is not required is nothing,
+ * and the drafted legal text names the entity regardless.
+ */
+export const OPERATOR_LEGAL_NAME = 'FUTUREBOXSTUDIO (PTY) LTD';
+
+/** The CIPC registration number, as issued. */
+export const OPERATOR_REGISTRATION_NUMBER = '2026/714071/07';
+
+/** Both together, which is the form every published surface uses. */
+export const OPERATOR_IDENTITY = `${OPERATOR_LEGAL_NAME} (${OPERATOR_REGISTRATION_NUMBER})`;

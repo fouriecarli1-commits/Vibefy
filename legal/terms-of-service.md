@@ -9,7 +9,8 @@
 
 ## 1. Who we are
 
-VibefyCode ("VibefyCode", "we", "us") is operated by [LEGAL_ENTITY], registered in [JURISDICTION].
+VibefyCode ("VibefyCode", "we", "us") is a product of FUTUREBOXSTUDIO (PTY) LTD (registration number 2026/714071/07),
+registered in [JURISDICTION].
 Contact: [CONTACT_EMAIL]. "You" means the person or organisation using the platform.
 
 ## 2. What the service is

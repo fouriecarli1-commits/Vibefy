@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { JetBrains_Mono, Poppins } from 'next/font/google';
 import { Suspense } from 'react';
+import { OPERATOR_IDENTITY } from '@vibefycode/shared';
 import { SiteNav } from '@/components/site-nav';
 import { SiteNavForViewer } from '@/components/site-nav-viewer';
 import './globals.css';
@@ -95,7 +96,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/legal/responsible-disclosure">Responsible disclosure</Link>
               <Link href="/verify">Check a badge</Link>
             </p>
-            <p className="mt-4">© {new Date().getFullYear()} VibefyCode</p>
+            <p className="mt-4">
+              © {new Date().getFullYear()} VibefyCode. A product of {OPERATOR_IDENTITY}.
+            </p>
           </div>
         </footer>
       </body>
