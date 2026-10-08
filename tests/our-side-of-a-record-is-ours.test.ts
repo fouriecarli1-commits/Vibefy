@@ -26,7 +26,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
 import { actingAs, committingAs, connect, expectRefusal } from './setup/client.ts';
-import { seedAccount, seedAssessment, type SeededAccount } from './setup/seed.ts';
+import { seedAccount, seedApp, seedAssessment, type SeededAccount } from './setup/seed.ts';
 
 let db: Client;
 let customer: SeededAccount;
@@ -149,6 +149,80 @@ describe('an audit export', () => {
       [customer.organisationId, customer.userId, 'a'.repeat(64)],
     );
     expect(rows[0]?.sha256, 'we can no longer record an export').toBe('a'.repeat(64));
+  });
+});
+
+describe('an alert we sent', () => {
+  /*
+   * The sixth, and the one nothing watched.
+   *
+   * Found by `tools/policy-mutation.mjs grants`, a class added for exactly
+   * this: a column-level write grant is the quietest rule in the schema — no
+   * policy to read, no trigger to find, only the shape of a `grant` in a
+   * migration — and `grant update on <table> to authenticated` undoes one in a
+   * line that looks like housekeeping. Widening all six failed tests for five
+   * of them. `alerts` produced nothing.
+   *
+   * `read_at` is the customer's: they dismiss their own alert. Everything else
+   * on the row is ours. `severity`, `title`, `body` and `kind` are our
+   * observation about their application, and `delivered_at` with
+   * `delivery_channel` is our record of having told them — which is the column
+   * that matters on the day a badge is suspended and somebody says they were
+   * never warned.
+   */
+  it('refuses its subject rewriting what we observed, or that we sent it', async () => {
+    const appId = await seedApp(db, customer, 'Alerted App');
+    const { rows: seeded } = await db.query<{ id: string }>(
+      `insert into public.alerts
+         (organisation_id, app_id, kind, severity, title, body, delivered_at,
+          delivery_channel, dedupe_key)
+       values ($1, $2, 'drift_detected', 'critical', 'Your score moved',
+               'The last assessment scored lower than the one your badge stands on.',
+               now(), 'email', $3)
+       returning id`,
+      [customer.organisationId, appId, `our-side-drift-${appId}`],
+    );
+    const alertId = seeded[0]!.id;
+
+    for (const sql of [
+      `update public.alerts set severity = 'info' where id = $1`,
+      `update public.alerts set body = 'Nothing to see here.' where id = $1`,
+      `update public.alerts set delivered_at = null, delivery_channel = null where id = $1`,
+    ]) {
+      await actingAs(db, { userId: customer.userId }, async (client) => {
+        const message = await expectRefusal(client, sql, [alertId]);
+        expect(message, `a customer rewrote their own alert: ${sql}`).toMatch(/permission denied/i);
+      });
+    }
+
+    const { rows } = await db.query<{ severity: string; delivered_at: string | null }>(
+      'select severity, delivered_at from public.alerts where id = $1',
+      [alertId],
+    );
+    expect(rows[0]?.severity, 'the severity did not survive').toBe('critical');
+    expect(rows[0]?.delivered_at, 'the record of sending it did not survive').not.toBeNull();
+  });
+
+  it('still lets them dismiss it, which is the one column that is theirs', async () => {
+    const appId = await seedApp(db, customer, 'Dismissable App');
+    const { rows: seeded } = await db.query<{ id: string }>(
+      `insert into public.alerts
+         (organisation_id, app_id, kind, severity, title, body, dedupe_key)
+       values ($1, $2, 'application_unreachable', 'warning',
+               'We could not reach your application',
+               'Three checks in a row did not answer.', $3)
+       returning id`,
+      [customer.organisationId, appId, `our-side-unreachable-${appId}`],
+    );
+
+    await committingAs(db, { userId: customer.userId }, async (client) => {
+      const { rows } = await client.query<{ read_at: string | null }>(
+        'update public.alerts set read_at = now() where id = $1 returning read_at',
+        [seeded[0]!.id],
+      );
+      expect(rows.length, 'a customer can no longer dismiss their own alert').toBe(1);
+      expect(rows[0]?.read_at).not.toBeNull();
+    });
   });
 });
 

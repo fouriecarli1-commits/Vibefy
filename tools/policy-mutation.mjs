@@ -26,6 +26,7 @@
  *     node tools/policy-mutation.mjs checks    > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs uniques   > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs restrictives > supabase/migrations/29999999999999_mutate.sql
+ *     node tools/policy-mutation.mjs grants       > supabase/migrations/29999999999999_mutate.sql
  *
  * `reads` opens every policy that scopes a select to a membership or to a
  * person: a hole there means one customer reading another's findings. `writes`
@@ -41,9 +42,12 @@
  * measure was not. That is the argument for running this rather than reasoning
  * about it.
  *
- * Expect `deployment.test.ts` to fail on the schema-file comparison. That is the
- * gate noticing the migrations changed, which is its job, and it is the one
- * failure to ignore.
+ * Expect four failures from the gates that notice the migrations changed, and
+ * no others: two in `deployment.test.ts` on the schema-file comparison, one in
+ * `migration-audit.test.ts`, and one in `the-sql-i-ask-him-to-paste.test.ts`,
+ * which holds that every migration on disk is in the document Anré pastes — and
+ * the mutation file is, briefly, a migration on disk. Those four are the noise.
+ * Anything else is an answer.
  *
  * This writes nothing to the database and touches no file. It prints SQL.
  */
@@ -193,6 +197,43 @@ const CLASSES = {
    * the whole mutation. Postgres will not let a policy change between
    * permissive and restrictive, which is the other reason to do it this way.
    */
+  /**
+   * Every column-level write grant, widened back to the whole table.
+   *
+   * Postgres has no per-column row-level security, so where a rule is about
+   * *which columns* a request-facing role may write it has to be a privilege:
+   * the table-level one revoked, and the permitted columns granted back by
+   * name. Six of those now exist — the screening verdict and the monitoring
+   * counters on `apps`, the resolution on an appeal, the answer on a
+   * data-subject request, `platform_role` on `users`, and `read_at` on an
+   * alert.
+   *
+   * They are the quietest rules in the schema. There is no policy to read and
+   * no trigger to find; the only trace is the shape of a `grant` in a
+   * migration, and a later `grant insert on <table> to authenticated` undoes
+   * all of it in one line that looks like housekeeping. A column-level revoke
+   * cannot even subtract from a table-level grant — Postgres says so in a
+   * warning and changes nothing — so the undo is easier to write than the
+   * rule.
+   *
+   * The mutation is the widening, not a removal: it grants the whole privilege
+   * back and leaves the column grants in place, which is exactly what a
+   * careless migration would do.
+   */
+  grants: {
+    sql: `select c.relname as tablename, cp.privilege_type
+           from information_schema.column_privileges cp
+           join pg_class c on c.relname = cp.table_name
+           join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+          where cp.table_schema = 'public' and cp.grantee = 'authenticated'
+            and cp.privilege_type in ('INSERT', 'UPDATE') and c.relkind = 'r'
+            and not has_table_privilege('authenticated', c.oid, cp.privilege_type)
+          group by c.relname, cp.privilege_type
+          order by c.relname, cp.privilege_type`,
+    alter: (row) =>
+      `grant ${row.privilege_type.toLowerCase()} on public.${row.tablename} to authenticated;`,
+  },
+
   restrictives: {
     sql: `select tablename, policyname from pg_policies
            where schemaname = 'public' and permissive = 'RESTRICTIVE'
@@ -342,6 +383,7 @@ const LABEL = {
   checks: 'check constraints dropped',
   uniques: 'uniqueness rules dropped',
   restrictives: 'restrictive policies opened',
+  grants: 'column-level write grants widened to the whole table',
 };
 // A class added without a label printed "26 undefined.", which is a header
 // somebody would paste into a decision entry.
