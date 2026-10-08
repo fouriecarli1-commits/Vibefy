@@ -32,11 +32,20 @@ Laas nagegaan 2026-10-08.
 > al het? `node tools/migration-audit.mjs > audit.sql`, plak daardie navraag, en
 > dit sê jou — dit lees net.
 
-> **Die badge, daarna.** Solank die databasis vir Vercel onbereikbaar is, sê
-> `/verify` vir enigiemand wat 'n kliënt se badge natrek dat dit 'n fout aan ons
-> kant is en dat niks vasgestel is nie. Dit was erger — dit het gesê die badge
-> is nooit uitgereik nie — en die kode is reg, maar dit help eers wanneer stap 3
-> hieronder klaar is en Vercel herontplooi het.
+> **Die badge behoort nou te werk sonder dat jy iets regmaak.** Die badge en
+> `/verify` het albei net een ry nodig, en daardie ry is openbaar — Supabase se
+> eie API kan dit oor HTTPS gee met die publieke sleutel wat jou konsole al die
+> tyd gebruik, sonder enige databasis-URL. Niks het daardie pad gebruik nie.
+> Nou probeer dit eers die direkte verbinding en val dan daarop terug.
+>
+> **Klaar as:** jy herontplooi Vercel en die badge wys 'n telling in plaas van
+> grys. Jy hoef nie eers die verbindingstring regmaak nie.
+>
+> **Maak dit steeds reg.** Die terugvalpad werk net vir die badge en
+> `/verify`. Jou konsole, die verslae en die werker het nog die direkte
+> verbinding nodig, en elke keer wat dit terugval skryf dit 'n fout in die log —
+> 'n badge wat werk oor 'n stukkende verbindingstring is nog steeds stukkend.
+> Stappe 0 tot 3 hieronder.
 
 ---
 

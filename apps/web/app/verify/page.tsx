@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { buildKeySet, loadRetiredKeys, loadSigningKey, verifyBadge } from '@vibefycode/badge';
-import { readAsAnon } from '@/lib/sql';
+import { lookUpBadgeVerification } from '@/lib/badge-verification';
 
 export const metadata: Metadata = {
   title: 'Check a badge',
@@ -202,15 +202,14 @@ interface BadgeRecord {
 
 async function lookUpBadge(badgeId: string): Promise<BadgeLookup> {
   try {
-    const record = await readAsAnon(async (client) => {
-      const { rows } = await client.query<BadgeRecord>(
-        `select payload, signature, status, slug, certified_origin
-           from public.badge_verification where public_id = $1`,
-        [badgeId],
-      );
-      return rows[0] ?? null;
-    });
-    return record === null ? { kind: 'never_issued' } : { kind: 'issued', record };
+    // Through `lookUpBadgeVerification`, which tries the direct connection and
+    // then Supabase's own API. The view is readable by `anon`, so the API can
+    // serve it with the public key and no database URL — which is the route
+    // that is still up when a wrong connection string has turned every badge
+    // grey. It logs when it falls back, so a working badge over a broken
+    // connection string is still something somebody is told about.
+    const { row } = await lookUpBadgeVerification(badgeId);
+    return row === null ? { kind: 'never_issued' } : { kind: 'issued', record: row };
   } catch {
     // Deliberately carries no detail to the page. What went wrong on our side
     // is ours to read in the logs; a visitor needs to know only that we did not

@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { renderBadgeSvg, renderBadgeUnavailableSvg, type BadgeStatus } from '@vibefycode/badge';
 import { whyTheDatabaseRefused } from '@/lib/connection-string';
-import { readAsAnon, writeAsService } from '@/lib/sql';
+import { lookUpBadgeVerification } from '@/lib/badge-verification';
+import { writeAsService } from '@/lib/sql';
 
 /**
  * The badge image.
@@ -112,21 +113,13 @@ async function serveBadge(
   id: string,
   sizePx: number | undefined,
 ): Promise<NextResponse> {
-  const badge = await readAsAnon(async (client) => {
-    const { rows } = await client.query<{
-      status: BadgeStatus;
-      slug: string;
-      app_name: string;
-      rubric_version: string;
-      assessed_at: string;
-      certified_origin: string;
-    }>(
-      `select status, slug, app_name, rubric_version, assessed_at, certified_origin
-         from public.badge_verification where public_id = $1`,
-      [id],
-    );
-    return rows[0] ?? null;
-  });
+  // Through `lookUpBadgeVerification`, which tries the direct connection and
+  // then Supabase's own API with the public key. This route is the one that
+  // renders on a customer's website, so it is the one whose failure the whole
+  // internet sees — and the view it reads is published, so there is no reason
+  // for a wrong connection string to be the end of it. The fallback logs
+  // itself, loudly, every time.
+  const { row: badge } = await lookUpBadgeVerification(id);
 
   if (!badge) {
     // Deliberately not a 404 image: an unknown badge id on someone's website
