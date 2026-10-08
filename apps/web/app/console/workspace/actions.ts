@@ -7,6 +7,7 @@ import { createInvitationToken } from '@vibefycode/workspace';
 import { renderInvitationEmail, resendFromEnvironment } from '@vibefycode/notify';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
+import { readAsUser, writeAsService } from '@/lib/sql';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -572,16 +573,43 @@ export async function verifySsoDomain(
     return { error: outcome.detail };
   }
 
-  // `setSsoEnforcement` below has always asked; this one did not, and the two
-  // decide the same thing between them.
-  const { data: verified, error } = await supabase
-    .from('sso_connections')
-    .update({ domain_verified_at: new Date().toISOString() })
-    .eq('id', connectionId)
-    .select('id')
-    .maybeSingle();
-  if (error) return { error: error.message };
-  if (!verified) return { error: 'You are not permitted to change that connection.' };
+  /*
+   * Written on our own connection, because it is our finding and not theirs.
+   *
+   * This update used to go through the customer's own client. The DNS check
+   * above is real; it was simply not on the path, so a workspace owner could
+   * insert a connection for any domain with `domain_verified_at` already set —
+   * measured with `gmail.com` — and `sso_routing` would then refuse password
+   * sign-in for every address at it. `sso_domains_are_verified_by_us` now
+   * refuses that row, which also means this write can no longer be made as
+   * the caller.
+   *
+   * So the authority check moves here, as the policy's own predicate evaluated
+   * against this request's claims. `sso_write_owners` is owner-only, not
+   * owner-or-admin, and this keeps it that way.
+   */
+  const mayVerify = await readAsUser(user.id, async (client) => {
+    const { rows } = await client.query<{ ok: boolean }>(
+      `select public.has_org_role($1, array['owner']::public.org_role[]) as ok`,
+      [connection.organisation_id],
+    );
+    return rows[0]?.ok === true;
+  });
+  if (!mayVerify) return { error: 'You are not permitted to change that connection.' };
+
+  const error = await writeAsService(async (client) => {
+    try {
+      await client.query(
+        `update public.sso_connections set domain_verified_at = now(), updated_at = now()
+          where id = $1`,
+        [connectionId],
+      );
+      return null as string | null;
+    } catch (cause) {
+      return cause instanceof Error ? cause.message : String(cause);
+    }
+  });
+  if (error) return { error };
 
   revalidatePath(`/console/workspace/${connection.organisation_id}/sso`);
   return {

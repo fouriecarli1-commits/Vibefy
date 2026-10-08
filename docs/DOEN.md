@@ -5,9 +5,17 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-08.
 
-> **Daar is nou dertien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
-> se agt was reeds daar; die negende tot dertiende is bygevoeg op 2026-10-07 en
+> **Daar is nou veertien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
+> se agt was reeds daar; die negende tot veertiende is bygevoeg op 2026-10-07 en
 > 2026-10-08, en staan onderaan `docs/sql/OUTSTANDING.sql`.
+>
+> **Die veertiende is familie van die dertiende.** 'n Werkruimte-eienaar kon
+> enige e-pos-domein eis en self as "verified" merk. Gemeet met `gmail.com`:
+> daarna gee `sso_routing('victim@gmail.com')` hul verskaffer terug, en die
+> aanmeldvorm weier 'n wagwoord vir elke adres by daardie domein. Dit vat net
+> een kliënt om elkeen met 'n Gmail-adres uit VibefyCode te sluit, sonder enige
+> stap aan ons kant. Die migrasie maak die "verified"-datum ons s'n om te
+> skryf; die eienaar mag steeds eis en mag steeds afdwing wat ons bevestig het.
 >
 > **Die dertiende is die ernstigste van die drie, en die enigste waar iemand
 > anders as die kliënt skade kry.** 'n Werkruimte-eienaar kon self 'n
@@ -225,7 +233,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — dertien migrasies
+## 4 · Supabase — veertien migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
@@ -236,11 +244,12 @@ niks het dit voorheen gekeer nie. Die agtste laat die databasis 'n weiering by
 inname neerskryf; die bedienerhandeling het dit probeer en is elke keer deur
 row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van ses
 funksies wat ons koste- en sitplekgetalle aan 'n onaangemelde besoeker gegee
-het. **Die elfde, twaalfde en dertiende maak die meeste saak van almal:** die
-een keer dat 'n kliënt hul eie telling skryf, die tweede dat hulle hul eie
-toepassing goedkeur onder die Aanvaarbare-Gebruik-beleid, die derde dat hulle
-self sê hulle besit 'n domein. Doen daardie drie eerste, en die dertiende
-eerste van almal.
+het. **Die elfde tot veertiende maak die meeste saak van almal:** die een keer
+dat 'n kliënt hul eie telling skryf, die tweede dat hulle hul eie toepassing
+goedkeur onder die Aanvaarbare-Gebruik-beleid, die derde dat hulle self sê
+hulle besit 'n domein wat ons dan gaan toets, die vierde dat hulle 'n
+e-pos-domein eis en almal daar uitsluit. Doen daardie vier eerste, en die
+dertiende eerste van almal.
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte
