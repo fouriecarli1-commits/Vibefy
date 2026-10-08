@@ -25,6 +25,7 @@
  *     node tools/policy-mutation.mjs recorders > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs checks    > supabase/migrations/29999999999999_mutate.sql
  *     node tools/policy-mutation.mjs uniques   > supabase/migrations/29999999999999_mutate.sql
+ *     node tools/policy-mutation.mjs restrictives > supabase/migrations/29999999999999_mutate.sql
  *
  * `reads` opens every policy that scopes a select to a membership or to a
  * person: a hole there means one customer reading another's findings. `writes`
@@ -177,6 +178,29 @@ const CLASSES = {
         ? `alter table public.${row.tablename} drop constraint if exists ${row.policyname};`
         : `drop index if exists public.${row.policyname};`,
   },
+  /**
+   * Every restrictive policy, opened.
+   *
+   * A restrictive policy is the shape this schema reaches for when a rule must
+   * hold whatever else is permitted — the second step in front of issuing a
+   * badge, inviting somebody, or recording a review, and the rule that only an
+   * owner creates an owner. It is also the shape whose loss is hardest to see
+   * by reading: a restrictive policy that stops restricting leaves every
+   * permissive policy in place, so every statement that used to work still
+   * works and the one that should not now does too.
+   *
+   * All of them carry a `with check` and no `using`, so opening the check is
+   * the whole mutation. Postgres will not let a policy change between
+   * permissive and restrictive, which is the other reason to do it this way.
+   */
+  restrictives: {
+    sql: `select tablename, policyname from pg_policies
+           where schemaname = 'public' and permissive = 'RESTRICTIVE'
+             and with_check is not null
+           order by tablename, policyname`,
+    alter: (row) => `alter policy ${row.policyname} on public.${row.tablename} with check (true);`,
+  },
+
   recorders: {
     /*
      * The triggers that write rather than refuse.
@@ -317,6 +341,7 @@ const LABEL = {
   recorders: 'recording triggers disabled',
   checks: 'check constraints dropped',
   uniques: 'uniqueness rules dropped',
+  restrictives: 'restrictive policies opened',
 };
 // A class added without a label printed "26 undefined.", which is a header
 // somebody would paste into a decision entry.
