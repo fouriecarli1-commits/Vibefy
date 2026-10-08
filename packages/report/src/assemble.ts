@@ -98,6 +98,56 @@ export async function assembleReportSource(
   const row = assessment.rows[0];
   if (!row) throw new Error(`Assessment ${assessmentId} does not exist.`);
 
+  /*
+   * A report is a statement about a number. There has to be one.
+   *
+   * `overall_score` is nullable and nothing ties it to a status, so every
+   * figure below read `Number(row.overall_score)` — and `bandFor(0)` is
+   * "Not ready: findings that block usable release within the assessed scope",
+   * the harshest sentence this product can print, arrived at by the absence of
+   * a measurement rather than by one. The dimensions table would have been
+   * empty underneath it and the comparison would have placed the application
+   * against its peers at zero.
+   *
+   * It is not reachable today: the engine writes the score in the same
+   * statement as the status, `sweepPendingReports` only takes `approved` and
+   * `published`, and since `20261008010000` nothing a request can reach may
+   * write the column at all. This refuses anyway, for the same reason
+   * `scoreExit` does — a function that cannot tell "zero" from "not measured"
+   * is wrong in itself, and the next caller will not be the careful one.
+   */
+  /*
+   * And a statement of what was not covered.
+   *
+   * `generateReport` refuses a scope statement under a hundred characters —
+   * "a report without one states no limits, and we do not publish those" — and
+   * that check is in the function that *stores* a report. The console page
+   * calls `renderReport` directly on this source and gates only on status, so
+   * the one caller that shows a customer their report live would have rendered
+   * the scope paragraph empty. One rule, enforced in one of the two callers,
+   * which is the shape of half the night.
+   *
+   * Here rather than there, because here is where both callers meet.
+   * `generateReport` keeps its own check: it names the frozen scope statement
+   * specifically and it has a test, and a rule worth having is worth having
+   * twice.
+   */
+  const scopeStatement = (row.scope_statement ?? '').trim();
+  if (scopeStatement.length < 100) {
+    throw new Error(
+      `Assessment ${assessmentId} has no frozen scope statement, so there is no report to ` +
+        'assemble. A report without one states no limits, and we do not publish those.',
+    );
+  }
+
+  if (row.overall_score === null) {
+    throw new Error(
+      `Assessment ${assessmentId} has no score, so there is no report to assemble. ` +
+        'Printing 0 would read as "Not ready", which is a finding about the application ' +
+        'rather than about the run.',
+    );
+  }
+
   const findings = await client.query<FindingRow>(
     `select f.*,
             coalesce(
@@ -202,7 +252,7 @@ export async function assembleReportSource(
         },
         {
           assessmentId: row.id,
-          overallScore: Number(row.overall_score ?? 0),
+          overallScore: Number(row.overall_score),
           certificationEligible: row.certification_eligible === true,
           dimensions: dimensionScores.map((dimension) => ({
             dimension: dimension.dimension as PolicySubject['dimensions'][number]['dimension'],
@@ -227,8 +277,8 @@ export async function assembleReportSource(
     rubricVersion: row.rubric_version,
     assessedOn: new Date(row.completed_at ?? row.created_at).toISOString().slice(0, 10),
     reviewedOn: row.reviewed_at ? new Date(row.reviewed_at).toISOString().slice(0, 10) : null,
-    overallScore: Number(row.overall_score ?? 0),
-    band: bandFor(Number(row.overall_score ?? 0)),
+    overallScore: Number(row.overall_score),
+    band: bandFor(Number(row.overall_score)),
     certificationEligible: row.certification_eligible === true,
     certificationBlockers: row.gate_failures ?? [],
     dimensions: dimensionScores.map((dimension) => ({
@@ -251,7 +301,7 @@ export async function assembleReportSource(
     })),
     narrative,
     comparison: compareToPeers({
-      score: Number(row.overall_score ?? 0),
+      score: Number(row.overall_score),
       category: row.category ?? null,
       peerScores,
     }),
@@ -270,7 +320,7 @@ export async function assembleReportSource(
       status: run.status,
       notes: run.metadata?.notes ?? [],
     })),
-    scopeStatement: row.scope_statement ?? '',
+    scopeStatement,
     promptBundleSha256: row.prompt_bundle_sha256 ?? '',
     intendedForAppStore: row.intended_for_app_store === true,
     branding: brandingRow
