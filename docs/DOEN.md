@@ -5,7 +5,25 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-08.
 
-> **Doen die SQL eers. Dit is nou belangriker as die badge.**
+> **Eerste, en dit neem een minuut: Vercel → Deployments → boonste een → ⋯ →
+> Redeploy.**
+>
+> Die badge behoort daarna te werk sonder dat jy iets anders regmaak. Die badge
+> en `/verify` het elkeen net een ry nodig, en daardie ry is openbaar: Supabase
+> se eie API kan dit oor HTTPS gee met die publieke sleutel wat jou konsole al
+> die tyd gebruik, sonder enige databasis-URL. Niks het daardie pad gebruik nie.
+> Nou probeer dit eers die direkte verbinding, en val dan daarop terug.
+>
+> **Klaar as:** die badge wys 'n telling in plaas van grys.
+>
+> **Maak dit steeds reg.** Die terugvalpad werk net vir die badge en
+> `/verify`. Jou konsole, die verslae en die werker het nog die direkte
+> verbinding nodig, en elke keer wat dit terugval skryf dit 'n fout in die log —
+> 'n badge wat werk oor 'n stukkende verbindingstring is nog steeds stukkend.
+> Stappe 0 tot 3 hieronder.
+
+> **Tweede, en dit is die belangrike een.** Die badge was 'n uitval; hierdie
+> is gate.
 >
 > Daar is sewentien migrasies in `docs/sql/OUTSTANDING.sql`. Sewe is van
 > vanaand, en vier van daardie sewe is gate wat iemand vandag kan gebruik:
@@ -31,21 +49,6 @@ Laas nagegaan 2026-10-08.
 > volgorde geplak en elkeen het sonder 'n fout geloop. Onseker wat jou databasis
 > al het? `node tools/migration-audit.mjs > audit.sql`, plak daardie navraag, en
 > dit sê jou — dit lees net.
-
-> **Die badge behoort nou te werk sonder dat jy iets regmaak.** Die badge en
-> `/verify` het albei net een ry nodig, en daardie ry is openbaar — Supabase se
-> eie API kan dit oor HTTPS gee met die publieke sleutel wat jou konsole al die
-> tyd gebruik, sonder enige databasis-URL. Niks het daardie pad gebruik nie.
-> Nou probeer dit eers die direkte verbinding en val dan daarop terug.
->
-> **Klaar as:** jy herontplooi Vercel en die badge wys 'n telling in plaas van
-> grys. Jy hoef nie eers die verbindingstring regmaak nie.
->
-> **Maak dit steeds reg.** Die terugvalpad werk net vir die badge en
-> `/verify`. Jou konsole, die verslae en die werker het nog die direkte
-> verbinding nodig, en elke keer wat dit terugval skryf dit 'n fout in die log —
-> 'n badge wat werk oor 'n stukkende verbindingstring is nog steeds stukkend.
-> Stappe 0 tot 3 hieronder.
 
 ---
 
