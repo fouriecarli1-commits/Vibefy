@@ -5,95 +5,38 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-08.
 
-> **Daar is nou sewentien SQL-migrasies, nie agt nie.**
-> `docs/sql/OPEN_ITEMS.md` se agt was reeds daar; die negende tot sewentiende is
-> bygevoeg op 2026-10-07 en 2026-10-08, en staan onderaan
-> `docs/sql/OUTSTANDING.sql`.
+> **Doen die SQL eers. Dit is nou belangriker as die badge.**
 >
-> **Die sewentiende is geld.** 'n Kliënt kon self hul plan, hul diepte en hul
-> bestedingsplafon skryf. Gemeet: `plan=certified`, `depth=continuous`,
-> `ceiling=999`. Diepte is wat die werker lees om te besluit hoeveel 'n lopie
-> mag kos — `limited` is 50c, `full` is $4 — so 'n gratis kliënt kon agt keer
-> meer modelkoste neem as wat hul vlak betaal, sonder om 'n hertoets-krediet te
-> gebruik en sonder die wagtyd. Die migrasie gee daardie kolomme net vir ons.
+> Daar is sewentien migrasies in `docs/sql/OUTSTANDING.sql`. Sewe is van
+> vanaand, en vier van daardie sewe is gate wat iemand vandag kan gebruik:
 >
-> **Die sestiende is die laaste van die klomp en die minste dringend.** Vier
-> rekords waarvan die persoon wat dit beskryf ons helfte kon skryf: 'n appèl wat
-> reeds "upheld" aankom, 'n data-versoek wat reeds "completed" aankom, 'n
-> ouditslêer se eie kontrolesom, en die bemarkings-kliënt-verklaring wat op die
-> openbare bladsy moet wys. Niks hiervan is 'n inbraak nie — dit is rekords wat
-> bestaan om te wys wat _ons_ gedoen het, en 'n rekord wat sy eie subjek kan
-> skryf bewys niks.
+> - 'n Kliënt kon hul **eie telling** skryf — 100 uit 100, met nul bevindinge,
+>   en dit gaan voor 'n beoordelaar.
+> - 'n Kliënt kon hul **eie toepassing goedkeur** nadat ons dit onder die
+>   Aanvaarbare-Gebruik-beleid geweier het.
+> - 'n Kliënt kon sê hulle **besit 'n domein wat nie hulle s'n is nie**, en ons
+>   sou dit gaan toets. Dit is die een met regsgevolge, want die skade val op
+>   iemand anders.
+> - 'n Kliënt kon hul **eie plan en bestedingsplafon** skryf.
 >
-> **Die vyftiende:** 'n admin in 'n werkruimte kon hulself eienaar maak. Die
-> reël was altyd daar en het nooit gegeld nie — Postgres se "permissive"
-> reëls word met OF saamgevoeg, en twee swakker reëls op dieselfde tabel het
-> die sterk een eenvoudig verbygesteek. Daardie presiese valstrik staan sedert
-> September in `20260923110000` neergeskryf, oor hierdie selfde tabel, oor 'n
-> ander reël.
+> Die ander drie is 'n admin wat hulself eienaar maak, iemand wat 'n
+> e-pos-domein eis en almal daar uitsluit, en rekords wat hul eie subjek kon
+> skryf. Elke migrasie verduidelik homself bo-aan sy eie blok — jy hoef dit nie
+> hier te lees nie.
 >
-> **Die veertiende is familie van die dertiende.** 'n Werkruimte-eienaar kon
-> enige e-pos-domein eis en self as "verified" merk. Gemeet met `gmail.com`:
-> daarna gee `sso_routing('victim@gmail.com')` hul verskaffer terug, en die
-> aanmeldvorm weier 'n wagwoord vir elke adres by daardie domein. Dit vat net
-> een kliënt om elkeen met 'n Gmail-adres uit VibefyCode te sluit, sonder enige
-> stap aan ons kant. Die migrasie maak die "verified"-datum ons s'n om te
-> skryf; die eienaar mag steeds eis en mag steeds afdwing wat ons bevestig het.
+> Supabase se SQL-venster werk ongeag of Vercel die databasis kan bereik, so die
+> badge hoef nie eers reg te wees nie.
 >
-> **Die dertiende is die ernstigste van die drie, en die enigste waar iemand
-> anders as die kliënt skade kry.** 'n Werkruimte-eienaar kon self 'n
-> "verified" magtiging skryf, vir 'n domein wat nie hulle s'n is nie. Gemeet:
-> `status = 'verified'`, `verification_target = 'competitor.example'`, en
-> `app_is_authorised_for_testing` gee toe **true** — die funksie wat die werker
-> "die harde hek" noem. Die DNS-bewys werk; dit was net nie op die pad nie. Die
-> migrasie maak dit 'n eienskap van die ry: jy mag vra, en jy mag terugtrek;
-> net ons mag sê dit is bewys. Dit keer ook dat 'n magtiging meer domeine dek
-> as wat bewys is.
->
-> **Die twaalfde is 'n tweelingbroer van die elfde, en net so dringend.** 'n
-> Werkruimte-eienaar kon hul eie toepassing "cleared" maak onder die
-> Aanvaarbare-Gebruik-beleid. Gemeet teen 'n toepassing wat 'n beoordelaar
-> geweier het: `update public.apps set screening_status = 'cleared'` het
-> `UPDATE 1` gegee. Daardie kolom is die hek wat keer dat ons iets assesseer en
-> badge wat ons geweier het. Dieselfde reël het ook toegelaat dat 'n eienaar die
-> teller terugstel wat hul badge opskort as hul werf af is. Die migrasie gee die
-> sewe kolomme wat óns skryf net vir ons, en die uitspraak word nou deur ons
-> bediener geskryf, nie deur die kliënt se aanmeldteken nie.
->
-> **Die elfde is die dringendste ding in hierdie dokument, die badge inkluis.**
-> 'n Kliënt kon hul eie telling skryf. Gemeet met 'n gewone kliënt se
-> aanmeldteken, sonder enige bladsy — net Supabase se eie API: 'n nuwe
-> assessering met `status = 'awaiting_review'`, `overall_score = 100` en
-> `certification_eligible = true`, en ook 'n bestaande assessering van 39 wat na
-> 99 herskryf is. `awaiting_review` is presies die status wat die
-> beoordelaarsbladsy lys, so so 'n ry gaan voor 'n mens wat 100 sien en geen
-> bevindinge nie. Niks in die produk het hierdie reg nodig nie — die enjin skryf
-> assesserings op sy eie verbinding, en 'n kliënt vra een aan deur
-> `assessment_requests`. Die migrasie neem die reg weg.
->
-> Die negende verander drie vreemde-sleutels op `cost_records` sodat 'n
-> werkruimte-verwydering nie die finansiële rekords saamneem wat die
-> bewaarskedule sê ons sewe jaar moet hou nie. Niks in die produk vee 'n
-> werkruimte uit, so dit is nie dringend nie — dit is 'n valstrik vir die dag
-> dat iemand dit met die hand doen.
->
-> **Die tiende maak wel saak, en hoe gouer hoe beter.** Postgres gee EXECUTE op
-> 'n nuwe funksie by verstek aan almal, en Supabase publiseer elke funksie in
-> `public` as `/rpc/<naam>` op die internet. Ses funksies wat met die eienaar se
-> regte lees — dus verby elke RLS-reël — was dus vir enigiemand sonder rekening
-> beskikbaar. Gemeet: `spend_since` gee $2.31 terug aan die `anon`-rol, teen 'n
-> tabel waarvan die reël sê selfs 'n beoordelaar dit nie mag sien nie. Die
-> migrasie neem daardie regte weg. Niks in die produk roep die ses deur Supabase
-> nie — die werker praat direk met die databasis as die eienaar — so daar is
-> niks wat dit kan breek nie.
+> **Klaar as:** jy het al sewentien blokke uit `docs/sql/OUTSTANDING.sql` in
+> volgorde geplak en elkeen het sonder 'n fout geloop. Onseker wat jou databasis
+> al het? `node tools/migration-audit.mjs > audit.sql`, plak daardie navraag, en
+> dit sê jou — dit lees net.
 
-> **Hoekom dit nou dringender is.** Solank die databasis onbereikbaar is, sê
-> `/verify` vir enigiemand wat 'n kliënt se badge natrek: _"VibefyCode has never
-> issued that badge — treat the mark as unverified"_, met 'n skakel om dit te
-> rapporteer. Dit was 'n `.catch(() => null)` wat "die lees het misluk" en "so 'n
-> badge bestaan nie" dieselfde ding gemaak het. Die kode is reg — dit sê nou dat
-> dit 'n fout aan ons kant is en dat niks vasgestel is nie — maar dit help eers
-> wanneer jy stap 3 hieronder doen en Vercel herontplooi.
+> **Die badge, daarna.** Solank die databasis vir Vercel onbereikbaar is, sê
+> `/verify` vir enigiemand wat 'n kliënt se badge natrek dat dit 'n fout aan ons
+> kant is en dat niks vasgestel is nie. Dit was erger — dit het gesê die badge
+> is nooit uitgereik nie — en die kode is reg, maar dit help eers wanneer stap 3
+> hieronder klaar is en Vercel herontplooi het.
 
 ---
 
@@ -258,21 +201,33 @@ no verification origin — badges will be issued and never announced
 
 ## 4 · Supabase — sewentien migrasies
 
-`docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
+**Begin hier, nie by 0 nie.** Hierdie afdeling is die een wat nie kan wag nie;
+0 tot 3 is die badge, en die badge is 'n uitval, nie 'n gat nie.
 
-Die vyfde en sesde maak die meeste saak: die een keer 'n verwerping wat 'n
-goedkeuring magtig, die ander 'n betaling wat twee keer toegepas kan word. Die
-sewende hou die telling op die badge en die telling in die verslag dieselfde —
-niks het dit voorheen gekeer nie. Die agtste laat die databasis 'n weiering by
-inname neerskryf; die bedienerhandeling het dit probeer en is elke keer deur
-row-level security geweier, stil. Die tiende neem die EXECUTE-reg weg van ses
-funksies wat ons koste- en sitplekgetalle aan 'n onaangemelde besoeker gegee
-het. **Die elfde tot veertiende maak die meeste saak van almal:** die een keer
-dat 'n kliënt hul eie telling skryf, die tweede dat hulle hul eie toepassing
-goedkeur onder die Aanvaarbare-Gebruik-beleid, die derde dat hulle self sê
-hulle besit 'n domein wat ons dan gaan toets, die vierde dat hulle 'n
-e-pos-domein eis en almal daar uitsluit. Doen daardie vier eerste, en die
-dertiende eerste van almal.
+`docs/sql/OUTSTANDING.sql`, van bo na onder, in Supabase se SQL-venster. Plak
+een blok op 'n slag. Elke blok begin met 'n verduideliking van wat dit regmaak
+en hoekom — jy hoef niks daarvan hier te lees nie.
+
+**Klaar as:** al sewentien het sonder 'n fout geloop.
+
+As een misluk met iets soos "already exists":
+
+```
+node tools/idempotent-catch-up.mjs > catch-up.sql
+```
+
+Dit skryf dieselfde migrasies oor in 'n vorm wat twee keer geplak kan word —
+alles wat al daar is word stil oorgeslaan. Plak `catch-up.sql` in plaas van die
+een wat misluk het.
+
+En as jy nie weet waar jou databasis staan nie:
+
+```
+node tools/migration-audit.mjs > audit.sql
+```
+
+Plak `audit.sql`. Dit lees net, skryf niks, en gee jou een reël per migrasie met
+"missing" of "nothing missing".
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte
