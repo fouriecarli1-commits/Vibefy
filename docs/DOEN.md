@@ -5,9 +5,16 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-08.
 
-> **Daar is nou veertien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
-> se agt was reeds daar; die negende tot veertiende is bygevoeg op 2026-10-07 en
+> **Daar is nou vyftien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
+> se agt was reeds daar; die negende tot vyftiende is bygevoeg op 2026-10-07 en
 > 2026-10-08, en staan onderaan `docs/sql/OUTSTANDING.sql`.
+>
+> **Die vyftiende:** 'n admin in 'n werkruimte kon hulself eienaar maak. Die
+> reël was altyd daar en het nooit gegeld nie — Postgres se "permissive"
+> reëls word met OF saamgevoeg, en twee swakker reëls op dieselfde tabel het
+> die sterk een eenvoudig verbygesteek. Daardie presiese valstrik staan sedert
+> September in `20260923110000` neergeskryf, oor hierdie selfde tabel, oor 'n
+> ander reël.
 >
 > **Die veertiende is familie van die dertiende.** 'n Werkruimte-eienaar kon
 > enige e-pos-domein eis en self as "verified" merk. Gemeet met `gmail.com`:
@@ -233,7 +240,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — veertien migrasies
+## 4 · Supabase — vyftien migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
