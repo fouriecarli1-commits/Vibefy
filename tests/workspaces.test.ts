@@ -326,7 +326,17 @@ describe('audit export', () => {
     ).rejects.toThrow(/append-only/i);
   });
 
-  it('refuses to record an export for a workspace the caller does not administer', async () => {
+  it('refuses to record an export from any signed-in caller at all', async () => {
+    /*
+     * This asked whether an outsider could record an export for somebody
+     * else's workspace, and the answer was the insert policy. `20261008070000`
+     * went further: `row_count` and `sha256` are what let a file produced in a
+     * dispute be checked against the record, and `recordAuditExport` ran on
+     * the caller's own identity — so the digest was written by the party who
+     * would be producing the file. The privilege is gone and the route records
+     * on our own connection, so nobody reachable through PostgREST may write
+     * this table, outsider or owner.
+     */
     const message = await actingAs(db, { userId: outsider.userId }, (client) =>
       expectRefusal(
         client,
@@ -335,7 +345,7 @@ describe('audit export', () => {
         [owner.organisationId, outsider.userId, '0'.repeat(64)],
       ),
     );
-    expect(message).toMatch(/policy/i);
+    expect(message).toMatch(/policy|permission denied/i);
   });
 });
 

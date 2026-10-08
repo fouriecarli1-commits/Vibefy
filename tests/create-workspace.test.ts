@@ -89,7 +89,11 @@ describe('the way the old code failed', () => {
         return error instanceof Error ? error.message : String(error);
       }
     });
-    expect(outcome).toMatch(/row-level security/i);
+    // `row-level security` until `20261008070000` revoked INSERT on
+    // `organisations` from `authenticated`, after which the refusal arrives one
+    // layer earlier as a missing privilege. Either answer is the point of this
+    // test: the old code's statement cannot succeed.
+    expect(outcome).toMatch(/row-level security|permission denied/i);
   });
 
   it('left nothing behind when it failed, which is why no slug was burned', async () => {

@@ -241,7 +241,19 @@ describe('the smaller two, because the rule is the rule', () => {
  * every session that touched them.
  */
 describe('a workspace', () => {
-  it('is created in the creator’s name', async () => {
+  it('is not created through PostgREST at all any more', async () => {
+    /*
+     * This asked for `row-level security`, and the own-name `with check` was
+     * what produced it. `20261008070000` revoked INSERT on `organisations`
+     * from `authenticated` outright — `is_marketing_client` is a disclosure
+     * rendered on the public verification page and its subject could clear it,
+     * and nothing in the product writes this table except `create_workspace` —
+     * so the refusal now arrives one layer earlier, as a missing privilege.
+     *
+     * Either answer is the rule. Both are asserted rather than the newer one
+     * alone, because the own-name clause is still in the policy and should
+     * still be the reason if the privilege ever comes back.
+     */
     expect(
       await attempt(
         colleague.userId,
@@ -249,19 +261,19 @@ describe('a workspace', () => {
          values ('Started By Somebody Else', $1, 'individual', $2)`,
         [`own-name-org-${Date.now()}`, owner.userId],
       ),
-    ).toMatch(/row-level security/i);
+    ).toMatch(/row-level security|permission denied/i);
   });
 
-  it('can be created in the creator’s own name, so the refusal is about the name', async () => {
+  it('is still created, through the door that replaced the insert', async () => {
     // The direction the guard fails in silence: refusing everybody, and being
-    // found the day nobody can make a workspace.
+    // found the day nobody can make a workspace. That door is now
+    // `create_workspace`, a `security definer` function, so this is where the
+    // contrast has to be drawn.
     expect(
-      await attempt(
-        colleague.userId,
-        `insert into public.organisations (name, slug, account_type, created_by)
-         values ('Started By Its Creator', $1, 'individual', $2)`,
-        [`own-name-org-ok-${Date.now()}`, colleague.userId],
-      ),
+      await attempt(colleague.userId, `select public.create_workspace($1, $2, 'agency')`, [
+        'Started By Its Creator',
+        `own-name-org-ok-${Date.now()}`,
+      ]),
     ).toBe('allowed');
   });
 });

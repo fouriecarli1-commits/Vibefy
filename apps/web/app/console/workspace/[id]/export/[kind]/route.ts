@@ -6,16 +6,28 @@ import {
   type AuditExportFormat,
 } from '@vibefycode/workspace';
 import { createClient } from '@/lib/supabase/server';
-import { writeAsUser } from '@/lib/sql';
+import { readAsUser, writeAsService, writeAsUser } from '@/lib/sql';
 
 /**
  * Producing an audit export.
  *
- * Everything runs inside one transaction under the caller's own row-level
- * security: the rows come back only if they are this workspace's, and the record
- * of the disclosure is written in the same breath as the disclosure. A file
- * handed over with no record of it having been handed over is the failure mode
- * an audit export exists to avoid.
+ * The rows are read under the caller's own row-level security, so they come
+ * back only if they are this workspace's. The record of the disclosure is
+ * written on our own connection, and before the file is returned: a file handed
+ * over with no record of it having been handed over is the failure mode an
+ * audit export exists to avoid.
+ *
+ * Both halves used to run as the caller, in one transaction, and the authority
+ * check was the insert policy — "refused by the insert policy if the caller is
+ * not an owner or admin of this workspace, which rolls back the whole
+ * transaction, file included". Neat, and it meant `row_count` and `sha256` were
+ * written by the party who would later be producing the file in a dispute.
+ * `audit-export.ts` says the table is append-only so a file can be checked
+ * against it; a digest its holder wrote checks nothing.
+ *
+ * So the authority check moved here, as the policy's own predicate evaluated
+ * against this request's claims, and the record moved to our connection. The
+ * transaction is gone, and the order is what replaces it: no record, no file.
  */
 export async function GET(
   request: Request,
@@ -38,22 +50,41 @@ export async function GET(
   const to = url.searchParams.get('to');
 
   try {
-    const result = await writeAsUser(user.id, async (client) => {
-      const exported = await runAuditExport(client, {
+    const mayExport = await readAsUser(user.id, async (client) => {
+      const { rows } = await client.query<{ ok: boolean }>(
+        `select public.has_org_role($1, array['owner', 'admin']::public.org_role[]) as ok`,
+        [id],
+      );
+      return rows[0]?.ok === true;
+    });
+    if (!mayExport) {
+      return NextResponse.json(
+        {
+          error:
+            'Only an owner or admin of this workspace can produce an audit export, and every export is recorded.',
+        },
+        { status: 403 },
+      );
+    }
+
+    const result = await writeAsUser(user.id, async (client) =>
+      runAuditExport(client, {
         organisationId: id,
         kind,
         format,
         periodStart: from ? new Date(from) : null,
         periodEnd: to ? new Date(to) : null,
-      });
-      // Refused by the insert policy if the caller is not an owner or admin of
-      // this workspace — which rolls back the whole transaction, file included.
+      }),
+    );
+
+    // Before the file, not after: the record is what makes the disclosure
+    // accountable, so a failure here is a failure to export.
+    await writeAsService(async (client) => {
       await recordAuditExport(client, {
         organisationId: id,
         requestedBy: user.id,
-        result: exported,
+        result,
       });
-      return exported;
     });
 
     return new NextResponse(result.body, {

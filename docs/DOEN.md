@@ -5,9 +5,17 @@ nie toegang tot Vercel, Supabase, Render of Resend nie.
 
 Laas nagegaan 2026-10-08.
 
-> **Daar is nou vyftien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
-> se agt was reeds daar; die negende tot vyftiende is bygevoeg op 2026-10-07 en
+> **Daar is nou sestien SQL-migrasies, nie agt nie.** `docs/sql/OPEN_ITEMS.md`
+> se agt was reeds daar; die negende tot sestiende is bygevoeg op 2026-10-07 en
 > 2026-10-08, en staan onderaan `docs/sql/OUTSTANDING.sql`.
+>
+> **Die sestiende is die laaste van die klomp en die minste dringend.** Vier
+> rekords waarvan die persoon wat dit beskryf ons helfte kon skryf: 'n appèl wat
+> reeds "upheld" aankom, 'n data-versoek wat reeds "completed" aankom, 'n
+> ouditslêer se eie kontrolesom, en die bemarkings-kliënt-verklaring wat op die
+> openbare bladsy moet wys. Niks hiervan is 'n inbraak nie — dit is rekords wat
+> bestaan om te wys wat _ons_ gedoen het, en 'n rekord wat sy eie subjek kan
+> skryf bewys niks.
 >
 > **Die vyftiende:** 'n admin in 'n werkruimte kon hulself eienaar maak. Die
 > reël was altyd daar en het nooit gegeld nie — Postgres se "permissive"
@@ -240,7 +248,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — vyftien migrasies
+## 4 · Supabase — sestien migrasies
 
 `docs/sql/OUTSTANDING.sql`, in volgorde, in die SQL-venster.
 
