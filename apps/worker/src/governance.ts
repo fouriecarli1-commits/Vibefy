@@ -155,7 +155,24 @@ export async function spendingIsPaused(client: PoolClient): Promise<boolean> {
 export interface RetentionSweepResult {
   readonly evidenceDeleted: number;
   readonly alertsDeleted: number;
+  /**
+   * Rows deleted whose bytes would not go, and bytes recovered on a later pass.
+   *
+   * Counted apart from `evidenceDeleted` because saying "deleted" about an
+   * artefact we still hold is the same untruth as the deletion record making
+   * that claim. Measured on 2026-10-09: a `remove` that threw left the row
+   * gone, `retention_deletions` asserting the artefact was deleted, this result
+   * reporting `evidenceDeleted: 1`, and one log line naming an entity id that
+   * no longer exists in any table — so nobody could have found the file even
+   * knowing to look.
+   */
+  readonly artefactsOrphaned: number;
+  readonly artefactsRecovered: number;
 }
+
+/** Audit actions for an artefact whose bytes outlived the row accounting for it. */
+const ARTEFACT_NOT_REMOVED = 'retention.artefact_not_removed';
+const ARTEFACT_REMOVED_LATER = 'retention.artefact_removed_later';
 
 /**
  * Deletes what is past its deadline, and records that it did.
@@ -181,7 +198,12 @@ export async function sweepRetention(
   storage?: Pick<ArtefactStorage, 'remove'>,
 ): Promise<RetentionSweepResult> {
   const client = await pool.connect();
-  const result = { evidenceDeleted: 0, alertsDeleted: 0 };
+  const result = {
+    evidenceDeleted: 0,
+    alertsDeleted: 0,
+    artefactsOrphaned: 0,
+    artefactsRecovered: 0,
+  };
   try {
     const { rows } = await client.query<{
       id: string;
@@ -228,28 +250,126 @@ export async function sweepRetention(
         );
         await client.query('delete from public.evidence where id = $1', [record.id]);
         await client.query('commit');
-        // The bytes, after the row and after the commit. A file left behind by
-        // a crash here is found again by the next sweep — the row is gone, so
-        // nothing points at it, and `remove` is safe to call on a path that is
-        // already gone. Deleting the file first and failing to delete the row
-        // would leave a row pointing at nothing, which is the state this whole
-        // change exists to end.
+        /*
+         * The bytes, after the row and after the commit.
+         *
+         * This comment used to say a file left behind here "is found again by
+         * the next sweep — the row is gone, so nothing points at it". Those two
+         * halves contradict each other, and the second is the true one: the
+         * sweep finds work by reading `public.evidence`, so once the row is
+         * deleted nothing will ever look for the file again. It stays for ever,
+         * `retention_deletions` says it is gone, and this function used to
+         * count it as deleted.
+         *
+         * The ordering is still right — deleting the file first and failing to
+         * delete the row leaves a row pointing at nothing, which is the state
+         * the storage argument exists to end. What was missing is a durable
+         * record of the exception, carrying the path, so the bytes can be found
+         * by somebody or by the pass below.
+         */
         const path = pathById.get(record.id);
         if (path && storage) {
-          await storage.remove(path).catch((error: unknown) => {
+          try {
+            await storage.remove(path);
+            result.evidenceDeleted += 1;
+          } catch (error) {
+            result.artefactsOrphaned += 1;
             log('evidence file not removed', {
               entityId: record.id,
+              path,
               error: error instanceof Error ? error.message : String(error),
             });
-          });
+            // The path, not just the id. The id names a row that no longer
+            // exists in any table, so a log line carrying only that cannot be
+            // acted on even by somebody who reads it.
+            await client
+              .query(
+                `insert into public.audit_log
+                   (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+                 values ($1, null, 'system', $2, 'evidence', $3, $4)`,
+                [
+                  record.organisationId,
+                  ARTEFACT_NOT_REMOVED,
+                  record.id,
+                  `The retention sweep deleted the evidence row and recorded the deletion, and the ` +
+                    `object store refused to remove the artefact at ${path}. We still hold those ` +
+                    `bytes. ${error instanceof Error ? error.message : String(error)}`,
+                ],
+              )
+              .catch((writeError: unknown) => {
+                log('orphaned artefact not recorded', {
+                  entityId: record.id,
+                  path,
+                  error: writeError instanceof Error ? writeError.message : String(writeError),
+                });
+              });
+          }
+        } else {
+          result.evidenceDeleted += 1;
         }
-        result.evidenceDeleted += 1;
       } catch (error) {
         await client.query('rollback');
         log('retention deletion failed', {
           entityId: record.id,
           error: error instanceof Error ? error.message : String(error),
         });
+      }
+    }
+
+    /*
+     * The second pass: bytes an earlier sweep could not remove.
+     *
+     * Without this the audit rows accumulate and every one needs a person. A
+     * `403` from the object store is usually momentary, `remove` on a path
+     * that is already gone does nothing, and the row it accounted for is long
+     * deleted — so the only thing to get right is not claiming success twice.
+     *
+     * The audit log is append-only, so an orphan is not marked resolved; a
+     * second row records the recovery and this query skips anything that has
+     * one. The path is read back out of the first row's summary, because it is
+     * the only place it was written down.
+     */
+    if (storage) {
+      const orphans = await client.query<{ id: string; entity_id: string; summary: string }>(
+        `select l.id, l.entity_id, l.summary
+           from public.audit_log l
+          where l.action = $1
+            and not exists (
+              select 1 from public.audit_log later
+               where later.action = $2
+                 and later.entity_id = l.entity_id
+            )
+          order by l.occurred_at
+          limit $3`,
+        [ARTEFACT_NOT_REMOVED, ARTEFACT_REMOVED_LATER, limit],
+      );
+      for (const orphan of orphans.rows) {
+        const path = /artefact at ([^\s]+)\./.exec(orphan.summary)?.[1];
+        if (!path) continue;
+        try {
+          await storage.remove(path);
+          await client.query(
+            `insert into public.audit_log
+               (actor_id, actor_role, action, entity_type, entity_id, summary)
+             values (null, 'system', $1, 'evidence', $2, $3)`,
+            [
+              ARTEFACT_REMOVED_LATER,
+              orphan.entity_id,
+              `The artefact at ${path}, which an earlier sweep could not remove, has now been ` +
+                `removed. The deletion record for it was always correct; for a time it was early.`,
+            ],
+          );
+          result.artefactsRecovered += 1;
+        } catch (error) {
+          // Still refusing. The first row stands and the next sweep tries
+          // again; saying so once per sweep per orphan would be the noise the
+          // counted results exist to avoid.
+          log('orphaned artefact still not removed', {
+            entityId: orphan.entity_id,
+            path,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
 
@@ -261,7 +381,12 @@ export async function sweepRetention(
     );
     result.alertsDeleted = alerts.rowCount ?? 0;
 
-    if (result.evidenceDeleted > 0 || result.alertsDeleted > 0) {
+    if (
+      result.evidenceDeleted > 0 ||
+      result.alertsDeleted > 0 ||
+      result.artefactsOrphaned > 0 ||
+      result.artefactsRecovered > 0
+    ) {
       log('retention sweep', { ...result });
     }
     return result;
