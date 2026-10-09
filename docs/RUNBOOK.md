@@ -1090,3 +1090,87 @@ the one failure to ignore.
 
 Delete the generated file before committing. It sorts last on purpose so it is
 obvious in `git status`, and `pnpm check:schema` refuses to pass while it exists.
+
+## Finding a test that proves nothing
+
+The section above asks which policies nothing watches. This one asks the same
+question of the TypeScript, where there is no tool and the work is done by hand.
+It is worth doing: on 2026-10-09 it caught four tests of mine that passed for a
+reason their own names denied, and nothing else would have.
+
+Four signatures, each with the mutation that exposes it.
+
+**An assertion of absence with nothing anchoring it.** `toHaveLength(0)`,
+`rowCount).toBe(0)`, `not.toContain`, `toBeNull` — true when the thing under
+test refused correctly, and equally true when it never ran. Mutation: make the
+subject do nothing at all — return an empty candidate list, throw from the
+query, hand it the wrong pool. If the test stays green, it was measuring
+silence. The fix is a positive observation of the same mechanism in the same
+test: a control row that _should_ be recorded, or an assertion that the report
+really rendered.
+
+**A guard tested directly, with nothing watching the wiring.** A test imports
+the validator, hands it bad input, and asserts it throws. The rule holds and
+nothing establishes that production code calls it. Mutation: delete the call
+site, keep the function. Found twice in two hours — the drift sweep's
+`overall_score is not null` filter and `getRubric`'s gate check. The fix is
+something observable from outside: `rubricVersionsValidated()` exists so a test
+can watch the call happen.
+
+**An outcome standing in for a mechanism.** "Says it once, however often the
+sweep runs" was true because of a status transition, not the dedupe key the
+test's comment credited. "The sweep filters it out" was true because a new guard
+threw, not because of the SQL. Mutation: break the mechanism the name claims and
+leave the other one intact. The fix is usually a rename, because the test was
+measuring something real — just not the thing it said.
+
+**A matcher that stopped matching.** `trust-page.test.ts` finds owner links by
+matching `href={trustPage.<field>}` in the source, and a rename to
+`trustPage.page.<field>` left it matching nothing — at which point
+`toHaveLength(links.length)` asserted that nothing was missing from nothing. Any
+test that finds its subject by a source pattern needs a count assertion in front
+of it. That one had one, which is the only reason the rename was caught.
+
+The recipe, one mutation at a time:
+
+```sh
+cp packages/engine/src/stages/game-checks.ts /tmp/subject.bak
+# apply exactly one change, then prove it applied — a script that aborts
+# part-way leaves the file untouched and the mutation passes cleanly, which
+# reads exactly like a guard that works
+grep -c 'the line you changed' packages/engine/src/stages/game-checks.ts
+pnpm vitest run tests/the-one-test.test.ts
+cp /tmp/subject.bak packages/engine/src/stages/game-checks.ts
+```
+
+Run them singly. Four browser-driven mutations in one command ran the container
+out of memory on 2026-10-09 and the restart left a mutated file behind; `git
+status` is the check before committing anything after a mutation run.
+
+### The sweeps, and what each measured
+
+Five enumerations, each over a shape rather than a hunch. Worth re-running as
+the codebase grows — the counts are from 2026-10-09.
+
+| Shape                                                     | Found | Live defects   |
+| --------------------------------------------------------- | ----- | -------------- |
+| `catch` blocks in the worker whose handling is a log line | 22    | 3              |
+| Supabase client writes whose `error` is never read        | 54    | 1              |
+| Values read from a row and coalesced to `0` or `''`       | 28    | 1              |
+| `.catch(() => undefined)` and `.catch(() => null)`        | 31    | 3              |
+| Comments saying "used to", "had never", "was never"       | 105   | 1 of 3 checked |
+
+The last one came out of the first four, and it is the one worth starting with
+next time. Every defect those four sweeps found was beside a place somebody had
+already thought carefully about: a prompt-only rule next to a guarded tool call,
+a badge expiry fifteen lines above the suspension it was modelled on, a loader
+beside the one corrected for the same fault, an unguarded baseline forty lines
+below its own warning. The comments explaining a fix are a map of where the next
+one is.
+
+Two candidates from that sweep dissolved on measurement, which is the other
+half of the method. Badge issuance looked certain to violate its unique index
+until the candidate query turned out to exclude an application with a live
+badge, and a gitignored `.env` cannot reach the repository scan because `git
+clone --depth 1` carries only tracked files. A hypothesis that reads well is the
+one most likely to become a fix nobody needed.
