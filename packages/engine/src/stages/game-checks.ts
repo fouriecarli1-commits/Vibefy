@@ -86,7 +86,14 @@ export interface GameMeasurements {
   readonly loopSignal: LoopSignal;
   readonly timeToPlayableMs: number | null;
   readonly bytesBeforePlayable: number;
-  readonly framesDuringPlay: number;
+  /**
+   * Null where the counters would not read at the end of play.
+   *
+   * It was `number` and the read fell back to zero, which is the thing the
+   * comment on `loopSignal` above forbids: a page that stopped answering is not
+   * a game that drew nothing.
+   */
+  readonly framesDuringPlay: number | null;
   /** Null where the page could not be asked, which is not the same as none. */
   readonly listenerTypes: readonly string[] | null;
   /** Null where the listeners could not be read. Only `false` is an accusation. */
@@ -158,7 +165,22 @@ const TOUCH_EVENTS = ['touchstart', 'touchmove', 'pointerdown', 'pointermove', '
  * The session must be open and must not have navigated yet: the instrumentation
  * has to be installed before the game's own script runs.
  */
-export async function measureGame(session: BrowserSession, url: string): Promise<GameMeasurements> {
+/**
+ * How the loop counters are read.
+ *
+ * Injectable with a default, like the storage the retention sweep takes, and
+ * for the same reason: the interesting case here is a page that answers once
+ * and not the next time, which cannot be arranged in a fixture without a race.
+ */
+export type CounterReader = (
+  page: BrowserSession['page'],
+) => Promise<{ frames: number; ticks: number } | null>;
+
+export async function measureGame(
+  session: BrowserSession,
+  url: string,
+  readLoopCounters: CounterReader = readCounters,
+): Promise<GameMeasurements> {
   const page = session.page;
   await page.addInitScript(INSTRUMENTATION);
 
@@ -380,7 +402,29 @@ export async function measureGame(session: BrowserSession, url: string): Promise
     await page.waitForTimeout(PLAY_MS);
   }
 
-  const played = (await readCounters(page)) ?? { frames: 0, ticks: 0 };
+  /*
+   * The baseline, and it is allowed to be missing.
+   *
+   * This read `(await readCounters(page)) ?? { frames: 0, ticks: 0 }`, so a page
+   * that had stopped answering became a game that drew nothing — forty lines
+   * below the comment in this same file saying why that is not allowed: "A page
+   * that has stopped answering is not a game that never started, and the
+   * difference between those two is a critical finding against somebody else's
+   * application."
+   *
+   * The consequence was `before = 0`, and `pausesWhenHidden` is
+   * `running(after) - before < 10`. A page that recovered for the second read
+   * then failed that comparison and produced PRD-05 — "The game keeps running
+   * when the tab is hidden" — at `confidence: 'high'`, on a baseline nobody
+   * measured. The second read was guarded and said so in `limitations`; this
+   * one was not.
+   */
+  const played = await readLoopCounters(page);
+  if (played === null) {
+    limitations.push(
+      'The page stopped answering when the loop counters were read at the end of play, so how much it drew while being played was not established.',
+    );
+  }
 
   // Does it stop when the document says nobody is looking?
   //
@@ -390,7 +434,9 @@ export async function measureGame(session: BrowserSession, url: string): Promise
   const running = (counters: { frames: number; ticks: number }) =>
     loopSignal === 'timer' ? counters.ticks : counters.frames;
   let pausesWhenHidden: boolean | null = null;
-  if (loopStartedAt !== null) {
+  // `played !== null` added: without a baseline there is nothing to compare the
+  // second reading against, and the comparison is what produces the finding.
+  if (loopStartedAt !== null && played !== null) {
     const before = running(played);
     const told = await setHidden(page, true);
     if (!told) {
@@ -402,7 +448,7 @@ export async function measureGame(session: BrowserSession, url: string): Promise
       );
     } else {
       await page.waitForTimeout(700);
-      const after = await readCounters(page);
+      const after = await readLoopCounters(page);
       // A handful of frames may land between dispatching the event and the game
       // acting on it; a game that has genuinely stopped does not add dozens.
       pausesWhenHidden = after === null ? null : running(after) - before < 10;
@@ -516,7 +562,7 @@ export async function measureGame(session: BrowserSession, url: string): Promise
     loopSignal,
     timeToPlayableMs: playableAt === null ? null : playableAt - navigatedAt,
     bytesBeforePlayable,
-    framesDuringPlay: played.frames,
+    framesDuringPlay: played === null ? null : played.frames,
     listenerTypes,
     acceptsTouch:
       listenerTypes === null ? null : listenerTypes.some((type) => TOUCH_EVENTS.includes(type)),
