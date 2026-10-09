@@ -25,7 +25,7 @@ Laas nagegaan 2026-10-08.
 > **Tweede, en dit is die belangrike een.** Die badge was 'n uitval; hierdie
 > is gate.
 >
-> Daar is sewentien migrasies in `docs/sql/OUTSTANDING.sql`. Sewe is van
+> Daar is agtien migrasies in `docs/sql/OUTSTANDING.sql`. Sewe is van
 > vanaand, en vier van daardie sewe is gate wat iemand vandag kan gebruik:
 >
 > - 'n Kliënt kon hul **eie telling** skryf — 100 uit 100, met nul bevindinge,
@@ -39,13 +39,14 @@ Laas nagegaan 2026-10-08.
 >
 > Die ander drie is 'n admin wat hulself eienaar maak, iemand wat 'n
 > e-pos-domein eis en almal daar uitsluit, en rekords wat hul eie subjek kon
-> skryf. Elke migrasie verduidelik homself bo-aan sy eie blok — jy hoef dit nie
-> hier te lees nie.
+> skryf. Die agtiende is klein en nie 'n gat nie: dit voeg een waarde by 'n lys
+> sodat ons jou kan sê wanneer 'n baadjie verstryk het. Elke migrasie
+> verduidelik homself bo-aan sy eie blok — jy hoef dit nie hier te lees nie.
 >
 > Supabase se SQL-venster werk ongeag of Vercel die databasis kan bereik, so die
 > badge hoef nie eers reg te wees nie.
 >
-> **Klaar as:** jy het al sewentien blokke uit `docs/sql/OUTSTANDING.sql` in
+> **Klaar as:** jy het al agtien blokke uit `docs/sql/OUTSTANDING.sql` in
 > volgorde geplak en elkeen het sonder 'n fout geloop. Onseker wat jou databasis
 > al het? `node tools/migration-audit.mjs > audit.sql`, plak daardie navraag, en
 > dit sê jou — dit lees net.
@@ -211,7 +212,7 @@ no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
 ```
 
-## 4 · Supabase — sewentien migrasies
+## 4 · Supabase — agtien migrasies
 
 **Begin hier, nie by 0 nie.** Hierdie afdeling is die een wat nie kan wag nie;
 0 tot 3 is die badge, en die badge is 'n uitval, nie 'n gat nie.
@@ -220,7 +221,7 @@ no verification origin — badges will be issued and never announced
 een blok op 'n slag. Elke blok begin met 'n verduideliking van wat dit regmaak
 en hoekom — jy hoef niks daarvan hier te lees nie.
 
-**Klaar as:** al sewentien het sonder 'n fout geloop.
+**Klaar as:** al agtien het sonder 'n fout geloop.
 
 As een misluk met iets soos "already exists":
 

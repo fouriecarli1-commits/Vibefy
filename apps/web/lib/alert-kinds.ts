@@ -16,6 +16,7 @@ export const KIND_LABEL: Record<string, string> = {
   badge_issued: 'Badge issued',
   badge_suspended: 'Badge suspended',
   badge_expiring: 'Badge expiring',
+  badge_expired: 'Badge expired',
   rubric_superseded: 'Standard has moved on',
   application_unreachable: 'Not responding',
   application_recovered: 'Responding again',

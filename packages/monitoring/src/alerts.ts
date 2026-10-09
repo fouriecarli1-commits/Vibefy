@@ -20,6 +20,7 @@ export type AlertKind =
   | 'material_regression'
   | 'badge_suspended'
   | 'badge_expiring'
+  | 'badge_expired'
   | 'badge_issued'
   | 'rubric_superseded'
   | 'application_unreachable'
@@ -109,6 +110,44 @@ export function badgeSuspendedAlert(
     appId,
     badgeId,
     dedupeKey: `badge-suspended:${badgeId}`,
+  };
+}
+
+/**
+ * The badge reached its date.
+ *
+ * Its own kind rather than `badge_suspended` reused. A suspension is something
+ * we did because the facts changed; an expiry is a date arriving, and the two
+ * have different remedies — one waits for us to restore it, the other needs a
+ * re-assessment. A notice that says the wrong thing is worse than no notice,
+ * which is settled ground here: it is why `monitoring_blocked` exists.
+ *
+ * `warning`, not `critical`. Critical is for something that happened to the
+ * customer without warning; this one was warned about twice, and a product that
+ * calls a foreseeable date a crisis teaches people to ignore the word.
+ */
+export function badgeExpiredAlert(
+  appName: string,
+  appId: string,
+  badgeId: string,
+  expiredAt: Date,
+): AlertDraft {
+  return {
+    kind: 'badge_expired',
+    severity: 'warning',
+    title: `${appName}: Verified by VibefyCode badge expired on ${day(expiredAt)}`,
+    body:
+      `The badge for ${appName} expired on ${day(expiredAt)} and its verification page now reads ` +
+      `as expired. Please remove the badge from your site — the licence requires it while the ` +
+      `badge is not current. A re-assessment renews it, and the score is not carried over: it is ` +
+      `measured again against the rubric in force on the day.`,
+    appId,
+    badgeId,
+    // Once per badge. Belt and braces, and worth knowing which is which: the
+    // sweep only ever sees a badge on the transition out of `active`, so it
+    // raises this once whatever the key says. The key is what holds if the
+    // status is ever set back, or if a second caller is added later.
+    dedupeKey: `badge-expired:${badgeId}`,
   };
 }
 

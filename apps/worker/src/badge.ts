@@ -15,6 +15,7 @@ import { randomBytes } from 'node:crypto';
 import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefycode/badge';
 import {
   badgeIssuedAlert,
+  badgeExpiredAlert,
   badgeSuspendedAlert,
   isMonitored,
   type MonitoredPlan,
@@ -470,12 +471,55 @@ export async function sweepBadgeLifecycle(
 ): Promise<{ expired: number; suspended: number }> {
   const client = await pool.connect();
   try {
-    const expired = await client.query(
-      `update public.badges
+    const expired = await client.query<{
+      id: string;
+      app_id: string;
+      organisation_id: string;
+      name: string;
+      expires_at: string;
+    }>(
+      `update public.badges b
           set status = 'expired'
-        where status = 'active' and expires_at <= now()
-        returning id`,
+         from public.apps app
+        where app.id = b.app_id
+          and b.status = 'active' and b.expires_at <= now()
+        returning b.id, b.app_id, b.organisation_id, app.name, b.expires_at`,
     );
+
+    /*
+     * And the notice, which this branch did not give.
+     *
+     * The sentence fifteen lines below, about the suspension branch, applies
+     * word for word here: "A customer's mark came down on their own website —
+     * which the licence obliges them to then remove — and the only way to find
+     * out was to open the console and look." It was written about one branch of
+     * this function and not the other.
+     *
+     * Measured on 2026-10-09: a badge twenty-five days out raises one
+     * `badge_expiring` at severity `info`, which neither delivery channel
+     * carries; at three days a second at `warning`, which is delivered; and at
+     * expiry the status changed and the alert count went from two to two. One
+     * delivered notice, inside the last week, and silence at the moment the
+     * licence creates the obligation.
+     *
+     * Its own kind rather than `badge_suspended` reused — see the migration.
+     * One row at a time in its own try, so a badge whose alert cannot be
+     * written does not stop the rest being told.
+     */
+    for (const row of expired.rows) {
+      try {
+        await raiseAlert(
+          client,
+          row.organisation_id,
+          badgeExpiredAlert(row.name, row.app_id, row.id, new Date(row.expires_at)),
+        );
+      } catch (error) {
+        log('expiry raised no notice', {
+          badgeId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     // A badge on a continuous plan is maintained by that plan. When it lapses the
     // monitoring stops, and a badge whose monitoring has stopped is a stale stamp.
