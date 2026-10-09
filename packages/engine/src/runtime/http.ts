@@ -88,8 +88,36 @@ export class TooManyRedirectsError extends Error {
   }
 }
 
+/** A probe that got no answer, and why. Not the same as a path not served. */
+export interface UnansweredProbe {
+  readonly path: string;
+  readonly why: string;
+}
+
 export class ScopedHttp {
   private readonly dispatcher: Dispatcher;
+
+  /**
+   * Probes the host would not answer at all.
+   *
+   * `probe` returns null for "the path is not served", which is an answer, and
+   * returned the same null for "the connection was reset", which is not. The
+   * docstring below it already settles the principle for a ceiling — "a clean
+   * security posture reported from a probe that was never sent" — and left the
+   * network case, which is the one a customer's own defences produce.
+   *
+   * Measured on 2026-10-09 against a host that serves its root and destroys
+   * every other socket, which is what a web application firewall does to
+   * anything asking for `.env`, `.git` and `.DS_Store`: the root loaded, every
+   * probe came back null, and nothing anywhere recorded it. The better defended
+   * the application, the quieter the scan — and the report said twelve paths
+   * were looked at and nothing was found.
+   *
+   * Collected on the client rather than returned, so the shape of `probe` stays
+   * "a response or not served" for its callers, and the stage asks afterwards.
+   * The same arrangement as `BrowserSession.blockedRequests`.
+   */
+  readonly unanswered: UnansweredProbe[] = [];
 
   constructor(
     private readonly guard: ScopeGuard,
@@ -246,6 +274,24 @@ export class ScopedHttp {
       });
     } catch (error) {
       if (classifyStop(error) !== null) throw error;
+      /*
+       * A refusal from the host is still an answer; a connection that died is
+       * not.
+       *
+       * An HTTP status — 403, 404, 401 — comes back through the success path
+       * above, so anything arriving here failed below HTTP: a reset socket, a
+       * DNS failure, a TLS error, a timeout. None of those establishes that the
+       * path is not served, and the caller reads null as exactly that.
+       *
+       * It is still null, because "not served" is the right default for a
+       * finding — the alternative is accusing somebody on a probe that never
+       * landed. What changes is that it is written down, so the stage can say
+       * the question was not asked rather than let silence answer it.
+       */
+      this.unanswered.push({
+        path,
+        why: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }

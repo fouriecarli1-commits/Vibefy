@@ -295,6 +295,36 @@ export const deterministicChecksStage: Stage = {
       }
     }
 
+    /*
+     * Probes the host would not answer, said rather than left as silence.
+     *
+     * `probe` returns null for "not served", which is the right default for a
+     * finding — the alternative is accusing somebody on a probe that never
+     * landed. But a host that serves its root and destroys every other socket
+     * is what a web application firewall does to anything asking for `.env` or
+     * `.git`, and every one of those probes comes back null. No findings, and
+     * until now no note either: the better defended the application, the
+     * quieter this scan, and the report read as twelve paths looked at and
+     * nothing found.
+     *
+     * Where *every* exposed-path probe went unanswered, nothing was asked and
+     * SEC-08 is reported as not tested. Where some answered, the criterion was
+     * checked against a smaller set than it names, and the count says so —
+     * `game-checks.ts` puts the same rule in its own words about a different
+     * measurement: "a lower bound nobody is told about is just a wrong number."
+     */
+    const unansweredExposed = http.unanswered.length;
+    if (unansweredExposed >= EXPOSED_PATHS.length) {
+      notTested.push({
+        criterion: 'SEC-08',
+        because: `The application answered its own front page and then refused every one of the ${EXPOSED_PATHS.length} requests for commonly exposed files, so none of them was established either way. A host or firewall that drops a scanner's requests looks identical, from out here, to one with nothing to find.`,
+      });
+    } else if (unansweredExposed > 0) {
+      notes.push(
+        `${unansweredExposed} of ${EXPOSED_PATHS.length} requests for commonly exposed files got no answer at all — not a refusal, no response. What the others found still stands; those paths were neither found nor ruled out.`,
+      );
+    }
+
     for (const adminPath of ADMIN_PATHS) {
       const response = await http.probe(url, adminPath);
       if (
