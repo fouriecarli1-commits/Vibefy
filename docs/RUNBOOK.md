@@ -1158,10 +1158,13 @@ the codebase grows — the counts are from 2026-10-09.
 | Supabase client writes whose `error` is never read        | 54    | 1              |
 | Values read from a row and coalesced to `0` or `''`       | 28    | 1              |
 | `.catch(() => undefined)` and `.catch(() => null)`        | 31    | 3              |
-| Comments saying "used to", "had never", "was never"       | 105   | 1 of 3 checked |
+| Comments saying "used to", "had never", "was never"       | 105   | 3 of 5 checked |
 
 The last one came out of the first four, and it is the one worth starting with
-next time. Every defect those four sweeps found was beside a place somebody had
+next time: five files checked by consequence so far, three defects. Two
+candidates dissolved on measurement, and the two sound files were sound for
+reasons worth reading — `probe` had already settled the principle for a ceiling
+and `persistOutcome` had already reasoned about which ordering fails safely. Every defect those four sweeps found was beside a place somebody had
 already thought carefully about: a prompt-only rule next to a guarded tool call,
 a badge expiry fifteen lines above the suspension it was modelled on, a loader
 beside the one corrected for the same fault, an unguarded baseline forty lines

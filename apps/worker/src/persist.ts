@@ -19,6 +19,8 @@ import { UnretryableError } from './errors.ts';
 import type { ArtefactStorage } from './report.ts';
 import { STOP_LABEL, type AssessmentOutcome, type StageResult } from '@vibefycode/engine';
 
+import { ARTEFACT_ORPHANED } from './governance.ts';
+
 export interface PersistInput {
   readonly outcome: AssessmentOutcome;
   /**
@@ -345,9 +347,47 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
     return assessmentId;
   } catch (error) {
     await client.query('rollback');
-    // Best effort, and deliberately quiet: another error is on its way up and
-    // must not be replaced by a failure to tidy up after it.
-    for (const path of stored) await input.storage.remove(path).catch(() => undefined);
+    /*
+     * Best effort, and written down where it is not.
+     *
+     * The comment on the ordering above calls an orphaned file "wasteful,
+     * cleanable, and harmless", and the first two depend on this loop working.
+     * When `remove` fails, the transaction has already rolled back, so
+     * `public.evidence` holds no row — and `sweepRetention` finds its work by
+     * reading that table, so it can never reach these bytes. They are
+     * screenshots and HTTP exchanges from somebody's application, held past
+     * every retention period the privacy policy names, findable by nobody.
+     *
+     * Same state as a retention deletion whose artefact would not go, so the
+     * same audit action and the same retry: `sweepRetention`'s second pass
+     * reads these rows and tries again. The error on its way up is still the
+     * one that matters, so a failure to record cannot replace it.
+     */
+    const abandoned: string[] = [];
+    for (const path of stored) {
+      try {
+        await input.storage.remove(path);
+      } catch {
+        abandoned.push(path);
+      }
+    }
+    for (const path of abandoned) {
+      await client
+        .query(
+          `insert into public.audit_log
+             (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+           values ($1, null, 'system', $2, 'evidence', null, $3)`,
+          [
+            input.organisationId,
+            ARTEFACT_ORPHANED,
+            `A run was rolled back after its evidence was written and the object store would not ` +
+              `remove the artefact at ${path}. No evidence row points at it, so the retention ` +
+              `sweep cannot reach it from the table; it is picked up by that sweep's second pass ` +
+              `instead.`,
+          ],
+        )
+        .catch(() => undefined);
+    }
     throw error;
   }
 }

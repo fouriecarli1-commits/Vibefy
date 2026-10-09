@@ -28,7 +28,7 @@ import {
   persistOutcome,
   runAssessmentJob,
 } from '../apps/worker/src/index.ts';
-import { bodiesFor, memoryStorage } from './setup/artefacts.ts';
+import { bodiesFor, memoryStorage, type MemoryStorage } from './setup/artefacts.ts';
 import { connect } from './setup/client.ts';
 import {
   makeReviewer,
@@ -587,4 +587,127 @@ describe('withdrawal during a run', () => {
     );
     expect(stored.rows[0].n, 'nothing from a withdrawn authorisation may be stored').toBe(0);
   });
+});
+
+/**
+ * Bytes a rolled-back run left behind, which retention can never reach.
+ *
+ * The ordering comment in `persistOutcome` calls an orphaned file "wasteful,
+ * cleanable, and harmless", and the first two of those depend on the cleanup
+ * loop in its `catch` actually working. When `storage.remove` fails there, the
+ * transaction has already rolled back — so `public.evidence` holds no row, and
+ * `sweepRetention` finds its work by reading that table. It can never reach
+ * these bytes from there.
+ *
+ * They are screenshots and HTTP exchanges from somebody's application, held
+ * past every retention period the privacy policy names, findable by nobody.
+ *
+ * Same state as a retention deletion whose artefact would not go, so the same
+ * audit action and the same retry: that sweep's second pass reads these rows
+ * and tries again. One mechanism with two producers, because an operator should
+ * not have to learn which one left which row behind.
+ */
+describe('a rollback whose cleanup also failed', () => {
+  /** A store that takes bytes and will not give them back. */
+  function keepsEverything(): {
+    put: MemoryStorage['put'];
+    remove: (path: string) => Promise<void>;
+  } {
+    const inner = memoryStorage();
+    return {
+      put: inner.put,
+      async remove() {
+        throw new Error('the object store refused to remove it');
+      },
+    };
+  }
+
+  async function withdrawnRun(storage: {
+    put: MemoryStorage['put'];
+    remove: (path: string) => Promise<void>;
+  }): Promise<{ appId: string; assessmentId: string }> {
+    const appId = await seedApp(db, owner);
+    const granted = await seedAuthorisation(db, owner, appId);
+    await db.query(
+      `insert into public.authorisations
+         (app_id, organisation_id, supersedes_id, status, method, scope_domains,
+          warranty_text_version, warranty_text_sha256, granted_by, revocation_reason)
+       values ($1, $2, $3, 'revoked', 'dns_txt', '{}', '1.0.0', $4, $5, 'Withdrawn while the run was in flight')`,
+      [appId, owner.organisationId, granted, sha256('orphan'), owner.userId],
+    );
+
+    const assessment = { ...outcome, assessmentId: crypto.randomUUID() };
+    const client = await pool.connect();
+    try {
+      await expect(
+        persistOutcome(client, {
+          outcome: assessment,
+          evidenceBodies: bodiesFor(assessment),
+          storage: storage as never,
+          appId,
+          organisationId: owner.organisationId,
+          authorisationId: granted,
+          depth: 'full',
+          requestedBy: owner.userId,
+          engineVersion: '1.0.0',
+        }),
+      ).rejects.toThrow(AuthorisationWithdrawnError);
+    } finally {
+      client.release();
+    }
+    return { appId, assessmentId: assessment.assessmentId };
+  }
+
+  const orphanRows = async (appId: string) =>
+    (
+      await db.query<{ summary: string }>(
+        `select summary from public.audit_log
+          where action = 'evidence.artefact_orphaned' and organisation_id = $1`,
+        [owner.organisationId],
+      )
+    ).rows.filter((row) => row.summary.length > 0 && appId.length > 0);
+
+  it('writes nothing to the database, which is why nothing can find the bytes', async () => {
+    const { assessmentId } = await withdrawnRun(keepsEverything());
+    /*
+     * The premise, asked of this run.
+     *
+     * The first version of this counted evidence rows whose `storage_path` was
+     * `in (select storage_path from public.evidence)` — a tautology, so it
+     * counted every row in the organisation and failed at 434. The point is
+     * narrower: this run wrote none, so `sweepRetention`, which finds its work
+     * by reading that table, has no way in.
+     */
+    const rows = await db.query(
+      `select count(*)::int as n from public.evidence where assessment_id = $1`,
+      [assessmentId],
+    );
+    expect(rows.rows[0].n).toBe(0);
+    const assessments = await db.query(
+      `select count(*)::int as n from public.assessments where id = $1`,
+      [assessmentId],
+    );
+    expect(assessments.rows[0].n).toBe(0);
+  }, 120_000);
+
+  it('records the artefacts it could not remove, with their paths', async () => {
+    const { appId } = await withdrawnRun(keepsEverything());
+    const rows = await orphanRows(appId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]!.summary).toMatch(/rolled back after its evidence was written/i);
+    // The path, because nothing else points at these bytes.
+    expect(rows[0]!.summary).toMatch(/artefact at \S+/);
+    // And the sentence that says why this needs its own record at all.
+    expect(rows[0]!.summary).toMatch(/retention sweep cannot reach it/i);
+  }, 120_000);
+
+  it('records nothing when the store lets go', async () => {
+    // The half that makes the other half mean something. The ordinary rollback
+    // tidies up after itself, and a row claiming bytes were left behind when
+    // they were not is its own untruth.
+    const before = (await orphanRows('x')).length;
+    const { appId } = await withdrawnRun(memoryStorage());
+    expect(appId).toBeTruthy();
+    expect((await orphanRows(appId)).length).toBe(before);
+  }, 120_000);
 });

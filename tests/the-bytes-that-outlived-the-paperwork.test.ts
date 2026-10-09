@@ -110,7 +110,7 @@ describe('a store that refuses to remove the artefact', () => {
   });
 
   it('writes down that we still hold the bytes, and where they are', async () => {
-    const recorded = await auditFor(evidenceId, 'retention.artefact_not_removed');
+    const recorded = await auditFor(evidenceId, 'evidence.artefact_orphaned');
     expect(recorded).toHaveLength(1);
     // The path is the whole point. The entity id names a row that no longer
     // exists anywhere, so a record carrying only that cannot be acted on.
@@ -125,7 +125,7 @@ describe('a store that refuses to remove the artefact', () => {
     expect(result.artefactsOrphaned).toBeGreaterThanOrEqual(1);
     // Asked of this row rather than of the total, which another file's expired
     // evidence would otherwise inflate.
-    const recorded = await auditFor(again, 'retention.artefact_not_removed');
+    const recorded = await auditFor(again, 'evidence.artefact_orphaned');
     expect(recorded).toHaveLength(1);
   }, 60_000);
 });
@@ -138,7 +138,7 @@ describe('a store that changes its mind', () => {
     // First pass: the store refuses, so the bytes stay and the exception is
     // written down.
     await sweepRetention(pool, () => undefined, new Date(), 500, refusingStorage());
-    expect(await auditFor(evidenceId, 'retention.artefact_not_removed')).toHaveLength(1);
+    expect(await auditFor(evidenceId, 'evidence.artefact_orphaned')).toHaveLength(1);
 
     // Second pass with a working store that actually holds the bytes.
     const storage = memoryStorage();
@@ -151,7 +151,7 @@ describe('a store that changes its mind', () => {
     expect(await storage.get('evidence/not-mine.png')).not.toBeNull();
     expect(result.artefactsRecovered).toBeGreaterThanOrEqual(1);
 
-    const cleared = await auditFor(evidenceId, 'retention.artefact_removed_later');
+    const cleared = await auditFor(evidenceId, 'evidence.artefact_removed_later');
     expect(cleared).toHaveLength(1);
     expect(cleared[0]!.summary).toContain(path);
   }, 60_000);
@@ -171,7 +171,7 @@ describe('a store that changes its mind', () => {
     const tracker = refusingStorage();
     await sweepRetention(pool, () => undefined, new Date(), 500, tracker);
     expect(tracker.attempted).not.toContain(path);
-    expect(await auditFor(evidenceId, 'retention.artefact_removed_later')).toHaveLength(1);
+    expect(await auditFor(evidenceId, 'evidence.artefact_removed_later')).toHaveLength(1);
   }, 60_000);
 });
 
@@ -184,7 +184,41 @@ describe('what it leaves alone', () => {
 
     const result = await sweepRetention(pool, () => undefined, new Date(), 500, storage);
     expect(await storage.get(path)).toBeNull();
-    expect(await auditFor(evidenceId, 'retention.artefact_not_removed')).toHaveLength(0);
+    expect(await auditFor(evidenceId, 'evidence.artefact_orphaned')).toHaveLength(0);
     expect(result.evidenceDeleted).toBeGreaterThanOrEqual(1);
+  }, 60_000);
+});
+
+describe('an orphan a rolled-back run left behind', () => {
+  it('is picked up by the same second pass, which is why it shares the action', async () => {
+    /*
+     * The justification for one mechanism, measured.
+     *
+     * `persist.ts` produces this state from the other direction: a transaction
+     * rolled back after the artefacts were written, where the cleanup then
+     * failed. No evidence row points at those bytes, so the first pass of this
+     * sweep cannot reach them from the table — the second pass is the only
+     * thing that can, and it finds its work by action name. If the two
+     * producers used different names, half the orphans would sit there for
+     * ever and an operator would have to know which producer left which row.
+     */
+    const path = 'evidence/left-by-a-rollback.png';
+    await db.query(
+      `insert into public.audit_log
+         (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+       values ($1, null, 'system', 'evidence.artefact_orphaned', 'evidence', null, $2)`,
+      [
+        owner.organisationId,
+        `A run was rolled back after its evidence was written and the object store would not ` +
+          `remove the artefact at ${path}. No evidence row points at it.`,
+      ],
+    );
+
+    const storage = memoryStorage();
+    await storage.put(path, Buffer.from('a screenshot nobody can find'));
+    const result = await sweepRetention(pool, () => undefined, new Date(), 500, storage);
+
+    expect(await storage.get(path)).toBeNull();
+    expect(result.artefactsRecovered).toBeGreaterThanOrEqual(1);
   }, 60_000);
 });

@@ -170,9 +170,21 @@ export interface RetentionSweepResult {
   readonly artefactsRecovered: number;
 }
 
-/** Audit actions for an artefact whose bytes outlived the row accounting for it. */
-const ARTEFACT_NOT_REMOVED = 'retention.artefact_not_removed';
-const ARTEFACT_REMOVED_LATER = 'retention.artefact_removed_later';
+/**
+ * Audit actions for bytes we hold that no row accounts for.
+ *
+ * Shared with `persist.ts`, which produces the same state from the other
+ * direction: a run whose transaction rolled back after the artefacts were
+ * written, where the cleanup then failed. One action and one retry rather than
+ * two half-overlapping mechanisms — the state is identical and so is the
+ * remedy, and an operator should not have to learn which producer left which
+ * row behind.
+ *
+ * Named for the artefact rather than for retention, because in the rolled-back
+ * case nothing was ever retained.
+ */
+export const ARTEFACT_ORPHANED = 'evidence.artefact_orphaned';
+export const ARTEFACT_REMOVED_LATER = 'evidence.artefact_removed_later';
 
 /**
  * Deletes what is past its deadline, and records that it did.
@@ -289,7 +301,7 @@ export async function sweepRetention(
                  values ($1, null, 'system', $2, 'evidence', $3, $4)`,
                 [
                   record.organisationId,
-                  ARTEFACT_NOT_REMOVED,
+                  ARTEFACT_ORPHANED,
                   record.id,
                   `The retention sweep deleted the evidence row and recorded the deletion, and the ` +
                     `object store refused to remove the artefact at ${path}. We still hold those ` +
@@ -341,7 +353,7 @@ export async function sweepRetention(
             )
           order by l.occurred_at
           limit $3`,
-        [ARTEFACT_NOT_REMOVED, ARTEFACT_REMOVED_LATER, limit],
+        [ARTEFACT_ORPHANED, ARTEFACT_REMOVED_LATER, limit],
       );
       for (const orphan of orphans.rows) {
         const path = /artefact at ([^\s]+)\./.exec(orphan.summary)?.[1];
