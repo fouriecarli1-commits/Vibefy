@@ -13,6 +13,7 @@ import { ScopedHttp } from '../runtime/http.ts';
 import { classifyStop, stopNote } from '../runtime/stop.ts';
 import type { ToolDefinition } from '../model/client.ts';
 import { browserTools, httpTool } from './tools.ts';
+import type { RefusedControl } from '../runtime/destructive-controls.ts';
 import type { RawFinding, Stage, StageContext, StageId, StageResult } from './types.ts';
 
 export const DIMENSIONS = [
@@ -98,9 +99,15 @@ export function createModelStage(config: ModelStageConfig): Stage {
         await session.open();
         await session.goto(url, 'domcontentloaded');
 
+        const refusedControls: RefusedControl[] = [];
         const tools: ToolDefinition[] = browserTools({
           session,
           onScreenshot: (id) => mintedEvidence.add(id),
+          // From the guard, which holds the authorisation's own ceiling. Passed
+          // rather than defaulted: `browserTools` requires it, so a stage that
+          // forgets it does not compile.
+          ceiling: context.guard.policy.ceiling,
+          onRefusedControl: (refused) => refusedControls.push(refused),
         });
         if (config.includeHttpTool) {
           tools.push(httpTool(http, (id) => mintedEvidence.add(id)));
@@ -178,6 +185,26 @@ export function createModelStage(config: ModelStageConfig): Stage {
             `The exploration did not run to a natural end. ${
               HALT_EXPLANATION[exploration.haltedBy] ?? 'It stopped early.'
             } What it found still stands; what it did not reach is not evidence that there was nothing there.`,
+          );
+        }
+
+        /*
+         * A refused click is a measurement, not a gap.
+         *
+         * The control was found and seen; what did not happen is pressing it.
+         * Saying so matters twice over: a reader of the report learns the
+         * boundary held, and nobody later reads "the stage explored the
+         * account settings" as meaning every path through them was followed.
+         */
+        if (refusedControls.length > 0) {
+          const quoted = [...new Set(refusedControls.map((refused) => refused.label))]
+            .slice(0, 5)
+            .map((label) => `"${label}"`)
+            .join(', ');
+          notes.push(
+            `${refusedControls.length} control(s) were found and deliberately not pressed, because ` +
+              `clicking them would modify or destroy data and this authorisation does not permit ` +
+              `that: ${quoted}. They were reported from the page instead.`,
           );
         }
 

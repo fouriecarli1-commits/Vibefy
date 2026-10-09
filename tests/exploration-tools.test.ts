@@ -56,7 +56,15 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server?.close(() => resolve()));
 });
 
-const tool = (name: string) => browserTools({ session }).find((entry) => entry.name === name)!;
+/**
+ * The tools, with the ceiling every authorisation carries.
+ *
+ * `allowDataModification` is false in `DEFAULT_CEILING` and the database will
+ * not let an authorisation say otherwise, so this is the only ceiling these
+ * tools are ever handed in production.
+ */
+const tool = (name: string) =>
+  browserTools({ session, ceiling: DEFAULT_CEILING }).find((entry) => entry.name === name)!;
 
 describe('describing a page', () => {
   it('says how much of it was left out', async () => {
@@ -91,7 +99,7 @@ describe('an action that did not happen', () => {
     );
     await fresh.open();
     try {
-      const tools = browserTools({ session: fresh });
+      const tools = browserTools({ session: fresh, ceiling: DEFAULT_CEILING });
       await tools.find((entry) => entry.name === 'navigate')!.run({ url: `${base}/plain` });
       // Nothing to go back to. This used to answer "Back at <url>" with the
       // page description beneath it, which reads as a back button that worked

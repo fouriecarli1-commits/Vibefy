@@ -7,10 +7,13 @@
  * property of how the tools are described in a prompt — it is a property of what
  * the functions can physically do.
  */
+import type { Locator } from 'playwright';
 import type { BrowserSession } from '../runtime/browser.ts';
 import type { ScopedHttp } from '../runtime/http.ts';
 import type { ToolDefinition } from '../model/client.ts';
 import { classifyStop } from '../runtime/stop.ts';
+import { destructivePhraseIn, type RefusedControl } from '../runtime/destructive-controls.ts';
+import type { IntensityCeiling } from '../runtime/scope.ts';
 
 const MAX_TEXT = 6_000;
 const MAX_ELEMENTS = 60;
@@ -112,12 +115,59 @@ async function attempt(
   }
 }
 
+/**
+ * What a person would have read on the control about to be clicked.
+ *
+ * Three sources in order, because none of them is always there. `innerText` is
+ * what a button says; the accessible name is what a screen reader would
+ * announce and is the only thing an icon button has; `value` is where a
+ * `<input type="submit">` keeps its label and it has no text node at all.
+ *
+ * Returns the empty string when the element cannot be read. The caller treats
+ * that as "not known to be destructive" on purpose — refusing every unlabelled
+ * control would stop the pass on most applications, and an unreadable button is
+ * not evidence of anything.
+ */
+async function readControlLabel(locator: Locator): Promise<string> {
+  for (const read of [
+    () => locator.innerText({ timeout: 2_000 }),
+    () => locator.getAttribute('aria-label', { timeout: 2_000 }),
+    () => locator.getAttribute('value', { timeout: 2_000 }),
+    () => locator.getAttribute('title', { timeout: 2_000 }),
+  ]) {
+    try {
+      const value = await read();
+      if (value !== null && value.trim().length > 0) return value;
+    } catch {
+      // An element that disappeared between being located and being read is a
+      // page that moved, not a refusal. The click below will report it.
+    }
+  }
+  return '';
+}
+
 export interface BrowserToolOptions {
   readonly session: BrowserSession;
   readonly onScreenshot?: (evidenceId: string, caption: string) => void;
+  /**
+   * The intensity ceiling the customer authorised.
+   *
+   * Required rather than optional, and not defaulted. `click` is the one tool
+   * here that can change somebody's data, and a ceiling that arrives as
+   * `undefined` and is treated as permissive is exactly the shape of defect
+   * this is here to close.
+   */
+  readonly ceiling: IntensityCeiling;
+  /** Called when a click is refused, so the stage can say so in its notes. */
+  readonly onRefusedControl?: (refused: RefusedControl) => void;
 }
 
-export function browserTools({ session, onScreenshot }: BrowserToolOptions): ToolDefinition[] {
+export function browserTools({
+  session,
+  onScreenshot,
+  ceiling,
+  onRefusedControl,
+}: BrowserToolOptions): ToolDefinition[] {
   return [
     {
       name: 'navigate',
@@ -146,7 +196,9 @@ export function browserTools({ session, onScreenshot }: BrowserToolOptions): Too
     {
       name: 'click',
       description:
-        'Click an element. Prefer a visible text label; fall back to a CSS selector when the text is ambiguous.',
+        'Click an element. Prefer a visible text label; fall back to a CSS selector when the text is ambiguous. ' +
+        'A control that would delete data, close an account or spend money is refused — that refusal is the ' +
+        'authorisation working, so note what you found and read the page instead of looking for another way to press it.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -159,6 +211,38 @@ export function browserTools({ session, onScreenshot }: BrowserToolOptions): Too
         const locator = input.text
           ? session.page.getByText(String(input.text), { exact: false }).first()
           : session.page.locator(String(input.selector)).first();
+
+        /*
+         * The warranty, enforced where the click happens.
+         *
+         * `legal/authorisation-to-test.md` says under "We will not": "Modify,
+         * delete or exfiltrate data", and every authorisation row carries
+         * `allow_data_modification: false` under a constraint that will not let
+         * it be anything else. Until now the only thing standing between the
+         * model and a "Delete account" button was a sentence in a tool
+         * description.
+         *
+         * The label is read from the page rather than from the model's input,
+         * because the input may be a CSS selector and because what matters is
+         * what a person would have read on the control. `innerText` first, then
+         * the accessible name, then the value — a submit input carries its
+         * label in `value` and has no text at all.
+         */
+        if (!ceiling.allowDataModification) {
+          const label = await readControlLabel(locator);
+          const phrase = destructivePhraseIn(label);
+          if (phrase !== null) {
+            const refused: RefusedControl = { label: label.replace(/\s+/g, ' ').trim(), phrase };
+            onRefusedControl?.(refused);
+            return (
+              `Refused: "${refused.label}" reads as a control that would modify or destroy data, ` +
+              `and this authorisation does not permit that (matched "${phrase}"). ` +
+              `The control exists and you have seen it — that is the observation. Report it from the ` +
+              `page rather than by pressing it.`
+            );
+          }
+        }
+
         await locator.click({ timeout: 10_000 });
         await session.page.waitForLoadState('domcontentloaded').catch(() => undefined);
         return `Clicked. Now at ${session.page.url()}\n\n${await describePage(session)}`;
