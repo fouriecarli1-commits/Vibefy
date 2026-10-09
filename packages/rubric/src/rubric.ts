@@ -81,6 +81,82 @@ export function listRubricVersions(): readonly string[] {
   return Object.keys(REGISTRY);
 }
 
+/**
+ * A published rubric this code cannot score against.
+ *
+ * Its own class, so a caller can tell a malformed rubric from a missing one:
+ * the first is our data being wrong and the second is a version nobody has.
+ */
+export class MalformedRubricError extends Error {
+  constructor(version: string, what: string) {
+    super(
+      `Rubric ${version} is published with ${what}, so nothing may be scored against it. ` +
+        'A gate that cannot say whether it blocks certification is a gate that does not block it.',
+    );
+    this.name = 'MalformedRubricError';
+  }
+}
+
+/**
+ * The gates, checked once per version.
+ *
+ * `scoring.ts` guards two lookups into published rubric data and says why: "one
+ * typographical error in a future rubric away from a finding that is free —
+ * silently, and on everybody's score at once." The gate fields are the same
+ * kind of data and were not guarded, and they are worse. The JSON reaches this
+ * module through `as unknown as RubricDefinition`, so the `blocksCertification:
+ * boolean` in the interface is a promise about data nobody checks: a future
+ * gate published without it reads as `undefined`, `certificationBlockers`
+ * treats that as falsy, and the gate is applied while blocking nothing. That is
+ * a badge issued to an application with a critical security finding, from a
+ * missing line in a JSON file.
+ *
+ * Memoised because `getRubric` is called from `isRubricDimensionId` and from
+ * every score, and this is a loop over three gates that cannot change at
+ * runtime.
+ */
+const validated = new Set<string>();
+
+/**
+ * Exported so a test can hand it a malformed definition.
+ *
+ * The registry holds module constants, and the defect this guards against is a
+ * future edit to one of them rather than a value anybody can inject today — so
+ * without a seam the only way to test the guard is to make the registry
+ * writable, which is a worse thing to do to this package.
+ */
+export function assertRubricGates(definition: RubricDefinition): void {
+  if (validated.has(definition.version)) return;
+  for (const gate of definition.gates) {
+    const named = gate.id || '(a gate with no id)';
+    if (typeof gate.id !== 'string' || gate.id.length === 0) {
+      throw new MalformedRubricError(definition.version, 'a gate that has no id');
+    }
+    if (typeof gate.blocksCertification !== 'boolean') {
+      throw new MalformedRubricError(
+        definition.version,
+        `a gate (${named}) whose blocksCertification is not true or false`,
+      );
+    }
+    // The label is printed in `certificationBlockers`, which is what a customer
+    // reads when their badge is withheld, and the rationale is what the
+    // published rubric owes them as the reason.
+    if (typeof gate.label !== 'string' || gate.label.trim().length === 0) {
+      throw new MalformedRubricError(definition.version, `a gate (${named}) with no label`);
+    }
+    if (typeof gate.rationale !== 'string' || gate.rationale.trim().length === 0) {
+      throw new MalformedRubricError(definition.version, `a gate (${named}) with no rationale`);
+    }
+    if (gate.capOverallAt !== undefined && !Number.isFinite(gate.capOverallAt)) {
+      throw new MalformedRubricError(
+        definition.version,
+        `a gate (${named}) whose capOverallAt is not a number`,
+      );
+    }
+  }
+  validated.add(definition.version);
+}
+
 export function getRubric(version: string = CURRENT_RUBRIC_VERSION): RubricDefinition {
   const definition = REGISTRY[version];
   if (!definition) {
@@ -89,7 +165,25 @@ export function getRubric(version: string = CURRENT_RUBRIC_VERSION): RubricDefin
         'Scores are never recomputed against a different version than the one recorded.',
     );
   }
+  assertRubricGates(definition);
   return definition;
+}
+
+/** For a test that needs the check to run again on the same version. */
+export function forgetRubricValidation(): void {
+  validated.clear();
+}
+
+/**
+ * Which versions have been through the check.
+ *
+ * Exported so a test can see that `getRubric` runs it, rather than only that
+ * the check works when called directly. Removing the call from `getRubric`
+ * left a first version of that test green, which is the same gap as a guard
+ * nobody wired in: the rule held and nothing used it.
+ */
+export function rubricVersionsValidated(): readonly string[] {
+  return [...validated];
 }
 
 /**
