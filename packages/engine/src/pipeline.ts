@@ -36,6 +36,7 @@ import {
   storeReadinessStage,
 } from './stages/model-stages.ts';
 import { synthesise, type ReportNarrative } from './stages/synthesis.ts';
+import { withoutACheck } from './stages/coverage.ts';
 import type { EvidenceArtefact } from './runtime/evidence.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './stages/types.ts';
 
@@ -209,6 +210,22 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
    * tick. Said here rather than in a stage, because it is a fact about the run
    * and not about any one of them.
    */
+  /*
+   * The criteria nothing asks a question about.
+   *
+   * Ten of rubric 1.1.0's forty-nine are emitted by no check in this engine and
+   * described in none of the prompts — seven always, and three more for
+   * anything the owner did not register as a game. `stages/coverage.ts` holds
+   * the measurement. Nothing could ever deduct for them, so they did not merely
+   * go unanswered: they scored full marks on every assessment, and the published
+   * questions they sit under ticked on their behalf.
+   *
+   * Said here, once, for the same reason the sign-in criteria below are: it is
+   * a fact about what this engine does rather than about any one stage, and no
+   * stage was going to say it on the way past.
+   */
+  notTested.push(...withoutACheck(context.target.isGame));
+
   if (context.target.hasAuthentication && context.syntheticCredentials === undefined) {
     for (const criterion of BEHIND_A_SIGN_IN) {
       notTested.push({

@@ -178,12 +178,27 @@ describe('the half of an application behind a sign-in', () => {
     const outcome = await runPipeline({ context: withAuth(true), stages: [anyStage] });
     const criteria = outcome.notTestedCriteria.map((entry) => entry.criterion);
     expect(criteria).toEqual(expect.arrayContaining(['FI-02', 'FI-07', 'PRI-03', 'STR-03']));
-    expect(outcome.notTestedCriteria[0]?.because).toMatch(/given no test account/i);
+    // The reason, read off the sign-in entries rather than off the first one.
+    // The list also carries the criteria nothing checks at all, from
+    // `stages/coverage.ts`, and those come first.
+    const signIn = outcome.notTestedCriteria.filter((entry) =>
+      ['FI-02', 'FI-07', 'PRI-03', 'STR-03'].includes(entry.criterion),
+    );
+    expect(signIn).toHaveLength(4);
+    for (const entry of signIn) expect(entry.because).toMatch(/given no test account/i);
   });
 
   it('says nothing of the kind about an application that has no sign-in', async () => {
     const outcome = await runPipeline({ context: withAuth(false), stages: [anyStage] });
-    expect(outcome.notTestedCriteria).toEqual([]);
+    // Not "the list is empty": it carries the ten criteria nothing checks, and
+    // those are a fact about this engine rather than about the sign-in. What
+    // must be absent is any sentence about a test account.
+    const criteria = outcome.notTestedCriteria.map((entry) => entry.criterion);
+    expect(criteria).not.toContain('FI-02');
+    expect(criteria).not.toContain('STR-03');
+    for (const entry of outcome.notTestedCriteria) {
+      expect(entry.because).not.toMatch(/test account/i);
+    }
   });
 
   it('leaves alone the criteria that are partly testable from outside', async () => {

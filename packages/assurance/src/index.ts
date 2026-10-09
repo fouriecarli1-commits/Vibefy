@@ -173,8 +173,12 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
     id: 'other_peoples_data',
     shortLabel: 'Other people’s data',
     question: 'Could I end up seeing somebody else’s data — or them seeing mine?',
+    // "called its endpoints as a different user" is struck: this engine is no
+    // user at all, let alone two. Changing the identifiers in an address is in
+    // the adversarial prompt and does happen; calling an endpoint as somebody
+    // else needs two sessions, and nothing here has one.
     whatWeChecked:
-      'We changed the identifiers in addresses the application uses, called its endpoints as a different user, and looked at whether anything that should be private came back.',
+      'We changed the identifiers in the addresses the application uses to see whether another person\u2019s data came back, and we checked whether the application lets any other website make requests to it carrying your session.',
     limitation:
       'Only within the parts the owner authorised us to test. Anything we were not permitted to reach was not examined.',
     criteria: ['SEC-06', 'SEC-11', 'PRI-06'],
@@ -213,8 +217,14 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
     id: 'what_they_collect',
     shortLabel: 'Privacy policy and deletion',
     question: 'Do they say what they collect — and can I get my account deleted?',
+    // The middle clause is struck. Comparing a policy's wording against the
+    // requests the application makes is PRI-02 and PRI-04, and this engine has
+    // no check for either and no prompt describing one — so the sentence
+    // promised the one thing in it that has never happened. Those criteria are
+    // now reported as not tested, which is what makes this question honest
+    // rather than this sentence.
     whatWeChecked:
-      'We opened the privacy policy, compared what it says against what the application was observed sending, and looked for a route a user can actually follow to delete their account.',
+      'We opened the privacy policy to see that it is there, reachable and about this application rather than a template, and we looked for a route a user can actually follow to delete their account.',
     limitation:
       'This is not a legal opinion. We are not lawyers, and nothing here says the application complies with POPIA, the GDPR, or any other law — only that these documents and routes were present and matched what we saw.',
     criteria: ['PRI-01', 'PRI-02', 'PRI-03', 'PRI-04', 'PRI-05'],
