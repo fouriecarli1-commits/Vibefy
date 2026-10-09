@@ -160,7 +160,26 @@ interface TrustPage {
  * tell which half is which — and the only reliable way to do that is to keep
  * the two apart everywhere, including in the code that fetches them.
  */
-async function loadTrustPage(slug: string): Promise<TrustPage | null> {
+/**
+ * Three answers here too, for the same reason and in the function next door.
+ *
+ * The comment above `loadAssurance` says why `null` could not carry both "this
+ * badge has no assessment behind it" and "the read failed". This loader ended
+ * in the same `.catch(() => null)`, and the page renders its section only when
+ * it has one — so a database blip removed the whole of "What the owner of this
+ * application says", with nothing saying so.
+ *
+ * The section holds the route to a human when something goes wrong, the
+ * security contact and the status page. A reader is on this page precisely when
+ * something has gone wrong, and "the owner published nothing" and "we could not
+ * read what they published" send them to different places.
+ */
+type TrustPageLoad =
+  | { readonly kind: 'ready'; readonly page: TrustPage }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'unavailable' };
+
+async function loadTrustPage(slug: string): Promise<TrustPageLoad> {
   return readAsAnon(async (client) => {
     const { rows } = await client.query<TrustPage>(
       `select contact_email, security_contact, status_url,
@@ -168,8 +187,9 @@ async function loadTrustPage(slug: string): Promise<TrustPage | null> {
          from public.trust_page_public where badge_slug = $1`,
       [slug],
     );
-    return rows[0] ?? null;
-  }).catch(() => null);
+    const row = rows[0];
+    return row ? ({ kind: 'ready', page: row } as const) : ({ kind: 'none' } as const);
+  }).catch(() => ({ kind: 'unavailable' }) as const);
 }
 
 async function loadBadge(slug: string): Promise<BadgeRecord | null> {
@@ -191,7 +211,24 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const badge = await loadBadge(slug).catch(() => null);
+  /*
+   * The same two meanings, in the title a shared link carries.
+   *
+   * `.catch(() => null)` put a failed read and an unissued badge through one
+   * branch, and that branch answers "Badge not found" — which is a claim about
+   * somebody's badge, stated to everybody who sees the link previewed, on a read
+   * that failed on our side. The page body itself is fine: `loadBadge` does not
+   * catch, so a failed read there is a failed request rather than a wrong
+   * answer.
+   *
+   * So a read failure gets a neutral title and is not indexed. Saying nothing is
+   * the only honest thing available here, because this function has no way to
+   * tell the reader anything.
+   */
+  const badge = await loadBadge(slug).catch(() => 'unreadable' as const);
+  if (badge === 'unreadable') {
+    return { title: 'Verified by VibefyCode', robots: { index: false, follow: false } };
+  }
   if (!badge) return { title: 'Badge not found' };
 
   const assessedOn = new Date(badge.assessed_at).toISOString().slice(0, 10);
@@ -428,7 +465,7 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           typed and published on purpose; their account name is not, and the
           distinction between the two is the whole reason this section exists
           in the first place. */}
-      {trustPage && (
+      {trustPage.kind === 'ready' && (
         <section
           aria-labelledby="owner-says"
           className="space-y-4 rounded-xl border border-line-strong p-6"
@@ -447,56 +484,75 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
           </div>
 
           <dl className="grid gap-4 sm:grid-cols-2">
-            {trustPage.contact_email && (
+            {trustPage.page.contact_email && (
               <div className="space-y-1">
                 <dt className="font-medium">If something goes wrong</dt>
                 <dd className="text-sm text-muted">
-                  <a href={`mailto:${trustPage.contact_email}`}>{trustPage.contact_email}</a>
+                  <a href={`mailto:${trustPage.page.contact_email}`}>
+                    {trustPage.page.contact_email}
+                  </a>
                 </dd>
               </div>
             )}
-            {trustPage.security_contact && (
+            {trustPage.page.security_contact && (
               <div className="space-y-1">
                 <dt className="font-medium">Reporting a vulnerability</dt>
-                <dd className="text-sm text-muted">{trustPage.security_contact}</dd>
+                <dd className="text-sm text-muted">{trustPage.page.security_contact}</dd>
               </div>
             )}
-            {trustPage.status_url && (
+            {trustPage.page.status_url && (
               <div className="space-y-1">
                 <dt className="font-medium">Whether it is up</dt>
                 <dd className="text-sm text-muted">
-                  <a href={trustPage.status_url} rel="nofollow noopener">
-                    {trustPage.status_url}
+                  <a href={trustPage.page.status_url} rel="nofollow noopener">
+                    {trustPage.page.status_url}
                   </a>
                 </dd>
               </div>
             )}
-            {trustPage.privacy_url && (
+            {trustPage.page.privacy_url && (
               <div className="space-y-1">
                 <dt className="font-medium">What they do with your data</dt>
                 <dd className="text-sm text-muted">
-                  <a href={trustPage.privacy_url} rel="nofollow noopener">
-                    {trustPage.privacy_url}
+                  <a href={trustPage.page.privacy_url} rel="nofollow noopener">
+                    {trustPage.page.privacy_url}
                   </a>
                 </dd>
               </div>
             )}
-            {trustPage.terms_url && (
+            {trustPage.page.terms_url && (
               <div className="space-y-1">
                 <dt className="font-medium">Their terms</dt>
                 <dd className="text-sm text-muted">
-                  <a href={trustPage.terms_url} rel="nofollow noopener">
-                    {trustPage.terms_url}
+                  <a href={trustPage.page.terms_url} rel="nofollow noopener">
+                    {trustPage.page.terms_url}
                   </a>
                 </dd>
               </div>
             )}
           </dl>
 
-          {trustPage.note && <p className="max-w-prose text-sm">{trustPage.note}</p>}
+          {trustPage.page.note && <p className="max-w-prose text-sm">{trustPage.page.note}</p>}
 
           <p className="text-sm text-muted">
-            Last changed by them on {new Date(trustPage.updated_at).toISOString().slice(0, 10)}.
+            Last changed by them on {new Date(trustPage.page.updated_at).toISOString().slice(0, 10)}
+            .
+          </p>
+        </section>
+      )}
+      {trustPage.kind === 'unavailable' && (
+        /* Said, rather than left out — the same rule as the list above.
+         *
+         * What is missing here is the owner's own contact route, their security
+         * address and their status page. Somebody reading this page is usually
+         * reading it because something has gone wrong, and a section that is
+         * simply absent reads as an owner who published nothing. */
+        <section role="alert" className="rounded-xl border border-line-strong p-5">
+          <h2 className="font-semibold">What the owner says is not loading</h2>
+          <p className="mt-2 text-sm text-muted">
+            This application’s owner may have published a contact route, a security address and a
+            status page. That section could not be read just now — a fault on our side, not
+            something the owner has or has not done. Reload in a moment.
           </p>
         </section>
       )}

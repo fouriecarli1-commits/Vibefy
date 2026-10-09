@@ -173,8 +173,17 @@ describe('what the page does with it', () => {
     // A page carrying our mark linking out with our search standing behind it
     // is a thing worth selling, which is exactly why it is not for sale.
     const block = page.slice(page.indexOf('owner-says'), page.indexOf('aria-labelledby="verify"'));
-    const links = block.match(/<a\s[^>]*href=\{trustPage\.[a-z_]+\}/g) ?? [];
-    expect(links.length).toBeGreaterThanOrEqual(3);
+    // Matched to the accessor loosely on purpose. This read `trustPage.[a-z_]+`
+    // and stopped finding anything the day the loader grew a three-answer
+    // result and the accessor became `trustPage.page.status_url` — at which
+    // point `toHaveLength(links.length)` below would have passed against an
+    // empty list. The `>= 3` is what caught it, which is the whole reason an
+    // assertion about a count sits in front of an assertion about a match.
+    const links = block.match(/<a\s[^>]*href=\{trustPage[^}]*\}/g) ?? [];
+    expect(
+      links.length,
+      'the owner-links block matched no links, so the rel check below would pass against nothing',
+    ).toBeGreaterThanOrEqual(3);
     expect(block.match(/rel="nofollow noopener"/g) ?? []).toHaveLength(links.length);
   });
 });
