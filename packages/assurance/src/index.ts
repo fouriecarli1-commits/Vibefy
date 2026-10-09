@@ -147,10 +147,18 @@ export const ASSURANCE_CLAIMS: readonly AssuranceClaim[] = [
     id: 'account_takeover',
     shortLabel: 'Getting into your account',
     question: 'Could somebody else get into my account?',
+    // The sentence used to open "We signed in with a test account", and
+    // nothing in this engine signs in: no caller sets `syntheticCredentials`,
+    // there is no sign-in tool on the model's surface, and `fill` refuses a
+    // password it was not given. It was first-person, past-tense and false, on
+    // the question a visitor reads first. What the checks actually do is read
+    // the session cookie's attributes, probe administrative routes and API
+    // paths unauthenticated, and see what answers without being asked who is
+    // calling — so that is what it now says.
     whatWeChecked:
-      'We signed in with a test account and tried the ways accounts are usually taken over: session cookies a script can read, pages that check who you are in the browser but not on the server, and endpoints that answer without asking who is calling.',
+      'We looked at the ways accounts are usually taken over: whether the session cookie can be read by any script on the page, whether the pages and endpoints that decide what you may see check who you are on the server rather than only in the browser, and whether anything answers without asking who is calling.',
     limitation:
-      'We tried the common ways, not every way. Somebody with more time, or with access we did not have, may find one we did not.',
+      'We tried the common ways, not every way, and we did it from outside the application rather than from inside somebody\u2019s session. Somebody with more time, or with access we did not have, may find one we did not.',
     criteria: ['SEC-03', 'SEC-05', 'SEC-07', 'SEC-09'],
     gate: 'GATE-CRITICAL-SECURITY',
     applies: (input) => input.declared.authentication,

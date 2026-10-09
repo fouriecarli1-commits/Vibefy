@@ -273,7 +273,9 @@ export const deterministicChecksStage: Stage = {
 
     findings.push(...transportChecks(url, root, headerScan));
     findings.push(...headerChecks(root, headerScan));
-    findings.push(...cookieChecks(root));
+    const cookies = cookieChecks(root);
+    findings.push(...cookies.findings);
+    notTested.push(...cookies.notTested);
     findings.push(...corsChecks(root, headerScan));
     findings.push(...bodyChecks(root));
 
@@ -867,9 +869,33 @@ function headerChecks(response: ScopedResponse, headerScan: string): RawFinding[
   return findings;
 }
 
-function cookieChecks(response: ScopedResponse): RawFinding[] {
+/**
+ * SEC-03, and what it means to have seen no cookie.
+ *
+ * `{ findings: [], notTested: [...] }` when the response carried no
+ * `set-cookie` at all, which is the ordinary case for a signed-out landing
+ * page. This used to return the empty array for both outcomes, and a criterion
+ * with no finding and no entry is a tick: the published question about getting
+ * into your account rendered a tick for a session cookie that was never
+ * looked at. "We saw no cookie" and "we read the cookie and it was correctly
+ * set" are the two things a reader most needs told apart here.
+ */
+function cookieChecks(response: ScopedResponse): {
+  findings: RawFinding[];
+  notTested: { criterion: string; because: string }[];
+} {
   const raw = response.headers['set-cookie'];
-  if (!raw) return [];
+  if (!raw)
+    return {
+      findings: [],
+      notTested: [
+        {
+          criterion: 'SEC-03',
+          because:
+            'The initial page response set no cookie, so there were no session cookie attributes to check. This assessment signs in to nothing, so a cookie handed out only after sign-in was never seen either.',
+        },
+      ],
+    };
 
   const problems: string[] = [];
   const lower = raw.toLowerCase();
@@ -878,9 +904,9 @@ function cookieChecks(response: ScopedResponse): RawFinding[] {
   if (!lower.includes('httponly')) problems.push('HttpOnly');
   if (!lower.includes('samesite')) problems.push('SameSite');
 
-  if (problems.length === 0) return [];
+  if (problems.length === 0) return { findings: [], notTested: [] };
 
-  return [
+  const findings: RawFinding[] = [
     {
       ruleId: 'SEC-03',
       dimension: 'security_posture',
@@ -892,6 +918,7 @@ function cookieChecks(response: ScopedResponse): RawFinding[] {
       evidenceIds: [response.evidenceId],
     },
   ];
+  return { findings, notTested: [] };
 }
 
 function corsChecks(response: ScopedResponse, headerScan: string): RawFinding[] {
