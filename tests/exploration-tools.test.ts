@@ -64,7 +64,9 @@ afterAll(async () => {
  * tools are ever handed in production.
  */
 const tool = (name: string) =>
-  browserTools({ session, ceiling: DEFAULT_CEILING }).find((entry) => entry.name === name)!;
+  browserTools({ session, ceiling: DEFAULT_CEILING, credentials: undefined }).find(
+    (entry) => entry.name === name,
+  )!;
 
 describe('describing a page', () => {
   it('says how much of it was left out', async () => {
@@ -99,7 +101,11 @@ describe('an action that did not happen', () => {
     );
     await fresh.open();
     try {
-      const tools = browserTools({ session: fresh, ceiling: DEFAULT_CEILING });
+      const tools = browserTools({
+        session: fresh,
+        ceiling: DEFAULT_CEILING,
+        credentials: undefined,
+      });
       await tools.find((entry) => entry.name === 'navigate')!.run({ url: `${base}/plain` });
       // Nothing to go back to. This used to answer "Back at <url>" with the
       // page description beneath it, which reads as a back button that worked

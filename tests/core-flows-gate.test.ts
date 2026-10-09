@@ -170,8 +170,8 @@ describe('the half of an application behind a sign-in', () => {
   };
 
   it('is reported as untested when nothing gave the run an account', async () => {
-    // `syntheticCredentials` is on the context, the tools tell the model to use
-    // only the ones it was given, and nothing has ever given it any. So every
+    // `syntheticCredentials` is on the context, `fill` will not type into a
+    // password field without it, and nothing has ever given it any. So every
     // application with a sign-in has been assessed entirely signed out, and
     // four published criteria that cannot be observed from outside a session
     // produced no findings — which renders as a tick.

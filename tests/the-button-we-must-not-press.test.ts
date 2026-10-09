@@ -11,8 +11,10 @@
  * from the database into the engine. Four of them — `allowDataModification`,
  * `allowDataExport`, `allowAccountCreation`, `syntheticAccountsOnly` — were
  * read out of the row, typed, defaulted in five places, and consulted in
- * exactly zero conditions. Three describe capabilities the engine does not yet
- * have, so they were vacuously satisfied. The fourth was not: `click` clicks
+ * exactly zero conditions. Two describe capabilities the engine does not yet
+ * have, so they were vacuously satisfied; `syntheticAccountsOnly` is now held
+ * unconditionally by `fill`, which is measured in
+ * `the-password-we-were-never-given.test.ts`. The fourth was not: `click` clicks
  * whatever element the model names, by visible text or by selector, on the
  * customer's live application, and the only thing between the model and a
  * "Delete account" button was a sentence in a tool description.
@@ -90,6 +92,7 @@ function tools() {
   return browserTools({
     session,
     ceiling: DEFAULT_CEILING,
+    credentials: undefined,
     onRefusedControl: (entry) => refused.push(entry),
   });
 }
@@ -230,11 +233,16 @@ describe('the three ceilings that are satisfied by absence', () => {
   /**
    * Which ceiling governs each thing the model can do to a live application.
    *
-   * `allowDataExport`, `allowAccountCreation` and `syntheticAccountsOnly` are
-   * consulted nowhere, and that is currently correct: the engine has no
-   * capability they would govern. Nothing captures bulk data, nothing creates
-   * an account, nothing signs in — `syntheticCredentials` is an optional field
-   * on the job that no caller sets.
+   * `allowDataExport` and `allowAccountCreation` are consulted nowhere, and
+   * that is currently correct: the engine has no capability they would govern.
+   * Nothing captures bulk data and nothing creates an account.
+   *
+   * `syntheticAccountsOnly` is not read either, but for a different reason:
+   * `fill` behaves as though it were always true. A password field takes only
+   * the password the owner provisioned and nothing else, whatever the
+   * authorisation says. That is stricter than the flag, so reading it could
+   * only loosen the rule, and this is the rule the brief states without a
+   * qualifier.
    *
    * "Currently correct" is the problem. The moment a tool arrives that signs
    * in or exports, those ceilings become live rules that nothing reads, and no
@@ -248,24 +256,24 @@ describe('the three ceilings that are satisfied by absence', () => {
     navigate: 'the scope guard: host allowlist, exclusions, and the three numeric ceilings',
     read_page: 'nothing — it reads what is already loaded',
     click: 'allowDataModification, enforced above',
-    fill: 'nothing yet; typing changes nothing until something is pressed, and click is guarded',
+    fill: 'the synthetic account, enforced in the tool: a password field takes only the password the owner provisioned, and a one-time-code field takes nothing',
     screenshot: 'nothing — evidence of what was on screen',
     go_back: 'the scope guard, through the navigation it causes',
     reload: 'the scope guard, through the request it causes',
   };
 
   it('has exactly the tools whose governing rule has been decided', () => {
-    const names = browserTools({ session, ceiling: DEFAULT_CEILING })
+    const names = browserTools({ session, ceiling: DEFAULT_CEILING, credentials: undefined })
       .map((entry) => entry.name)
       .sort();
     const expected = Object.keys(GOVERNED_BY).sort();
     expect(
       names,
       'the model’s tool surface changed. For each new tool, decide which intensity ceiling governs ' +
-        'it and add it to GOVERNED_BY — a tool that signs in makes `allowAccountCreation` and ' +
-        '`syntheticAccountsOnly` live rules, and a tool that downloads makes `allowDataExport` one. ' +
-        'All three are read from the authorisation and consulted nowhere today, which is only safe ' +
-        'while no tool can do those things.',
+        'it and add it to GOVERNED_BY — a tool that creates an account makes `allowAccountCreation` a ' +
+        'live rule, and a tool that downloads makes `allowDataExport` one. Both are read from the ' +
+        'authorisation and consulted nowhere today, which is only safe while no tool can do those ' +
+        'things.',
     ).toEqual(expected);
   });
 

@@ -13,6 +13,12 @@ import type { ScopedHttp } from '../runtime/http.ts';
 import type { ToolDefinition } from '../model/client.ts';
 import { classifyStop } from '../runtime/stop.ts';
 import { destructivePhraseIn, type RefusedControl } from '../runtime/destructive-controls.ts';
+import {
+  secretFieldKind,
+  type FieldIdentity,
+  type RefusedCredential,
+} from '../runtime/credential-fields.ts';
+import type { SyntheticCredentials } from './types.ts';
 import type { IntensityCeiling } from '../runtime/scope.ts';
 
 const MAX_TEXT = 6_000;
@@ -146,6 +152,33 @@ async function readControlLabel(locator: Locator): Promise<string> {
   return '';
 }
 
+/**
+ * What the field about to be filled says it is.
+ *
+ * One `evaluate` rather than four `getAttribute` calls, so the four values come
+ * from the same element at the same instant: a page that re-rendered halfway
+ * through could otherwise hand back the `type` of one field and the `name` of
+ * the next. Returns null when the element cannot be read at all, and the caller
+ * lets `fill` itself report that — an element that cannot be read cannot be
+ * filled either, so nothing is let through by failing open here.
+ */
+async function readFieldIdentity(locator: Locator): Promise<FieldIdentity | null> {
+  try {
+    return await locator.evaluate(
+      (element) => ({
+        type: element.getAttribute('type') ?? '',
+        autocomplete: element.getAttribute('autocomplete') ?? '',
+        name: element.getAttribute('name') ?? '',
+        id: element.getAttribute('id') ?? '',
+      }),
+      undefined,
+      { timeout: 10_000 },
+    );
+  } catch {
+    return null;
+  }
+}
+
 export interface BrowserToolOptions {
   readonly session: BrowserSession;
   readonly onScreenshot?: (evidenceId: string, caption: string) => void;
@@ -160,6 +193,19 @@ export interface BrowserToolOptions {
   readonly ceiling: IntensityCeiling;
   /** Called when a click is refused, so the stage can say so in its notes. */
   readonly onRefusedControl?: (refused: RefusedControl) => void;
+  /**
+   * The synthetic account the owner provisioned for this run, or `undefined`
+   * when none was.
+   *
+   * Required rather than optional, for the same reason as `ceiling`: `fill` is
+   * the one tool here that can type a secret into somebody's live application,
+   * and a caller that simply forgot to pass this would get the permissive
+   * reading of "we were given nothing". Writing it out makes that a compile
+   * error instead.
+   */
+  readonly credentials: SyntheticCredentials | undefined;
+  /** Called when a fill is refused, so the stage can say so in its notes. */
+  readonly onRefusedCredential?: (refused: RefusedCredential) => void;
 }
 
 export function browserTools({
@@ -167,6 +213,8 @@ export function browserTools({
   onScreenshot,
   ceiling,
   onRefusedControl,
+  credentials,
+  onRefusedCredential,
 }: BrowserToolOptions): ToolDefinition[] {
   return [
     {
@@ -251,7 +299,10 @@ export function browserTools({
     {
       name: 'fill',
       description:
-        'Type a value into a form field. Use only the synthetic test credentials you were given; never invent credentials and never try ones you were not given.',
+        'Type a value into a form field. A password, passcode or one-time-code field is refused unless the ' +
+        'value is exactly the synthetic test password the owner provisioned for this run — that refusal is the ' +
+        'authorisation working, so record what is behind the sign-in as unreachable rather than looking for a ' +
+        'value that would be accepted.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -262,11 +313,57 @@ export function browserTools({
         additionalProperties: false,
       },
       async run(input) {
-        await session.page
-          .locator(String(input.selector))
-          .first()
-          .fill(String(input.value), { timeout: 10_000 });
-        return `Filled ${String(input.selector)}.`;
+        const selector = String(input.selector);
+        const value = String(input.value);
+        const locator = session.page.locator(selector).first();
+
+        /*
+         * The one rule on this tool surface that still lived only in a prompt.
+         *
+         * The description above used to end "never invent credentials and never
+         * try ones you were not given", and that was the whole of it: nothing
+         * stopped the model typing `admin` into a password field on somebody's
+         * live application and pressing the button next to it. That is
+         * unauthorised credential testing, which is the single act every signed
+         * authorisation is written to put out of bounds, and PART 6.2 of the
+         * brief is absolute about it.
+         *
+         * Decided from the field, not from the model's intent — see
+         * `secretFieldKind`. A password field accepts exactly the password the
+         * owner provisioned; a one-time-code field accepts nothing, because
+         * nobody provisioned a code and a code we chose would be a guess.
+         */
+        const field = await readFieldIdentity(locator);
+        const kind = field === null ? null : secretFieldKind(field);
+        if (kind === 'code') {
+          onRefusedCredential?.({ selector, kind, because: 'no_code_exists' });
+          return (
+            `Refused: ${selector} asks for a one-time code or card security code, and no such code was ` +
+            `provisioned for this run. One we chose would be a guess against a live account. Record the ` +
+            `field as reached and the step past it as unreachable.`
+          );
+        }
+        if (kind === 'password') {
+          if (credentials === undefined) {
+            onRefusedCredential?.({ selector, kind, because: 'none_provisioned' });
+            return (
+              `Refused: ${selector} is a password field and this run was given no test account, so there ` +
+              `is no value it may receive. Inventing one would be credential testing we are not authorised ` +
+              `to do. Everything behind sign-in is out of reach for this run — report that as a limit of ` +
+              `the assessment, not as a property of the application.`
+            );
+          }
+          if (value !== credentials.password) {
+            onRefusedCredential?.({ selector, kind, because: 'not_the_provisioned_one' });
+            return (
+              `Refused: the value offered for ${selector} is not the one the owner provisioned for this ` +
+              `run. The synthetic test password is the only password this tool will type.`
+            );
+          }
+        }
+
+        await locator.fill(value, { timeout: 10_000 });
+        return `Filled ${selector}.`;
       },
     },
     {

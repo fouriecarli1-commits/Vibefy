@@ -198,8 +198,8 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
   /*
    * The half of an application that is behind a sign-in.
    *
-   * `syntheticCredentials` is on the context, the tools tell the model to use
-   * only the ones it was given, and nothing has ever given it any: the worker's
+   * `syntheticCredentials` is on the context, `fill` refuses to type into a
+   * password field without it, and nothing has ever given it any: the worker's
    * job carries an optional field that no caller sets and no queue row holds.
    * So every application whose owner told us it has authentication has been
    * assessed entirely signed out — and four published criteria cannot be

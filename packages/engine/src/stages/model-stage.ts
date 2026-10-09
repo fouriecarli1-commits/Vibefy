@@ -14,6 +14,7 @@ import { classifyStop, stopNote } from '../runtime/stop.ts';
 import type { ToolDefinition } from '../model/client.ts';
 import { browserTools, httpTool } from './tools.ts';
 import type { RefusedControl } from '../runtime/destructive-controls.ts';
+import type { RefusedCredential } from '../runtime/credential-fields.ts';
 import type { RawFinding, Stage, StageContext, StageId, StageResult } from './types.ts';
 
 export const DIMENSIONS = [
@@ -100,6 +101,7 @@ export function createModelStage(config: ModelStageConfig): Stage {
         await session.goto(url, 'domcontentloaded');
 
         const refusedControls: RefusedControl[] = [];
+        const refusedCredentials: RefusedCredential[] = [];
         const tools: ToolDefinition[] = browserTools({
           session,
           onScreenshot: (id) => mintedEvidence.add(id),
@@ -108,6 +110,10 @@ export function createModelStage(config: ModelStageConfig): Stage {
           // forgets it does not compile.
           ceiling: context.guard.policy.ceiling,
           onRefusedControl: (refused) => refusedControls.push(refused),
+          // Whatever the owner provisioned, or nothing. Passed rather than
+          // defaulted for the same reason as the ceiling above.
+          credentials: context.syntheticCredentials,
+          onRefusedCredential: (refused) => refusedCredentials.push(refused),
         });
         if (config.includeHttpTool) {
           tools.push(httpTool(http, (id) => mintedEvidence.add(id)));
@@ -205,6 +211,31 @@ export function createModelStage(config: ModelStageConfig): Stage {
             `${refusedControls.length} control(s) were found and deliberately not pressed, because ` +
               `clicking them would modify or destroy data and this authorisation does not permit ` +
               `that: ${quoted}. They were reported from the page instead.`,
+          );
+        }
+
+        /*
+         * A refused fill is a different gap from a refused click.
+         *
+         * The click guard says a control was seen and not pressed. This says a
+         * sign-in was reached and not passed, which bounds the whole assessment
+         * rather than one control: four published criteria cannot be observed
+         * from outside a session at all. Saying it here is how the report stops
+         * reading "we found no session handling" when what happened is that we
+         * never had a session.
+         */
+        if (refusedCredentials.length > 0) {
+          const noAccount = refusedCredentials.some(
+            (refused) => refused.because === 'none_provisioned',
+          );
+          notes.push(
+            `${refusedCredentials.length} credential field(s) were reached and deliberately not filled. ` +
+              (noAccount
+                ? 'This run was given no synthetic test account, so there was no password it was permitted ' +
+                  'to type; anything behind the sign-in is unassessed for that reason, which is ours and ' +
+                  'not the application\u2019s.'
+                : 'The only password this run may type is the synthetic one the owner provisioned, and a ' +
+                  'one-time code cannot be provisioned at all.'),
           );
         }
 
