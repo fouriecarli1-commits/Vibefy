@@ -31,6 +31,7 @@ import {
 } from './monitoring.ts';
 import { sweepAlertPush } from './push.ts';
 import { sweepAlertEmail } from './email.ts';
+import { sweepUndeliveredNotices } from './notices.ts';
 import {
   spendingIsPaused,
   sweepGovernanceDeadlines,
@@ -445,6 +446,11 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
     // The other half of the same promise: an alert has to reach someone who did
     // not install the app.
     once('alert email', () => sweepAlertEmail(pool, emailProvider, log));
+    // And the half neither channel can see: an alert that never appeared in
+    // either pending query, because there was no address to write to and no
+    // handset to send to. `alerts.delivered_at` has said what null means since
+    // M4 and an index was built to find them; nothing had ever asked.
+    once('undelivered notices', () => sweepUndeliveredNotices(pool, log));
     // Requests whose worker never came back. A deploy in the middle of a run
     // used to strand its row at `claimed` for ever — and because the
     // re-assessment sweep skips an application that already has one queued or
