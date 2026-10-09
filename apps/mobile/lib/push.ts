@@ -1,5 +1,6 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import { removeDeviceTokens, type TokenRemoval } from '@vibefycode/api';
 import { supabase } from './supabase.ts';
 
 /**
@@ -49,11 +50,15 @@ export async function registerForPush(): Promise<{ registered: boolean; reason?:
   return { registered: true };
 }
 
-/** Called on sign-out. A token left behind pushes somebody else's alerts to this phone. */
-export async function unregisterPush(): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from('device_tokens').delete().eq('user_id', user.id);
+/**
+ * Called on sign-out, and when the push toggle is turned off.
+ *
+ * A token left behind pushes somebody else's alerts to this phone, which is why
+ * the outcome is returned rather than swallowed: on sign-out the session is gone
+ * a line later and cannot be retried, and on the toggle the screen used to
+ * promise the push had stopped whatever happened. `@vibefycode/api` holds the work and
+ * says why it lives there.
+ */
+export async function unregisterPush(): Promise<TokenRemoval> {
+  return removeDeviceTokens(supabase);
 }

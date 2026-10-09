@@ -123,3 +123,76 @@ export const expoPushSender: PushSender = async (messages) => {
   const payload = (await response.json()) as { data?: PushTicket[] };
   return payload.data ?? [];
 };
+
+// ---------------------------------------------------------------------------
+// Taking a handset off the list
+// ---------------------------------------------------------------------------
+
+/**
+ * `apps/mobile` had this as four lines inside `unregisterPush`, which returned
+ * `void` and discarded the delete's `error`. That function's own docstring
+ * names the harm which makes the error worth looking at — "A token left behind
+ * pushes somebody else's alerts to this phone" — and nothing looked at it.
+ *
+ * Two consequences, measured on 2026-10-09. On sign-out the session is gone a
+ * line later, so a failed delete cannot be retried and the handset keeps
+ * receiving the previous account's alerts: app names, finding titles, badge
+ * suspensions. And on the push toggle the screen said "This device will no
+ * longer receive alerts" whatever happened — a sentence about something that
+ * did not occur, told to the one person who could have fixed it.
+ *
+ * It lives in this package rather than in the app because this is where the
+ * push domain lives and both sides already import it, and because `apps/mobile`
+ * cannot be read by the test suite: `expo-device` pulls in `react-native`,
+ * which is written in Flow and will not parse. The client arrives as an
+ * argument and only its shape is named here, so nothing device-specific is
+ * dragged along.
+ */
+/** The slice of the client this needs. Structural, so the real one satisfies it. */
+export interface DeviceTokenStore {
+  readonly auth: {
+    getUser(): PromiseLike<{ data: { user: { id: string } | null } }>;
+  };
+  from(table: 'device_tokens'): {
+    delete(): {
+      eq(column: 'user_id', value: string): PromiseLike<{ error: { message: string } | null }>;
+    };
+  };
+}
+
+export interface TokenRemoval {
+  /** True only when this handset will not be pushed to again. */
+  readonly removed: boolean;
+  /**
+   * Why not, in words for the person holding the phone.
+   *
+   * They are the only one who can act: nobody else knows this handset was
+   * signed out, and after a sign-out there is no session left to retry under.
+   */
+  readonly reason?: string;
+}
+
+export async function removeDeviceTokens(store: DeviceTokenStore): Promise<TokenRemoval> {
+  const {
+    data: { user },
+  } = await store.auth.getUser();
+  if (!user) {
+    // The old code returned here as though it had succeeded. A session that has
+    // already gone leaves the row behind with the previous user on it, which is
+    // the state this function exists to prevent.
+    return {
+      removed: false,
+      reason:
+        'There is no longer a session on this device, so the registration could not be removed. Sign in again and turn push notifications off, or remove the app.',
+    };
+  }
+
+  const { error } = await store.from('device_tokens').delete().eq('user_id', user.id);
+  if (error) {
+    return {
+      removed: false,
+      reason: `The registration for this device could not be removed (${error.message}). Until it is, this handset may still receive alerts for this account.`,
+    };
+  }
+  return { removed: true };
+}

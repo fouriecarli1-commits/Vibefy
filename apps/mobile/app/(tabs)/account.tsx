@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { Alert, ScrollView, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MOBILE_CAPABILITIES } from '@vibefycode/api';
 import { NON_RELIANCE_LEGEND } from '@vibefycode/shared';
@@ -61,9 +61,18 @@ export default function AccountScreen() {
                 setPushOn(result.registered);
                 setNotice(result.reason ?? 'This device will receive alerts.');
               } else {
-                await unregisterPush();
-                setPushOn(false);
-                setNotice('This device will no longer receive alerts. They still appear here.');
+                // The switch follows what happened, not what was asked for.
+                // It used to go off and the notice used to promise the pushes
+                // had stopped, whatever the delete returned — a sentence about
+                // something that did not occur, told to the one person who
+                // could have fixed it.
+                const removal = await unregisterPush();
+                setPushOn(!removal.removed);
+                setNotice(
+                  removal.removed
+                    ? 'This device will no longer receive alerts. They still appear here.'
+                    : (removal.reason ?? 'The registration for this device could not be removed.'),
+                );
               }
               setBusy(false);
             }}
@@ -102,9 +111,21 @@ export default function AccountScreen() {
           setBusy(true);
           // The token goes before the session does. One left behind would push
           // the next person's alerts to this handset.
-          await unregisterPush().catch(() => undefined);
+          //
+          // Signing out happens either way: nobody is kept in an account
+          // because a registration would not go. But it is said, in an alert
+          // rather than the notice above, because this screen is about to be
+          // replaced and the person holding the phone is the only one who can
+          // act — there is no session left to retry under.
+          const removal = await unregisterPush().catch(() => ({
+            removed: false,
+            reason: 'The registration for this device could not be removed.',
+          }));
           await supabase.auth.signOut();
           setBusy(false);
+          if (!removal.removed) {
+            Alert.alert('This handset may still receive alerts', removal.reason ?? '');
+          }
           router.replace('/sign-in');
         }}
         busy={busy}
