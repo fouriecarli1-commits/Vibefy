@@ -263,7 +263,48 @@ async function findingsFor(client: PoolClient, assessmentId: string): Promise<Co
 }
 
 function toSnapshot(row: AssessmentRow, findings: ComparableFinding[]): AssessmentSnapshot {
-  const dimensions: ComparableDimension[] = (row.dimension_scores ?? []).map((entry) => ({
+  /*
+   * A score nobody computed is not a zero.
+   *
+   * `overall_score` was read as `Number(row.overall_score ?? 0)`, which is the
+   * same defect `packages/report/src/assemble.ts` was corrected for on the same
+   * column. Measured on 2026-10-09 by calling `recordDriftFor` on an unscored
+   * assessment with a scored one behind it: a drift report naming a material
+   * regression, with two published reasons — "The overall score fell by 85.0
+   * points, from 85.0 to 0.0" and "The overall score fell below the
+   * certification threshold of 70, to 0.0" — and, with a badge present,
+   * `suspendBadge` true, so the customer's mark comes down and they are told in
+   * writing that their score fell eighty-five points.
+   *
+   * `sweepDriftDetection` filters `a.overall_score is not null`, so nothing
+   * reaches this today. That is the problem: the rule lives in one caller's SQL
+   * and the function using the number has no opinion, while both functions that
+   * build a snapshot are exported. The next caller inherits a guard it cannot
+   * see. The same argument this codebase makes about rules that live only in
+   * `apps/web` — enforcement belongs where the value is used.
+   *
+   * Throwing rather than returning null: every caller already handles a null as
+   * "nothing to compare", which would turn a scoring fault into silence. The
+   * sweep's own catch records it as a drift detection that failed, which is what
+   * it is.
+   */
+  if (row.overall_score === null || row.overall_score === undefined) {
+    throw new Error(
+      `Assessment ${row.id} has no overall score, so there is nothing to compare it against. ` +
+        'A score that was never computed is not a zero.',
+    );
+  }
+  // The same rule for the dimensions. An assessment with a score always has
+  // six of them — `persistOutcome` writes them in the same statement — so a
+  // null here is a scoring fault too, and reading it as an empty array means
+  // the dimension-floor rule silently cannot fire.
+  if (row.dimension_scores === null || row.dimension_scores === undefined) {
+    throw new Error(
+      `Assessment ${row.id} has an overall score and no dimension scores, so the dimension ` +
+        'floors cannot be checked. That is a scoring fault, not a comparison with no findings.',
+    );
+  }
+  const dimensions: ComparableDimension[] = row.dimension_scores.map((entry) => ({
     dimension: entry.dimension as ComparableDimension['dimension'],
     score: Number(entry.score),
   }));
@@ -271,7 +312,7 @@ function toSnapshot(row: AssessmentRow, findings: ComparableFinding[]): Assessme
     assessmentId: row.id,
     assessedAt: new Date(row.assessed_at),
     rubricVersion: row.rubric_version,
-    overallScore: Number(row.overall_score ?? 0),
+    overallScore: Number(row.overall_score),
     certificationEligible: row.certification_eligible,
     dimensions,
     findings,
