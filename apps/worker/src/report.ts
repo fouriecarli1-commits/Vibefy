@@ -269,6 +269,19 @@ export async function generateReport(
 export const REPORT_RENDER_ATTEMPTS = 3;
 const renderFailures = new Map<string, number>();
 
+/**
+ * Audit actions for a report the sweep could not produce.
+ *
+ * The attempts cap stays in memory on purpose — a restart often follows the
+ * deploy that fixes the bug, and the sweep should try again. What was missing is
+ * a record that outlives the process. Measured on 2026-10-09: after three
+ * failures the assessment sits at `approved` with no row in `public.reports`,
+ * `audit_log` empty, and the fact held in a `Map`. The sweep's own log line says
+ * "each needs a person", and nothing told a person.
+ */
+const RENDER_ABANDONED = 'report.render_abandoned';
+const RENDER_RECOVERED = 'report.render_recovered';
+
 /** Forgets the failure counts. Exported for tests, which share one process. */
 export function resetReportFailureCounts(): void {
   renderFailures.clear();
@@ -333,6 +346,37 @@ export async function sweepPendingReports(
         renderFailures.delete(row.id);
         generated += 1;
         log('report generated', { assessmentId: row.id, tier: plan.entitlement.reportTier });
+        // If this one had been given up on before, say so. The audit log is
+        // append-only, so an abandonment cannot be marked resolved; a second
+        // row is what takes it off the list of customers still waiting.
+        await client
+          .query(
+            `insert into public.audit_log
+               (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+             select $1, null, 'system', $2, 'assessment', $3, $4
+              where exists (
+                select 1 from public.audit_log l
+                 where l.action = $5 and l.entity_id = $3
+              )
+                and not exists (
+                  select 1 from public.audit_log l
+                   where l.action = $2 and l.entity_id = $3
+                )`,
+            [
+              row.organisation_id,
+              RENDER_RECOVERED,
+              row.id,
+              'A report the sweep had given up rendering has now been produced. The customer was ' +
+                'waiting for it from the moment their assessment was approved.',
+              RENDER_ABANDONED,
+            ],
+          )
+          .catch((error: unknown) => {
+            log('report recovery not recorded', {
+              assessmentId: row.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
       } catch (error) {
         // One bad assessment must not stop the others.
         const failures = (renderFailures.get(row.id) ?? 0) + 1;
@@ -351,6 +395,46 @@ export async function sweepPendingReports(
             attempts: failures,
             consequence: 'it no longer takes a slot in the sweep window',
           });
+          /*
+           * And a record that outlives the process.
+           *
+           * The line above, and the count behind it, are the only places this
+           * ever existed: `renderFailures` is a module-level `Map`, so a deploy
+           * forgets which assessments were given up on, and nothing else
+           * records it at all. Meanwhile the assessment sits at `approved` with
+           * no row in `public.reports` — which is indistinguishable, to anyone
+           * reading the database, from one whose report is about to be rendered
+           * on the next sweep. A customer paid for that report.
+           *
+           * One row per assessment: the sweep reaches this branch once per
+           * process, but a restart brings it back here, and three lines a day
+           * about the same assessment is not a clearer account than one.
+           */
+          await client
+            .query(
+              `insert into public.audit_log
+                 (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+               select $1, null, 'system', $2, 'assessment', $3, $4
+                where not exists (
+                  select 1 from public.audit_log l
+                   where l.action = $2 and l.entity_id = $3
+                )`,
+              [
+                row.organisation_id,
+                RENDER_ABANDONED,
+                row.id,
+                `The report for this approved assessment could not be rendered after ` +
+                  `${REPORT_RENDER_ATTEMPTS} attempts, so the sweep stopped trying until the ` +
+                  `worker restarts. The customer has an approved assessment and no report. Last ` +
+                  `error: ${error instanceof Error ? error.message : String(error)}`,
+              ],
+            )
+            .catch((writeError: unknown) => {
+              log('abandoned report not recorded', {
+                assessmentId: row.id,
+                error: writeError instanceof Error ? writeError.message : String(writeError),
+              });
+            });
         }
       }
     }
