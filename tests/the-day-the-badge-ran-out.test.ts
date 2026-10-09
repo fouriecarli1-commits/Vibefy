@@ -128,6 +128,28 @@ describe('a badge that reached its date', () => {
     const late = await alertsFor(badgeId);
     expect(late).toHaveLength(2);
     expect(late[1]!.severity).toBe('warning');
+
+    /*
+     * And the anchor the `not.toContain` above needs.
+     *
+     * On its own that assertion passes when nothing whatever is pending —
+     * which is also what a broken query, a suppressed address or an empty
+     * window would produce. It only means "the info one is filtered out" if a
+     * warning one, raised about the same badge in the same test, is carried.
+     */
+    const second = await pool.connect();
+    try {
+      const pending = await findPendingEmails(second);
+      const warning = (
+        await db.query<{ id: string }>(
+          `select id from public.alerts where badge_id = $1 and severity = 'warning'`,
+          [badgeId],
+        )
+      ).rows[0]!.id;
+      expect(pending.map((row) => row.alert_id)).toContain(warning);
+    } finally {
+      second.release();
+    }
   }, 60_000);
 
   it('is told on the day it happens, which it was not', async () => {

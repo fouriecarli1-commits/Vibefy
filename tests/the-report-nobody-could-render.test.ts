@@ -178,6 +178,15 @@ describe('what it leaves alone', () => {
     const storage = new LocalReportStorage(mkdtempSync(join(tmpdir(), 'vibefy-reports-')));
     await sweepPendingReports(pool, storage, () => undefined);
 
+    // Anchored first. Without this the test passes when the render silently
+    // failed once, because `report.render_abandoned` needs three attempts —
+    // and the absence below would then be evidence of the opposite of what it
+    // claims.
+    const reports = await db.query(`select id from public.reports where assessment_id = $1`, [
+      assessmentId,
+    ]);
+    expect(reports.rowCount).toBeGreaterThan(0);
+
     expect(await auditFor(assessmentId, 'report.render_abandoned')).toHaveLength(0);
     // And no recovery row either: there was nothing to recover from, and a row
     // saying a customer was kept waiting when they were not is its own untruth.

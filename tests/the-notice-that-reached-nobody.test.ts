@@ -193,10 +193,35 @@ describe('a critical notice that could not be delivered', () => {
 
 describe('what it leaves alone', () => {
   let account: SeededAccount;
+  let control: string;
 
   beforeAll(async () => {
     account = await seedAccount(db, 'notice-quiet');
+    /*
+     * A control, in the same block as the three that must not be recorded.
+     *
+     * Without it a sweep that did nothing at all — threw, found no rows, was
+     * handed the wrong pool — makes every assertion below pass, and each one
+     * becomes evidence of the opposite of what it claims. This is the third
+     * absence assertion tonight to need anchoring, and the only reason the
+     * other two were found is that mutation went looking.
+     */
+    control = await raise(account, null, {
+      kind: 'badge_suspended',
+      severity: 'critical',
+      key: 'quiet-control',
+    });
+    await db.query(
+      `insert into public.email_suppressions (email, reason, kind)
+       values ($1, 'mailbox does not exist', 'hard_bounce')`,
+      [account.email],
+    );
   });
+
+  it('records the one that really did reach nobody', async () => {
+    await sweepUndeliveredNotices(pool, () => undefined);
+    expect(await recordedFor(control)).toHaveLength(1);
+  }, 60_000);
 
   it('says nothing about an alert that was delivered', async () => {
     const id = await raise(account, null, {
