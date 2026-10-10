@@ -184,8 +184,8 @@ describe('the criteria each pass claims to answer', () => {
     const source = readFileSync(join(import.meta.dirname, '..', path), 'utf8')
       // Comments quote rule ids while explaining them, and this file is one of
       // the reasons they do. Strip them before reading the code.
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/[^\n]*/g, '');
+      .replace(/(^|\s)\/\/.*$/gm, '$1')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
     return [
       ...new Set(
         [...source.matchAll(/ruleId: '([A-Z]+-\d+)'/g)].map((match) => match[1] as string),

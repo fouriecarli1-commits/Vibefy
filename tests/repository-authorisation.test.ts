@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import type { Client } from 'pg';
 import { connect } from './setup/client.ts';
 import { seedAccount, seedApp, seedAuthorisation, type SeededAccount } from './setup/seed.ts';
+import { withoutComments } from './setup/source.ts';
 
 let db: Client;
 let owner: SeededAccount;
@@ -169,10 +170,3 @@ describe('what the code does with it', () => {
  * comments go first, so a line comment containing a star followed by a slash
  * cannot end a block early.
  */
-function withoutComments(source: string): string {
-  return source
-    .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
-    .join('\n')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-}

@@ -43,8 +43,8 @@ const SECRET = 'sk_test_paystack_secret';
  */
 const codeOf = (path: string) =>
   readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
 
 const provider = (fetchImpl?: typeof fetch) =>
   new PaystackProvider({

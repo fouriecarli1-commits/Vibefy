@@ -331,7 +331,7 @@ describe('the scan keeps up with the pages', () => {
   const scannedRoutesFrom = (source: string): string[] => {
     const block = /const PAGES = \[([\s\S]*?)\]/.exec(source);
     if (!block) throw new Error('a11y-scan no longer has a PAGES list');
-    const code = block[1]!.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const code = block[1]!.replace(/(^|\s)\/\/.*$/gm, '$1').replace(/\/\*[\s\S]*?\*\//g, '');
     return [...code.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
   };
 

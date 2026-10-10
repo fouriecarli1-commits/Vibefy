@@ -313,8 +313,8 @@ describe('the subprocess boundary', () => {
       'utf8',
     )
       // The comment beside it quotes the attack.
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/^[ \t]*\/\/.*$/gm, ' ');
+      .replace(/^[ \t]*\/\/.*$/gm, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ');
     const args = /'--recurse-submodules=no',[\s\S]{0,400}?path,/.exec(source)?.[0] ?? '';
     expect(args).toContain("'--',");
     expect(args.indexOf("'--',")).toBeLessThan(args.indexOf('url,'));

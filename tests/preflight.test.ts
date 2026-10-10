@@ -177,7 +177,7 @@ describe('what it must never be mistaken for', () => {
   it('has no score, and nowhere to put one', () => {
     // Asserted on the shape rather than on the prose, which talks about the
     // absence of a score and would match a search for the word.
-    const shape = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const shape = source.replace(/(^|\s)\/\/.*$/gm, '$1').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(shape).not.toMatch(/readonly\s+(score|percentage|percentile|band|rating)\b/i);
     expect(Object.keys(messy[0]!).sort()).toEqual(
       ['detail', 'evidence', 'fix', 'id', 'outcome', 'question'].sort(),
@@ -204,7 +204,7 @@ describe('what it must never be mistaken for', () => {
      * pasted is theirs, so anything beyond what a visitor's browser does is
      * testing a stranger's application without their say-so.
      */
-    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const code = source.replace(/(^|\s)\/\/.*$/gm, '$1').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(code.match(/fetchPublicPage\(/g) ?? []).toHaveLength(1);
     expect(code).not.toMatch(/['"`]\/\.(?:git|env)/);
     expect(code).not.toMatch(/robots\.txt|sitemap\.xml|\.map['"`]/);

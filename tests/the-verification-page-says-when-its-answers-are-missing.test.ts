@@ -27,8 +27,8 @@ import { describe, expect, it } from 'vitest';
 
 /** The code, without the comments — which quote the defect on purpose. */
 const source = readFileSync(join(process.cwd(), 'apps/web/app/a/[slug]/page.tsx'), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, ' ')
-  .replace(/^[ \t]*\/\/.*$/gm, ' ');
+  .replace(/^[ \t]*\/\/.*$/gm, ' ')
+  .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
 describe('the assurance load', () => {
   it('tells a failed read apart from a badge with nothing behind it', () => {

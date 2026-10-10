@@ -36,8 +36,8 @@ import { describe, expect, it } from 'vitest';
  */
 const source = (path: string) =>
   readFileSync(join(process.cwd(), path), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ');
+    .replace(/^[ \t]*\/\/.*$/gm, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
 const application = source('apps/mobile/app/application/[id].tsx');
 const report = source('apps/mobile/app/report/[assessmentId].tsx');

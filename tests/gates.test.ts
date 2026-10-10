@@ -19,6 +19,14 @@ import {
 } from '../tools/contrast-check.mts';
 
 describe('copy lint', () => {
+  it('has phrases to forbid, which the cases below are generated from', () => {
+    // Imported from `tools/copy-lint.mjs`. Empty it or rename the export and
+    // `it.each` registers nothing: no test fails, no test appears, and the
+    // rule that keeps "secure" and "guaranteed" out of everything we publish
+    // is verified by nothing.
+    expect(FORBIDDEN_PHRASES.length, 'no forbidden phrase is declared').toBeGreaterThan(4);
+  });
+
   it.each(FORBIDDEN_PHRASES)('rejects "%s"', (phrase) => {
     const violations = lintText(`Our badge means the app is ${phrase}.`);
     expect(violations.length).toBeGreaterThan(0);

@@ -1153,6 +1153,31 @@ positive here is correct behaviour: the public-views test anchors itself by
 asserting that every view it declares public is still found, which no regex for
 `toBeGreaterThan` will see. Read the block before changing it.
 
+### Stripping comments before asserting about code
+
+Twenty-five test files do it, because the comment above a rule necessarily
+names the thing the rule forbids. On 2026-10-10 they did it seven different
+ways, and two of those ways could hide the thing being looked for:
+
+- **Block comments stripped first** (sixteen files). A line comment containing
+  an opening sequence then runs to the next closing one and takes the code
+  between them with it. Three lines of commented-out history around a live
+  call and the assertion sees nothing.
+- **`//` matched anywhere on a line** (four files, in four identical copies of
+  the same local helper). `const url = 'https://x/y'` becomes `const url =
+'https:`, so a rule about what a line contains stops seeing the rest of any
+  line with a URL in it. One of those four guards "the service-role key must
+  never reach a public read" over a file whose whole subject is a Supabase
+  client.
+
+`tests/setup/source.ts` is the one `withoutComments` to use in new tests, with
+`tests/source-stripping.test.ts` holding both failing cases. Every chain in the
+suite has been reordered to line-first and the four URL-eating copies replaced.
+**The other twenty-one still have their own copy**, reordered but not migrated,
+and that is the next tidy-up: a twenty-three-site rewrite by regex produced
+four call sites that compiled and stripped the wrong thing, so it wants doing
+by hand and reading each diff.
+
 ### A positive control beats a count floor
 
 A floor says the population was big. A control says the query can still find

@@ -115,8 +115,8 @@ describe('ordering cannot be bought', () => {
     // The compile-time assertion in types.ts is the real guard. This checks the
     // other half: that the ranking module never mentions a commercial concept.
     const source = readFileSync(join(process.cwd(), 'packages/directory/src/rank.ts'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/(^|\s)\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
       .toLowerCase();
     for (const term of ['marketing', 'plan', 'price', 'sponsor', 'promoted', 'boost', 'featured']) {
       expect(source, `rank.ts must not reference "${term}"`).not.toMatch(

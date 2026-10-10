@@ -104,8 +104,8 @@ describe('both sign-in forms read the same answer', () => {
   /** The code, without the comments — which quote the defect on purpose. */
   const source = (path: string) =>
     readFileSync(join(process.cwd(), path), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/^[ \t]*\/\/.*$/gm, ' ');
+      .replace(/^[ \t]*\/\/.*$/gm, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
   for (const path of ['apps/web/components/auth-form.tsx', 'apps/mobile/app/sign-in.tsx']) {
     it(`${path} does not call the lookup itself`, () => {

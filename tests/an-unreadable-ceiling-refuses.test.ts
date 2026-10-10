@@ -42,7 +42,7 @@ const route = readFileSync(join(process.cwd(), 'apps/web/app/api/copilot/route.t
  * Because the comment explaining this defect quotes the defect, and a test that
  * reads source has to be able to tell an explanation from the thing explained.
  */
-const code = route.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+const code = route.replace(/^[ \t]*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('the spend read', () => {
   it('does not turn a failure into a spend of nothing', () => {

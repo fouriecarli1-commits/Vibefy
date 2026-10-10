@@ -152,13 +152,29 @@ describe('the scoring module cannot see money', () => {
     (file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'types.ts',
   );
 
+  it('found the scoring files, or the cases below are no cases at all', () => {
+    /*
+     * `it.each([])` registers nothing and the file still reports as passing.
+     * A directory rename, or a move to another suffix, would leave the
+     * strongest commercial guarantee in the product — that the thing which
+     * computes a score cannot see what anybody paid — checking no files, with
+     * no test failing and no test appearing.
+     */
+    expect(scoringFiles.length, 'no scoring source was read').toBeGreaterThan(2);
+    expect(scoringFiles).toContain('rubric.ts');
+  });
+
   it.each(scoringFiles)('%s contains no commercial concept', (file) => {
     const source = readFileSync(join(scoringDir, file), 'utf8');
     // Strip comments: the guarantee is about what the code does, and the
     // comments necessarily discuss what it must not do.
+    // Line comments before block comments. The other order lets a line
+    // comment containing an opening sequence run to the next closing one and
+    // take the code between them with it, which is how a reference to a
+    // forbidden concept would hide.
     const code = source
-      .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/(^|\s)\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
       .toLowerCase();
     for (const term of forbidden) {
       expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
@@ -201,8 +217,8 @@ describe('what suspends a badge cannot see money either', () => {
   it.each(verdictFiles)('%s contains no commercial concept', (file) => {
     const source = readFileSync(join(monitoringDir, file), 'utf8');
     const code = source
-      .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/(^|\s)\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
       .toLowerCase();
     for (const term of forbidden) {
       expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));

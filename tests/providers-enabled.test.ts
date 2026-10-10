@@ -51,6 +51,10 @@ describe('asking Supabase what is enabled', () => {
     expect(providers.unavailable).toBeNull();
   });
 
+  it('has providers to offer, or the cases below are none', () => {
+    expect(SOCIAL_PROVIDERS.length, 'no social provider is declared').toBeGreaterThan(1);
+  });
+
   it.each(SOCIAL_PROVIDERS.map((provider) => provider.id))('can offer %s', async (id) => {
     // Every one of the nine, because a provider in the catalogue that the
     // discovery cannot report is a button that never appears however it is

@@ -20,15 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { whyTheDatabaseRefused } from '../apps/web/lib/connection-string.ts';
-
-/** Line comments out, then block comments, so a prose mention cannot match. */
-function withoutComments(source: string): string {
-  return source
-    .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
-    .join('\n')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-}
+import { withoutComments } from './setup/source.ts';
 
 const sql = withoutComments(readFileSync('apps/web/lib/sql.ts', 'utf8'));
 

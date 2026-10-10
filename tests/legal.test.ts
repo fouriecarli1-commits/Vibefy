@@ -129,6 +129,13 @@ interface RegistryEntry {
 }
 
 describe('the drafts do not over-claim', () => {
+  it('has documents in the registry, or the cases below are none', () => {
+    // `buildRegistry()` reads the filesystem. If it ever returns nothing,
+    // `it.each` registers nothing and the whole legal corpus goes unchecked
+    // with a green file.
+    expect(Object.keys(registry.documents).length, 'the registry is empty').toBeGreaterThan(8);
+  });
+
   it.each(Object.keys(registry.documents))('%s passes the copy lint', (file) => {
     expect(lintText(read(file), `legal/${file}`)).toEqual([]);
   });

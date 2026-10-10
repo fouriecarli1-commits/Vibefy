@@ -27,8 +27,8 @@ const source = readFileSync(
   join(process.cwd(), 'apps/mobile/app/report/[assessmentId].tsx'),
   'utf8',
 )
-  .replace(/\/\*[\s\S]*?\*\//g, ' ')
-  .replace(/^[ \t]*\/\/.*$/gm, ' ');
+  .replace(/^[ \t]*\/\/.*$/gm, ' ')
+  .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
 describe('the report on a phone', () => {
   it('reads what the run could not answer', () => {

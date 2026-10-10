@@ -35,8 +35,8 @@ import { describe, expect, it } from 'vitest';
 
 /** The code, without comments — which quote the defect on purpose. */
 const page = readFileSync(join(import.meta.dirname, '..', 'apps/web/app/verify/page.tsx'), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, ' ')
-  .replace(/^[ \t]*\/\/.*$/gm, ' ');
+  .replace(/^[ \t]*\/\/.*$/gm, ' ')
+  .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
 describe('a read that failed', () => {
   it('is not turned into null', () => {

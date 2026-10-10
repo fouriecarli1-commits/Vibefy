@@ -49,8 +49,8 @@ describe('a lookup that failed for some other reason', () => {
     join(import.meta.dirname, '..', 'packages/engine/src/authorisation/ownership.ts'),
     'utf8',
   )
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ');
+    .replace(/^[ \t]*\/\/.*$/gm, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
   it('is not caught into an empty list', () => {
     expect(source).not.toMatch(/lookup\([^)]*\)\s*\.catch/);

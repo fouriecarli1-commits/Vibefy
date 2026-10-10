@@ -40,8 +40,8 @@ const source = readFileSync(
 )
   // The comments quote both defects verbatim while explaining them, as the ones
   // above show. Every source-text rule in this suite strips them first.
-  .replace(/\/\*[\s\S]*?\*\//g, ' ')
-  .replace(/^[ \t]*\/\/.*$/gm, ' ');
+  .replace(/^[ \t]*\/\/.*$/gm, ' ')
+  .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
 describe('a read that failed', () => {
   it('never catches into an empty list', () => {

@@ -22,15 +22,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-
-/** Line comments out, then block comments, so prose cannot match. */
-function withoutComments(source: string): string {
-  return source
-    .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
-    .join('\n')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-}
+import { withoutComments } from './setup/source.ts';
 
 const lookup = withoutComments(readFileSync('apps/web/lib/badge-verification.ts', 'utf8'));
 const verify = withoutComments(readFileSync('apps/web/app/verify/page.tsx', 'utf8'));

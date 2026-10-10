@@ -20,15 +20,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { forgetWhatWasSaid, sayItAgain } from '../apps/web/lib/said-recently.ts';
-
-/** Line comments out, then block comments, so prose cannot match. */
-function withoutComments(source: string): string {
-  return source
-    .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
-    .join('\n')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-}
+import { withoutComments } from './setup/source.ts';
 
 beforeEach(() => {
   forgetWhatWasSaid();

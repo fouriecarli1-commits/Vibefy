@@ -51,8 +51,8 @@ const ids = (input: TriageInput) => triageAssessment(input).attention.map((entry
 /** The code of a page, without comments — which quote the defect on purpose. */
 const pageSource = (path: string) =>
   readFileSync(join(import.meta.dirname, '..', path), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ');
+    .replace(/^[ \t]*\/\/.*$/gm, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
 describe('the rule itself, which always worked', () => {
   it('fires on a large move', () => {

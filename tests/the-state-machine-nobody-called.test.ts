@@ -84,8 +84,8 @@ describe('the action that resolves a request', () => {
     join(import.meta.dirname, '..', 'apps/web/app/console/privacy/actions.ts'),
     'utf8',
   )
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ');
+    .replace(/^[ \t]*\/\/.*$/gm, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
   it('constrains the update by the status the row is in', () => {
     expect(source).toMatch(/statusesThatMayBecome\(/);
