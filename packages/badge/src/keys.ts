@@ -121,16 +121,98 @@ export function buildKeySet(active: SigningKey | null, retired: readonly PublicJ
   return { keys };
 }
 
+/**
+ * The public half of a JWK, built field by field.
+ *
+ * Never a copy of what came in. `toJwk` has always constructed the active
+ * key's JWK from an explicit list for this reason, and the retired keys had no
+ * such protection: `JSON.parse(raw) as PublicJwk[]` is a cast, not a check, so
+ * whatever JSON sat in the environment variable was published verbatim at a
+ * public, cacheable, cross-origin URL.
+ *
+ * Measured on 2026-10-10: an entry carrying `d` — the Ed25519 private scalar —
+ * was served in the key set exactly as pasted. Retiring a key means pasting
+ * JSON into that variable, and the natural thing to paste is the JWK you have,
+ * which for a key you generated yourself includes `d`. Anybody reading the
+ * published set could then sign a badge with our key id, saying anything they
+ * liked. There is no worse outcome available to a product whose only asset is
+ * being believed.
+ *
+ * So the public fields are copied out and nothing else travels, whatever
+ * arrives. A private component cannot be published by this function even if
+ * somebody pastes one.
+ */
+export function publicPartOf(candidate: unknown): {
+  jwk: PublicJwk | null;
+  carriedPrivate: boolean;
+} {
+  if (typeof candidate !== 'object' || candidate === null)
+    return { jwk: null, carriedPrivate: false };
+  const source = candidate as Record<string, unknown>;
+  const carriedPrivate = typeof source.d === 'string' && source.d.length > 0;
+  const usable =
+    source.kty === 'OKP' &&
+    source.crv === 'Ed25519' &&
+    typeof source.x === 'string' &&
+    source.x.length > 0 &&
+    typeof source.kid === 'string' &&
+    source.kid.length > 0;
+  if (!usable) return { jwk: null, carriedPrivate };
+  return {
+    jwk: {
+      kty: 'OKP',
+      crv: 'Ed25519',
+      x: source.x as string,
+      kid: source.kid as string,
+      use: 'sig',
+      alg: 'EdDSA',
+    },
+    carriedPrivate,
+  };
+}
+
+export interface RetiredKeys {
+  readonly keys: PublicJwk[];
+  /**
+   * Entries that arrived carrying a private component, by key id.
+   *
+   * Stripped rather than refused: refusing would publish no key set at all and
+   * make every badge ever signed unverifiable, which is worse than the
+   * stripping and does not undo the exposure. Returned rather than logged here
+   * so the route can say it — and it has to be said, because a private key
+   * that reached a public environment variable must be treated as compromised
+   * and rotated, which no amount of stripping achieves.
+   */
+  readonly carriedPrivate: string[];
+  /** Entries that are not an Ed25519 public key, and were left out. */
+  readonly unusable: number;
+}
+
 /** Retired public keys, published alongside the active one. */
-export function loadRetiredKeys(env: NodeJS.ProcessEnv = process.env): PublicJwk[] {
+export function loadRetiredKeys(env: NodeJS.ProcessEnv = process.env): RetiredKeys {
   const raw = env.VIBEFYCODE_BADGE_RETIRED_KEYS;
-  if (!raw) return [];
+  if (!raw) return { keys: [], carriedPrivate: [], unusable: 0 };
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw) as PublicJwk[];
-    return Array.isArray(parsed) ? parsed : [];
+    parsed = JSON.parse(raw);
   } catch {
     throw new KeyError(
       'VIBEFYCODE_BADGE_RETIRED_KEYS is not valid JSON. Refusing to publish an incomplete key set.',
     );
   }
+  if (!Array.isArray(parsed)) return { keys: [], carriedPrivate: [], unusable: 0 };
+
+  const keys: PublicJwk[] = [];
+  const carriedPrivate: string[] = [];
+  let unusable = 0;
+  for (const candidate of parsed) {
+    const { jwk, carriedPrivate: hadPrivate } = publicPartOf(candidate);
+    if (hadPrivate) {
+      const named = (candidate as Record<string, unknown>).kid;
+      carriedPrivate.push(typeof named === 'string' ? named : '(unnamed)');
+    }
+    if (jwk) keys.push(jwk);
+    else unusable += 1;
+  }
+  return { keys, carriedPrivate, unusable };
 }

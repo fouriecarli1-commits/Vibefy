@@ -32,7 +32,7 @@ export default async function VerifyPage({
   const result = record
     ? verifyBadge(
         { payload: record.payload, signature: record.signature },
-        buildKeySet(loadSigningKey(), loadRetiredKeys()),
+        buildKeySet(loadSigningKey(), loadRetiredKeys().keys),
       )
     : null;
 
