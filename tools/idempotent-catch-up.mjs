@@ -190,8 +190,11 @@ for (const file of files) {
 
 /*
  * The documented invocation is `… > catch-up.sql`, so the header lands in the
- * file and not on his screen. The one number worth checking against the
- * eighteen in `docs/sql/OUTSTANDING.sql` goes to the other stream.
+ * file and not on his screen. The one number worth checking against the count
+ * in the first line of `docs/sql/OUTSTANDING.sql` goes to the other stream.
+ * Not "the eighteen", which is what this said: a comment naming a count that
+ * grows with the next migration is a comment that will be wrong and will be
+ * believed.
  */
 console.error(
   `\n✓ ${files.length} migration(s), from ${all.find((name) => name >= from)} onward.\n`,

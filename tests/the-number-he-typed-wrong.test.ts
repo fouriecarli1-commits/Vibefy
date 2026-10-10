@@ -119,7 +119,18 @@ describe('what the run tells the person who started it', () => {
     const first = migrations.find((name) => name.startsWith('20260923110000'))!;
     const result = run(first);
     expect(result.stderr).toContain(first);
-    expect(result.stderr).toMatch(/\b18\b/);
+    /*
+     * Counted from the migrations on disk rather than written here.
+     *
+     * This said `18`, which was true on the day and became false the moment a
+     * nineteenth migration was added — a hand-kept number in a test about a
+     * tool that exists because a hand-kept number went wrong. The count the
+     * tool prints is the one he reads to know how many blocks to expect, so
+     * what matters is that it matches what is outstanding, not what it was.
+     */
+    const outstanding = migrations.filter((name) => name >= first).length;
+    expect(outstanding).toBeGreaterThan(1);
+    expect(result.stderr).toMatch(new RegExp(`\\b${outstanding}\\b`));
   });
 
   it('names the starting migration in the header without the .sql it never had', () => {

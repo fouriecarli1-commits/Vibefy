@@ -32,8 +32,11 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const rows = await readAsAnon(async (client) => {
     const { rows: found } = await client.query<BadgeRow>(
+      // `owner_is_marketing_client` was added to this view on 2026-10-10 for
+      // the same reason it is read on the status endpoint: the label the
+      // independence policy promises wherever a rating appears.
       `select public_id, slug, status, app_name, certified_origin,
-              rubric_version, assessed_at, expires_at
+              rubric_version, assessed_at, expires_at, owner_is_marketing_client
          from public.listed_badges
         order by public_id`,
     );

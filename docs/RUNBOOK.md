@@ -1435,14 +1435,17 @@ $PG/pg_dump -h "$SOCK" -U postgres --schema-only --no-owner -d vibefycode_test \
 diff /tmp/after.sql /tmp/scratch.sql && echo identical
 ```
 
-Do not pass `--no-acl` to those dumps. Seven of the eighteen blocks exist to
+Do not pass `--no-acl` to those dumps. Seven of the outstanding blocks exist to
 revoke a privilege, so a comparison that excludes grants excludes the thing
 being tested — which a first run of this did, and it came back clean for the
 wrong reason.
 
-Measured on 2026-10-10: the audit named eighteen before and nothing after, every
-block applied with `ON_ERROR_STOP=1` set, and the two dumps differed by zero
-lines. Also worth knowing: regenerate the audit before using it. A stale
+Measured on 2026-10-10 against the eighteen blocks outstanding that morning,
+and re-run the same day when a nineteenth was added: the audit named every
+outstanding block before and nothing after, each applied with `ON_ERROR_STOP=1`
+set, and the two dumps differed by zero lines. Re-run it rather than trusting
+the measurement — the count is whatever the first line of the document says
+today. Also worth knowing: regenerate the audit before using it. A stale
 `audit.sql` from earlier in the same session reported two migrations missing
 from a database that had them, which is the defect the markers had just been
 fixed for.

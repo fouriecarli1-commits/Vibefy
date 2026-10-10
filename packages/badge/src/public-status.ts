@@ -44,7 +44,38 @@ export interface PublicBadgeStatus {
   /** Said in the payload, because this is the field people act on. */
   readonly meaning: string;
   readonly limits: string;
+  /**
+   * The paid-relationship disclosure, or null where there is none to make.
+   *
+   * Section 5 of the published independence policy: a customer who has bought
+   * marketing services from us is labelled as such "wherever their rating
+   * appears". The verification page and the directory label it. This surface
+   * and the list below — the two built because the signed payload is awkward
+   * to use, and the two a marketplace is told to use — said nothing, so our
+   * mark could appear beside a paying client's listing with no disclosure
+   * anywhere in what the integrator received.
+   *
+   * A sentence rather than only the boolean, for the same reason `meaning` and
+   * `limits` are sentences: whoever renders this should not have to invent the
+   * wording of a disclosure, and most will render what we hand them.
+   */
+  readonly paidRelationship: string | null;
 }
+
+/**
+ * What we say when the owner has bought marketing services from us.
+ *
+ * It says what the relationship is and what it cannot touch, because a
+ * disclosure that only says "this customer pays us" invites the reader to
+ * assume the obvious thing, and the scoring code is closed against exactly
+ * that: `scoreAssessment` takes one argument and cannot see a plan, a price or
+ * a relationship.
+ */
+export const PAID_RELATIONSHIP_DISCLOSURE =
+  'The owner of this application has purchased marketing services from VibefyCode. ' +
+  'Assessment and scoring are produced by a closed function that is given no plan, price ' +
+  'or commercial relationship, and our published methodology says what that means; this ' +
+  'label is here so you can weigh it yourself rather than find out later.';
 
 /** A row as the public badge view hands it over. */
 export interface BadgeRow {
@@ -56,6 +87,17 @@ export interface BadgeRow {
   readonly rubric_version: string;
   readonly assessed_at: string | Date;
   readonly expires_at: string | Date | null;
+  /**
+   * Optional on the type, never absent in production.
+   *
+   * `badge_verification` has carried it since the badges migration;
+   * `listed_badges` gained it on 2026-10-10. Optional rather than required
+   * because a row is also built in tests and by callers selecting fewer
+   * columns, and the builders below treat an absent value the way the policy
+   * does: a disclosure is made when we know there is one to make, and a
+   * missing column is not a statement that there is none.
+   */
+  readonly owner_is_marketing_client?: boolean | null;
 }
 
 const STATE_BY_STATUS: Readonly<Record<string, PublicBadgeState>> = {
@@ -98,6 +140,7 @@ export function badgeStatus(row: BadgeRow, verifyOrigin: string): PublicBadgeSta
     verificationPage: `${verifyOrigin.replace(/\/+$/, '')}/a/${row.slug}`,
     meaning: BADGE_MEANING,
     limits: BADGE_LIMITS,
+    paidRelationship: row.owner_is_marketing_client ? PAID_RELATIONSHIP_DISCLOSURE : null,
   };
 }
 
@@ -108,6 +151,8 @@ export interface LiveBadgeEntry {
   readonly assessedOn: string;
   readonly expiresOn: string | null;
   readonly verificationPage: string;
+  /** The same disclosure, per entry. See `PublicBadgeStatus`. */
+  readonly paidRelationship: string | null;
 }
 
 export interface LiveBadgeList {
@@ -145,6 +190,7 @@ export function liveBadgeList(
       assessedOn: asDate(row.assessed_at),
       expiresOn: row.expires_at === null ? null : asDate(row.expires_at),
       verificationPage: `${verifyOrigin.replace(/\/+$/, '')}/a/${row.slug}`,
+      paidRelationship: row.owner_is_marketing_client ? PAID_RELATIONSHIP_DISCLOSURE : null,
     })),
     meaning: BADGE_MEANING,
     limits: BADGE_LIMITS,

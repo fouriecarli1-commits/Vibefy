@@ -32,8 +32,11 @@ export async function GET(
 
   const row = await readAsAnon(async (client) => {
     const { rows } = await client.query<BadgeRow>(
+      // `owner_is_marketing_client` because the independence policy promises
+      // the paid-relationship label wherever a rating appears, and this is one
+      // of the two surfaces a marketplace is told to use.
       `select public_id, slug, status, app_name, certified_origin,
-              rubric_version, assessed_at, expires_at
+              rubric_version, assessed_at, expires_at, owner_is_marketing_client
          from public.badge_verification where public_id = $1`,
       [publicId],
     );
