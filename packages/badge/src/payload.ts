@@ -51,7 +51,15 @@ export interface BadgePayload {
 
 export class PayloadError extends Error {}
 
-const REQUIRED_KEYS = [
+/**
+ * The signed keys, in the order they are serialised in.
+ *
+ * Exported because `/api/badge/[publicId]` publishes this order to anybody who
+ * wants to verify a badge offline, and a published instruction that does not
+ * match the implementation makes a genuine badge look forged. The order is
+ * named once and the sentence is built from it.
+ */
+export const SIGNED_KEYS = [
   'v',
   'kid',
   'badgeId',
@@ -65,6 +73,8 @@ const REQUIRED_KEYS = [
   'expiresAt',
   'ownerIsMarketingClient',
 ] as const;
+
+const REQUIRED_KEYS = SIGNED_KEYS;
 
 /**
  * The exact bytes that get signed.

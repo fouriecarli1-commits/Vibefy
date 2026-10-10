@@ -563,9 +563,16 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
         </h2>
         <p className="max-w-prose text-muted">
           You do not have to take our word for it. The payload below is signed with Ed25519, and the
-          public key is published at{' '}
-          <code>{`${verifyOrigin}/.well-known/vibefycode-badge-key`}</code>. Any JOSE library can
-          verify it without contacting us.
+          public key is published as a JWK at{' '}
+          <code>{`${verifyOrigin}/.well-known/vibefycode-badge-key`}</code>. Any library that can
+          import that key and check an Ed25519 signature will do it, without contacting us.
+        </p>
+        <p className="max-w-prose text-sm text-muted">
+          There is no JWT here and no algorithm to negotiate: the signature is over the payload
+          written out in one exact way, and <code>/api/badge/{badge.public_id}</code> returns that
+          payload together with the rule for rebuilding those bytes. Follow the rule rather than
+          re-encoding the JSON yourself, or the signature will not match a payload that is perfectly
+          genuine.
         </p>
         <p className="max-w-prose text-sm text-muted">
           One thing that signature does <strong>not</strong> tell you: whether the badge is still

@@ -58,8 +58,26 @@ describe('canonicalisation', () => {
     expect(canonicalise(shuffled)).toBe(a);
   });
 
-  it('treats 82 and 82.0 as the same score, so one assessment has one signature', () => {
-    expect(canonicalise(payload({ score: 82 }))).toBe(canonicalise(payload({ score: 82.0 })));
+  it('rounds a score to one decimal, so one assessment has one signature', () => {
+    /*
+     * This read `canonicalise(payload({ score: 82 }))` against
+     * `canonicalise(payload({ score: 82.0 }))`, which in JavaScript is the
+     * same literal twice — a tautology under a name that described real
+     * behaviour. The behaviour is the rounding, so the inputs have to differ
+     * by less than a tenth.
+     */
+    expect(canonicalise(payload({ score: 82 }))).toBe(canonicalise(payload({ score: 82.04 })));
+    expect(canonicalise(payload({ score: 82 }))).not.toBe(canonicalise(payload({ score: 82.4 })));
+  });
+
+  it('writes a whole score as a whole number, which is what a verifier has to copy', () => {
+    // The published instruction at /api/badge/[publicId] tells a third party
+    // how to rebuild these bytes. It said "score fixed to one decimal place",
+    // and anybody who wrote 82.0 got different bytes and a genuine badge that
+    // would not verify.
+    expect(canonicalise(payload({ score: 82 }))).toContain('"score":82,');
+    expect(canonicalise(payload({ score: 82 }))).not.toContain('82.0');
+    expect(canonicalise(payload({ score: 82.5 }))).toContain('"score":82.5,');
   });
 
   it('refuses to sign a payload with an unexpected field', () => {

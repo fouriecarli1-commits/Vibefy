@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { SIGNED_KEYS } from '@vibefycode/badge';
 import { readAsAnon } from '@/lib/sql';
 
 /**
@@ -50,8 +51,21 @@ export async function GET(
       signature: badge.signature,
       algorithm: 'EdDSA (Ed25519)',
       keySet: `${verifyOrigin.replace(/\/+$/, '')}/.well-known/vibefycode-badge-key`,
+      /*
+       * The instruction a third party follows, built from the key order it
+       * describes rather than retyped beside it.
+       *
+       * It used to end "score fixed to one decimal place", which is what the
+       * implementation does to the *number* and not what it writes. The score
+       * is rounded to one decimal and then serialised as a JSON number, so 82
+       * is `82` — a verifier who read that sentence literally and wrote `82.0`
+       * computed different bytes and concluded a genuine badge was forged.
+       * Scores are usually whole numbers, so that was most of them.
+       */
       canonicalisation:
-        'Sign and verify over the payload serialised with its keys in this exact order: v, kid, badgeId, slug, appName, certifiedOrigin, rubricVersion, score, assessedOn, issuedAt, expiresAt, ownerIsMarketingClient — no whitespace, score fixed to one decimal place.',
+        `Sign and verify over the payload serialised with its keys in this exact order: ${SIGNED_KEYS.join(', ')}. ` +
+        'No whitespace. Each value is written as JSON writes it, and the score is rounded to one ' +
+        'decimal first — so a score of 82 is "score":82, not "score":82.0, and 82.5 is "score":82.5.',
       currentStatus: badge.status,
       verificationPage: `${verifyOrigin.replace(/\/+$/, '')}/a/${badge.slug}`,
       signatureAttests:
