@@ -87,6 +87,52 @@ export function screeningRefusal(status: unknown, appId: string): string | null 
   return `App ${appId} has screening status ${JSON.stringify(status)}, which is not "cleared". Only a cleared application is assessed, so this one is not.`;
 }
 
+/**
+ * The columns of `public.apps` this job turns into a decision, and what each
+ * absence would decide instead.
+ *
+ * The query is `select a.*`, so these arrive by being columns rather than by
+ * being asked for, and every one is then read with a default or a `typeof`
+ * check. A default cannot tell an absent column from an empty value, and here
+ * the two mean opposite things.
+ *
+ * The screening status and the authorisation flag fail in the direction that
+ * refuses: absent, both stop the run, loudly, naming the value they saw. These
+ * six do not.
+ *
+ *   · `repository_url` absent means every application looks as though it
+ *     declared no source, so the static stage — the cheapest and least
+ *     arguable in this engine — silently does not run, and the paid report
+ *     says secrets in source and dependency risk were outside its scope. That
+ *     is the tier's whole differentiator, withdrawn by a rename.
+ *   · `primary_url` absent means every stage that needs a URL does not apply,
+ *     and the run completes having looked at nothing.
+ *   · The four owner-declared facts absent read as "no authentication, no
+ *     payments, no personal data, not a game", so the criteria about each are
+ *     never asked — a narrower assessment than the customer declared, with no
+ *     line anywhere saying it was narrowed.
+ *
+ * `packages/report/src/assemble.ts` carries the same guard for the columns a
+ * report turns into a claim, for the same reason and in the same words.
+ */
+const DECISION_COLUMNS: Readonly<Record<string, string>> = {
+  repository_url:
+    'the static stage would not run for any application, and every paid report would say source analysis was out of scope',
+  primary_url:
+    'every stage that needs an address would not apply, and the run would complete having examined nothing',
+  has_authentication: 'nothing behind a sign-in would be asked about, for any application',
+  has_payments: 'the criteria about taking money would never be asked',
+  processes_personal_data: 'the privacy criteria would never be asked',
+  is_game: 'the pass that plays the game would never run, for any game',
+};
+
+export class AppRowIncompleteError extends UnretryableError {}
+
+/** Which of them the row does not carry, in the order they are declared. */
+export function missingDecisionColumns(row: object): string[] {
+  return Object.keys(DECISION_COLUMNS).filter((column) => !(column in row));
+}
+
 export async function runAssessmentJob(
   job: AssessmentJob,
   dependencies: RunDependencies,
@@ -101,6 +147,12 @@ export async function runAssessmentJob(
   );
   const appRow = app.rows[0];
   if (!appRow) throw new NotAuthorisedError(`App ${job.appId} does not exist.`);
+  for (const column of missingDecisionColumns(appRow)) {
+    throw new AppRowIncompleteError(
+      `App ${job.appId} came back without the column "${column}". No assessment ran: ` +
+        `${DECISION_COLUMNS[column] ?? 'unknown'}.`,
+    );
+  }
   const refusal = screeningRefusal(appRow.screening_status, job.appId);
   if (refusal) throw new NotAuthorisedError(refusal);
   if (!appRow.authorised) {
