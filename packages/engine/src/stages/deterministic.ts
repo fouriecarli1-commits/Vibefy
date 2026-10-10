@@ -186,6 +186,20 @@ const EXPOSED_PATHS: readonly { path: string; title: string; severity: RawFindin
     },
   ];
 
+/**
+ * Whether the application answered instead of the path.
+ *
+ * A single-page application with a catch-all route answers 200 with a body for
+ * every path. A response byte-identical to the front page is that catch-all,
+ * and it establishes nothing about the path asked for — which is as true of a
+ * note as of a finding. Used by all four probes in this stage, in two
+ * directions: it stops an owner being accused of serving what they do not, and
+ * it stops them being credited with publishing what they do not.
+ */
+function answeredByCatchAll(response: { body: string }, root: { body: string }): boolean {
+  return response.body.trim() === root.body.trim();
+}
+
 const ADMIN_PATHS = [
   '/admin',
   '/administrator',
@@ -311,7 +325,7 @@ export const deterministicChecksStage: Stage = {
          * out, which is what the note and the not-tested entry below say.
          */
         const contentType = (response.headers['content-type'] ?? '').toLowerCase();
-        if (contentType.includes('text/html') || response.body.trim() === root.body.trim()) {
+        if (contentType.includes('text/html') || answeredByCatchAll(response, root)) {
           answeredByTheApplication.push(candidate.path);
           continue;
         }
@@ -415,7 +429,7 @@ export const deterministicChecksStage: Stage = {
     const adminAnsweredByCatchAll: string[] = [];
     for (const adminPath of ADMIN_PATHS) {
       const response = await http.probe(url, adminPath);
-      if (response && response.status === 200 && response.body.trim() === root.body.trim()) {
+      if (response && response.status === 200 && answeredByCatchAll(response, root)) {
         adminAnsweredByCatchAll.push(adminPath);
         continue;
       }
@@ -448,10 +462,22 @@ export const deterministicChecksStage: Stage = {
       );
     }
 
+    /*
+     * The catch-all again, in the other direction.
+     *
+     * Under a route that answers everything, `/robots.txt` comes back 200 and
+     * the note was skipped — crediting an owner with a robots.txt they may not
+     * have — and `/.well-known/security.txt` came back 200 and the report said
+     * they publish one. A flattering untruth in a report somebody pays for is
+     * still an untruth, and it is the half of this defect that does not shout.
+     */
     const robots = await http.probe(url, '/robots.txt');
-    if (!robots || robots.status !== 200) {
+    const robotsServed = robots?.status === 200 && !answeredByCatchAll(robots, root);
+    if (!robotsServed) {
       notes.push(
-        'No robots.txt was served. That is not a defect, but it is worth adding before launch.',
+        robots?.status === 200
+          ? 'A request for robots.txt came back as the application’s own page rather than as a file, so whether one is served could not be established. If there is none, it is worth adding before launch.'
+          : 'No robots.txt was served. That is not a defect, but it is worth adding before launch.',
       );
     }
 
@@ -459,10 +485,13 @@ export const deterministicChecksStage: Stage = {
     // a note rather than a finding because the published rubric has no criterion
     // for it, and inventing one would produce a score nobody can check.
     const securityTxt = await http.probe(url, '/.well-known/security.txt');
+    const securityTxtServed = securityTxt?.status === 200 && !answeredByCatchAll(securityTxt, root);
     notes.push(
-      securityTxt?.status === 200
+      securityTxtServed
         ? 'A security.txt is published, so somebody who finds a defect knows where to send it.'
-        : 'No security.txt was served. Publishing one at /.well-known/security.txt tells a finder where to report a defect instead of guessing.',
+        : securityTxt?.status === 200
+          ? 'A request for /.well-known/security.txt came back as the application’s own page rather than as a file, so no security.txt was found. Publishing one tells a finder where to report a defect instead of guessing.'
+          : 'No security.txt was served. Publishing one at /.well-known/security.txt tells a finder where to report a defect instead of guessing.',
     );
 
     // --- Browser pass: accessibility, viewport, console -----------------------

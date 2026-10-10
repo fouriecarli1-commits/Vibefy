@@ -222,6 +222,83 @@ describe('an administrative route that really is served unprotected', () => {
   });
 });
 
+describe('the notes, where the catch-all flatters instead of accusing', () => {
+  /*
+   * The other half, and the half that does not shout. Under a catch-all,
+   * `/robots.txt` came back 200 so the note telling an owner to add one was
+   * skipped, and `/.well-known/security.txt` came back 200 so the report said
+   * they publish one. A flattering untruth in a report somebody pays for is
+   * still an untruth.
+   */
+  let app: Awaited<ReturnType<typeof startApp>>;
+  let result: StageResult;
+
+  beforeAll(async () => {
+    app = await startApp(() => ({ status: 200, body: SHELL, type: 'text/html; charset=utf-8' }));
+    result = await deterministicChecksStage.run(contextFor(app.url));
+  }, 180_000);
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  const notes = () => (result.notes ?? []).join(' | ');
+
+  it('does not say a security.txt is published', () => {
+    expect(
+      notes(),
+      'the report credited an owner with a security.txt they do not publish',
+    ).not.toMatch(/A security\.txt is published/);
+  });
+
+  it('says the request came back as the application instead', () => {
+    expect(notes()).toMatch(/security\.txt came back as the application/);
+  });
+
+  it('still tells them to add one, which is the advice either way', () => {
+    expect(notes()).toMatch(/Publishing one tells a finder/);
+  });
+
+  it('says the same about robots.txt rather than crediting one', () => {
+    expect(notes()).toMatch(/robots\.txt came back as the application/);
+  });
+});
+
+describe('an application that really publishes those files', () => {
+  let app: Awaited<ReturnType<typeof startApp>>;
+  let result: StageResult;
+
+  beforeAll(async () => {
+    app = await startApp((path) =>
+      path === '/robots.txt'
+        ? { status: 200, body: 'User-agent: *\nAllow: /\n', type: 'text/plain' }
+        : path === '/.well-known/security.txt'
+          ? { status: 200, body: 'Contact: mailto:security@kettle.example\n', type: 'text/plain' }
+          : path === '/'
+            ? { status: 200, body: SHELL, type: 'text/html; charset=utf-8' }
+            : { status: 404, body: 'not found', type: 'text/plain' },
+    );
+    result = await deterministicChecksStage.run(contextFor(app.url));
+  }, 180_000);
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  const notes = () => (result.notes ?? []).join(' | ');
+
+  it('is credited with the security.txt it really publishes', () => {
+    // The positive control: a fix that never credited anybody would satisfy
+    // every assertion above.
+    expect(notes()).toMatch(/A security\.txt is published/);
+  });
+
+  it('is not told to add a robots.txt it already has', () => {
+    expect(notes()).not.toMatch(/No robots\.txt was served/);
+    expect(notes()).not.toMatch(/robots\.txt came back as the application/);
+  });
+});
+
 describe('an application that serves the files it should not', () => {
   let app: Awaited<ReturnType<typeof startApp>>;
   let result: StageResult;
