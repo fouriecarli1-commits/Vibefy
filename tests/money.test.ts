@@ -142,6 +142,15 @@ describe('cost records', () => {
   });
 
   it('is invisible to customers and to reviewers alike', async () => {
+    // There has to be something to be invisible. An empty table is invisible to
+    // everybody, and would pass this for a reason that has nothing to do with
+    // the policies on it.
+    const { rows: existing } = await db.query('select count(*)::int as n from public.cost_records');
+    expect(
+      existing[0]!.n,
+      'no cost records exist, so nobody being able to see them proves nothing',
+    ).toBeGreaterThan(0);
+
     for (const identity of [account, reviewer]) {
       await actingAs(db, { userId: identity.userId }, async (client) => {
         const { rows } = await client.query(`select * from public.cost_records`);

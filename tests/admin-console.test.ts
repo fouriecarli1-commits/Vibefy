@@ -111,11 +111,17 @@ describe('what a reviewer cannot see', () => {
   });
 
   it('cannot read a customer plan, which would be a commercial signal beside a score', async () => {
+    const SQL = 'select plan from public.subscriptions where organisation_id = $1';
+    // The same query as the owner, so an organisation with no subscription at
+    // all cannot pass this by having nothing to hide.
+    const { rows: real } = await db.query(SQL, [customer.organisationId]);
+    expect(
+      real,
+      'the customer has no plan, so a reviewer not seeing one proves nothing',
+    ).toHaveLength(1);
+
     const rows = await actingAs(db, { userId: reviewer.userId }, async (client) => {
-      const result = await client.query(
-        'select plan from public.subscriptions where organisation_id = $1',
-        [customer.organisationId],
-      );
+      const result = await client.query(SQL, [customer.organisationId]);
       return result.rows;
     });
     expect(rows).toHaveLength(0);
@@ -124,6 +130,20 @@ describe('what a reviewer cannot see', () => {
 
 describe('what a customer cannot do', () => {
   it('cannot put their own workspace on a better plan', async () => {
+    const plan = async () => {
+      const { rows } = await db.query<{ plan: string }>(
+        'select plan from public.subscriptions where organisation_id = $1',
+        [customer.organisationId],
+      );
+      return rows[0]?.plan;
+    };
+
+    // An update that changes nothing is indistinguishable from an update with
+    // nothing to change, so the row is read before and after.
+    const before = await plan();
+    expect(before, 'the customer has no subscription to upgrade').toBeDefined();
+    expect(before).not.toBe('organisation');
+
     const rows = await actingAs(db, { userId: customer.userId }, async (client) => {
       const result = await client.query(
         `update public.subscriptions set plan = 'organisation'
@@ -135,6 +155,7 @@ describe('what a customer cannot do', () => {
     // Row-level security makes it a no-op rather than an error: there is no row
     // the customer may write, so nothing is updated.
     expect(rows).toHaveLength(0);
+    expect(await plan(), 'the plan changed anyway').toBe(before);
   });
 
   it('cannot write the platform role column at all', async () => {

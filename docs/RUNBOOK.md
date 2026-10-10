@@ -1131,6 +1131,58 @@ matching `href={trustPage.<field>}` in the source, and a rename to
 test that finds its subject by a source pattern needs a count assertion in front
 of it. That one had one, which is the only reason the rename was caught.
 
+### Screening for the first signature instead of reading for it
+
+By 2026-10-10 the first signature had enough instances to be worth finding by
+script rather than by eye. There are 292 absence assertions in the suite, and
+most are fine: a pure function handed good input, with the bad-input case in
+the same `describe`. The ones that matter have a subject that could be empty
+for a reason unrelated to the claim.
+
+Three screens, each narrower than the last. Parse out each `it` block by brace
+matching, then keep the block if it:
+
+1. asserts absence **and** queries a database — 68 of the 292;
+2. asserts absence **and** queries the **catalogue** (`pg_policies`, `pg_class`,
+   `information_schema`, `pg_enum`) — 14, of which 7 were already anchored;
+3. asserts absence **under `actingAs`** while seeding nothing itself, so it
+   depends on state from elsewhere — 4.
+
+Screens two and three found eleven real ones and two false positives. A false
+positive here is correct behaviour: the public-views test anchors itself by
+asserting that every view it declares public is still found, which no regex for
+`toBeGreaterThan` will see. Read the block before changing it.
+
+### A positive control beats a count floor
+
+A floor says the population was big. A control says the query can still find
+things, which is the stronger claim, and it is available more often than it
+looks:
+
+- **Same query, same parameters, as the owner.** The isolation tests assert
+  that a stranger sees no row. Run the identical SQL on the owning connection
+  first and require one row. A mistyped id now fails the control instead of
+  passing the claim.
+- **The exemption list as the control.** Both the public-views sweep and the
+  permissive-policy sweep carry a list of reviewed cases. Asserting that every
+  entry is still found turns the list into proof the query works.
+- **Set equality instead of a filter.** `enum labels not in MY_MAP` is empty
+  when the enum query returns nothing. `labels === Object.keys(MY_MAP)` cannot
+  be.
+- **The same query made to find something certain.** For `no column is shaped
+like card data`, ask the same catalogue, in the same schema, with the same
+  operator, for `%email%` first.
+- **Read the state before and after.** An update that returns no rows is
+  indistinguishable from an update with nothing to update. Read the column, try
+  the write, read it again.
+
+The first anchor written for the RLS sweeps counted the population in a second
+query of its own. Pointing the sweep at schema `publik` left that count still
+asking about `public`, and the test passed. **An anchor measured over a
+different population than the claim is not an anchor** — it is a second
+assertion that happens to agree today. Both numbers have to come out of one
+query.
+
 The recipe, one mutation at a time:
 
 ```sh

@@ -126,19 +126,31 @@ describe('a customer cannot read another customer’s data', () => {
   });
 
   it('cannot see the other organisation or its members', async () => {
+    const QUERIES: readonly [string, string, unknown][] = [
+      ['organisation', 'select id from public.organisations where id = $1', alice.organisationId],
+      ['membership', 'select id from public.memberships where user_id = $1', alice.userId],
+      ['user', 'select id from public.users where id = $1', alice.userId],
+    ];
+
+    /*
+     * The same three queries on the owning connection first.
+     *
+     * Each one passed by coming back empty, and an empty answer has two
+     * causes: the policy hid the row, or there was never a row to hide. A
+     * mistyped id, a fixture that moved, a seed that stopped running — all
+     * three read as perfect isolation. Running them as the owner, with the
+     * same SQL and the same parameter, separates the two.
+     */
+    for (const [what, sql, param] of QUERIES) {
+      const { rows } = await db.query(sql, [param]);
+      expect(rows, `no ${what} to hide, so hiding it proves nothing`).toHaveLength(1);
+    }
+
     await actingAs(db, { userId: mallory.userId }, async (client) => {
-      const orgs = await client.query(`select id from public.organisations where id = $1`, [
-        alice.organisationId,
-      ]);
-      expect(orgs.rows).toHaveLength(0);
-
-      const members = await client.query(`select id from public.memberships where user_id = $1`, [
-        alice.userId,
-      ]);
-      expect(members.rows).toHaveLength(0);
-
-      const users = await client.query(`select id from public.users where id = $1`, [alice.userId]);
-      expect(users.rows).toHaveLength(0);
+      for (const [what, sql, param] of QUERIES) {
+        const { rows } = await client.query(sql, [param]);
+        expect(rows, `a stranger read the ${what}`).toHaveLength(0);
+      }
     });
   });
 
