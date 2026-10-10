@@ -1,6 +1,12 @@
 -- =============================================================================
 -- The remediation relationship, on the face of the result.
 --
+-- audit-marker: exists (select 1 from information_schema.columns where table_schema='public' and table_name='badge_verification' and column_name='owner_has_remediation')
+--
+-- Named for the same reason as the portfolio migration: this replaces a view
+-- created in 20260822094000_badges, so "the view exists" was true before it
+-- ran. The disclosure column is what it actually adds.
+--
 -- The wall stops the money reaching the score. This makes the relationship
 -- visible anyway — because a separation nobody can see is a separation nobody
 -- has reason to believe, and the objection is not answered by a policy document

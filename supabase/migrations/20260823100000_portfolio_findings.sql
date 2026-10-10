@@ -1,6 +1,14 @@
 -- ---------------------------------------------------------------------------
 -- The portfolio row carries its own findings
 --
+-- audit-marker: exists (select 1 from information_schema.columns where table_schema='public' and table_name='portfolio' and column_name='open_findings')
+--
+-- Named, because this migration redefines a view that already exists. The
+-- audit's guess for a `create view` is whether the view is there, which was
+-- true before this ran — so a database that had stopped at the migration
+-- before was told it had this one. Found on 2026-10-10 by asking every marker
+-- whether it was already true. The column is what this migration adds.
+--
 -- Two policy rules could never come out right on the portfolio page, because
 -- the row it reads did not carry the facts they need.
 --

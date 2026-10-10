@@ -30,16 +30,25 @@
  * different meaning.
  */
 import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const dir = 'supabase/migrations';
 const rows = [];
 const unmarked = [];
 
-for (const file of readdirSync(dir).sort()) {
-  if (!file.endsWith('.sql')) continue;
-  const sql = readFileSync(`${dir}/${file}`, 'utf8');
-  const name = file.replace(/\.sql$/, '');
-
+/**
+ * The catalogue check for one migration, in the order the guesses are tried.
+ *
+ * Exported because `tests/a-marker-that-was-already-true.test.ts` builds the
+ * database one migration at a time and asks each marker whether it is already
+ * satisfied before its own migration runs. A test that mirrored this chain in
+ * its own regexes covered three of the eight shapes and drifted from the other
+ * five in silence — among them the two shapes whose markers were found to be
+ * true before their own migrations on 2026-10-10.
+ *
+ * Returns null when nothing here matches, which is the case the CLI refuses on.
+ */
+export function markerFor(sql) {
   // The first durable object each migration creates, as a catalogue check.
   let check = null;
   let m;
@@ -96,46 +105,63 @@ for (const file of readdirSync(dir).sort()) {
       check = `'${value[2]}' = any(enum_range(null::public.${value[1]})::text[])`;
     }
   }
-  if (!check) {
-    unmarked.push(name);
-    continue;
+  return check ?? null;
+}
+
+/*
+ * Guarded, so the file can be imported for `markerFor` without running.
+ * Importing it printed the whole audit to stdout the first time a test asked
+ * for the function, and would have called `process.exit(1)` from inside the
+ * test process if a marker had been missing. The same guard stub-check was
+ * missing, found the same way.
+ */
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  for (const file of readdirSync(dir).sort()) {
+    if (!file.endsWith('.sql')) continue;
+    const sql = readFileSync(`${dir}/${file}`, 'utf8');
+    const name = file.replace(/\.sql$/, '');
+
+    const check = markerFor(sql);
+    if (!check) {
+      unmarked.push(name);
+      continue;
+    }
+    rows.push(`    ('${name}', ${check})`);
   }
-  rows.push(`    ('${name}', ${check})`);
-}
 
-/*
- * A migration with no marker used to be warned about and dropped.
- *
- * The warning went to stderr, the exit code stayed 0, and the documented
- * invocation is `node tools/migration-audit.mjs > audit.sql` — so the message
- * landed on a screen nobody was reading and the file reported `nothing
- * missing` about a set that never contained that migration. The one defect
- * this tool exists to prevent, reproduced in the tool.
- *
- * So it refuses. A partial audit is worse than no audit: it is the same
- * sentence with a different meaning.
- */
-if (unmarked.length > 0) {
-  console.error(`\n✗ No marker for ${unmarked.length} migration(s). Nothing was written.\n`);
-  for (const name of unmarked) console.error(`  ${name}`);
-  console.error(
-    '\n  Add one by hand as a comment in the migration:\n' +
-      '  -- audit-marker: exists (select 1 from public.some_table where ...)\n',
-  );
-  process.exit(1);
-}
+  /*
+   * A migration with no marker used to be warned about and dropped.
+   *
+   * The warning went to stderr, the exit code stayed 0, and the documented
+   * invocation is `node tools/migration-audit.mjs > audit.sql` — so the message
+   * landed on a screen nobody was reading and the file reported `nothing
+   * missing` about a set that never contained that migration. The one defect
+   * this tool exists to prevent, reproduced in the tool.
+   *
+   * So it refuses. A partial audit is worse than no audit: it is the same
+   * sentence with a different meaning.
+   */
+  if (unmarked.length > 0) {
+    console.error(`\n✗ No marker for ${unmarked.length} migration(s). Nothing was written.\n`);
+    for (const name of unmarked) console.error(`  ${name}`);
+    console.error(
+      '\n  Add one by hand as a comment in the migration:\n' +
+        '  -- audit-marker: exists (select 1 from public.some_table where ...)\n',
+    );
+    process.exit(1);
+  }
 
-const VALUES = `  values\n${rows.join(',\n')}`;
+  const VALUES = `  values\n${rows.join(',\n')}`;
 
-/*
- * When, and how many.
- *
- * A stale `audit.sql` — generated before two markers were corrected and
- * re-used an hour later out of habit — named two migrations as missing from a
- * database that had them. Nothing on the file said how old it was or what it
- * covered, so there was no way to see that from the answer.
- */
-console.log(`-- ============================================================================
+  /*
+   * When, and how many.
+   *
+   * A stale `audit.sql` — generated before two markers were corrected and
+   * re-used an hour later out of habit — named two migrations as missing from a
+   * database that had them. Nothing on the file said how old it was or what it
+   * covered, so there was no way to see that from the answer.
+   */
+  console.log(`-- ============================================================================
 -- Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC by
 -- tools/migration-audit.mjs, and it covers ${rows.length} migration(s).
 --
@@ -160,3 +186,4 @@ select coalesce(string_agg(migration, ', ' order by migration) filter (where not
                 'nothing missing') as missing,
        count(*) as checked
   from state as t(migration, present);`);
+}
