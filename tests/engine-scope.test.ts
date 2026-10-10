@@ -45,9 +45,27 @@ function shippedSources(): { path: string; source: string }[] {
  *
  * Every source-text rule in this suite needs this, and this one more than most:
  * the comment above the method being looked for names it.
+ *
+ * Line comments first, then block comments, which is the order the rest of the
+ * repository uses and the reverse of what this did. Block-first lets a line
+ * comment containing an opening sequence run to the next closing one and take
+ * the code between them with it:
+ *
+ *     // we removed the installGlobalDispatcher() call /*
+ *     installGlobalDispatcher();
+ *     // *\/
+ *
+ * Block-first strips from the first opener to that last closer and the call
+ * disappears, so the sweep finds nothing. Line-first removes all three
+ * comments and leaves the call where the sweep can see it.
+ *
+ * Only a line comment that starts a line is removed, deliberately: a trailing
+ * `//` cannot be told from the one inside `https://`, and eating the rest of
+ * that line would hide real code. The cost is a false positive when a trailing
+ * comment mentions the thing being looked for, which fails loudly.
  */
 function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+  return source.replace(/^[ \t]*\/\/.*$/gm, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
 const policy = {
@@ -256,6 +274,62 @@ describe('the client enforces the address, not only the URL', () => {
       .filter(({ source }) => !/installGlobalDispatcher\(\): void/.test(source))
       .map(({ path }) => relative(process.cwd(), path));
     expect(callers).toEqual([]);
+  });
+});
+
+describe('what the two sweeps above are asked of', () => {
+  /*
+   * Both pass by finding nothing in `shippedSources()`, and neither asked
+   * whether it found a file. The roots are a hardcoded pair and the extensions
+   * a hardcoded set, so a third root, a renamed directory, or a build that
+   * moves to another suffix empties the population quietly — at which point
+   * "nothing calls the global installer" and "nothing opens the private
+   * network hatch" are both true of nothing.
+   *
+   * The `finds it when it is there` test below is a control over the
+   * *predicate*, against a string. This is the control over the *population*.
+   */
+  it('is a plausible number of files, including the one the sweeps are about', () => {
+    const sources = shippedSources();
+    expect(sources.length, 'no shipped source was read at all').toBeGreaterThan(200);
+
+    // The file that declares `installGlobalDispatcher`. The caller sweep
+    // excludes its declaration by name, which only means anything if the
+    // declaration is in the set being searched.
+    const paths = sources.map(({ path }) => relative(process.cwd(), path));
+    expect(paths).toContain('packages/engine/src/runtime/http.ts');
+    expect(
+      sources.find(({ path }) => path.endsWith('runtime/http.ts'))!.source,
+      'the exclusion in the caller sweep no longer matches anything',
+    ).toMatch(/installGlobalDispatcher\(\): void/);
+  });
+
+  it('reads every root it claims to, with each one contributing', () => {
+    const paths = shippedSources().map(({ path }) => relative(process.cwd(), path));
+    for (const root of ['packages', 'apps']) {
+      expect(
+        paths.filter((path) => path.startsWith(`${root}/`)).length,
+        `${root}/ contributed no shipped source`,
+      ).toBeGreaterThan(20);
+    }
+  });
+
+  it('strips a line comment before a block comment, not after', () => {
+    // The order that lets a commented-out mention hide a real call.
+    const source = [
+      '// we removed the installGlobalDispatcher() call /*',
+      'installGlobalDispatcher();',
+      '// */',
+    ].join('\n');
+    expect(stripComments(source)).toContain('installGlobalDispatcher();');
+  });
+
+  it('still removes what it is meant to remove', () => {
+    // An absence assertion needs the positive case beside it, or stripping
+    // nothing at all would satisfy the test above.
+    expect(stripComments('// installGlobalDispatcher()')).not.toContain('installGlobal');
+    expect(stripComments('/* installGlobalDispatcher() */')).not.toContain('installGlobal');
+    expect(stripComments('const keep = 1;')).toContain('const keep = 1;');
   });
 });
 
