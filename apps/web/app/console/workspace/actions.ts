@@ -6,6 +6,7 @@ import { verifyDnsTxt, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisatio
 import { createInvitationToken } from '@vibefycode/workspace';
 import { renderInvitationEmail, resendFromEnvironment } from '@vibefycode/notify';
 import { checkClaim } from '@vibefycode/shared';
+import { optionalScore, readably } from '@/lib/typed-score';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser, writeAsService } from '@/lib/sql';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
@@ -313,14 +314,6 @@ const DIMENSIONS = [
   'store_distribution_readiness',
 ] as const;
 
-function optionalScore(value: FormDataEntryValue | null): number | null {
-  const text = String(value ?? '').trim();
-  if (!text) return null;
-  const parsed = Number(text);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return null;
-  return parsed;
-}
-
 /**
  * Saving a policy profile.
  *
@@ -343,16 +336,23 @@ export async function savePolicyProfile(
 
   const floors: Record<string, number> = {};
   for (const dimension of DIMENSIONS) {
-    const value = optionalScore(formData.get(`floor_${dimension}`));
-    if (value !== null) floors[dimension] = value;
+    const typed = optionalScore(formData.get(`floor_${dimension}`), readably(dimension));
+    // Refused rather than dropped. Saving the other five floors and silently
+    // omitting this one would be the same defect with better arithmetic.
+    if ('error' in typed) return { error: typed.error };
+
+    if (typed.value !== null) floors[dimension] = typed.value;
   }
+
+  const overall = optionalScore(formData.get('minOverallScore'), 'the overall score');
+  if ('error' in overall) return { error: overall.error };
 
   const maxOpenSeverity = String(formData.get('maxOpenSeverity') ?? '').trim();
   const row = {
     organisation_id: organisationId,
     name,
     description: String(formData.get('description') ?? '').trim() || null,
-    min_overall_score: optionalScore(formData.get('minOverallScore')),
+    min_overall_score: overall.value,
     dimension_floors: floors,
     max_open_severity: ['critical', 'high', 'medium', 'low', 'info'].includes(maxOpenSeverity)
       ? maxOpenSeverity
