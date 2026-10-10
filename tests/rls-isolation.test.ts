@@ -212,6 +212,43 @@ describe('a reviewer', () => {
   });
 });
 
+/**
+ * One catalogue question, asked so that the population and the offenders come
+ * back from the same query.
+ *
+ * Every assertion below passes by finding nothing, and nothing anchored them
+ * to a population. A `where` clause that stops matching — a renamed schema, a
+ * table that is no longer `relkind = 'r'`, a database the migrations never
+ * reached — returns no offenders for a reason that has nothing to do with the
+ * claim, and the suite reports that row-level security is on for every table
+ * in a schema that has none. That is the first of the four signatures in the
+ * runbook: an absence assertion with nothing anchoring it.
+ *
+ * The first attempt at the anchor counted the population in a second query of
+ * its own. Mutating the sweep's schema name to `publik` left that second query
+ * still counting `public`, and the test passed — an anchor measured over a
+ * different population than the claim is not an anchor at all. So the two
+ * share a single `population` CTE, and a drift in its `where` clause moves
+ * both numbers together.
+ */
+async function sweep(
+  population: string,
+  offending: string,
+): Promise<{ considered: number; offenders: string[] }> {
+  const { rows } = await db.query<{ considered: string; offenders: string[] | null }>(
+    `with population as (${population})
+     select (select count(*)::text from population) as considered,
+            (select array_agg(label order by label) from population where ${offending}) as offenders`,
+  );
+  return { considered: Number(rows[0]!.considered), offenders: rows[0]!.offenders ?? [] };
+}
+
+/** The population every sweep in this file is about: an ordinary public table. */
+const PUBLIC_TABLES = `select c.relname as label, c.oid, c.relrowsecurity
+     from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'`;
+
 describe('a table with policies and no grants is a table nobody can reach', () => {
   /*
    * Three tables shipped with row-level security, careful policies, and no
@@ -225,23 +262,17 @@ describe('a table with policies and no grants is a table nobody can reach', () =
    * instead, about every table at once, and will fail on the next one.
    */
   it('gives the authenticated role something to do on every table it secures', async () => {
-    const { rows } = await db.query<{ table_name: string }>(
-      `select c.relname as table_name
-         from pg_class c
-         join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'public'
-          and c.relkind = 'r'
-          and c.relrowsecurity
-          and not exists (
-            select 1
-              from information_schema.role_table_grants g
-             where g.table_schema = 'public'
-               and g.table_name = c.relname
-               and g.grantee in ('authenticated', 'anon')
-          )
-        order by c.relname`,
+    const { considered, offenders: unreachable } = await sweep(
+      `${PUBLIC_TABLES} and c.relrowsecurity`,
+      `not exists (
+         select 1
+           from information_schema.role_table_grants g
+          where g.table_schema = 'public'
+            and g.table_name = population.label
+            and g.grantee in ('authenticated', 'anon')
+       )`,
     );
-    const unreachable = rows.map((row) => row.table_name);
+    expect(considered, 'no table with row-level security was examined').toBeGreaterThan(40);
     expect(
       unreachable,
       `Tables with row-level security that no customer role may touch:\n  ${unreachable.join('\n  ')}\n` +
@@ -266,12 +297,13 @@ describe('a table with policies and no grants is a table nobody can reach', () =
      * `anon` may be named deliberately — the published rubric is — so what this
      * refuses is the unnamed default, not a considered decision.
      */
-    const { rows } = await db.query<{ tablename: string; policyname: string }>(
-      `select tablename, policyname from pg_policies
-        where schemaname = 'public' and 'public' = any(roles)
-        order by tablename, policyname`,
+    const { considered, offenders: unnamed } = await sweep(
+      `select tablename || '.' || policyname as label, roles
+         from pg_policies
+        where schemaname = 'public'`,
+      `'public' = any(roles)`,
     );
-    const unnamed = rows.map((row) => `${row.tablename}.${row.policyname}`);
+    expect(considered, 'no policy was examined').toBeGreaterThan(70);
     expect(
       unnamed,
       `Policies that apply to every role, including anon:\n  ${unnamed.join('\n  ')}\n` +
@@ -282,17 +314,11 @@ describe('a table with policies and no grants is a table nobody can reach', () =
   it('gives every policy on those tables something to filter', async () => {
     // The other direction, and the quieter failure: a grant with no policy on a
     // forced-RLS table means every row is hidden and nothing says why.
-    const { rows } = await db.query<{ table_name: string }>(
-      `select c.relname as table_name
-         from pg_class c
-         join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'public'
-          and c.relkind = 'r'
-          and c.relrowsecurity
-          and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
-        order by c.relname`,
+    const { considered, offenders: silent } = await sweep(
+      `${PUBLIC_TABLES} and c.relrowsecurity`,
+      'not exists (select 1 from pg_policy p where p.polrelid = population.oid)',
     );
-    const silent = rows.map((row) => row.table_name);
+    expect(considered, 'no table with row-level security was examined').toBeGreaterThan(40);
     expect(
       silent,
       `Tables with row-level security and no policy at all: ${silent.join(', ')}`,
@@ -315,16 +341,14 @@ describe('the invariants this schema rests on, asked of the catalogue', () => {
      * a bare name resolves to, so they choose the code the function runs. Ours
      * all pin it. Nothing made them, until now.
      */
-    const { rows } = await db.query<{ proname: string }>(
-      `select p.proname
+    const { considered, offenders: unpinned } = await sweep(
+      `select p.proname as label, p.proconfig
          from pg_proc p
          join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = 'public'
-          and p.prosecdef
-          and not coalesce(p.proconfig, '{}') @> array['search_path=public, pg_temp']
-        order by p.proname`,
+        where n.nspname = 'public' and p.prosecdef`,
+      `not coalesce(proconfig, '{}') @> array['search_path=public, pg_temp']`,
     );
-    const unpinned = rows.map((row) => row.proname);
+    expect(considered, 'no definer function was examined').toBeGreaterThan(20);
     expect(
       unpinned,
       `Definer functions with no pinned search path:\n  ${unpinned.join('\n  ')}\n` +
@@ -335,15 +359,38 @@ describe('the invariants this schema rests on, asked of the catalogue', () => {
   it('turns row-level security on for every table in public', async () => {
     // A table without it is readable by anybody the grant reaches, which for
     // `authenticated` is every customer at once.
-    const { rows } = await db.query<{ relname: string }>(
-      `select c.relname
+    const { considered, offenders: open } = await sweep(PUBLIC_TABLES, 'not relrowsecurity');
+    expect(
+      considered,
+      'the public schema has no tables, so every claim about all of them is vacuous',
+    ).toBeGreaterThan(40);
+    expect(open, `Tables with no row-level security: ${open.join(', ')}`).toEqual([]);
+  });
+
+  /**
+   * The population definition, checked against the schema rather than assumed.
+   *
+   * Every sweep above filters `c.relkind = 'r'` — an ordinary table. Partition
+   * one and its relkind becomes `p`; make one foreign and it becomes `f`.
+   * Either way it leaves all five sweeps at once, silently, and the floors
+   * beside them stay comfortably met by the forty-three that remain.
+   *
+   * A floor catches a population that collapsed. This catches one that leaked.
+   */
+  it('has no table-like object that the sweeps above would walk past', async () => {
+    const { considered, offenders: missed } = await sweep(
+      `select c.relname || ' (relkind ' || c.relkind::text || ')' as label, c.relkind
          from pg_class c
          join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
-        order by c.relname`,
+        where n.nspname = 'public'`,
+      `relkind in ('p', 'f')`,
     );
-    const open = rows.map((row) => row.relname);
-    expect(open, `Tables with no row-level security: ${open.join(', ')}`).toEqual([]);
+    expect(considered, 'the public schema answered for nothing at all').toBeGreaterThan(100);
+    expect(
+      missed,
+      `Partitioned or foreign tables in public:\n  ${missed.join('\n  ')}\n` +
+        "Every catalogue sweep in this file filters relkind = 'r', so these carry none of the guarantees above. Widen the filters, or say in the migration why the table is exempt.",
+    ).toEqual([]);
   });
 
   it('knows every view a stranger can read, and why it bypasses those policies', async () => {
