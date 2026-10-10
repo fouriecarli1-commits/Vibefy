@@ -21,6 +21,45 @@ import { writeAsService } from '@/lib/sql';
  */
 export const dynamic = 'force-dynamic';
 
+/**
+ * The headers every badge response carries, whatever it is a picture of.
+ *
+ * There were three sets. The 503 and the 200 carried the content-security
+ * policy, `nosniff` and the cross-origin header; the 404 served to an unknown
+ * or revoked id carried none of the three. An SVG is a document a browser will
+ * execute script from, which is what the policy and `nosniff` are for, so
+ * having them on two paths out of three is having them nowhere in particular.
+ *
+ * It survived because the test for them reads this file rather than a
+ * response: `expect(route).toContain("'x-content-type-options': 'nosniff'")`
+ * is satisfied by any one of the three. One function now, and
+ * `tests/the-headers-every-badge-carries.test.ts` asks each path what it
+ * actually answered with.
+ */
+function badgeHeaders(cacheControl: string, extra: Record<string, string> = {}) {
+  return {
+    'content-type': 'image/svg+xml; charset=utf-8',
+    'cache-control': cacheControl,
+    'access-control-allow-origin': '*',
+    /*
+     * The image is never a document; a hostile SVG served inline is a script.
+     *
+     * `img-src data:` is not a loosening of that. The seal is the supplied
+     * artwork embedded as a data URI, and `default-src 'none'` forbade it — so
+     * from the moment the badge stopped being drawn, every browser loaded the
+     * document and then refused the picture inside it. An empty frame on the
+     * customer's website, and nothing in any log to say why.
+     *
+     * Only `data:`. No remote origin can be reached from inside the badge,
+     * which is the property that mattered.
+     */
+    'content-security-policy':
+      "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",
+    'x-content-type-options': 'nosniff',
+    ...extra,
+  };
+}
+
 function originFrom(request: NextRequest): string | null {
   const referer = request.headers.get('referer');
   if (referer) {
@@ -111,18 +150,11 @@ export async function GET(
       // Not 404: the badge is not what is missing. Not 500 with an HTML body,
       // which is where this started.
       status: 503,
-      headers: {
-        'content-type': 'image/svg+xml; charset=utf-8',
-        // The success and not-found paths cache for five minutes, which is what
-        // makes a revocation land quickly. Caching a transient failure for the
-        // same five minutes would pin one bad second across every embed of every
-        // badge on every site.
-        'cache-control': 'no-store',
-        'access-control-allow-origin': '*',
-        'content-security-policy':
-          "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",
-        'x-content-type-options': 'nosniff',
-      },
+      // The success and not-found paths cache for five minutes, which is what
+      // makes a revocation land quickly. Caching a transient failure for the
+      // same five minutes would pin one bad second across every embed of every
+      // badge on every site.
+      headers: badgeHeaders('no-store'),
     });
   }
 }
@@ -146,10 +178,7 @@ async function serveBadge(
     const svg = renderBadgeSvg({ status: 'revoked', ...(sizePx ? { sizePx } : {}) });
     return new NextResponse(svg, {
       status: 404,
-      headers: {
-        'content-type': 'image/svg+xml; charset=utf-8',
-        'cache-control': 'public, max-age=300',
-      },
+      headers: badgeHeaders('public, max-age=300'),
     });
   }
 
@@ -196,29 +225,22 @@ async function serveBadge(
   }
 
   return new NextResponse(svg, {
-    headers: {
-      'content-type': 'image/svg+xml; charset=utf-8',
-      // Five minutes. Long enough to be cheap, short enough that a revocation
-      // reaches every embedded instance within minutes.
-      'cache-control': 'public, max-age=300, must-revalidate',
-      // The layout depends on the size in the query string, so caches must key on it.
-      vary: 'Accept',
-      'access-control-allow-origin': '*',
+    /*
+     * Five minutes. Long enough to be cheap, short enough that a revocation
+     * reaches every embedded instance within minutes.
+     *
+     * `vary: 'Accept'` used to be here, under a comment saying the layout
+     * depends on the size in the query string so caches must key on it. A
+     * cache keys on the whole URL, query string included, without being asked;
+     * `Accept` is a different header entirely and varying on it only fragments
+     * the cache by browser. And the layout does not depend on the size any
+     * more either — `renderBadgeSvg` stopped reading `sizePx` when the badge
+     * started embedding the supplied artwork. A header whose comment names a
+     * purpose it cannot serve, for a reason that is no longer true.
+     */
+    headers: badgeHeaders('public, max-age=300, must-revalidate', {
       'x-vibefycode-status': badge.status,
       'x-vibefycode-verify': verificationUrl,
-      // The image is never a document; a hostile SVG served inline is a script.
-      //
-      // `img-src data:` is not a loosening of that. The seal is the supplied
-      // artwork embedded as a data URI, and `default-src 'none'` forbade it —
-      // so from the moment the badge stopped being drawn, every browser loaded
-      // the document and then refused the picture inside it. An empty frame on
-      // the customer's website, and nothing in any log to say why.
-      //
-      // Only `data:`. No remote origin can be reached from inside the badge,
-      // which is the property that mattered.
-      'content-security-policy':
-        "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox",
-      'x-content-type-options': 'nosniff',
-    },
+    }),
   });
 }

@@ -19,11 +19,31 @@ import { renderBadgeSvg } from '../packages/badge/src/index.ts';
 
 const route = readFileSync(join(process.cwd(), 'apps/web/app/badge/[file]/route.ts'), 'utf8');
 
-/** The policy the route sends, pulled out of the source it is written in. */
+/**
+ * The policy the route sends, pulled out of the source it is written in.
+ *
+ * What this file is about is the *relationship* between the policy and the
+ * artwork: the renderer embeds a data URI, so the policy has to permit `data:`
+ * and nothing else. Reading it out of the source is the right shape for that
+ * question, and it only works because there is now one policy to read.
+ *
+ * There were three, and this regex found the first. The 404 served for an id
+ * nobody holds had no policy at all and this said nothing about it, because
+ * the other two paths satisfied every assertion here. That the headers are the
+ * same on all three outcomes, and present on each, is asked of the responses
+ * in `tests/the-headers-every-badge-carries.test.ts`.
+ */
 function contentSecurityPolicy(): string {
-  const match = /'content-security-policy':\s*\n?\s*"([^"]+)"/.exec(route);
-  if (!match) throw new Error('The badge route no longer sets a content security policy.');
-  return match[1]!;
+  const found = [...route.matchAll(/'content-security-policy':\s*\n?\s*"([^"]+)"/g)];
+  if (found.length === 0)
+    throw new Error('The badge route no longer sets a content security policy.');
+  if (found.length > 1) {
+    throw new Error(
+      `The badge route sets ${found.length} content security policies. Which one a caller gets ` +
+        'depends on which outcome it hit, which is how one of them came to be missing.',
+    );
+  }
+  return found[0]![1]!;
 }
 
 describe('the badge is allowed to contain what it contains', () => {
@@ -61,6 +81,9 @@ describe('and nothing else', () => {
   });
 
   it('is still sandboxed and still refuses to be sniffed', () => {
+    // Whether every outcome sends them is asked of the responses, in
+    // tests/the-headers-every-badge-carries.test.ts. This is the policy's
+    // content, which is what this file is about.
     expect(contentSecurityPolicy()).toContain('sandbox');
     expect(route).toContain("'x-content-type-options': 'nosniff'");
   });
