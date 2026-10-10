@@ -1095,6 +1095,17 @@ which is the reason to run it rather than read about it.
   `tests/the-tables-that-may-only-be-added-to.test.ts` and the authorisation and
   review tests are most of it.
 
+Three policies were resolved individually on 2026-10-10, one suite run each,
+by opening that one policy: `authorisations_select_members` — the warranty text
+a customer accepted, the scope they granted and the hash of the exact words —
+and then `audit_log_select_members` and `invoices_select_members` together,
+which a single run resolves because `read-isolation-sweep` is table-driven and
+its failing case names the table. Each is noticed by its own case in that file
+and nothing else. That is also a positive control on the sweep: a per-table case
+whose seed had quietly stopped working would pass while proving nothing, which
+its header says happened to two tests before the owner's read was added beside
+every assertion.
+
 What an all-at-once run can and cannot say: a failure proves something notices
 that policy's loss, and a _pass_ proves nothing about any individual policy —
 only that the set as a whole is not wholly unguarded. Resolving it per policy
