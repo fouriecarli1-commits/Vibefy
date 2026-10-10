@@ -223,15 +223,20 @@ en hoekom — jy hoef niks daarvan hier te lees nie.
 
 **Klaar as:** al agtien het sonder 'n fout geloop.
 
-As een misluk met iets soos "already exists":
+As een misluk met iets soos "already exists", neem die nommer boaan daardie
+blok — die lang getal, soos `20261008030000` — en gee dit saam:
 
 ```
-node tools/idempotent-catch-up.mjs > catch-up.sql
+node tools/idempotent-catch-up.mjs 20261008030000 > catch-up.sql
 ```
 
-Dit skryf dieselfde migrasies oor in 'n vorm wat twee keer geplak kan word —
-alles wat al daar is word stil oorgeslaan. Plak `catch-up.sql` in plaas van die
-een wat misluk het.
+Dit skryf daardie blok en al die oorblywendes oor in 'n vorm wat twee keer
+geplak kan word; alles wat al daar is word stil oorgeslaan. Plak `catch-up.sql`
+in plaas van die een wat misluk het, en jy is klaar met die res ook.
+
+**Gee altyd die nommer.** Sonder dit herskryf dit al vier-en-sestig migrasies —
+sowat agt-en-half-duisend reëls wat jy nie nodig het nie. Met die nommer van die
+een wat misluk het, is dit sowat agthonderd.
 
 En as jy nie weet waar jou databasis staan nie:
 
