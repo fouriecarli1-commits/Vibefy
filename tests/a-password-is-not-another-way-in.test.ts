@@ -24,6 +24,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { withoutComments } from './setup/source.ts';
 import { describe, expect, it } from 'vitest';
 import { SSO_ROUTING_UNKNOWN, ssoRoutingFor } from '../packages/shared/src/sso-routing.ts';
 
@@ -102,10 +103,7 @@ describe('when the lookup does not answer', () => {
 
 describe('both sign-in forms read the same answer', () => {
   /** The code, without the comments — which quote the defect on purpose. */
-  const source = (path: string) =>
-    readFileSync(join(process.cwd(), path), 'utf8')
-      .replace(/^[ \t]*\/\/.*$/gm, ' ')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const source = (path: string) => withoutComments(readFileSync(join(process.cwd(), path), 'utf8'));
 
   for (const path of ['apps/web/components/auth-form.tsx', 'apps/mobile/app/sign-in.tsx']) {
     it(`${path} does not call the lookup itself`, () => {

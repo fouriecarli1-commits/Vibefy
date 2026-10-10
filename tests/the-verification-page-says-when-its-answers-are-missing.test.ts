@@ -24,11 +24,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 
 /** The code, without the comments — which quote the defect on purpose. */
-const source = readFileSync(join(process.cwd(), 'apps/web/app/a/[slug]/page.tsx'), 'utf8')
-  .replace(/^[ \t]*\/\/.*$/gm, ' ')
-  .replace(/\/\*[\s\S]*?\*\//g, ' ');
+const source = withoutComments(
+  readFileSync(join(process.cwd(), 'apps/web/app/a/[slug]/page.tsx'), 'utf8'),
+);
 
 describe('the assurance load', () => {
   it('tells a failed read apart from a badge with nothing behind it', () => {

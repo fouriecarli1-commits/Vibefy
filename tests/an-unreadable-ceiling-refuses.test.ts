@@ -26,6 +26,7 @@
  * nobody has agreed to spend, and the first anybody hears of it is an invoice.
  */
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -42,7 +43,7 @@ const route = readFileSync(join(process.cwd(), 'apps/web/app/api/copilot/route.t
  * Because the comment explaining this defect quotes the defect, and a test that
  * reads source has to be able to tell an explanation from the thing explained.
  */
-const code = route.replace(/^[ \t]*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+const code = withoutComments(route);
 
 describe('the spend read', () => {
   it('does not turn a failure into a spend of nothing', () => {

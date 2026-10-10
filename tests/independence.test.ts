@@ -21,6 +21,7 @@ import {
   type ScoringInput,
 } from '../packages/rubric/src/index.ts';
 import { connect } from './setup/client.ts';
+import { withoutComments } from './setup/source.ts';
 import {
   makeReviewer,
   seedAccount,
@@ -168,14 +169,10 @@ describe('the scoring module cannot see money', () => {
     const source = readFileSync(join(scoringDir, file), 'utf8');
     // Strip comments: the guarantee is about what the code does, and the
     // comments necessarily discuss what it must not do.
-    // Line comments before block comments. The other order lets a line
-    // comment containing an opening sequence run to the next closing one and
-    // take the code between them with it, which is how a reference to a
-    // forbidden concept would hide.
-    const code = source
-      .replace(/(^|\s)\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .toLowerCase();
+    // Through `withoutComments`, which is the one place the order of the two
+    // strips is decided — line comments before block comments, for the reason
+    // its own header gives.
+    const code = withoutComments(source).toLowerCase();
     for (const term of forbidden) {
       expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
     }
@@ -216,10 +213,7 @@ describe('what suspends a badge cannot see money either', () => {
 
   it.each(verdictFiles)('%s contains no commercial concept', (file) => {
     const source = readFileSync(join(monitoringDir, file), 'utf8');
-    const code = source
-      .replace(/(^|\s)\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .toLowerCase();
+    const code = withoutComments(source).toLowerCase();
     for (const term of forbidden) {
       expect(code, `${file} must not reference "${term}"`).not.toMatch(new RegExp(`\\b${term}\\b`));
     }

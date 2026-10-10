@@ -33,15 +33,17 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { withoutComments } from './setup/source.ts';
 
-const source = readFileSync(
-  join(import.meta.dirname, '..', 'packages/engine/src/stages/game-checks.ts'),
-  'utf8',
-)
-  // The comments quote both defects verbatim while explaining them, as the ones
-  // above show. Every source-text rule in this suite strips them first.
-  .replace(/^[ \t]*\/\/.*$/gm, ' ')
-  .replace(/\/\*[\s\S]*?\*\//g, ' ');
+// The comments quote both defects verbatim while explaining them, as the ones
+// above show. Every source-text rule in this suite strips them first, through
+// the one function that decides how.
+const source = withoutComments(
+  readFileSync(
+    join(import.meta.dirname, '..', 'packages/engine/src/stages/game-checks.ts'),
+    'utf8',
+  ),
+);
 
 describe('a read that failed', () => {
   it('never catches into an empty list', () => {

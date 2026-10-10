@@ -38,6 +38,7 @@ import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import {
   CostMeter,
   DEFAULT_CEILING,
@@ -181,11 +182,10 @@ describe('a target that never answered', () => {
 describe('the criteria each pass claims to answer', () => {
   const ruleIdsIn = async (path: string): Promise<string[]> => {
     const { readFileSync } = await import('node:fs');
-    const source = readFileSync(join(import.meta.dirname, '..', path), 'utf8')
-      // Comments quote rule ids while explaining them, and this file is one of
-      // the reasons they do. Strip them before reading the code.
-      .replace(/(^|\s)\/\/.*$/gm, '$1')
-      .replace(/\/\*[\s\S]*?\*\//g, '');
+    // Comments quote rule ids while explaining them, and this file is one of
+    // the reasons they do. Stripped before reading the code, through the one
+    // function that decides how.
+    const source = withoutComments(readFileSync(join(import.meta.dirname, '..', path), 'utf8'));
     return [
       ...new Set(
         [...source.matchAll(/ruleId: '([A-Z]+-\d+)'/g)].map((match) => match[1] as string),

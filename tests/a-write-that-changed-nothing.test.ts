@@ -28,6 +28,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { withoutComments } from './setup/source.ts';
 import type { Client } from 'pg';
 import { actingAs, connect } from './setup/client.ts';
 import { seedAccount, type SeededAccount } from './setup/seed.ts';
@@ -75,10 +76,7 @@ describe('a delete the caller is not permitted to make', () => {
 
 describe('every action that reports a write', () => {
   /** The code, without the comments — which quote the defect on purpose. */
-  const source = (path: string) =>
-    readFileSync(join(process.cwd(), path), 'utf8')
-      .replace(/^[ \t]*\/\/.*$/gm, ' ')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const source = (path: string) => withoutComments(readFileSync(join(process.cwd(), path), 'utf8'));
 
   /*
    * Every action file that writes through PostgREST and then reports what it

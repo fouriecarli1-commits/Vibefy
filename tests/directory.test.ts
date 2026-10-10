@@ -9,6 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client } from 'pg';
+import { withoutComments } from './setup/source.ts';
 import {
   DIMENSIONS,
   categoriesOf,
@@ -114,10 +115,9 @@ describe('ordering cannot be bought', () => {
   it('has no field through which placement could be bought', () => {
     // The compile-time assertion in types.ts is the real guard. This checks the
     // other half: that the ranking module never mentions a commercial concept.
-    const source = readFileSync(join(process.cwd(), 'packages/directory/src/rank.ts'), 'utf8')
-      .replace(/(^|\s)\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .toLowerCase();
+    const source = withoutComments(
+      readFileSync(join(process.cwd(), 'packages/directory/src/rank.ts'), 'utf8'),
+    ).toLowerCase();
     for (const term of ['marketing', 'plan', 'price', 'sponsor', 'promoted', 'boost', 'featured']) {
       expect(source, `rank.ts must not reference "${term}"`).not.toMatch(
         new RegExp(`\\b${term}\\b`),

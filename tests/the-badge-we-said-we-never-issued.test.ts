@@ -32,11 +32,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 
 /** The code, without comments — which quote the defect on purpose. */
-const page = readFileSync(join(import.meta.dirname, '..', 'apps/web/app/verify/page.tsx'), 'utf8')
-  .replace(/^[ \t]*\/\/.*$/gm, ' ')
-  .replace(/\/\*[\s\S]*?\*\//g, ' ');
+const page = withoutComments(
+  readFileSync(join(import.meta.dirname, '..', 'apps/web/app/verify/page.tsx'), 'utf8'),
+);
 
 describe('a read that failed', () => {
   it('is not turned into null', () => {

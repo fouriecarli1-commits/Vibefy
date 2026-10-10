@@ -8,6 +8,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import {
   BrowserSession,
   CeilingExceededError,
@@ -64,9 +65,7 @@ function shippedSources(): { path: string; source: string }[] {
  * that line would hide real code. The cost is a false positive when a trailing
  * comment mentions the thing being looked for, which fails loudly.
  */
-function stripComments(source: string): string {
-  return source.replace(/^[ \t]*\/\/.*$/gm, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
-}
+const stripComments = withoutComments;
 
 const policy = {
   allowedHosts: ['kettle.example'],

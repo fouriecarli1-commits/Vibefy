@@ -39,11 +39,18 @@
  * deliberate job for daylight, noted in `docs/RUNBOOK.md`.
  *
  * So: line comments first, and only where `//` follows the start of a line or
- * a space. A trailing comment after code on the same line survives, which is
- * deliberate — it cannot be told apart from the `//` inside a scheme, and
- * eating the rest of that line hides real code. The cost is a false positive
- * when a trailing comment mentions the thing being searched for, and a false
- * positive fails loudly.
+ * a space. That one condition does the whole job, because the character in
+ * front of the slashes is the difference: a comment is preceded by whitespace
+ * or starts the line, a scheme by a colon, a protocol-relative URL by a quote.
+ * A trailing comment after code is therefore removed, and the URL on the same
+ * kind of line is not.
+ *
+ * This paragraph said the opposite until 2026-10-10 — that a trailing comment
+ * survives, on the theory that it could not be told apart from a scheme. It
+ * can, `tests/source-stripping.test.ts` has said so since the day it was
+ * written, and the sentence here was simply left behind. A false sentence in
+ * the file every source-text assertion rests on is worth more than a defect in
+ * one of them.
  */
 export function withoutComments(source: string): string {
   return source.replace(/(^|\s)\/\/.*$/gm, '$1').replace(/\/\*[\s\S]*?\*\//g, ' ');

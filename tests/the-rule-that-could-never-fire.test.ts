@@ -29,6 +29,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import { triageAssessment, type TriageInput } from '../packages/governance/src/index.ts';
 
 const base: TriageInput = {
@@ -50,9 +51,7 @@ const ids = (input: TriageInput) => triageAssessment(input).attention.map((entry
 
 /** The code of a page, without comments — which quote the defect on purpose. */
 const pageSource = (path: string) =>
-  readFileSync(join(import.meta.dirname, '..', path), 'utf8')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  withoutComments(readFileSync(join(import.meta.dirname, '..', path), 'utf8'));
 
 describe('the rule itself, which always worked', () => {
   it('fires on a large move', () => {

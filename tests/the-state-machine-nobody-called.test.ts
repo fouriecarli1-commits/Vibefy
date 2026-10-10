@@ -33,6 +33,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import {
   canTransition,
   statusesThatMayBecome,
@@ -80,12 +81,12 @@ describe('the statuses a move is legal from', () => {
 
 describe('the action that resolves a request', () => {
   /** The code, without the comments — which quote the defect on purpose. */
-  const source = readFileSync(
-    join(import.meta.dirname, '..', 'apps/web/app/console/privacy/actions.ts'),
-    'utf8',
-  )
-    .replace(/^[ \t]*\/\/.*$/gm, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const source = withoutComments(
+    readFileSync(
+      join(import.meta.dirname, '..', 'apps/web/app/console/privacy/actions.ts'),
+      'utf8',
+    ),
+  );
 
   it('constrains the update by the status the row is in', () => {
     expect(source).toMatch(/statusesThatMayBecome\(/);

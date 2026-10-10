@@ -4,6 +4,7 @@
  * `tests/setup/source.ts` says why it is one function and why it works in that
  * order. This is the part that would go red if either changed.
  */
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { withoutComments } from './setup/source.ts';
 
@@ -64,5 +65,93 @@ describe('where the line it keeps and the line it cuts differ', () => {
     expect(withoutComments('const a = 1; // mentions dangerous()')).not.toContain('dangerous()');
     expect(withoutComments('const a = 1; // mentions dangerous()')).toContain('const a = 1;');
     expect(withoutComments("fetch('https://x/y');")).toContain('x/y');
+  });
+});
+
+describe('who strips comments', () => {
+  /*
+   * One function, and nothing beside it.
+   *
+   * There were seven inline spellings across five files on 2026-10-10, two of
+   * them wrong in ways that could delete the thing an assertion was looking
+   * for. They are gone; this is what stops the eighth. A suite where every
+   * file decides for itself how to strip a comment is a suite where one of
+   * them decides wrongly and passes.
+   */
+  const STRIPPER = /\.replace\(\s*\/\\?\(\^\|\\s\\?\)?\\\/\\\//;
+  const BLOCK_STRIPPER = /\.replace\(\s*\/\\\/\\\*\[/;
+
+  /**
+   * The one file allowed to contain the pattern, because it is the pattern.
+   *
+   * Named rather than derived: a guard that excluded "whatever file matches"
+   * would excuse the next copy as readily as the original. The same trap as
+   * the stub checker reading its own scan list, which took a rename to fix.
+   */
+  const THE_FUNCTION = 'tests/setup/source.ts';
+
+  const testFiles = readdirSync('tests')
+    .filter((entry) => entry.endsWith('.test.ts'))
+    .map((entry) => `tests/${entry}`);
+
+  it('found the suite, or this proves nothing', () => {
+    expect(testFiles.length).toBeGreaterThan(100);
+  });
+
+  it('recognises a stripper when it sees one', () => {
+    // The positive control: both spellings that were in the suite this
+    // morning, and the one that survives in the shared function.
+    expect(STRIPPER.test(String.raw`source.replace(/(^|\s)\/\/.*$/gm, '$1')`)).toBe(true);
+    expect(BLOCK_STRIPPER.test(String.raw`source.replace(/\/\*[\s\S]*?\*\//g, ' ')`)).toBe(true);
+    expect(STRIPPER.test("source.replace(/x/, 'y')")).toBe(false);
+  });
+
+  /**
+   * The two files allowed to contain the pattern, and why each one is.
+   *
+   * Named with reasons rather than derived, because a guard that excused
+   * "whatever matches" would excuse the next copy as readily as these two —
+   * the same trap as the stub checker that matched its own scan list, which
+   * took a rename to fix.
+   */
+  const ALLOWED: Readonly<Record<string, string>> = {
+    'tests/source-stripping.test.ts':
+      'This file. Its positive control has to contain the pattern to prove the sweep can see one, which is the whole reason the control exists.',
+    'tests/the-score-nobody-may-publish-unmeasured.test.ts':
+      'A different function: it replaces every comment character with a space so that line and column numbers survive, because its failure message points at a line in the file it read. Stripping to nothing would move every line after the first comment.',
+  };
+
+  it('is nobody but the shared function', () => {
+    const offenders = testFiles.filter((path) => {
+      if (path in ALLOWED) return false;
+      const source = readFileSync(path, 'utf8');
+      return STRIPPER.test(source) || BLOCK_STRIPPER.test(source);
+    });
+    expect(
+      offenders,
+      'strip comments through withoutComments in tests/setup/source.ts, which is the one place ' +
+        'the order of the two strips is decided',
+    ).toEqual([]);
+  });
+
+  it('is in the shared function, which this test did not find because it is not a test file', () => {
+    // The other half of the claim above: the pattern exists somewhere, and
+    // the sweep would be vacuous if it did not.
+    const source = readFileSync(THE_FUNCTION, 'utf8');
+    expect(STRIPPER.test(source) || BLOCK_STRIPPER.test(source)).toBe(true);
+  });
+});
+
+describe('the two files allowed their own stripper', () => {
+  it('still contain one, so the exceptions are not stale', () => {
+    // An exception for a file that no longer needs it is a hole kept open for
+    // nothing, and it would be the obvious place for the next copy to land.
+    for (const path of [
+      'tests/source-stripping.test.ts',
+      'tests/the-score-nobody-may-publish-unmeasured.test.ts',
+    ]) {
+      const source = readFileSync(path, 'utf8');
+      expect(/\\\/\\\//.test(source) || source.includes('replace('), path).toBe(true);
+    }
   });
 });

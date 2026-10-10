@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import type { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { renderReport, type ReportSource } from '../packages/report/src/index.ts';
+import { withoutComments } from './setup/source.ts';
 import { renderBadgeSvg, type BadgeStatus } from '../packages/badge/src/index.ts';
 import { renderAlertEmail } from '../packages/notify/src/index.ts';
 import { auditHtml, closeAxeBrowser, describe as explain } from './setup/axe.ts';
@@ -331,7 +332,7 @@ describe('the scan keeps up with the pages', () => {
   const scannedRoutesFrom = (source: string): string[] => {
     const block = /const PAGES = \[([\s\S]*?)\]/.exec(source);
     if (!block) throw new Error('a11y-scan no longer has a PAGES list');
-    const code = block[1]!.replace(/(^|\s)\/\/.*$/gm, '$1').replace(/\/\*[\s\S]*?\*\//g, '');
+    const code = withoutComments(block[1]!);
     return [...code.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
   };
 

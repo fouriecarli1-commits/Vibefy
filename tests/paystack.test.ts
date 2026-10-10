@@ -15,6 +15,7 @@
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import { Client, Pool } from 'pg';
 import { beforeAll, afterAll } from 'vitest';
 import {
@@ -41,10 +42,7 @@ const SECRET = 'sk_test_paystack_secret';
  * a test that reads them is a test about prose wearing the clothes of one
  * about behaviour.
  */
-const codeOf = (path: string) =>
-  readFileSync(path, 'utf8')
-    .replace(/^\s*\/\/.*$/gm, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
+const codeOf = (path: string) => withoutComments(readFileSync(path, 'utf8'));
 
 const provider = (fetchImpl?: typeof fetch) =>
   new PaystackProvider({

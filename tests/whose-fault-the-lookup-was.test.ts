@@ -24,6 +24,7 @@
  * right, with the reason written beside each.
  */
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { verifyWellKnownFile } from '../packages/engine/src/authorisation/ownership.ts';
@@ -45,12 +46,12 @@ describe('a host that genuinely does not exist', () => {
 
 describe('a lookup that failed for some other reason', () => {
   /** The code, without comments — which quote the defect on purpose. */
-  const source = readFileSync(
-    join(import.meta.dirname, '..', 'packages/engine/src/authorisation/ownership.ts'),
-    'utf8',
-  )
-    .replace(/^[ \t]*\/\/.*$/gm, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const source = withoutComments(
+    readFileSync(
+      join(import.meta.dirname, '..', 'packages/engine/src/authorisation/ownership.ts'),
+      'utf8',
+    ),
+  );
 
   it('is not caught into an empty list', () => {
     expect(source).not.toMatch(/lookup\([^)]*\)\s*\.catch/);

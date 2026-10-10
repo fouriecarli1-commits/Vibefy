@@ -1234,13 +1234,21 @@ ways, and two of those ways could hide the thing being looked for:
   never reach a public read" over a file whose whole subject is a Supabase
   client.
 
-`tests/setup/source.ts` is the one `withoutComments` to use in new tests, with
-`tests/source-stripping.test.ts` holding both failing cases. Every chain in the
-suite has been reordered to line-first and the four URL-eating copies replaced.
-**The other twenty-one still have their own copy**, reordered but not migrated,
-and that is the next tidy-up: a twenty-three-site rewrite by regex produced
-four call sites that compiled and stripped the wrong thing, so it wants doing
-by hand and reading each diff.
+`tests/setup/source.ts` is the one `withoutComments`, and
+`tests/source-stripping.test.ts` holds both failing cases plus a sweep over the
+suite: no test file may strip comments inline, and the two that may are named
+there with their reasons. That sweep is the thing to add to, not to work around.
+
+Done on 2026-10-10, by hand, twenty-two files in six passes with the tests run
+after each — a twenty-three-site rewrite by regex the night before had produced
+four call sites that compiled and stripped the wrong thing. Two notes from
+doing it. The exact spelling differed by file (`(^|\s)//` in five,
+`^[ \t]*//` in sixteen, `^\s*//` in one), so a single pattern would have
+missed most of them; the sweep in the test finds them properly because it
+matches the shape rather than one spelling. And one file keeps its own: it
+replaces every comment character with a space so that line and column numbers
+survive into its failure message, which is a different function and not a
+copy.
 
 ### A positive control beats a count floor
 

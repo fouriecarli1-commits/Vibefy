@@ -25,6 +25,7 @@
  * by a test at all.
  */
 import { readFileSync } from 'node:fs';
+import { withoutComments } from './setup/source.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RUN_TIMEOUT_MINUTES } from '../apps/worker/src/queue.ts';
 import {
@@ -110,9 +111,7 @@ describe('a run that comes back', () => {
 
 describe('the loop acts on it', () => {
   /** The worker's source, without the comments that name these very symbols. */
-  const code = readFileSync('apps/worker/src/main.ts', 'utf8')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const code = withoutComments(readFileSync('apps/worker/src/main.ts', 'utf8'));
 
   it('never awaits the assessment without the timeout around it', () => {
     /*
@@ -141,7 +140,7 @@ describe('the loop acts on it', () => {
       '// const result = await withRunTimeout(',
       'const result = await runAssessmentJob(claimed);',
     ].join('\n');
-    const stripped = disabled.replace(/^[ \t]*\/\/.*$/gm, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    const stripped = withoutComments(disabled);
     expect(stripped).not.toContain('withRunTimeout(');
     expect(stripped).toMatch(/await\s+runAssessmentJob\(/);
   });

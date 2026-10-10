@@ -25,6 +25,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 
 /**
  * The code, without the comments.
@@ -34,10 +35,7 @@ import { describe, expect, it } from 'vitest';
  * verbatim, which is the point of them — and reported the defects as still
  * present. A text test that reads prose is a text test that measures prose.
  */
-const source = (path: string) =>
-  readFileSync(join(process.cwd(), path), 'utf8')
-    .replace(/^[ \t]*\/\/.*$/gm, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ');
+const source = (path: string) => withoutComments(readFileSync(join(process.cwd(), path), 'utf8'));
 
 const application = source('apps/mobile/app/application/[id].tsx');
 const report = source('apps/mobile/app/report/[assessmentId].tsx');

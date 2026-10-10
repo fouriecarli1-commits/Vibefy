@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { withoutComments } from './setup/source.ts';
 import {
   MAX_REPOSITORY_BYTES,
   REPOSITORY_HOSTS,
@@ -308,13 +309,10 @@ describe('the subprocess boundary', () => {
   });
 
   it('passes the URL after a double dash, so a flag is impossible rather than unreachable', () => {
-    const source = readFileSync(
-      join(process.cwd(), 'packages/engine/src/runtime/repository.ts'),
-      'utf8',
-    )
-      // The comment beside it quotes the attack.
-      .replace(/^[ \t]*\/\/.*$/gm, ' ')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ');
+    // Without comments: the one beside it quotes the attack.
+    const source = withoutComments(
+      readFileSync(join(process.cwd(), 'packages/engine/src/runtime/repository.ts'), 'utf8'),
+    );
     const args = /'--recurse-submodules=no',[\s\S]{0,400}?path,/.exec(source)?.[0] ?? '';
     expect(args).toContain("'--',");
     expect(args.indexOf("'--',")).toBeLessThan(args.indexOf('url,'));
