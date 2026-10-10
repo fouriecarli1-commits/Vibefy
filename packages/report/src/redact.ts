@@ -47,7 +47,17 @@ export function sortFindings(findings: readonly ReportFinding[]): ReportFinding[
 }
 
 export interface RedactedReport {
-  readonly source: ReportSource;
+  /**
+   * Everything about the assessment except its findings.
+   *
+   * It used to be the whole `ReportSource`, which put the unredacted findings
+   * on the redacted object — one dot away from every line of the renderer.
+   * The comment beside the free-tier strip promises that "a renderer that
+   * forgets a conditional must not be able to leak it", and `view.source
+   * .findings` was how it could. Nothing reads it today; the type is what
+   * keeps that true.
+   */
+  readonly source: Omit<ReportSource, 'findings'>;
   readonly findings: readonly ReportFinding[];
   readonly showEvidence: boolean;
   readonly showRemediation: boolean;
@@ -56,12 +66,53 @@ export interface RedactedReport {
   readonly withheld: readonly string[];
 }
 
+/**
+ * What a free reader may see of a finding, named field by field.
+ *
+ * This was `{ ...finding, evidence: [], remediation: '' }` — a spread with two
+ * fields blanked, which is a list of what to withhold. `ReportFinding` has
+ * nine fields and the list covered the two that matter today, so it was
+ * complete and complete by coincidence. Add a field — a reproduction, an
+ * affected URL, a technical detail — and it ships to the free tier by default,
+ * which is the paid report given away rather than withheld.
+ *
+ * Named the other way round, so a new field is withheld until somebody
+ * classifies it, and `tests/the-field-nobody-classified.test.ts` refuses a
+ * field that appears in neither list.
+ */
+export const FREE_TIER_FINDING_FIELDS = [
+  'id',
+  'ruleId',
+  'dimension',
+  'severity',
+  'confidence',
+  'title',
+  'description',
+] as const;
+
+/** Withheld from a free report, and the reason each one is the paid product. */
+export const PAID_ONLY_FINDING_FIELDS: Readonly<Record<string, string>> = {
+  remediation: 'The step that fixes it, which is most of what a paid report is for.',
+  evidence: 'The screenshots, traces and HTTP exchanges behind the finding.',
+};
+
+function freeTierFinding(finding: ReportFinding): ReportFinding {
+  const picked: Record<string, unknown> = {};
+  for (const field of FREE_TIER_FINDING_FIELDS) picked[field] = finding[field];
+  // Present and empty rather than absent: the renderer and the type both
+  // expect them, and an absent field reads as a finding with no remediation
+  // written rather than one withheld.
+  return { ...picked, remediation: '', evidence: [] } as unknown as ReportFinding;
+}
+
 export function redactForTier(source: ReportSource, tier: ReportTier): RedactedReport {
   const sorted = sortFindings(source.findings);
 
+  const { findings: _withheld, ...metadata } = source;
+
   if (tier === 'paid') {
     return {
-      source,
+      source: metadata,
       findings: sorted,
       showEvidence: true,
       showRemediation: true,
@@ -75,10 +126,10 @@ export function redactForTier(source: ReportSource, tier: ReportTier): RedactedR
   const hidden = sorted.length - shown.length;
 
   return {
-    source,
+    source: metadata,
     // Evidence is stripped from the objects themselves, not merely hidden by the
     // template — a renderer that forgets a conditional must not be able to leak it.
-    findings: shown.map((finding) => ({ ...finding, evidence: [], remediation: '' })),
+    findings: shown.map(freeTierFinding),
     showEvidence: false,
     showRemediation: false,
     showPrioritisedPlan: false,
