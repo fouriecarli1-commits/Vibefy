@@ -1199,6 +1199,13 @@ Run them singly. Four browser-driven mutations in one command ran the container
 out of memory on 2026-10-09 and the restart left a mutated file behind; `git
 status` is the check before committing anything after a mutation run.
 
+**Restore from the copy, never with `git checkout`.** On 2026-10-10 one
+cleanup line used `git checkout tests/one-name-for-the-company.test.ts` to undo
+a mutation, which reverted the file to HEAD and took an hour of uncommitted
+work with it. `cp /tmp/subject.bak` restores the file you were testing. `git
+checkout` restores the last commit, which is a different file when the subject
+is the thing you are writing.
+
 ### The sweeps, and what each measured
 
 Five enumerations, each over a shape rather than a hunch. Worth re-running as

@@ -78,18 +78,97 @@ describe('the name', () => {
     );
   });
 
-  it('names no second company anywhere in the legal corpus', () => {
-    // Any other `(Pty) Ltd` in these documents is either a second entity or a
-    // leftover, and both are worth stopping. A mention of futurebox the
-    // *application* is fine; futurebox the company is this one.
-    const others: string[] = [];
-    for (const file of documents) {
-      const text = readFileSync(join(LEGAL, file), 'utf8');
-      for (const match of text.matchAll(/([A-Z][A-Za-z0-9 ]{2,40}\(PTY\) LTD)/g)) {
-        if (match[1] !== OPERATOR_LEGAL_NAME) others.push(`${file}: ${match[1]}`);
-      }
+  /**
+   * Every company-shaped name in a document.
+   *
+   * The pattern used to be `\(PTY\) LTD`, case-sensitive and uppercase — so a
+   * second company written the way a second company would actually be
+   * written, `Acme Trading (Pty) Ltd`, matched nothing at all. The test's own
+   * comment says "any other `(Pty) Ltd`", which is the form it could not see.
+   * `Limited` spelled out, and a trailing full stop, were invisible too.
+   *
+   * Adding the `i` flag to the whole pattern is not the fix, which the first
+   * attempt discovered: it makes the leading `[A-Z]` case-insensitive as well,
+   * so the match swallows the prose in front of the name and reports `is a
+   * product of FUTUREBOXSTUDIO (PTY) LTD` as a second company.
+   *
+   * So the suffix is matched case-insensitively on its own, and the name is
+   * the run of words immediately before it with any lowercase prose words
+   * trimmed off the front. That reads a lowercase mention too, which the
+   * casing assertion below needs in order to object to one.
+   */
+  const COMPANY_SUFFIX = /\((?:pty|proprietary)\)\s*(?:ltd|limited)\.?/gi;
+
+  function companiesIn(text: string): string[] {
+    const found: string[] = [];
+    for (const match of text.matchAll(COMPANY_SUFFIX)) {
+      const before = text.slice(Math.max(0, match.index - 60), match.index);
+      const words = (/[A-Za-z0-9 .&'-]*$/.exec(before)?.[0] ?? '').trim().split(/\s+/);
+      while (words.length > 1 && /^[a-z]/.test(words[0]!)) words.shift();
+      found.push(`${words.join(' ')} ${match[0]}`.trim());
     }
+    return found;
+  }
+
+  const mentions = documents.flatMap((file) =>
+    companiesIn(readFileSync(join(LEGAL, file), 'utf8')).map((name) => ({ file, name })),
+  );
+  const isOurs = (name: string) => name.toUpperCase() === OPERATOR_LEGAL_NAME.toUpperCase();
+
+  it('reads a company name in the forms a company name is written in', () => {
+    expect(companiesIn('entered into with Acme Trading (Pty) Ltd and others')).toEqual([
+      'Acme Trading (Pty) Ltd',
+    ]);
+    expect(companiesIn('a product of Beta Holdings (Proprietary) Limited.')).toEqual([
+      'Beta Holdings (Proprietary) Limited.',
+    ]);
+    expect(companiesIn('is a product of FUTUREBOXSTUDIO (PTY) LTD')).toEqual([
+      'FUTUREBOXSTUDIO (PTY) LTD',
+    ]);
+    expect(companiesIn('no company here at all')).toEqual([]);
+  });
+
+  it('flags an all-lowercase mention, even though it cannot say where the name starts', () => {
+    // The limit of the trimming, written down rather than discovered later.
+    // Nothing distinguishes a lowercase company name from the lowercase prose
+    // in front of it, so the name comes back truncated to its last word. The
+    // mention is still found, which is all the assertions below need; the
+    // message they print will be short of a word.
+    expect(companiesIn('operated by gamma works (pty) ltd')).toEqual(['works (pty) ltd']);
+  });
+
+  it('finds our own name, which is what makes the two claims below mean anything', () => {
+    // The positive control. Both assertions after this pass by finding nothing
+    // unexpected, and a pattern that matches nothing finds nothing unexpected
+    // either. Ours is in four documents, each for a reason in NAMES_THE_ENTITY.
+    expect(
+      mentions
+        .filter((m) => isOurs(m.name))
+        .map((m) => m.file)
+        .sort(),
+      'the pattern no longer finds the company it was written for',
+    ).toEqual(Object.keys(NAMES_THE_ENTITY).sort());
+  });
+
+  it('names no second company anywhere in the legal corpus', () => {
+    // Any other company here is either a second entity or a leftover, and both
+    // are worth stopping. A mention of futurebox the *application* is fine;
+    // futurebox the company is this one.
+    const others = mentions.filter((m) => !isOurs(m.name)).map((m) => `${m.file}: ${m.name}`);
     expect(others, `a second company is named:\n  ${others.join('\n  ')}`).toEqual([]);
+  });
+
+  it('spells our own name the one way, wherever it appears', () => {
+    // Nothing else catches this. `reads identically in every document` asks
+    // whether the exact constant appears, not whether a second,
+    // differently-cased mention is sitting beside it.
+    const miscased = mentions
+      .filter((m) => isOurs(m.name) && m.name !== OPERATOR_LEGAL_NAME)
+      .map((m) => `${m.file}: ${m.name}`);
+    expect(
+      miscased,
+      `the company's own name, written another way:\n  ${miscased.join('\n  ')}`,
+    ).toEqual([]);
   });
 });
 
