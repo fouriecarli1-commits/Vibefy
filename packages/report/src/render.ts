@@ -258,14 +258,27 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
   /*
    * Where this score stands among other applications of the same kind.
    *
-   * Printed whatever it says, including "there are not enough of them yet".
-   * A comparison that only appears when it flatters is an advertisement, and
-   * a reader who has seen one once will wonder about every report that leaves
-   * it out.
+   * Printed whenever one was computed, including when it says "there are not
+   * enough of them yet". A comparison that only appears when it flatters is an
+   * advertisement, and a reader who has seen one once will wonder about every
+   * report that leaves it out.
+   *
+   * Left out only when the field is absent, which is a different case and was
+   * decided on purpose: `tests/comparison.test.ts` says "there was no attempt,
+   * so there is nothing to explain. A report assembled before this existed
+   * still renders." A sentence about a missing comparison, on a report from
+   * before comparisons existed, would be stranger than the silence.
+   *
+   * Spelled out because the paragraph above reads as covering the absent case
+   * and does not. I rewrote this block on that reading, and the test that had
+   * already decided it is what caught me. Every producer today sets the field,
+   * so a new report always prints the section.
    */
   const comparison = source.comparison ?? null;
-  const comparisonHtml = comparison
-    ? `<section>
+  const comparisonHtml =
+    comparison === null
+      ? ''
+      : `<section>
   <h2>Where this stands</h2>
   ${
     comparison.kind === 'percentile'
@@ -273,9 +286,7 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
      <p class="muted">${escapeHtml(comparison.limits)}</p>`
       : `<p class="muted">${escapeHtml(comparison.explanation)}</p>`
   }
-</section>`
-    : '';
-
+</section>`;
   const policy = source.policy ?? null;
   const policyHtml = policy
     ? `<section class="callout">
