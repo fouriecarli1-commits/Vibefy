@@ -1177,3 +1177,65 @@ until the candidate query turned out to exclude an application with a live
 badge, and a gitignored `.env` cannot reach the repository scan because `git
 clone --depth 1` carries only tracked files. A hypothesis that reads well is the
 one most likely to become a fix nobody needed.
+
+## Proving the blocks he pastes actually work
+
+`tests/the-sql-i-ask-him-to-paste.test.ts` compares `docs/sql/OUTSTANDING.sql`
+to the migrations statement for statement, in order, with none missing. That is
+the proof. This is the end-to-end confirmation of it, worth re-running whenever
+a block is added, because it answers the question he actually has: if I paste
+these in order, where do I end up?
+
+Build a database in his state — everything before the first outstanding block —
+then paste the file at it.
+
+```sh
+PG=/usr/lib/postgresql/16/bin
+SOCK="$PWD/.tmp/pg/socket"
+export PGOPTIONS="-c client_min_messages=warning"
+FIRST=$(grep -oE "^-- 20[0-9]{12}_[a-z_]+\.sql$" docs/sql/OUTSTANDING.sql \
+          | head -1 | sed 's/^-- //;s/\.sql$//')
+
+$PG/createdb -h "$SOCK" -U postgres his_state
+P="$PG/psql -v ON_ERROR_STOP=1 -q -h $SOCK -U postgres -d his_state"
+$P -f supabase/shim/local-postgres-shim.sql
+for m in supabase/migrations/*.sql; do
+  [ "$(basename "$m" .sql)" \< "$FIRST" ] || break
+  $P -f "$m"
+done
+
+# Now the paste, exactly as he does it.
+$PG/psql -v ON_ERROR_STOP=1 -h "$SOCK" -U postgres -d his_state \
+  -f docs/sql/OUTSTANDING.sql
+```
+
+Three things to check afterwards, and the third is the one that matters.
+
+```sh
+# 1. The audit agrees — before the paste it should name every outstanding
+#    block, and after it, nothing.
+node tools/migration-audit.mjs > /tmp/audit.sql
+$PG/psql -t -A -h "$SOCK" -U postgres -d his_state -f /tmp/audit.sql | tail -1
+
+# 2. Nothing errored. `ON_ERROR_STOP=1` above means a non-zero exit is a
+#    block that would have failed under his hands.
+
+# 3. The schema is the one the tests ran against — grants included.
+$PG/pg_dump -h "$SOCK" -U postgres --schema-only --no-owner -d his_state \
+  | grep -vE "^--|restrict " > /tmp/after.sql
+$PG/pg_dump -h "$SOCK" -U postgres --schema-only --no-owner -d vibefycode_test \
+  | grep -vE "^--|restrict " > /tmp/scratch.sql
+diff /tmp/after.sql /tmp/scratch.sql && echo identical
+```
+
+Do not pass `--no-acl` to those dumps. Seven of the eighteen blocks exist to
+revoke a privilege, so a comparison that excludes grants excludes the thing
+being tested — which a first run of this did, and it came back clean for the
+wrong reason.
+
+Measured on 2026-10-10: the audit named eighteen before and nothing after, every
+block applied with `ON_ERROR_STOP=1` set, and the two dumps differed by zero
+lines. Also worth knowing: regenerate the audit before using it. A stale
+`audit.sql` from earlier in the same session reported two migrations missing
+from a database that had them, which is the defect the markers had just been
+fixed for.
