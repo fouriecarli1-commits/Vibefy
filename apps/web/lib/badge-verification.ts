@@ -58,7 +58,23 @@ export interface BadgeVerificationLookup {
   readonly source: VerificationSource;
 }
 
-const COLUMNS = [
+/**
+ * Exactly the columns `public.badge_verification` publishes.
+ *
+ * Coupled to the view in both directions and checked against it in
+ * `tests/the-columns-the-badge-reads.test.ts`, because neither direction can be
+ * taken on trust:
+ *
+ *   · A name here that the view does not have makes the direct query fail with
+ *     `column does not exist`, which sends every badge down the fallback — and
+ *     the fallback selects the same list, so it fails too and the badge goes
+ *     grey everywhere at once. `owner_name` was removed from this view by
+ *     migration on 2026-09-23, and had this list not been edited with it, that
+ *     is what would have happened.
+ *   · A column the view has and this list omits is something published to
+ *     `anon` that nothing reads, which is either a leak or dead weight.
+ */
+export const BADGE_VERIFICATION_COLUMNS = [
   'public_id',
   'slug',
   'status',
@@ -75,7 +91,9 @@ const COLUMNS = [
   'owner_is_marketing_client',
   'owner_has_remediation',
   'exit_measurement',
-].join(', ');
+] as const;
+
+const COLUMNS = BADGE_VERIFICATION_COLUMNS.join(', ');
 
 /**
  * Reads the row, or throws when neither route can answer.

@@ -41,12 +41,25 @@ describe('which route answers', () => {
   });
 
   it('reads the same columns by either route', () => {
-    // One list, interpolated into the SQL and handed to `.select()`. Two lists
-    // is how a column arrives on one route and not the other, and the row
-    // feeds a signature check.
-    expect(lookup.match(/COLUMNS/g) ?? []).toHaveLength(3);
+    /*
+     * One list, interpolated into the SQL and handed to `.select()`. Two lists
+     * is how a column arrives on one route and not the other, and the row
+     * feeds a signature check.
+     *
+     * This counted occurrences of the identifier and expected three, which a
+     * rename broke without any of the above becoming untrue — exporting the
+     * array as `BADGE_VERIFICATION_COLUMNS` made it five. A count of a name is
+     * not the claim; one definition and two uses of it is. Measured that way
+     * now, so the next rename passes and a second list does not.
+     */
+    const definitions =
+      lookup.match(/^(?:export )?const \w*COLUMNS\w*\s*(?::[^=]+)?=\s*\[/gm) ?? [];
+    expect(definitions, `one list, not ${definitions.length}`).toHaveLength(1);
     expect(lookup).toMatch(/select \$\{COLUMNS\} from public\.badge_verification/);
     expect(lookup).toMatch(/\.select\(COLUMNS\)/);
+    expect(lookup, 'the string handed to both routes is built from the one list').toMatch(
+      /const COLUMNS = BADGE_VERIFICATION_COLUMNS\.join/,
+    );
   });
 
   it('reads as nobody on both routes', () => {
