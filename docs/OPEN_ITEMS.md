@@ -285,10 +285,24 @@ a password it must never quote the value.
   screenshot gets, and state in the authorisation document that a trace of the session
   is kept and what it contains. Cheapest, and it leaves the credential there.
 
-**What I need from you is which.** I would take the third today and the second when
-there is time, but it is your call: it is your customers' authorisation that says what
-we keep. Nothing is blocked while this is open — the artefact now records that nothing
-read its body, so neither of us can mistake it for one we checked.
+**How urgent it is, honestly.** The password half is not live yet. No caller sets the
+synthetic test account on a job — that is its own open item — so no trace in storage
+today contains a password. The URL half is live on every run: a trace records the full
+address of every navigation. Deciding this before the test account is wired is much
+cheaper than deciding it after.
+
+**The same decision has a second half.** Nine of the rubric's criteria say they are
+evidenced by a browser trace, including FI-01 and FI-02 — the primary journey and
+sign-in. The stage that answers most of them is the exploration, and it discards its
+trace: only the deterministic pass keeps one. So we are both storing a trace nothing
+cleans and failing to store the traces the published rubric names. A run now says in
+its notes which criteria carry less than the rubric names for them, so the gap is
+visible rather than assumed, but closing it means capturing more traces — which is the
+same question as above, pointing the other way.
+
+**What I need from you is which.** I would take the third option today and the second
+when there is time, but it is your call: it is your customers' authorisation that says
+what we keep. Nothing is blocked while this is open.
 
 ## Stubs in the codebase
 

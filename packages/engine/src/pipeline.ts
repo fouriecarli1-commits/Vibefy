@@ -113,6 +113,65 @@ export interface RunPipelineOptions {
  */
 const BEHIND_A_SIGN_IN = ['FI-02', 'FI-07', 'PRI-03', 'STR-03'] as const;
 
+/**
+ * Findings whose criterion names an evidence kind the finding does not carry.
+ *
+ * `requiredEvidence` is published. It is in `packages/rubric/versions`, it is
+ * in the migration that publishes the rubric to the database, and a customer
+ * can read it: FI-02, "sign-up and sign-in succeed and persist across
+ * refresh", says it is evidenced by a `playwright_trace`. Nine of rubric
+ * 1.1.0's criteria name one.
+ *
+ * Nothing read that field. The only test on it asserts every criterion names
+ * at least one kind, which is a check that the field is populated rather than
+ * honoured. And the stage that answers most of those nine — the functional
+ * exploration — opens a browser, starts a trace, and throws it away in
+ * `close()`: only the deterministic pass calls `captureTrace`. So a published
+ * promise about how a finding is evidenced was kept by one stage out of four
+ * and checked by nobody.
+ *
+ * This does not drop a finding. A defect that is real and evidenced by a
+ * screenshot is still a defect, and withholding it over the kind of file
+ * attached to it would be the gate serving itself rather than the customer.
+ * It says so instead, in the notes the report already carries for things that
+ * were not examined, and in the log, because which stage records what is ours
+ * to fix.
+ *
+ * Grouped by criterion: ten findings against FI-02 are one sentence, not ten.
+ */
+export function evidenceShortfall(
+  findings: readonly { readonly ruleId: string; readonly evidenceIds: readonly string[] }[],
+  kindOf: (id: string) => string | undefined,
+  rubricVersion: string,
+): { criterion: string; missing: string[] }[] {
+  const required = new Map<string, readonly string[]>();
+  for (const dimension of getRubric(rubricVersion).dimensions) {
+    for (const criterion of dimension.criteria) {
+      required.set(criterion.id, criterion.requiredEvidence);
+    }
+  }
+
+  const shortfall = new Map<string, Set<string>>();
+  for (const finding of findings) {
+    const wanted = required.get(finding.ruleId);
+    if (wanted === undefined || wanted.length === 0) continue;
+    const carried = new Set(
+      finding.evidenceIds
+        .map((id) => kindOf(id))
+        .filter((kind): kind is string => kind !== undefined),
+    );
+    const missing = wanted.filter((kind) => !carried.has(kind));
+    if (missing.length === 0) continue;
+    const already = shortfall.get(finding.ruleId) ?? new Set<string>();
+    for (const kind of missing) already.add(kind);
+    shortfall.set(finding.ruleId, already);
+  }
+
+  return [...shortfall.entries()]
+    .map(([criterion, kinds]) => ({ criterion, missing: [...kinds].sort() }))
+    .sort((a, b) => a.criterion.localeCompare(b.criterion));
+}
+
 export async function runPipeline(options: RunPipelineOptions): Promise<AssessmentOutcome> {
   const { context } = options;
   const rubricVersion = options.rubricVersion ?? '1.0.0';
@@ -225,6 +284,26 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
    * stage was going to say it on the way past.
    */
   notTested.push(...withoutACheck(context.target.isGame));
+
+  const shortfall = evidenceShortfall(
+    findings,
+    (id) => context.evidence.byId(id)?.kind,
+    rubricVersion,
+  );
+  if (shortfall.length > 0) {
+    context.log('findings carry less than the rubric names as their evidence', {
+      assessmentId: context.assessmentId,
+      rubricVersion,
+      shortfall: shortfall.map((entry) => `${entry.criterion} wants ${entry.missing.join(', ')}`),
+    });
+    notes.push(
+      `The published rubric names an evidence kind for each criterion. ${shortfall
+        .map((entry) => `${entry.criterion} names ${entry.missing.join(' and ')}`)
+        .join('; ')} — and this run did not record ${
+        shortfall.length === 1 ? 'it' : 'those'
+      } for the finding(s) filed there. What is attached to them is what was captured, and it is what a reviewer can check them by.`,
+    );
+  }
 
   if (context.target.hasAuthentication && context.syntheticCredentials === undefined) {
     for (const criterion of BEHIND_A_SIGN_IN) {
