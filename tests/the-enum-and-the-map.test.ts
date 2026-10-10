@@ -30,6 +30,7 @@ import { PLAN_TIERS } from '../packages/billing/src/index.ts';
 import { REQUEST_KINDS } from '../packages/governance/src/index.ts';
 import { getRubric, listRubricVersions } from '../packages/rubric/src/index.ts';
 import { badgeStatus, type BadgeRow } from '../packages/badge/src/index.ts';
+import pricing from '../config/pricing.json' with { type: 'json' };
 
 let db: Client;
 beforeAll(async () => {
@@ -171,10 +172,21 @@ describe('the pairs', () => {
     same(await valuesOf('assessment_stop_reason'), [...STOP_REASONS]);
   });
 
-  it('plan_tier has an entitlement for every tier', async () => {
-    // Coverage, depth, report tier and ceiling all come from this map. A tier
-    // with no entitlement is a plan whose terms nobody decided.
-    same(await valuesOf('plan_tier'), [...PLAN_TIERS]);
+  it('plan_tier has an entitlement and a price for every tier', async () => {
+    /*
+     * Three lists, not two. Coverage, depth, report tier and ceiling come from
+     * `ENTITLEMENTS`; what a customer is charged comes from
+     * `config/pricing.json`, which the pricing page and the Stripe adapter
+     * both read. A tier in the enum and the entitlements with no row in the
+     * pricing file is a plan nobody can buy, and the only symptom is an
+     * absence on a page.
+     */
+    const tiers = await valuesOf('plan_tier');
+    same(tiers, [...PLAN_TIERS]);
+    same(
+      tiers,
+      pricing.tiers.map((tier) => tier.id),
+    );
   });
 
   it('finding_severity has a penalty in every published rubric', async () => {
