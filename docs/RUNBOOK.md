@@ -1295,6 +1295,40 @@ work with it. `cp /tmp/subject.bak` restores the file you were testing. `git
 checkout` restores the last commit, which is a different file when the subject
 is the thing you are writing.
 
+### A published promise nobody reads
+
+The sharpest finds of 2026-10-10 all had one shape: something this product
+publishes, in a form a customer or a third party can read, with no code behind
+it.
+
+- `requiredEvidence` in the rubric says a finding against FI-02 is evidenced by
+  a browser trace. Nothing compared a finding's evidence against it, and the
+  stage answering most of those criteria discarded its trace.
+- `maximumBadgeValidityMonths` says twelve months. The worker had its own table
+  of terms by plan and a comment restating twelve by hand.
+- A gate says `blocksCertification: true`. Every check asked whether it said so;
+  none asked whether anything could trigger it.
+- `/api/badge/<id>` publishes the address of our signing keys and the exact
+  canonicalisation a verifier must reproduce. The address was a relative path
+  and the canonicalisation described a format the signer does not write.
+
+How to run the sweep: list what leaves this building. The rubric JSON and the
+migration that publishes it, the API responses, the badge payload, the legal
+documents in `legal/`, the `.well-known` keys, the trust-page claims, the
+accessibility statement. For each field in them, find the code that reads it. A
+published field with no reader is either decoration or a promise, and nobody
+outside can tell which.
+
+Two cheap tells. A comment restating a published number ("twelve months is the
+outside limit") means two copies, and the one in the code is the one that
+decides. And `grep` for the field name across the repository: one hit, in the
+file that publishes it, is the whole finding.
+
+The fix is rarely to enforce it silently. `evidenceShortfall` says what is
+missing and keeps the finding; `termWithinPublished` refuses to issue rather
+than clamping. Enforcing a published promise by quietly changing what a
+customer gets is the same defect pointed the other way.
+
 ### The sweeps, and what each measured
 
 Five enumerations, each over a shape rather than a hunch. Worth re-running as
