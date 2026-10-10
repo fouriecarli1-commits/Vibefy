@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "@vibefycode/shared": "workspace:*"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

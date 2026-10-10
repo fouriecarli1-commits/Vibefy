@@ -73,12 +73,15 @@ const SKIP_DIRS = new Set([
 const SKIP_FILES = new Set([
   'tools/copy-lint.mjs',
   'tools/copy-lint.test.ts',
-  // The run-time half of this gate, which necessarily contains every phrase it
-  // refuses. Skipping it is safe only because `tests/claim-check.test.ts` pins
-  // its list to the one in this file: prose smuggled in there fails that test
-  // instead, and two lists that could drift would be worse than one skipped
-  // file — the drifting one would be the one facing the public.
+  // The two run-time halves of this gate, which necessarily contain every
+  // phrase they refuse. Skipping them is safe only because their lists are
+  // pinned to the one in this file — `tests/claim-check.test.ts` for the words
+  // a customer types, `tests/the-words-the-model-wrote.test.ts` for the words a
+  // model writes — so prose smuggled into either fails a test instead. Two
+  // lists that could drift would be worse than one skipped file: the drifting
+  // one would be the one facing the public.
   'packages/shared/src/claim-check.ts',
+  'packages/shared/src/drafted-text.ts',
   'supabase/migrations/20260830110000_publish_rubric_1_0_0.sql',
   // And 1.1.0's, for the identical reason: it embeds the same rubric JSON, and
   // `tests/rubric-published.test.ts` pins every published version's payload to
@@ -91,7 +94,6 @@ const SKIP_FILES = new Set([
   // Kept to the list alone — `packages/copilot/src/index.ts` holds the prose
   // the assistant is instructed with and stays scanned, which
   // `tests/copilot-route.test.ts` asserts.
-  'packages/copilot/src/guard.ts',
   // And its tests, for the reason `tools/copy-lint.test.ts` is here: a test
   // that proves a phrase is refused has to contain the phrase.
   'packages/copilot/src/copilot.test.ts',

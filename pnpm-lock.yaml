@@ -329,6 +329,10 @@ importers:
         version: 7.0.2
 
   packages/copilot:
+    dependencies:
+      '@vibefycode/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: 26.2.0

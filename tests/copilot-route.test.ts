@@ -146,7 +146,14 @@ describe('the exemption is the list, not the prose', () => {
   })();
 
   it('exempts the rule list, which necessarily contains every forbidden phrase', () => {
-    expect(skipped).toContain('packages/copilot/src/guard.ts');
+    // The list moved to `@vibefycode/shared` on 2026-10-10, because the
+    // assistant was not the only thing drafting text a customer reads: the
+    // findings in a paid report are written by a model and went through no
+    // gate at all. `packages/copilot/src/guard.ts` is a wrapper now and needs
+    // no exemption — which is the better state, since the exemption should sit
+    // on exactly as many files as necessarily contain the words.
+    expect(skipped).toContain('packages/shared/src/drafted-text.ts');
+    expect(skipped).not.toContain('packages/copilot/src/guard.ts');
   });
 
   it('does not exempt the file the assistant is instructed with', () => {

@@ -8,6 +8,7 @@
  * here, in code, before it can reach a report.
  */
 import { z } from 'zod';
+import { checkDraftedText } from '@vibefycode/shared';
 import { BrowserSession } from '../runtime/browser.ts';
 import { ScopedHttp } from '../runtime/http.ts';
 import { classifyStop, stopNote } from '../runtime/stop.ts';
@@ -172,15 +173,36 @@ export function createModelStage(config: ModelStageConfig): Stage {
           };
         }
 
-        const { kept, dropped } = enforceEvidence(output.findings, mintedEvidence, context);
-        if (dropped.length > 0) {
+        const evidenced = enforceEvidence(output.findings, mintedEvidence, context);
+
+        /*
+         * Both halves, before either becomes report text.
+         *
+         * The dropped findings go through it too, because the sentence below
+         * quotes their titles — a claim we refuse to publish as a finding
+         * must not arrive in the note explaining why we refused it.
+         */
+        const { findings: kept, withheld } = withholdOverclaims(evidenced.kept);
+        const unevidenced = unevidencedNote(evidenced.dropped);
+        if (unevidenced !== null) notes.push(unevidenced);
+
+        const modelNotes = withheldNotes(output.notes);
+        notes.push(...modelNotes.notes);
+
+        const overclaimed = [...withheld, ...modelNotes.withheld];
+        if (overclaimed.length > 0) {
+          // Logged as well as noted: a model reaching for these words is
+          // something to read the prompt about, and a line in a customer's
+          // report is not where that gets noticed.
+          context.log('model text withheld before it reached a report', {
+            assessmentId: context.assessmentId,
+            stage: config.id,
+            withheld: overclaimed,
+          });
           notes.push(
-            `${dropped.length} claim(s) were withheld because they cited no evidence we captured: ${dropped
-              .map((finding) => finding.title)
-              .join('; ')}. Unverifiable claims are dropped rather than published.`,
+            `${overclaimed.length} sentence(s) written during this stage were withheld before they reached this report, because VibefyCode may not state what they stated. Nothing was removed from what was found: the criteria, the severities and the evidence are all here.`,
           );
         }
-        notes.push(...output.notes);
 
         // An exploration that used every turn it is allowed did not finish
         // looking. The findings it produced stand; the ones it did not reach
@@ -329,6 +351,102 @@ const HALT_EXPLANATION: Readonly<Record<string, string>> = {
   refused:
     'The model declined to answer. That is not a fault in the application and not a fault in this code; it needs a person to look at what was sent.',
 };
+
+/**
+ * The words a model wrote, checked before they become report text.
+ *
+ * `enforceEvidence` above asks whether a finding is supported. This asks
+ * whether the sentences describing it are ones we may publish — and until
+ * 2026-10-10 nothing did. The assistant beside the report has had every reply
+ * checked since the day it shipped, and the route doing it says in its header
+ * that the reply is "the only text the product sends a customer that no
+ * build-time gate has read". A model writes most of the words in a paid
+ * report: the titles, the descriptions, the remediation steps and these notes.
+ * PART 11 of the brief names report text first.
+ *
+ * A reply is withheld whole, because a reply is one thing. A finding is not: it
+ * carries a rubric criterion, a severity and evidence we captured, all of which
+ * are ours and none of which the sentence can spoil. Dropping it would lose a
+ * defect the customer paid to be told about over a choice of words, so the
+ * offending sentence is withheld, by itself, and what replaces it says which
+ * rule it tripped.
+ *
+ * The title is replaced rather than removed: a finding has to be nameable, and
+ * the criterion and severity name it well enough to find in the report.
+ */
+function withheldSentence(reasons: readonly string[]): string {
+  return `This sentence was withheld before it reached you, because it ${reasons.join(
+    ', and it ',
+  )}. That is a limit on what VibefyCode may state, not a change to the finding: the criterion, the severity and the evidence are unaffected. Ask us to restate it and a person will.`;
+}
+
+export function withholdOverclaims(findings: readonly RawFinding[]): {
+  findings: RawFinding[];
+  withheld: string[];
+} {
+  const withheld: string[] = [];
+  const checked = findings.map((finding) => {
+    const titleCheck = checkDraftedText(finding.title);
+    const descriptionCheck = checkDraftedText(finding.description);
+    const remediationCheck = checkDraftedText(finding.remediation);
+    if (titleCheck.allowed && descriptionCheck.allowed && remediationCheck.allowed) return finding;
+
+    for (const check of [titleCheck, descriptionCheck, remediationCheck]) {
+      if (!check.allowed) withheld.push(`${finding.ruleId}: ${check.reasons.join('; ')}`);
+    }
+
+    return {
+      ...finding,
+      title: titleCheck.allowed
+        ? finding.title
+        : `A ${finding.severity} finding against ${finding.ruleId}, whose title was withheld`,
+      description: descriptionCheck.allowed
+        ? finding.description
+        : withheldSentence(descriptionCheck.reasons),
+      remediation: remediationCheck.allowed
+        ? finding.remediation
+        : withheldSentence(remediationCheck.reasons),
+    };
+  });
+  return { findings: checked, withheld };
+}
+
+/**
+ * The same check on a note, which is the other half of what a model writes.
+ *
+ * Notes are the sentences about what could not be reached and what the
+ * customer should know, and they go into the report beside the findings. A
+ * note has no criterion and no evidence to protect, so a tripped one is
+ * replaced outright.
+ */
+/**
+ * The sentence that says what was dropped for citing no evidence.
+ *
+ * It quotes the titles, which are a model's words, so it withholds them first.
+ * A claim we refuse to publish as a finding must not arrive in the note
+ * explaining why we refused it — and when that was two lines at the call site
+ * rather than one function, a mutation that removed the withholding left every
+ * test green. This returns null for an empty list so the caller cannot compose
+ * a note about nothing.
+ */
+export function unevidencedNote(dropped: readonly RawFinding[]): string | null {
+  if (dropped.length === 0) return null;
+  const titles = withholdOverclaims(dropped)
+    .findings.map((finding) => finding.title)
+    .join('; ');
+  return `${dropped.length} claim(s) were withheld because they cited no evidence we captured: ${titles}. Unverifiable claims are dropped rather than published.`;
+}
+
+export function withheldNotes(notes: readonly string[]): { notes: string[]; withheld: string[] } {
+  const withheld: string[] = [];
+  const checked = notes.map((note) => {
+    const check = checkDraftedText(note);
+    if (check.allowed) return note;
+    withheld.push(check.reasons.join('; '));
+    return withheldSentence(check.reasons);
+  });
+  return { notes: checked, withheld };
+}
 
 export function enforceEvidence(
   findings: readonly StageOutput['findings'][number][],

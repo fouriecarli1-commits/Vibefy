@@ -28,10 +28,15 @@ import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
  *   · The context is read as the caller, through row-level security. There is
  *     no assessment id you can pass to see somebody else's findings, because
  *     the query that assembles the grounding cannot see them either.
- *   · Every reply is checked before it is returned. This is the only text the
- *     product sends a customer that no build-time gate has read, and an
- *     assistant that calls an application secure has undone the sentence the
- *     rest of the product is careful about.
+ *   · Every reply is checked before it is returned. An assistant that calls
+ *     an application secure is making a claim we do not make, and it undoes
+ *     the sentence the rest of the product is careful about. This bullet used
+ *     to call the reply the only text the product sends a customer that no
+ *     build-time gate has read, which was false: a model writes the title,
+ *     the description and the remediation step of every finding in a paid
+ *     report. Those go through the same check now, from the same list in
+ *     `@vibefycode/shared` — see `withholdOverclaims` in the engine's model
+ *     stage, which withholds the sentence rather than the finding.
  *   · The tokens are priced and written to `cost_records`. An assistant that
  *     spends without appearing in the ledger is exactly the hole the spend cap
  *     was blind to a week ago, rebuilt with a text box in front of it.
