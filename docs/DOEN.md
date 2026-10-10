@@ -238,6 +238,11 @@ in plaas van die een wat misluk het, en jy is klaar met die res ook.
 sowat agt-en-half-duisend reëls wat jy nie nodig het nie. Met die nommer van die
 een wat misluk het, is dit sowat agthonderd.
 
+Tik jy die nommer verkeerd, weier dit en skryf niks: `No migration starts
+with …`. Tik dit dan net weer. En as dit wel loop, wys dit op jou skerm hoeveel
+migrasies dit oorgeskryf het — daardie getal moet klop met hoeveel blokke ná
+daardie een oor is.
+
 En as jy nie weet waar jou databasis staan nie:
 
 ```

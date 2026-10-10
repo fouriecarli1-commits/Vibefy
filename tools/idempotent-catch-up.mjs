@@ -25,10 +25,15 @@
  * Nothing here is trusted because it looks right.
  *
  *     node tools/idempotent-catch-up.mjs [fromMigration] > catch-up.sql
+ *
+ * `fromMigration` must name a migration — the full name or its leading
+ * timestamp. A number that names none is refused rather than quietly covering
+ * nothing, which is what it used to do.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 
-const from = process.argv[2] ?? '00000000000000';
+const EVERYTHING = '00000000000000';
+const from = process.argv[2] ?? EVERYTHING;
 const dir = 'supabase/migrations';
 
 /** `create type X as enum (...)` has no `if not exists`, so it gets a guard. */
@@ -117,9 +122,39 @@ function idempotent(sql) {
   return out;
 }
 
-const files = readdirSync(dir)
-  .filter((file) => file.endsWith('.sql') && file.replace(/\.sql$/, '') >= from)
+const all = readdirSync(dir)
+  .filter((file) => file.endsWith('.sql'))
+  .map((file) => file.replace(/\.sql$/, ''))
   .sort();
+
+/*
+ * A number no migration carries selects none of them.
+ *
+ * `from` is compared as a string, so one wrong digit in the date sorts after
+ * every filename and the run produced a file of nothing but comments, exit 0,
+ * and a header reading "Covers 0 migration(s), from undefined onward". Pasted
+ * into Supabase that answers "Success. No rows returned" — the same answer a
+ * correct catch-up on an up-to-date database gives. The person who mistyped
+ * is told he is finished.
+ *
+ * So the number has to name a migration. Accepted is anything that a filename
+ * starts with, which is both the full name printed in `docs/sql/OUTSTANDING.sql`
+ * and the bare fourteen-digit timestamp.
+ */
+if (from !== EVERYTHING && !all.some((name) => name.startsWith(from))) {
+  console.error(`\n✗ No migration starts with "${from}". Nothing was written.\n`);
+  console.error('  The number to pass is the one above each block in docs/sql/OUTSTANDING.sql,');
+  console.error(`  for example ${all.at(-1)}.\n`);
+  process.exit(1);
+}
+
+const files = all.filter((name) => name >= from).map((name) => `${name}.sql`);
+
+/* Belt and braces: the guard above should make this impossible. */
+if (files.length === 0) {
+  console.error(`\n✗ "${from}" selected no migrations. Nothing was written.\n`);
+  process.exit(1);
+}
 
 const parts = [
   `-- ============================================================================
@@ -129,7 +164,7 @@ const parts = [
 -- it is not already there, so a paste that failed halfway can simply be run
 -- again, and a database that is already up to date is left alone.
 --
--- Covers ${files.length} migration(s), from ${files[0]?.replace(/\\.sql$/, '')} onward, in order.
+-- Covers ${files.length} migration(s), from ${files[0].replace(/\.sql$/, '')} onward, in order.
 -- Run the whole thing in one go.
 -- ============================================================================
 `,
@@ -153,4 +188,12 @@ for (const file of files) {
   }
 }
 
+/*
+ * The documented invocation is `… > catch-up.sql`, so the header lands in the
+ * file and not on his screen. The one number worth checking against the
+ * eighteen in `docs/sql/OUTSTANDING.sql` goes to the other stream.
+ */
+console.error(
+  `\n✓ ${files.length} migration(s), from ${all.find((name) => name >= from)} onward.\n`,
+);
 console.log(parts.join('\n'));
