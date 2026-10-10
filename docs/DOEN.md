@@ -3,7 +3,7 @@
 Alles wat op jou wag, in volgorde. Niks hiervan kan ek vir jou doen nie — ek het
 nie toegang tot Vercel, Supabase, Render of Resend nie.
 
-Laas nagegaan 2026-10-08.
+Laas nagegaan 2026-10-10.
 
 > **Eerste, en dit neem een minuut: Vercel → Deployments → boonste een → ⋯ →
 > Redeploy.**
@@ -13,6 +13,11 @@ Laas nagegaan 2026-10-08.
 > se eie API kan dit oor HTTPS gee met die publieke sleutel wat jou konsole al
 > die tyd gebruik, sonder enige databasis-URL. Niks het daardie pad gebruik nie.
 > Nou probeer dit eers die direkte verbinding, en val dan daarop terug.
+>
+> Vier ander foute in die badge-pad self is sedertdien reggemaak. Een daarvan
+> het elke badge sonder `?size=` in die URL as 'n klein grys raampie van 64
+> pixels gewys in plaas van volle grootte — presies wat jy gesien het. Die
+> redeploy bring almal saam.
 >
 > **Klaar as:** die badge wys 'n telling in plaas van grys.
 >
