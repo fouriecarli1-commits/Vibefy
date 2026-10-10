@@ -1078,10 +1078,33 @@ authorisation to test an application granted by a person who did not grant it.
 schema makes illegal states impossible — a badge issuing with no human review, an
 append-only table written over.
 
-Measured on 2026-09-23: of forty-four read-scoping policies, sixteen had no test.
-Of twenty-six assertion triggers, none did. Worth knowing before running it, and
-worth re-running rather than trusting: the layer that turned out to be weak was
-not the one anybody would have guessed.
+Re-measured on 2026-10-10, and both halves of the old number are out of date —
+which is the reason to run it rather than read about it.
+
+- **Reads.** Forty-five policies now (the schema grew from forty-four). Opening
+  all of them at once fails fourteen test files. That is not the same quantity
+  as September's "twenty-eight of forty-four covered" and must not be read as a
+  comparison: a test file can notice several policies and several can notice
+  one. What has certainly changed is the gap itself —
+  `tests/read-isolation-sweep.test.ts` was written from that run and is
+  table-driven over the sixteen policies that had nothing, so those sixteen are
+  covered by construction.
+- **Triggers.** Twenty-nine of them, and disabling them all fails twenty-eight
+  test files. In September the count of covered triggers was zero, so any
+  failure at all is the change;
+  `tests/the-tables-that-may-only-be-added-to.test.ts` and the authorisation and
+  review tests are most of it.
+
+What an all-at-once run can and cannot say: a failure proves something notices
+that policy's loss, and a _pass_ proves nothing about any individual policy —
+only that the set as a whole is not wholly unguarded. Resolving it per policy
+means one suite run each, which is four and a half minutes a policy. The useful
+middle is to open one table's policies at a time when a table matters.
+
+Five of the failures in either run are the gate noticing the generated
+migration: `deployment`, `migration-audit`, `the-sql-i-ask-him-to-paste`,
+`a-marker-that-was-already-true` and `the-audit-that-answered-for-fewer`. That
+is their job, and they are the failures to ignore.
 
 Every policy in the class whose loss nothing notices is a hole in the tests, not
 in the schema. `deployment.test.ts` will fail on the schema-file comparison —
