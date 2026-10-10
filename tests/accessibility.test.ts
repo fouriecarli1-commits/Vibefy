@@ -311,16 +311,37 @@ describe('the scan keeps up with the pages', () => {
       'Redirects to /sign-in without a session, so a scan of it scans that page. It is reached only from the auth callback, by an account that has just been created and has no acceptance on record.',
   };
 
-  const scanned = (() => {
-    const source = readFileSync(join(process.cwd(), 'tools/a11y-scan.mts'), 'utf8');
+  /**
+   * The scanned routes, read out of the scanner's own source.
+   *
+   * Comments are stripped first, and that is the whole point. Without it, a
+   * route name quoted anywhere in the block counted as scanned — including in
+   * the comment somebody writes when they comment the line out, which is the
+   * ordinary way to disable a line of TypeScript:
+   *
+   *     // we stopped scanning '/pre-flight' for now
+   *
+   * Measured: removing `'/pre-flight'` from PAGES and leaving a comment that
+   * mentions it kept this block green. The guard against a public page
+   * shipping unscanned was defeated by the most likely edit there is.
+   *
+   * Line comments before block comments, which is the order the rest of the
+   * source-text assertions in this repository use.
+   */
+  const scannedRoutesFrom = (source: string): string[] => {
     const block = /const PAGES = \[([\s\S]*?)\]/.exec(source);
     if (!block) throw new Error('a11y-scan no longer has a PAGES list');
-    const literal = [...block[1]!.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
+    const code = block[1]!.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    return [...code.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
+  };
+
+  const scanned = (() => {
+    const source = readFileSync(join(process.cwd(), 'tools/a11y-scan.mts'), 'utf8');
     // The verification page has no literal URL — it exists only once a badge is
     // seeded — so the scan pushes it onto the list at run time. Counting it here
     // is the point of SEEDED_ROUTES: a route scanned by a mechanism this test
     // knows nothing about is a route that can stop being scanned in silence.
-    return [...literal, ...SEEDED_ROUTES];
+    return [...scannedRoutesFrom(source), ...SEEDED_ROUTES];
   })();
 
   it('found the routes it is talking about', () => {
@@ -343,6 +364,76 @@ describe('the scan keeps up with the pages', () => {
       missed,
       `Public pages nobody scans: ${missed.join(', ')}. Add them to PAGES in tools/a11y-scan.mts, or excuse them in this test with a reason.`,
     ).toEqual([]);
+  });
+
+  /**
+   * What each excuse claims, as something that can go red.
+   *
+   * The reasons above are prose, written once, asserting facts about pages:
+   * that two of them redirect without a session, that a third renders the same
+   * form component as a page that is scanned. All three were true when they
+   * were written and nothing kept them true. Make `/auth/new-password` render
+   * its form directly and the excuse becomes false, the page becomes
+   * unscanned, and the only thing that would have objected is a sentence.
+   *
+   * A reason nobody re-measures is the shape of defect this whole sweep has
+   * been finding; an exemption is the worst place for one, because an
+   * exemption is where the gate agreed not to look.
+   */
+  const pageSource = (route: string) =>
+    readFileSync(join(appDir, `${route.replace(/^\//, '')}/page.tsx`), 'utf8');
+
+  const CLAIMS: Readonly<Record<string, () => void>> = {
+    '/sign-up': () => {
+      // "the same form component with a different heading"
+      const [up, inn] = [pageSource('/sign-up'), pageSource('/sign-in')];
+      for (const component of ['AuthForm', 'ProviderSignIn']) {
+        expect(up, `sign-up no longer uses ${component}`).toContain(component);
+        expect(inn, `sign-in no longer uses ${component}`).toContain(component);
+      }
+    },
+    '/auth/new-password': () => {
+      // "redirects to /forgot-password without a session"
+      expect(pageSource('/auth/new-password')).toMatch(
+        /if \(!user\)\s*redirect\('\/forgot-password'\)/,
+      );
+    },
+    '/auth/accept': () => {
+      // "redirects to /sign-in without a session"
+      expect(pageSource('/auth/accept')).toMatch(/if \(!user\)\s*redirect\('\/sign-in'\)/);
+    },
+    '/invite/[token]': () => {
+      // "needs a live invitation token" — true of the route's shape, not of a
+      // line of code, so this is the whole of it.
+      expect('/invite/[token]').toContain('[');
+    },
+  };
+
+  it('has a check for every excuse, so a new one cannot arrive as prose alone', () => {
+    expect(Object.keys(CLAIMS).sort()).toEqual(Object.keys(EXCUSED).sort());
+  });
+
+  it.each(Object.keys(CLAIMS))('the excuse for %s is still true of the page', (route) => {
+    CLAIMS[route]!();
+  });
+
+  it('does not count a route that is only mentioned in a comment', () => {
+    const commented = [
+      'const PAGES = [',
+      "  '/kept',",
+      "  // we stopped scanning '/dropped' for now",
+      "  /* and '/also-dropped' while we are here */",
+      '];',
+    ].join('\n');
+    expect(scannedRoutesFrom(commented)).toEqual(['/kept']);
+  });
+
+  it('still reads the real list, so the stripping has not eaten it', () => {
+    // An absence assertion needs something anchoring it. If the stripping ever
+    // removes too much, the block above would pass on an empty list.
+    expect(scanned.length).toBeGreaterThan(15);
+    expect(scanned).toContain('/pre-flight');
+    expect(scanned).toContain('/legal/badge-licence');
   });
 
   it('does not excuse a page without a reason', () => {
