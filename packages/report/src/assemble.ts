@@ -82,6 +82,55 @@ interface PolicyRow {
   require_store_readiness: boolean;
 }
 
+/**
+ * The columns this assembler turns into a claim, and what each absence would
+ * assert instead.
+ *
+ * The query is `select a.*`, so these arrive by being columns of
+ * `public.assessments` rather than by being asked for, and `AssessmentRow`
+ * above is a declaration about what `a.*` contains rather than a check. Every
+ * one of them is then read with a default — `?? []`, `?? ''`, `=== true` — and
+ * a default cannot tell an empty value from an absent column.
+ *
+ * What that would cost, in this file's own words about `not_tested`: "a
+ * document that quietly drops the questions it could not answer lets the reader
+ * assume the missing line was fine, and that is the specific way an assurance
+ * report misleads somebody." A renamed column does exactly that, to every
+ * report, silently.
+ *
+ * So the keys are checked rather than the values. `'not_tested' in row` is the
+ * whole mechanism, and it distinguishes the two cases a default cannot.
+ */
+const CLAIM_COLUMNS: Readonly<Record<string, string>> = {
+  not_tested:
+    'absent, every report would say nothing went unanswered, which is the one thing this document must never imply by omission',
+  gate_failures:
+    'absent, an assessment blocked from certification would list no blockers, and the page would read as though nothing stood in the way',
+  certification_eligible:
+    'absent, `=== true` is false and a certified assessment would be reported as not eligible — wrong in the direction that costs the customer their badge rather than the direction that costs us our word, and wrong either way',
+  dimension_scores:
+    'absent, the table of dimensions would be empty under a real overall score, and the comparison would place the application against its peers on nothing',
+  scope_statement:
+    'absent, the refusal below would fire with a message about a short scope statement, which would send somebody looking in the wrong place',
+  prompt_bundle_sha256:
+    'absent, the report would carry an empty hash where it names the prompts the run used, which is the field a reviewer reproduces a run from',
+};
+
+export class ReportSourceIncompleteError extends Error {
+  constructor(assessmentId: string, column: string, consequence: string) {
+    super(
+      `Assessment ${assessmentId} came back without the column "${column}". No report was ` +
+        `assembled: ${consequence}.`,
+    );
+    this.name = 'ReportSourceIncompleteError';
+  }
+}
+
+/** Which of them the row does not carry, in the order they are declared. */
+export function missingClaimColumns(row: object): string[] {
+  return Object.keys(CLAIM_COLUMNS).filter((column) => !(column in row));
+}
+
 export async function assembleReportSource(
   client: SqlExecutor,
   assessmentId: string,
@@ -97,6 +146,10 @@ export async function assembleReportSource(
   );
   const row = assessment.rows[0];
   if (!row) throw new Error(`Assessment ${assessmentId} does not exist.`);
+
+  for (const column of missingClaimColumns(row)) {
+    throw new ReportSourceIncompleteError(assessmentId, column, CLAIM_COLUMNS[column] ?? 'unknown');
+  }
 
   /*
    * A report is a statement about a number. There has to be one.

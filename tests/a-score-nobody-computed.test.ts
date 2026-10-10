@@ -28,7 +28,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from 'pg';
-import { assembleReportSource } from '../packages/report/src/assemble.ts';
+import { assembleReportSource, missingClaimColumns } from '../packages/report/src/assemble.ts';
 import { connect } from './setup/client.ts';
 import {
   makeReviewer,
@@ -128,5 +128,84 @@ describe('what a report may be assembled from', () => {
     const source = await assembleReportSource(db, assessmentId);
     expect(source.overallScore).toBe(0);
     expect(source.band).toBe('Not ready');
+  });
+});
+
+/**
+ * The columns a default cannot speak for.
+ *
+ * The query is `select a.*`, so `not_tested`, `gate_failures` and the rest
+ * arrive by being columns of `public.assessments` rather than by being asked
+ * for — and each is read with a default. `?? []` cannot tell an empty value
+ * from an absent column, which means a rename would have every report assert
+ * that nothing went unanswered and that nothing blocked certification.
+ *
+ * This file's subject is the same mistake one field over: a function that
+ * cannot tell nought from not measured. These are checked by key rather than
+ * by value, because `'not_tested' in row` is the only thing that can tell the
+ * two apart.
+ */
+describe('a row that came back without a column', () => {
+  it('names the missing column and what its absence would have asserted', () => {
+    const row = {
+      id: 'assessment-1',
+      overall_score: 71,
+      scope_statement: 'x'.repeat(120),
+      gate_failures: [],
+      certification_eligible: true,
+      dimension_scores: [],
+      prompt_bundle_sha256: 'abc',
+    };
+    expect(missingClaimColumns(row)).toEqual(['not_tested']);
+  });
+
+  it('says nothing is missing when every column is there, including an empty one', () => {
+    // The half that makes the other half mean something: an empty array is a
+    // real answer and must not be refused.
+    const row = {
+      not_tested: [],
+      gate_failures: [],
+      certification_eligible: false,
+      dimension_scores: [],
+      scope_statement: '',
+      prompt_bundle_sha256: '',
+    };
+    expect(missingClaimColumns(row)).toEqual([]);
+  });
+
+  it('refuses to assemble rather than reporting the default', async () => {
+    /*
+     * Through the real function, with a fake executor, because the refusal has
+     * to be in the path both callers take — the sweep that stores a report and
+     * the console page that renders one live. The row carries everything but
+     * `not_tested`.
+     */
+    const row = {
+      id: 'assessment-1',
+      app_name: 'An App',
+      primary_url: 'https://customer.example',
+      intended_for_app_store: false,
+      category: null,
+      policy_profile_id: null,
+      organisation_name: 'A Workspace',
+      rubric_version: '1.1.0',
+      overall_score: 71,
+      dimension_scores: [],
+      certification_eligible: true,
+      gate_failures: [],
+      scope_statement: 'x'.repeat(120),
+      prompt_bundle_sha256: 'abc',
+      report_narrative: null,
+      completed_at: '2026-10-01T00:00:00.000Z',
+      created_at: '2026-10-01T00:00:00.000Z',
+      reviewed_at: null,
+    };
+    const executor = { query: async () => ({ rows: [row] }) };
+    await expect(assembleReportSource(executor as never, 'assessment-1')).rejects.toThrow(
+      /without the column "not_tested"/,
+    );
+    await expect(assembleReportSource(executor as never, 'assessment-1')).rejects.toThrow(
+      /nothing went unanswered/,
+    );
   });
 });
