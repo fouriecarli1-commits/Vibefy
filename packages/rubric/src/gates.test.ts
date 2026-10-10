@@ -21,7 +21,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  assertRubricGates,
+  assertRubricIsScorable,
   rubricVersionsValidated,
   forgetRubricValidation,
   getRubric,
@@ -74,7 +74,7 @@ function withGate(gate: Record<string, unknown>): RubricDefinition {
 
 describe('the wiring', () => {
   it('is run by getRubric, not only available to be called', () => {
-    // Removing `assertRubricGates(definition)` from `getRubric` left every
+    // Removing `assertRubricIsScorable(definition)` from `getRubric` left every
     // other test here green: they call the validator directly, so they proved
     // the rule and said nothing about anything using it. This watches the call
     // happen.
@@ -109,7 +109,7 @@ describe('the wiring', () => {
 /** Runs the same check `getRubric` runs, on a definition it does not hold. */
 function check(definition: RubricDefinition): void {
   forgetRubricValidation();
-  assertRubricGates(definition);
+  assertRubricIsScorable(definition);
 }
 
 describe('a malformed gate', () => {

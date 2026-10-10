@@ -1166,6 +1166,22 @@ The two shapes worth carrying from it:
 - **An instruction we publish for somebody else to follow.** Nobody runs it, so
   nothing checks it. Rebuild its output in a test and compare to the real
   thing.
+- **A list that names what to block, withhold or strip.** Found four times on
+  2026-10-10 and complete every time, by coincidence every time: the screening
+  statuses that stop a run (two of three, so a fourth value would have been
+  assessed), the free-tier fields to blank (two of nine, so a tenth would have
+  shipped free), the restrictions in the authorisation ceiling (`raw.x ===
+true` is right for a permission and backwards for a restriction), and the
+  retired-key fields to drop (none, so a pasted private scalar was published).
+  Name what is permitted instead, and the default moves to the safe side. The
+  test then reads the full set from wherever it really lives — a `pg_enum`, an
+  interface, `information_schema` — and refuses anything unclassified.
+- **An invariant the arithmetic assumes.** `scoreAssessment` takes
+  `Σ(score × weight)` as a score out of 100, which is only true if the weights
+  sum to one. Nothing in the code checked it; a test did, for the current
+  version only. Weights summing to 0.9 depress every score in the product by a
+  tenth and raise nothing. Ask of every calculation: what has to be true for
+  this line to mean what it says, and who checks it?
 
 ### Screening for the first signature instead of reading for it
 

@@ -125,8 +125,48 @@ const validated = new Set<string>();
  * without a seam the only way to test the guard is to make the registry
  * writable, which is a worse thing to do to this package.
  */
-export function assertRubricGates(definition: RubricDefinition): void {
+export function assertRubricIsScorable(definition: RubricDefinition): void {
   if (validated.has(definition.version)) return;
+
+  /*
+   * The weights are the arithmetic.
+   *
+   * `scoreAssessment` computes `dimensions.reduce((total, d) => total + d.score
+   * * d.weight, 0)` and takes that as the overall score out of 100, which is
+   * only true if the weights sum to one. Weights summing to 0.9 depress every
+   * score in the product by a tenth; 1.1 inflates every one. Neither shows up
+   * as an error anywhere — the number is simply wrong, on every badge, and
+   * reads exactly like a number that is right.
+   *
+   * It was asserted in `packages/rubric/src/scoring.test.ts`, for the current
+   * version only, because that test calls `getRubric()` with no argument. A
+   * score recomputed against an older version — which the file's own comment
+   * says never happens, but the registry still holds them — went unchecked.
+   * Here it is checked for whichever version is about to score something.
+   *
+   * No dimensions at all is the same defect with a cleaner edge: the reduce
+   * returns 0 and every application scores zero.
+   */
+  if (definition.dimensions.length === 0) {
+    throw new MalformedRubricError(definition.version, 'no dimensions, so nothing to score');
+  }
+  for (const dimension of definition.dimensions) {
+    if (!Number.isFinite(dimension.weight) || dimension.weight <= 0) {
+      throw new MalformedRubricError(
+        definition.version,
+        `a dimension (${dimension.id}) whose weight is ${JSON.stringify(dimension.weight)}`,
+      );
+    }
+  }
+  const weightTotal = definition.dimensions.reduce((total, d) => total + d.weight, 0);
+  if (Number(weightTotal.toFixed(10)) !== 1) {
+    throw new MalformedRubricError(
+      definition.version,
+      `dimension weights summing to ${weightTotal} rather than 1, which makes every score it ` +
+        'produces wrong by that factor',
+    );
+  }
+
   for (const gate of definition.gates) {
     const named = gate.id || '(a gate with no id)';
     if (typeof gate.id !== 'string' || gate.id.length === 0) {
@@ -165,7 +205,7 @@ export function getRubric(version: string = CURRENT_RUBRIC_VERSION): RubricDefin
         'Scores are never recomputed against a different version than the one recorded.',
     );
   }
-  assertRubricGates(definition);
+  assertRubricIsScorable(definition);
   return definition;
 }
 
