@@ -6,7 +6,7 @@
  * object and no context parameter — adding one would be the obvious way to
  * reintroduce commercial influence, so the signature is kept closed on purpose.
  */
-import { getRubric, type RubricDefinition, type RubricGate } from './rubric.ts';
+import { RUN_FACT_GATES, getRubric, type RubricDefinition, type RubricGate } from './rubric.ts';
 import type {
   AppliedGate,
   DimensionScore,
@@ -135,7 +135,11 @@ function gateTriggers(
   findings: readonly ScoringFinding[],
   coreFlowsUnreachable: boolean,
 ): boolean {
-  if (gate.id === 'GATE-NO-AUTHORISATION-COVERAGE') return coreFlowsUnreachable;
+  // The same set the validator refuses an untriggerable gate against. Two
+  // copies of "which gates are about the run" would disagree the day a third
+  // one is published, and the disagreeing copy would be the one that decides
+  // whether a badge is issued.
+  if (RUN_FACT_GATES.has(gate.id)) return coreFlowsUnreachable;
 
   return findings.some((finding) => {
     if (gate.triggerSeverity && finding.severity !== gate.triggerSeverity) return false;

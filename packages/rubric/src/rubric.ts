@@ -125,6 +125,23 @@ const validated = new Set<string>();
  * without a seam the only way to test the guard is to make the registry
  * writable, which is a worse thing to do to this package.
  */
+/**
+ * The gates no finding can trigger, because they are about the run.
+ *
+ * `gateTriggers` in `scoring.ts` matched this one by its literal id and every
+ * other gate by its selectors, which meant a gate published with neither
+ * `appliesToRules` nor `appliesToDimensions` fired never — while
+ * `blocksCertification: true` sat in the published rubric saying it would. The
+ * shape checks below asked whether a gate *says* it blocks something; nothing
+ * asked whether it *can*.
+ *
+ * So the one list lives here, the validator refuses a gate that is in neither
+ * category, and `scoring.ts` reads the same set rather than its own literal.
+ * A fourth gate about the run adds its id here and nothing else moves; a
+ * fourth gate about findings cannot be published without selectors.
+ */
+export const RUN_FACT_GATES: ReadonlySet<string> = new Set(['GATE-NO-AUTHORISATION-COVERAGE']);
+
 export function assertRubricIsScorable(definition: RubricDefinition): void {
   if (validated.has(definition.version)) return;
 
@@ -192,6 +209,53 @@ export function assertRubricIsScorable(definition: RubricDefinition): void {
         definition.version,
         `a gate (${named}) whose capOverallAt is not a number`,
       );
+    }
+
+    /*
+     * And whether anything could ever trigger it.
+     *
+     * A gate selects by rule id or by dimension, or it is one of the gates
+     * about the run itself. With none of the three it is a published promise
+     * that something will be blocked, kept by nothing — and the name of a rule
+     * or a dimension that does not exist in this rubric is the same defect
+     * written as a typo. `SEC-4` for `SEC-04`, or `security` for
+     * `security_posture`, is well-formed by every check above and fires on no
+     * assessment ever.
+     */
+    if (!RUN_FACT_GATES.has(gate.id)) {
+      const rules = gate.appliesToRules ?? [];
+      const dimensions = gate.appliesToDimensions ?? [];
+      if (rules.length === 0 && dimensions.length === 0) {
+        throw new MalformedRubricError(
+          definition.version,
+          `a gate (${named}) that selects neither a rule nor a dimension, so no finding can ` +
+            'ever trigger it — a gate published as blocking and kept by nothing',
+        );
+      }
+      const knownRules = new Set(
+        definition.dimensions.flatMap((dimension) =>
+          dimension.criteria.map((criterion) => criterion.id),
+        ),
+      );
+      for (const rule of rules) {
+        if (!knownRules.has(rule)) {
+          throw new MalformedRubricError(
+            definition.version,
+            `a gate (${named}) naming rule ${rule}, which this rubric does not define, so the ` +
+              'gate fires on nothing',
+          );
+        }
+      }
+      const knownDimensions = new Set(definition.dimensions.map((dimension) => dimension.id));
+      for (const dimension of dimensions) {
+        if (!knownDimensions.has(dimension)) {
+          throw new MalformedRubricError(
+            definition.version,
+            `a gate (${named}) naming dimension ${dimension}, which this rubric does not ` +
+              'define, so the gate fires on nothing',
+          );
+        }
+      }
     }
   }
   validated.add(definition.version);
