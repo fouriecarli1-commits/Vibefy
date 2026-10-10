@@ -21,6 +21,7 @@ import {
   type MonitoredPlan,
 } from '@vibefycode/monitoring';
 import { badgeEmbedSnippet } from '@vibefycode/shared';
+import { getRubric } from '@vibefycode/rubric';
 import { raiseAlert } from './monitoring.ts';
 import registry from '../../../legal/registry.json' with { type: 'json' };
 import type { PoolClient } from 'pg';
@@ -220,6 +221,80 @@ export async function findIssuanceCandidates(
   }));
 }
 
+/**
+ * How long this badge may last, against the term the rubric publishes.
+ *
+ * `maximumBadgeValidityMonths` is in the published rubric — `12` in 1.0.0 and
+ * 1.1.0 — and nothing read it. The comment above `VALIDITY_MONTHS` says
+ * "twelve months is the outside limit", which restates the published number by
+ * hand: the day a rubric publishes a shorter one, or a plan here is given a
+ * longer term, the badge we issue and the rubric we issued it under disagree,
+ * and the only place that disagreement appears is in the customer's hands.
+ *
+ * It refuses rather than clamping. A clamp would issue a badge on terms nobody
+ * chose, which is the same defect as the twelve-month fallback this file
+ * already refuses for an unknown plan: "refusing beats guessing". A refusal
+ * stops one issuance and is read by a person; a quiet clamp changes what we
+ * sold.
+ */
+export function validityMonthsFor(plan: string, rubricVersion: string): number {
+  const months = VALIDITY_MONTHS[plan];
+  // Refusing beats guessing. A plan this file has never heard of is a plan
+  // whose terms nobody has decided, and the old fallback decided them in the
+  // customer's favour by twelve months at a time, silently.
+  if (months === undefined || months <= 0) {
+    throw new Error(`No badge validity is defined for the plan "${plan}", so no badge was issued.`);
+  }
+  const published = getRubric(rubricVersion).certification.maximumBadgeValidityMonths;
+  /*
+   * Returned by the check rather than asserted beside it.
+   *
+   * Written the other way first — an assertion, then `return months` — and
+   * deleting the call left every test green: a sweep proved the published
+   * versions agree, a hand-built case proved the comparison works, and nothing
+   * held the two together. Which is the defect this whole sweep is about, made
+   * by hand, in the fix for it.
+   *
+   * Handing the number back makes the checked path the shorter one to write. It
+   * does not make the unchecked one impossible: `return months` still compiles,
+   * because nothing here objects to an unused local. So the wiring is held by a
+   * test that reads this function — the honest version of a claim I first wrote
+   * as "the compiler would say so", which the mutation disproved in one run.
+   */
+  return termWithinPublished(plan, months, published, rubricVersion);
+}
+
+/**
+ * The term, checked against the published maximum and handed back.
+ *
+ * Split out so a test can hand it two numbers that disagree — the published
+ * versions agree today, so the case cannot be built from the registry, and
+ * there is no way to register a rubric at run time on purpose. A third
+ * parameter on `validityMonthsFor` would have been the other way to do it, and
+ * a maximum a caller may pass is a maximum a caller may raise.
+ */
+export function termWithinPublished(
+  plan: string,
+  months: number,
+  publishedMaximum: number,
+  rubricVersion: string,
+): number {
+  if (!Number.isFinite(publishedMaximum) || publishedMaximum <= 0) {
+    throw new Error(
+      `Rubric ${rubricVersion} publishes no usable maximum badge validity ` +
+        `(${JSON.stringify(publishedMaximum)}), so no badge was issued.`,
+    );
+  }
+  if (months > publishedMaximum) {
+    throw new Error(
+      `The plan "${plan}" would issue a badge for ${months} months, and rubric ${rubricVersion} ` +
+        `publishes ${publishedMaximum} months as the maximum. No badge was issued: the term we ` +
+        'sell cannot be longer than the term we publish.',
+    );
+  }
+  return months;
+}
+
 export async function issueBadgeFor(
   client: PoolClient,
   candidate: IssuanceCandidate,
@@ -228,16 +303,7 @@ export async function issueBadgeFor(
 ): Promise<{ badgeId: string; slug: string; publicId: string }> {
   const publicId = randomBytes(16).toString('base64url');
   const slug = slugify(candidate.appName);
-  const months = VALIDITY_MONTHS[candidate.plan];
-  // Refusing beats guessing. A plan this file has never heard of is a plan
-  // whose terms nobody has decided, and the old fallback decided them in the
-  // customer's favour by twelve months at a time, silently.
-  if (months === undefined || months <= 0) {
-    throw new Error(
-      `No badge validity is defined for the plan "${candidate.plan}", so no badge was issued.`,
-    );
-  }
-  const expiresAt = addMonths(now, months);
+  const expiresAt = addMonths(now, validityMonthsFor(candidate.plan, candidate.rubricVersion));
 
   const payload: BadgePayload = {
     v: 1,
