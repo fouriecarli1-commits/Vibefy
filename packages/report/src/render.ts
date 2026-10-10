@@ -14,7 +14,40 @@ import { NON_RELIANCE_LEGEND, AI_DISCLOSURE, legibleOr, themes } from '@vibefyco
 import { redactForTier, scoreFingerprint } from './redact.ts';
 import type { RenderedReport, ReportFinding, ReportSource, ReportTier } from './types.ts';
 
-const SEVERITY_LABEL: Record<ReportFinding['severity'], string> = {
+/**
+ * The remediation step, or the reason there is none.
+ *
+ * This was `view.showRemediation && finding.remediation ? ... : ''`, and the
+ * empty string covered two different situations. On a free report the step is
+ * withheld on purpose and the plan page says so. On a paid one, where the step
+ * is the thing somebody bought, an empty or absent `remediation` rendered as
+ * nothing at all — no block, no sentence, no difference from a finding that
+ * needs no action.
+ *
+ * `findingSchema` asks the model for "a step the customer can take today, not
+ * a topic to read about" and types it `z.string()`, which an empty string
+ * satisfies. So the quiet case is reachable from a model answer, not only from
+ * a renamed column.
+ *
+ * Saying so costs a sentence. Not saying so lets a reader conclude that we
+ * found something and had nothing to suggest, which is a worse advertisement
+ * than the gap itself.
+ */
+function remediationBlock(showRemediation: boolean, finding: ReportFinding): string {
+  if (!showRemediation) return '';
+  if (finding.remediation && finding.remediation.trim().length > 0) {
+    return `<div class="remediation"><strong>What to do.</strong> ${escapeHtml(finding.remediation)}</div>`;
+  }
+  return `<div class="remediation"><strong>What to do.</strong> No step was recorded for this finding. That is a gap in this report rather than a sign that nothing needs doing — ask us and a person will write one.</div>`;
+}
+
+/**
+ * Exported so `tests/the-enum-and-the-map.test.ts` can ask `pg_enum` whether
+ * every severity the database can store has a label here. Without that, a
+ * severity added to the enum renders as `undefined · high confidence` in a
+ * paid PDF.
+ */
+export const SEVERITY_LABEL: Record<ReportFinding['severity'], string> = {
   critical: 'Critical',
   high: 'High',
   medium: 'Medium',
@@ -183,11 +216,7 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
         </div>
         <p class="muted">${escapeHtml(finding.dimension.replace(/_/g, ' '))} · ${escapeHtml(finding.ruleId)}</p>
         <p>${escapeHtml(finding.description)}</p>
-        ${
-          view.showRemediation && finding.remediation
-            ? `<div class="remediation"><strong>What to do.</strong> ${escapeHtml(finding.remediation)}</div>`
-            : ''
-        }
+        ${remediationBlock(view.showRemediation, finding)}
         ${evidenceBlock(view.showEvidence, finding)}
       </article>`,
     )

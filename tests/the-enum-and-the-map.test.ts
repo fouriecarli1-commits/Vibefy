@@ -30,6 +30,7 @@ import { PLAN_TIERS } from '../packages/billing/src/index.ts';
 import { REQUEST_KINDS } from '../packages/governance/src/index.ts';
 import { getRubric, listRubricVersions } from '../packages/rubric/src/index.ts';
 import { badgeStatus, type BadgeRow } from '../packages/badge/src/index.ts';
+import { SEVERITY_LABEL } from '../packages/report/src/render.ts';
 import pricing from '../config/pricing.json' with { type: 'json' };
 
 let db: Client;
@@ -189,11 +190,15 @@ describe('the pairs', () => {
     );
   });
 
-  it('finding_severity has a penalty in every published rubric', async () => {
+  it('finding_severity has a penalty in every published rubric, and a label in the report', async () => {
     const severities = await valuesOf('finding_severity');
     for (const version of listRubricVersions()) {
       same(severities, Object.keys(getRubric(version).scoring.severityPenalties));
     }
+    // Without this, a severity added to the enum renders as `undefined ·
+    // high confidence` in a paid PDF — the same undefined-in-a-lookup defect
+    // as the policy ceiling, in the document somebody paid for.
+    same(severities, Object.keys(SEVERITY_LABEL));
   });
 
   it('confidence_level has a multiplier in every published rubric', async () => {

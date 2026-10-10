@@ -429,3 +429,49 @@ describe('the order a report lists findings in', () => {
     expect(assemble).toMatch(/order by started_at nulls last, stage/);
   });
 });
+
+describe('a finding with no remediation step', () => {
+  /*
+   * `view.showRemediation && finding.remediation ? ... : ''` covered two
+   * different situations with one empty string. On a free report the step is
+   * withheld on purpose and the plan page says so; on a paid one, where the
+   * step is what somebody bought, an empty or absent `remediation` rendered as
+   * nothing at all — no block, no sentence, and no difference from a finding
+   * that needs no action.
+   *
+   * Reachable from a model answer rather than only from a renamed column:
+   * `findingSchema` types it `z.string()`, which an empty string satisfies.
+   */
+  const withNoStep = (remediation: string) => ({
+    ...source,
+    findings: [finding({ remediation })],
+  });
+
+  it('says so on a paid report rather than leaving the block out', () => {
+    const html = renderReport(withNoStep(''), 'paid').html;
+    expect(html).toContain('No step was recorded for this finding');
+    expect(html).toContain('a gap in this report rather than a sign that nothing needs doing');
+  });
+
+  it('treats whitespace as no step, because a space is not an instruction', () => {
+    expect(renderReport(withNoStep('   '), 'paid').html).toContain('No step was recorded');
+  });
+
+  it('still prints a real step when there is one', () => {
+    // The half that makes the other half mean something.
+    const html = renderReport(
+      { ...source, findings: [finding({ remediation: 'Set HttpOnly on it.' })] },
+      'paid',
+    ).html;
+    expect(html).toContain('Set HttpOnly on it.');
+    expect(html).not.toContain('No step was recorded');
+  });
+
+  it('says nothing either way on a free report, where the step is withheld on purpose', () => {
+    // The free tier's silence is a different silence, explained elsewhere, and
+    // a sentence about a missing step would read as a fault in our work.
+    const html = renderReport(withNoStep(''), 'free').html;
+    expect(html).not.toContain('No step was recorded');
+    expect(html).not.toContain('What to do');
+  });
+});
