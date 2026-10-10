@@ -148,14 +148,23 @@ https://vibefycode.com/badge/nonexistent-test-id.svg
 - **Grys raampie** → Vercel → Logs (tyd-kieser op **Live**) → tref die bladsy
   weer → klik die `/badge/...`-reël → maak die **Logs**-paneel onder oop.
 
-Die boodskap daar is nou 'n vol sin wat sê wat om te verander. Sy drie vorms:
+Die boodskap daar is nou 'n vol sin wat sê wat om te verander. Elke vorm wat dit
+kan wees, en wat dit beteken:
 
-| Begin met                                               | Beteken                                 |
-| ------------------------------------------------------- | --------------------------------------- |
-| `...which is the dedicated pooler`                      | Nog die verkeerde pooler — terug stap B |
-| `...uses the pooler host but the username "postgres"`   | Shared pooler, verkeerde gebruikersnaam |
-| `...still contains [YOUR-PASSWORD]`                     | Die plekhouer is nie vervang nie        |
-| `circuit breaker` of `too many authentication failures` | Render hamer nog — terug stap A         |
+| Die sin bevat                           | Beteken                                           |
+| --------------------------------------- | ------------------------------------------------- |
+| `is not a URL`                          | Nie 'n adres nie — kopieer die string weer heel   |
+| `which is not a database address`       | Verkeerde soort adres — moet `postgresql://` wees |
+| `still contains [YOUR-PASSWORD]`        | Die plekhouer is nie vervang nie                  |
+| `which is the dedicated pooler`         | Nog die verkeerde pooler — terug stap B           |
+| `which is the direct connection`        | Die direkte verbinding — terug stap B             |
+| `publishes no IPv4 address`             | Daardie gasheer werk nooit — terug stap B         |
+| `uses the pooler host but the username` | Shared pooler, verkeerde gebruikersnaam           |
+| `temporarily blocked new connections`   | Render hamer nog — terug stap A                   |
+
+Die laaste een se **rou** fout — die `error:`-reël bo die verduideliking — sê
+`circuit breaker` of `too many authentication failures`. Die tabel hierbo kyk na
+die verduideliking, nie na die rou fout nie.
 
 ### Nooit nodig nie
 
