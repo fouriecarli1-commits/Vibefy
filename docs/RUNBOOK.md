@@ -1176,6 +1176,18 @@ true` is right for a permission and backwards for a restriction), and the
   Name what is permitted instead, and the default moves to the safe side. The
   test then reads the full set from wherever it really lives — a `pg_enum`, an
   interface, `information_schema` — and refuses anything unclassified.
+- **A probe whose failure was reasoned about and whose universal success was
+  not.** `SEC-08` raised a finding on any 200 with a body. A single-page
+  application with a catch-all route answers 200 with a body for _every_ path,
+  so an application with nothing wrong got a dozen findings, several critical,
+  telling its owner they publish their `.env`. The same file reasons at length
+  about the opposite case — a firewall refusing every probe reads as an
+  application with nothing to find — ten lines below. Somebody thought hard
+  about probes that fail and not about probes that all succeed. Ask of every
+  probe: what does a host that answers _everything_ look like here, and what
+  does one that answers _nothing_ look like? Then check both directions of the
+  untruth — two of the four probes in that stage accused an owner and the other
+  two complimented one, crediting a `security.txt` nobody published.
 - **An invariant the arithmetic assumes.** `scoreAssessment` takes
   `Σ(score × weight)` as a score out of 100, which is only true if the weights
   sum to one. Nothing in the code checked it; a test did, for the current
@@ -1326,6 +1338,7 @@ product. Counts from that night.
 | Gate tools run against an empty directory                     | 8     | 3                  |
 | Exported functions no shipped file outside their module calls | 81    | 2 dead, 1 untested |
 | Every marker asked before and after its own migration         | 64    | 2                  |
+| Probe loops read for what a catch-all route answers           | 4     | 4                  |
 
 Two things to carry forward from that night. The false-positive rate climbs
 sharply as a screen gets cheaper — thirteen of the fifteen source-pattern
