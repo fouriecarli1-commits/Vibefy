@@ -23,7 +23,7 @@ import { dirname, join, relative, extname } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Surfaces whose words reach a customer, a regulator or a court. */
-const SCAN_DIRS = ['apps', 'packages', 'legal', 'brand', 'supabase'];
+export const COPY_SCAN_DIRS = ['apps', 'packages', 'legal', 'brand', 'supabase'];
 const SCAN_FILES = ['README.md'];
 const SCAN_EXTENSIONS = new Set([
   '.ts',
@@ -168,12 +168,23 @@ const QUALIFIERS = [
   'absence of',
 ];
 
-function collectFiles(dir, out = []) {
+/*
+ * A scan directory that is not there used to read as one that is empty.
+ *
+ * The `catch` returned the accumulator and the walk carried on, so renaming
+ * `legal/` or `brand/` would have removed the Badge Licence and the artwork
+ * notes — the prose this gate exists for — from the gate, silently, while
+ * `apps/` kept the file count comfortably above zero.
+ */
+export function collectFiles(dir, out = []) {
   let entries;
   try {
     entries = readdirSync(dir);
-  } catch {
-    return out;
+  } catch (error) {
+    throw new Error(
+      `copy lint cannot read ${dir} — if the directory moved, update COPY_SCAN_DIRS`,
+      { cause: error },
+    );
   }
   for (const entry of entries) {
     if (SKIP_DIRS.has(entry)) continue;
@@ -359,7 +370,7 @@ function paragraphsOf(lines, suppressed = new Set()) {
 
 export function runCopyLint() {
   const files = [
-    ...SCAN_DIRS.flatMap((dir) => collectFiles(join(root, dir))),
+    ...COPY_SCAN_DIRS.flatMap((dir) => collectFiles(join(root, dir))),
     ...SCAN_FILES.map((file) => join(root, file)),
   ];
   const violations = [];
