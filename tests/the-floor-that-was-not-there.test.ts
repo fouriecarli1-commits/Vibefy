@@ -21,6 +21,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { optionalScore, readably } from '../apps/web/lib/typed-score.ts';
+import { evaluatePolicy } from '../packages/policy/src/index.ts';
+import type { PolicyProfile, PolicySubject } from '../packages/policy/src/types.ts';
 
 const scoreOf = (input: string) => optionalScore(input, 'the overall score');
 
@@ -82,5 +84,77 @@ describe('the dimension names in the message', () => {
   it('reads as words rather than as a column name', () => {
     expect(readably('security_posture')).toBe('security posture');
     expect(readably('practicality_ux')).toBe('practicality ux');
+  });
+});
+
+describe('a severity ceiling the evaluator does not recognise', () => {
+  const profile = (maxOpenSeverity: PolicyProfile['maxOpenSeverity']): PolicyProfile => ({
+    id: 'profile-1',
+    name: 'Vendor bar',
+    description: null,
+    minOverallScore: null,
+    dimensionFloors: {},
+    maxOpenSeverity,
+    requireCertification: false,
+    requireStoreReadiness: false,
+  });
+
+  const subject: PolicySubject = {
+    assessmentId: 'assessment-1',
+    overallScore: 95,
+    dimensions: [],
+    openFindings: [
+      {
+        ruleId: 'SEC-04',
+        dimension: 'security_posture',
+        severity: 'critical',
+        title: 'Keys in the page source',
+      },
+    ],
+    certificationEligible: true,
+    intendedForAppStore: false,
+  };
+
+  it('does not pass an application on a limit it could not apply', () => {
+    /*
+     * `SEVERITY_RANK[profile.maxOpenSeverity]` is undefined for a value that is
+     * not one of the five, and `rank > undefined` is false for every finding
+     * ever — so the strictest-sounding rule in a procurement profile permitted
+     * a critical open finding, silently, while the console carried on printing
+     * "No open finding worse than" whatever the column said.
+     *
+     * The dimension floor beside it had already decided this question for a
+     * missing score: a requirement nobody could evaluate is not a pass.
+     */
+    const result = evaluatePolicy(profile('HIGH' as PolicyProfile['maxOpenSeverity']), subject);
+    expect(result.meetsPolicy).toBe(false);
+    expect(result.failures.map((failure) => failure.rule)).toContain('max_open_severity');
+    expect(result.failures[0]?.explanation).toMatch(/not a severity this rubric uses/);
+  });
+
+  it('still applies a limit it does recognise', () => {
+    // The half that makes the other half mean something.
+    const result = evaluatePolicy(profile('high'), subject);
+    expect(result.meetsPolicy).toBe(false);
+    expect(result.failures[0]?.explanation).toMatch(/above the permitted high ceiling/);
+  });
+
+  it('passes a clean application when the ceiling is recognised and met', () => {
+    const result = evaluatePolicy(profile('critical'), {
+      ...subject,
+      openFindings: [
+        {
+          ruleId: 'UX-06',
+          dimension: 'practicality_ux',
+          severity: 'low',
+          title: 'A small thing',
+        },
+      ],
+    });
+    expect(result.meetsPolicy).toBe(true);
+  });
+
+  it('means no limit when there is none', () => {
+    expect(evaluatePolicy(profile(null), subject).meetsPolicy).toBe(true);
   });
 });

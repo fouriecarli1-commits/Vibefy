@@ -347,16 +347,29 @@ export async function savePolicyProfile(
   const overall = optionalScore(formData.get('minOverallScore'), 'the overall score');
   if ('error' in overall) return { error: overall.error };
 
+  /*
+   * Empty means no limit; anything unrecognised is refused rather than stored.
+   *
+   * This was `includes(...) ? value : null`, and null is what the evaluator and
+   * the console both read as "no limit" — so a value we do not recognise,
+   * posted by a stale form or a renamed severity, turned the strictest-sounding
+   * rule in a procurement profile into the loosest one, and the page carried on
+   * saying what the column said.
+   */
   const maxOpenSeverity = String(formData.get('maxOpenSeverity') ?? '').trim();
+  const severities = ['critical', 'high', 'medium', 'low', 'info'];
+  if (maxOpenSeverity !== '' && !severities.includes(maxOpenSeverity)) {
+    return {
+      error: `"${maxOpenSeverity}" is not a severity. Leave the limit empty for no limit, or choose one of ${severities.join(', ')}.`,
+    };
+  }
   const row = {
     organisation_id: organisationId,
     name,
     description: String(formData.get('description') ?? '').trim() || null,
     min_overall_score: overall.value,
     dimension_floors: floors,
-    max_open_severity: ['critical', 'high', 'medium', 'low', 'info'].includes(maxOpenSeverity)
-      ? maxOpenSeverity
-      : null,
+    max_open_severity: maxOpenSeverity === '' ? null : maxOpenSeverity,
     require_certification: formData.get('requireCertification') === 'on',
     require_store_readiness: formData.get('requireStoreReadiness') === 'on',
     is_default: formData.get('isDefault') === 'on',

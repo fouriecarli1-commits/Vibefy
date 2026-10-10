@@ -72,17 +72,40 @@ export function evaluatePolicy(profile: PolicyProfile, subject: PolicySubject): 
 
   if (profile.maxOpenSeverity !== null) {
     const ceiling = SEVERITY_RANK[profile.maxOpenSeverity];
-    const over = subject.openFindings.filter(
-      (finding) => SEVERITY_RANK[finding.severity] > ceiling,
-    );
-    if (over.length > 0) {
-      const worst = over.reduce((a, b) =>
-        SEVERITY_RANK[b.severity] > SEVERITY_RANK[a.severity] ? b : a,
-      );
+    /*
+     * A ceiling this file does not recognise is not a ceiling of infinity.
+     *
+     * `maxOpenSeverity` arrives from a column. A value that is not one of the
+     * five — a severity renamed, a row written by an older release, a
+     * hand-edited profile — makes `ceiling` undefined, and
+     * `SEVERITY_RANK[finding.severity] > undefined` is false for every finding
+     * ever. So the strictest-sounding rule in a procurement profile would have
+     * permitted a critical open finding, silently, while the console carried on
+     * printing "No open finding worse than <whatever the column says>".
+     *
+     * The dimension floor above already decided this question for the case of
+     * a missing score: "a dimension the assessment did not produce is not a
+     * pass. Silence about a requirement is the failure mode this whole product
+     * exists to fix." Same answer here.
+     */
+    if (ceiling === undefined) {
       failures.push({
         rule: 'max_open_severity',
-        explanation: `${over.length} open finding${over.length === 1 ? '' : 's'} above the permitted ${profile.maxOpenSeverity} ceiling, the worst being a ${worst.severity}: ${worst.title}.`,
+        explanation: `This profile permits open findings up to "${String(profile.maxOpenSeverity)}", which is not a severity this rubric uses, so the limit could not be applied and this application is not passed on it. Set the limit again and it will be.`,
       });
+    } else {
+      const over = subject.openFindings.filter(
+        (finding) => SEVERITY_RANK[finding.severity] > ceiling,
+      );
+      if (over.length > 0) {
+        const worst = over.reduce((a, b) =>
+          SEVERITY_RANK[b.severity] > SEVERITY_RANK[a.severity] ? b : a,
+        );
+        failures.push({
+          rule: 'max_open_severity',
+          explanation: `${over.length} open finding${over.length === 1 ? '' : 's'} above the permitted ${profile.maxOpenSeverity} ceiling, the worst being a ${worst.severity}: ${worst.title}.`,
+        });
+      }
     }
   }
 
