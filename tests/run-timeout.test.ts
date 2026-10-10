@@ -27,13 +27,16 @@ describe('the two timeouts', () => {
     expect(RECLAIM_AFTER_MINUTES - RUN_TIMEOUT_MINUTES).toBeGreaterThanOrEqual(20);
   });
 
-  it('is enforced by the worker rather than assumed', () => {
-    const source = readFileSync('apps/worker/src/main.ts', 'utf8');
-    expect(source).toMatch(/withRunTimeout\(/);
-    // A promise cannot be cancelled, so the process ends rather than carrying
-    // on beside a run that could still write.
-    expect(source).toMatch(/runIsOrphaned\(\)/);
-  });
+  /*
+   * What `withRunTimeout` and `runIsOrphaned` actually do is asserted in
+   * `tests/a-run-that-never-came-back.test.ts`.
+   *
+   * This used to be two `toMatch` calls against this file's source — that it
+   * contains the strings `withRunTimeout(` and `runIsOrphaned()` somewhere.
+   * Neither stripped comments, so a commented-out call satisfied both, and
+   * neither said anything about what happens when a run does hang. The margin
+   * asserted above is a real property of two numbers and stays here.
+   */
 });
 
 describe('what a second attempt cannot change', () => {

@@ -255,7 +255,7 @@ export function clearOrphanedRun(): void {
   orphanedRun = null;
 }
 
-class RunTimedOutError extends Error {
+export class RunTimedOutError extends Error {
   constructor(requestId: string, minutes: number) {
     super(
       `The run for request ${requestId} was still going after ${minutes} minutes and the worker stopped waiting for it. Nothing it may still write will be accepted.`,
@@ -264,7 +264,14 @@ class RunTimedOutError extends Error {
   }
 }
 
-async function withRunTimeout<T>(work: Promise<T>, requestId: string): Promise<T> {
+/*
+ * Exported as a test seam. The whole safety argument used to rest on two
+ * `toMatch` calls against this file's own source — `withRunTimeout\(` and
+ * `runIsOrphaned\(\)` appearing somewhere in it — which a commented-out call
+ * satisfies just as well as a live one, and which says nothing about what
+ * either does.
+ */
+export async function withRunTimeout<T>(work: Promise<T>, requestId: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const expiry = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(
