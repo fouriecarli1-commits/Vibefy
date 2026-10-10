@@ -407,6 +407,66 @@ export function createScopedDispatcher(guard: ScopeGuard): Dispatcher {
 }
 
 /** Builds a policy from a stored authorisation record. */
+/** A ceiling we cannot read is not a ceiling, so a run does not start on one. */
+export class MalformedCeilingError extends Error {
+  constructor(detail: string) {
+    super(
+      `The authorisation's intensity ceiling cannot be read: ${detail}. ` +
+        'No assessment step runs on a ceiling we do not understand.',
+    );
+    this.name = 'MalformedCeilingError';
+  }
+}
+
+/**
+ * A restriction the customer agreed to, which is on unless it says otherwise.
+ *
+ * `raw.x === true` is right for a permission — absent means not granted. For a
+ * *restriction* it is backwards, and both restrictions on this record were
+ * written that way: `non_destructive_only` and `synthetic_accounts_only` came
+ * back false for an empty object, for a null, and for the string `'true'`.
+ *
+ * `intensity_ceiling` is jsonb with no shape constraint. Its column default
+ * sets both to true, so a record written the ordinary way is fine; a record
+ * written with a partial object is not, and what it permits is destructive
+ * operations against somebody else's application with real accounts. The
+ * brief's posture everywhere else is to refuse rather than guess, and the
+ * nearest thing to refusing for a flag is to keep the restriction on.
+ */
+function restrictionOn(value: unknown, key: string): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'boolean') return value;
+  throw new MalformedCeilingError(`${key} is ${JSON.stringify(value)} rather than true or false`);
+}
+
+/** A permission, which is off unless it says otherwise. */
+function permissionGranted(value: unknown, key: string): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'boolean') return value;
+  throw new MalformedCeilingError(`${key} is ${JSON.stringify(value)} rather than true or false`);
+}
+
+/**
+ * A number from the record, or the default when the record does not say.
+ *
+ * `Number(raw.x ?? DEFAULT)` covered an absent key and nothing else. A
+ * non-numeric string gave `NaN`, and every `count > NaN` is false — so the one
+ * thing bounding how hard we hit a customer's application stopped bounding it,
+ * silently. An empty string gave 0, which fails closed and merely looks like a
+ * broken run.
+ *
+ * Absent means "not specified", and the default stands. Present and unusable
+ * means we do not know what we were permitted to do, which stops the run.
+ */
+function ceilingNumber(value: unknown, key: string, fallback: number): number {
+  if (value === undefined || value === null) return fallback;
+  const asNumber = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(asNumber) || asNumber <= 0) {
+    throw new MalformedCeilingError(`${key} is ${JSON.stringify(value)}, which is not a limit`);
+  }
+  return asNumber;
+}
+
 export function policyFromAuthorisation(record: {
   scope_domains: string[];
   scope_exclusions: string[];
@@ -417,16 +477,29 @@ export function policyFromAuthorisation(record: {
     allowedHosts: record.scope_domains,
     exclusions: record.scope_exclusions,
     ceiling: {
-      nonDestructiveOnly: raw.non_destructive_only === true,
-      maxRequestsPerMinute: Number(
-        raw.max_requests_per_minute ?? DEFAULT_CEILING.maxRequestsPerMinute,
+      nonDestructiveOnly: restrictionOn(raw.non_destructive_only, 'non_destructive_only'),
+      maxRequestsPerMinute: ceilingNumber(
+        raw.max_requests_per_minute,
+        'max_requests_per_minute',
+        DEFAULT_CEILING.maxRequestsPerMinute,
       ),
-      maxTotalRequests: Number(raw.max_total_requests ?? DEFAULT_CEILING.maxTotalRequests),
-      maxDurationSeconds: Number(raw.max_duration_seconds ?? DEFAULT_CEILING.maxDurationSeconds),
-      allowDataModification: raw.allow_data_modification === true,
-      allowDataExport: raw.allow_data_export === true,
-      allowAccountCreation: raw.allow_account_creation === true,
-      syntheticAccountsOnly: raw.synthetic_accounts_only === true,
+      maxTotalRequests: ceilingNumber(
+        raw.max_total_requests,
+        'max_total_requests',
+        DEFAULT_CEILING.maxTotalRequests,
+      ),
+      maxDurationSeconds: ceilingNumber(
+        raw.max_duration_seconds,
+        'max_duration_seconds',
+        DEFAULT_CEILING.maxDurationSeconds,
+      ),
+      allowDataModification: permissionGranted(
+        raw.allow_data_modification,
+        'allow_data_modification',
+      ),
+      allowDataExport: permissionGranted(raw.allow_data_export, 'allow_data_export'),
+      allowAccountCreation: permissionGranted(raw.allow_account_creation, 'allow_account_creation'),
+      syntheticAccountsOnly: restrictionOn(raw.synthetic_accounts_only, 'synthetic_accounts_only'),
     },
     // Deliberately absent: a policy derived from a real authorisation record
     // can never permit reaching a private address.
