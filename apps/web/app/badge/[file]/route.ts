@@ -3,7 +3,7 @@ import { renderBadgeSvg, renderBadgeUnavailableSvg, type BadgeStatus } from '@vi
 import { whyTheDatabaseRefused } from '@/lib/connection-string';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { writeAsService } from '@/lib/sql';
-import { originFrom } from '@/lib/verify-origin';
+import { verifyOriginForRequest } from '@/lib/verify-origin';
 
 /**
  * The badge image.
@@ -211,17 +211,14 @@ async function serveBadge(
    * has configured nothing still produces the origin it is being served from
    * rather than an empty string.
    *
-   * The pure `originFrom` rather than `resolveVerifyOrigin`, because this
+   * `verifyOriginForRequest` rather than `resolveVerifyOrigin`, because this
    * route already has the request and the server wrapper reads `next/headers`
    * — which is the split that file describes: "so the decision can be tested
    * without a request, and without dragging Next's server-only modules into a
    * test project that has no business resolving them". The first attempt used
    * the wrapper and turned every success into a 503 under test.
    */
-  const verificationUrl = `${originFrom(
-    process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL,
-    request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
-  )}/a/${badge.slug}`;
+  const verificationUrl = `${verifyOriginForRequest(request)}/a/${badge.slug}`;
 
   const svg = renderBadgeSvg({
     status: badge.status,

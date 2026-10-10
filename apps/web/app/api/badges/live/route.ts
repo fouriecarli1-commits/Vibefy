@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { liveBadgeList, type BadgeRow } from '@vibefycode/badge';
 import { readAsAnon } from '@/lib/sql';
+import { verifyOriginForRequest } from '@/lib/verify-origin';
 
 /**
  * Every badge whose owner chose to be listed, in one document.
@@ -28,7 +29,7 @@ import { readAsAnon } from '@/lib/sql';
  */
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const rows = await readAsAnon(async (client) => {
     const { rows: found } = await client.query<BadgeRow>(
       `select public_id, slug, status, app_name, certified_origin,
@@ -39,7 +40,11 @@ export async function GET() {
     return found;
   });
 
-  const verifyOrigin = process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  // Through the shared resolver, like the two single-badge routes. This one
+  // had no request parameter at all, which is the small thing that made
+  // reading the environment raw look like the only option: one document,
+  // every live badge, every `verificationPage` in it relative.
+  const verifyOrigin = verifyOriginForRequest(request);
 
   return NextResponse.json(liveBadgeList(rows, verifyOrigin), {
     headers: {

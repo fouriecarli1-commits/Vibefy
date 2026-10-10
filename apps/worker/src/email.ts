@@ -130,6 +130,13 @@ export async function sweepAlertEmail(
   pool: Poolish,
   provider: EmailProvider | null,
   log: Logger = noop,
+  // Read raw because this process has no request to fall back to — the web
+  // app's resolver reads one, and there is none here. The empty default is no
+  // longer a dead link in somebody's inbox: `renderAlertEmail` asks whether
+  // what it was given is followable and says the same thing in words when it
+  // is not. That check lives there rather than here because `deepLink` below
+  // is built from this value too, and one of the two being absolute was the
+  // kind of half-fix that reads as done.
   consoleUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '',
   now: Date = new Date(),
 ): Promise<EmailSweepResult> {

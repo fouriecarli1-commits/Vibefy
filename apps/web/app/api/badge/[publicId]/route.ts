@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { SIGNED_KEYS } from '@vibefycode/badge';
 import { readAsAnon } from '@/lib/sql';
+import { verifyOriginForRequest } from '@/lib/verify-origin';
 
 /**
  * The signed payload, for anyone who wants to check a badge themselves.
@@ -15,7 +16,7 @@ import { readAsAnon } from '@/lib/sql';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ publicId: string }> },
 ) {
   const { publicId } = await params;
@@ -43,7 +44,23 @@ export async function GET(
     );
   }
 
-  const verifyOrigin = process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  /*
+   * Through the shared resolver, because this is the address a stranger is
+   * told to fetch our signing keys from.
+   *
+   * It read the two variables raw and fell back to `''`, so the response said
+   * `keySet: "/.well-known/vibefycode-badge-key"` — a relative path, resolved
+   * against whatever host the verifier's own code is running on. The two
+   * shapes `apps/web/lib/verify-origin.ts` exists to repair land here too: a
+   * bare host is relative again, and the `.env.example` value with `/verify`
+   * on it points at a 404.
+   *
+   * What that costs is not a broken link. A verifier who cannot fetch the key
+   * set cannot check the signature, and the conclusion they reach about a
+   * genuine badge is the one `/verify` used to reach when our own key list was
+   * empty: that we never issued it.
+   */
+  const verifyOrigin = verifyOriginForRequest(request);
 
   return NextResponse.json(
     {

@@ -63,16 +63,48 @@ function escapeHtml(value: string): string {
  * a customer's own application under an agreement they accepted. What there is
  * instead is a control in the console, and this says where.
  */
+/**
+ * Whether this is an address a mail client can follow.
+ *
+ * Everything below used to interpolate `consoleUrl` into a link without asking,
+ * and the worker's default for it was `process.env.NEXT_PUBLIC_SITE_URL ?? ''`.
+ * On a deployment with that variable unset the button in this email pointed at
+ * `/console/alerts` and the footer told the recipient to set their preferences
+ * at `/console/privacy` — relative paths, in an email, where there is no page
+ * to resolve them against. Both are dead text in every mail client there is.
+ *
+ * The footer one is the sharper half. The comment above it says there is no
+ * unsubscribe link because the control is in the console and this sentence says
+ * where: a notice whose only way to receive fewer notices is a path that goes
+ * nowhere.
+ *
+ * So a link is rendered when there is something to link to, and otherwise the
+ * same instruction is given in words. An email that says where to look is worth
+ * more than one with an anchor that cannot be clicked.
+ */
+function followable(url: string | null | undefined): string | null {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\/[^/\s]+/i.test(trimmed) ? trimmed.replace(/\/+$/, '') : null;
+}
+
 function footerText(input: AlertEmailInput): string {
+  const origin = followable(input.consoleUrl);
   return [
     `You are receiving this because you are a member of the workspace this application belongs to.`,
-    `Choose which alerts reach you at ${input.consoleUrl}/console/privacy.`,
+    origin === null
+      ? `Choose which alerts reach you under Privacy in the VibefyCode console.`
+      : `Choose which alerts reach you at ${origin}/console/privacy.`,
     `A badge suspension is a notice we are required to give, and is always sent.`,
   ].join(' ');
 }
 
 export function renderAlertEmail(input: AlertEmailInput): EmailMessage {
-  const link = input.deepLink ?? `${input.consoleUrl}/console/alerts`;
+  // The deep link is built by the caller from the same origin, so it is checked
+  // rather than trusted: a relative one is no more followable than a relative
+  // fallback.
+  const origin = followable(input.consoleUrl);
+  const link = followable(input.deepLink) ?? (origin === null ? null : `${origin}/console/alerts`);
   const heading = input.appName ? `${input.appName} — ${input.title}` : input.title;
 
   const text = [
@@ -80,7 +112,7 @@ export function renderAlertEmail(input: AlertEmailInput): EmailMessage {
     '',
     input.body,
     '',
-    `Open it: ${link}`,
+    link === null ? 'It is waiting under Alerts in the VibefyCode console.' : `Open it: ${link}`,
     '',
     NON_RELIANCE_LEGEND,
     '',
@@ -102,7 +134,11 @@ export function renderAlertEmail(input: AlertEmailInput): EmailMessage {
       <p style="margin:0;font-size:15px;line-height:1.6;white-space:pre-line">${escapeHtml(input.body)}</p>
     </td></tr>
     <tr><td style="padding:24px 28px 4px">
-      <a href="${escapeHtml(link)}" style="display:inline-block;background:${INK};color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:15px">Open it in the console</a>
+      ${
+        link === null
+          ? `<p style="margin:0;font-size:15px;line-height:1.6">It is waiting under Alerts in the VibefyCode console.</p>`
+          : `<a href="${escapeHtml(link)}" style="display:inline-block;background:${INK};color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:15px">Open it in the console</a>`
+      }
     </td></tr>
     <tr><td style="padding:24px 28px 0">
       <p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};border-top:1px solid ${LINE};padding-top:16px">${escapeHtml(NON_RELIANCE_LEGEND)}</p>

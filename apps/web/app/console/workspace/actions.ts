@@ -9,6 +9,7 @@ import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser, writeAsService } from '@/lib/sql';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
+import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import type { ActionState } from '@/app/console/apps/actions';
 
 async function signedIn() {
@@ -120,7 +121,11 @@ export async function inviteMember(
   });
   if (error) return { error: error.message };
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  // The link in the invitation email, and the only copy of the token there
+  // will ever be — the database stores its hash. Built from `''` it was
+  // `/invite/<token>`, which no mail client can follow, and the invitation
+  // could not be re-sent with the same link because nothing has it any more.
+  const origin = await resolveSiteOrigin();
   const acceptUrl = `${origin}/invite/${token}`;
   const expiresOn = expiresAt.toISOString().slice(0, 10);
 

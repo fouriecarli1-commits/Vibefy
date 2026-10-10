@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { badgeStatus, type BadgeRow } from '@vibefycode/badge';
 import { readAsAnon } from '@/lib/sql';
+import { verifyOriginForRequest } from '@/lib/verify-origin';
 
 /**
  * Is this badge live, and what does it cover.
@@ -24,7 +25,7 @@ import { readAsAnon } from '@/lib/sql';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ publicId: string }> },
 ) {
   const { publicId } = await params;
@@ -54,6 +55,10 @@ export async function GET(
     );
   }
 
-  const verifyOrigin = process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  // Through the shared resolver. `verificationPage` is the one field in this
+  // response a marketplace renders as a link beside somebody's listing, and
+  // built from `''` it was `/a/<slug>` — which resolves against the
+  // marketplace's own domain, so our verification link pointed at their site.
+  const verifyOrigin = verifyOriginForRequest(request);
   return NextResponse.json(badgeStatus(row, verifyOrigin), { headers });
 }

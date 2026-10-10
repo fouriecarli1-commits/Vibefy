@@ -85,3 +85,57 @@ export function originFrom(configured: string | undefined, host: string | null):
 export function isPlaceholderOrigin(origin: string): boolean {
   return origin.includes('vibefycode.example');
 }
+
+/**
+ * Anything with request headers on it, which is every caller here.
+ *
+ * Structural rather than `NextRequest`, so this file stays free of Next's
+ * server-only modules — the split its header describes.
+ */
+interface HasHeaders {
+  readonly headers: { get(name: string): string | null };
+}
+
+/**
+ * The host a request actually arrived on.
+ *
+ * `x-forwarded-host` is what a proxy sets, and Vercel always does; `host` is
+ * the fallback for running this locally. That pair was written out at five
+ * call sites, which is five chances to read only one of them.
+ */
+export function hostOf(request: HasHeaders): string | null {
+  return request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+}
+
+/**
+ * The origin badges and verification pages are served from.
+ *
+ * The two environment variables are read here and nowhere else in this app.
+ * That is not tidiness: six call sites read them raw, each one repeating the
+ * `?? ''` fallback that `originFrom` exists to replace, and the only reason
+ * all six were found is that one of them was found first.
+ * `tests/the-links-we-sent-nowhere.test.ts` holds the one-reader claim, so a
+ * seventh cannot appear quietly.
+ */
+export function verifyOriginFor(host: string | null): string {
+  return originFrom(process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL, host);
+}
+
+/** The same, for a route or handler that has the request in its hand. */
+export function verifyOriginForRequest(request: HasHeaders): string {
+  return verifyOriginFor(hostOf(request));
+}
+
+/**
+ * The origin the console itself is served from, which is not always the one
+ * badges are.
+ *
+ * `verifyOriginFor` prefers `NEXT_PUBLIC_VERIFY_URL`, because a deployment may
+ * serve badges from a hostname of their own and only the operator can say so.
+ * That preference is wrong for a link somebody is meant to click and arrive in
+ * the console — an invitation, a checkout return — so this one does not
+ * consult the badge variable at all.
+ */
+export function siteOriginFor(host: string | null): string {
+  return originFrom(process.env.NEXT_PUBLIC_SITE_URL, host);
+}

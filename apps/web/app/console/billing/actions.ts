@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { PriceNotSetError, currencyForCountry, type PlanId } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
 import { PaymentsNotConfiguredError, paymentProvider } from '@/lib/payments';
+import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -57,7 +58,20 @@ export async function startCheckout(
     throw error;
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+  /*
+   * Where the provider sends the customer back to.
+   *
+   * The fallback here was `http://localhost:3000`, which on a deployment with
+   * `NEXT_PUBLIC_SITE_URL` unset is the machine of whoever just paid. The
+   * payment succeeds, the provider redirects, and they land on a connection
+   * error with no confirmation that the money went anywhere. A bare host in
+   * the variable is worse in the other direction: a provider rejects a return
+   * URL that is not absolute, so nobody can buy anything at all.
+   *
+   * The site origin rather than the verify origin: this is a console address,
+   * and a deployment may serve badges from a different hostname.
+   */
+  const origin = await resolveSiteOrigin();
 
   let session;
   try {
