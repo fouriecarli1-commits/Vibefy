@@ -97,10 +97,13 @@ export async function completeRequest(
  * Shorter than `RECLAIM_AFTER_MINUTES` on purpose, and that gap is the whole
  * argument. Nothing else bounds a run's wall-clock time: the scope guard's
  * thirty-minute ceiling is only checked when a request passes through it, so a
- * model call or a page load that hangs never reaches it. A run still alive at
- * ninety minutes is requeued by the reclaim sweep while it is still running,
- * and the same assessment is then performed twice and charged twice — which is
- * the hazard the reclaim comment names and nothing enforced.
+ * model call or a page load that hangs never reaches it. Before this existed, a
+ * run still alive at ninety minutes was requeued by the reclaim sweep while it
+ * was still running, and the same assessment was then performed twice and
+ * charged twice.
+ *
+ * The gap is held by `tests/run-timeout.test.ts` rather than by these two
+ * numbers happening to be far apart.
  */
 export const RUN_TIMEOUT_MINUTES = 60;
 
@@ -169,14 +172,21 @@ export async function failRequest(
 /**
  * How long a claimed request may sit before we assume its worker is gone.
  *
- * A run's own wall-clock ceiling is thirty minutes, and persisting what it
- * found takes seconds. Ninety is three times the longest a run can legitimately
- * take, and the margin is the whole safety argument: a claim is not held by a
- * lock once the claiming transaction commits, so reclaiming one whose worker is
- * still alive would run the same assessment twice and charge for both.
+ * The margin is the whole safety argument: a claim is not held by a lock once
+ * the claiming transaction commits, so reclaiming one whose worker is still
+ * alive would run the same assessment twice and charge for both.
  *
- * The margin is now enforced rather than assumed: the worker stops waiting for
- * a run at `RUN_TIMEOUT_MINUTES`, half an hour before this.
+ * What bounds a run is `RUN_TIMEOUT_MINUTES`, which is sixty, so the margin is
+ * thirty minutes — and `tests/run-timeout.test.ts` requires at least twenty.
+ *
+ * This paragraph used to argue from a different number: "a run's own wall-clock
+ * ceiling is thirty minutes ... ninety is three times the longest a run can
+ * legitimately take". The thirty was the scope guard's, which the comment above
+ * `RUN_TIMEOUT_MINUTES` says plainly is not a wall-clock bound — it is only
+ * checked when a request passes through the guard. So the safety argument for
+ * this number rested on the claim its neighbour refutes, and read as a 3×
+ * margin where there is 1.5×. The margin is sound; the arithmetic justifying it
+ * was not.
  */
 export const RECLAIM_AFTER_MINUTES = 90;
 

@@ -8,8 +8,8 @@
  * still alive. A run that hung was therefore performed twice and charged twice,
  * which is exactly the hazard the reclaim sweep's own comment names.
  */
-import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
 import {
   RECLAIM_AFTER_MINUTES,
   RUN_TIMEOUT_MINUTES,
@@ -25,6 +25,32 @@ describe('the two timeouts', () => {
     // a comment rather than anything in the code.
     expect(RUN_TIMEOUT_MINUTES).toBeLessThan(RECLAIM_AFTER_MINUTES);
     expect(RECLAIM_AFTER_MINUTES - RUN_TIMEOUT_MINUTES).toBeGreaterThanOrEqual(20);
+    /*
+     * And the comment that justifies the gap argues from these numbers.
+     *
+     * It used to argue from the scope guard's thirty-minute ceiling — "ninety
+     * is three times the longest a run can legitimately take" — which the
+     * comment ten lines above it says plainly is not a wall-clock bound at
+     * all, because it is only checked when a request passes through the guard.
+     * A safety margin whose justification cites a bound that does not exist is
+     * the thing somebody raises a timeout against.
+     */
+    // Read raw, not through `withoutComments`: the subject here is the comment
+    // itself, and stripping it first is how the first version of this
+    // assertion passed by reading nothing.
+    const queue = readFileSync('apps/worker/src/queue.ts', 'utf8');
+    /*
+     * Asserted as a positive rather than as an absence.
+     *
+     * The obvious form — "the file must not say three times the longest a run
+     * can legitimately take" — fails, because the corrected comment quotes the
+     * sentence it replaced, which is how this repository records a correction
+     * and is worth more than the assertion. A negative over a file that
+     * deliberately contains its own history cannot tell a claim from a
+     * quotation.
+     */
+    expect(queue).toContain('which is sixty, so the margin is');
+    expect(queue).toContain('tests/run-timeout.test.ts');
   });
 
   /*
