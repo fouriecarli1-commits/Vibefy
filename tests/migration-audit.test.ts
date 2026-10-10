@@ -18,6 +18,7 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { Pool } from 'pg';
 
 const MIGRATIONS = readdirSync('supabase/migrations')
   .filter((file) => file.endsWith('.sql'))
@@ -41,7 +42,32 @@ describe('the migration audit', () => {
   it('reads the catalogue and writes nothing', () => {
     // It is meant to be pasted into a production console by somebody who is
     // already having a bad afternoon.
-    expect(audit).not.toMatch(/\b(insert|update|delete|drop|alter|create|truncate)\b/i);
+    /*
+     * This asked for the absence of the bare words `insert`, `update`, `delete`
+     * and so on anywhere in the query, and that check caused a defect rather
+     * than preventing one. Two markers need to say which privilege a migration
+     * removed, and `UPDATE` inside `has_column_privilege(...)` writes nothing
+     * whatever — so both were written instead as "the customer has no privilege
+     * at all on this column", which is false and should be false: a customer
+     * must be able to read their own screening status and their own appeal's
+     * resolution. The audit then called a fully-migrated database incomplete.
+     *
+     * The statement-shape check below is the real guarantee and always was: a
+     * query whose every statement begins with `select` or `with` cannot write,
+     * whatever words appear inside it. Kept as a word check is the narrow set
+     * that could do damage from inside a select — against the SQL with comments
+     * stripped, because a first attempt at this forbade `copy` and matched "one
+     * line you can copy back" in the audit's own explanation.
+     */
+    const sql = audit
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+    expect(sql).not.toMatch(/\b(drop|truncate|grant|revoke)\b/i);
+    expect(sql).not.toMatch(
+      /\binsert\s+into\b|\bdelete\s+from\b|\bcreate\s+(table|index|function|type|policy)\b/i,
+    );
+    expect(sql).not.toMatch(/\bpg_sleep\b|\bdblink\b|^\s*copy\s/im);
 
     // Every statement, not just the first: the audit grew a second query and a
     // test that only looked at the opening word would not have noticed.
@@ -74,4 +100,50 @@ describe('the migration audit', () => {
     expect(audit).toMatch(/string_agg\(migration/);
     expect(audit).toContain('nothing missing');
   });
+});
+
+/**
+ * Whether a marker tells the truth, which nothing above asks.
+ *
+ * The tests in the block above check the audit's shape: every migration named,
+ * nothing that writes. Neither asks whether a marker answers correctly, and two
+ * did not. `the_acceptable_use_verdict_is_ours` and `our_side_of_a_record_is_ours`
+ * each asked whether `authenticated` holds *any* privilege on a column, and the
+ * answer is yes and should be yes — a customer must be able to read their own
+ * screening status and their own appeal's resolution. So the audit reported a
+ * fully-migrated database as missing two of eighteen migrations: the one thing
+ * it exists not to do, told to the one person who runs it precisely because he
+ * is unsure where he stands.
+ *
+ * The test database has every migration by construction — `globalSetup` resets
+ * it and applies them all — so the audit run against it must come back empty.
+ * A marker that asks the wrong question now fails on the day it is written.
+ */
+describe('the markers themselves', () => {
+  it('report nothing missing against a database that has every migration', async () => {
+    const dsn = process.env.VIBEFYCODE_TEST_DSN;
+    expect(dsn, 'the audit cannot be checked for truth without the test database').toBeTruthy();
+    const url = new URL(dsn!);
+    const pool = new Pool({
+      host: url.searchParams.get('host')!,
+      database: url.pathname.slice(1),
+      user: 'postgres',
+    });
+    try {
+      const last = audit
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('--'))
+        .join('\n')
+        .split(';')
+        .map((statement) => statement.trim())
+        .filter(Boolean)
+        .at(-1)!;
+      const { rows } = await pool.query<{ missing: string }>(last);
+      expect(rows[0]?.missing, 'the audit calls a fully-migrated database incomplete').toBe(
+        'nothing missing',
+      );
+    } finally {
+      await pool.end();
+    }
+  }, 60_000);
 });

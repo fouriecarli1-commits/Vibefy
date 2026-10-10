@@ -7561,7 +7561,7 @@ comment on table public.assessments is
 -- 20261008030000_the_acceptable_use_verdict_is_ours.sql
 -- ===========================================================================
 
--- audit-marker: not exists (select 1 from information_schema.column_privileges where table_schema = 'public' and table_name = 'apps' and column_name = 'screening_status' and grantee = 'authenticated')
+-- audit-marker: not has_column_privilege('authenticated', 'public.apps', 'screening_status', 'UPDATE')
 --
 -- A workspace owner could clear their own application under the Acceptable
 -- Use Policy.
@@ -8106,7 +8106,7 @@ comment on policy memberships_only_an_owner_keeps_granting_ownership on public.m
 -- 20261008070000_our_side_of_a_record_is_ours.sql
 -- ===========================================================================
 
--- audit-marker: not exists (select 1 from information_schema.column_privileges where table_schema = 'public' and table_name = 'appeals' and column_name = 'resolution' and grantee = 'authenticated')
+-- audit-marker: not has_column_privilege('authenticated', 'public.appeals', 'resolution', 'INSERT')
 --
 -- Four more records whose own subject could write our half of them.
 --

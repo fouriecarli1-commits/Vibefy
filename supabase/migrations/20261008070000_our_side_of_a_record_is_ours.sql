@@ -1,4 +1,4 @@
--- audit-marker: not exists (select 1 from information_schema.column_privileges where table_schema = 'public' and table_name = 'appeals' and column_name = 'resolution' and grantee = 'authenticated')
+-- audit-marker: not has_column_privilege('authenticated', 'public.appeals', 'resolution', 'INSERT')
 --
 -- Four more records whose own subject could write our half of them.
 --

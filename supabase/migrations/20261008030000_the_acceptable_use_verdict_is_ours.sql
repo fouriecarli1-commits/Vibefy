@@ -1,4 +1,4 @@
--- audit-marker: not exists (select 1 from information_schema.column_privileges where table_schema = 'public' and table_name = 'apps' and column_name = 'screening_status' and grantee = 'authenticated')
+-- audit-marker: not has_column_privilege('authenticated', 'public.apps', 'screening_status', 'UPDATE')
 --
 -- A workspace owner could clear their own application under the Acceptable
 -- Use Policy.
