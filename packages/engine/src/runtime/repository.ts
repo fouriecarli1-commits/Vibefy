@@ -114,14 +114,28 @@ export function repositoryUrlOrRefuse(
   return url.toString();
 }
 
-async function directorySize(path: string): Promise<number> {
+/**
+ * How much the clone has written so far.
+ *
+ * Every failure used to be swallowed, which made the size cap fail in the
+ * permissive direction: a tree it could not read measured zero bytes, and zero
+ * is under every ceiling. The cap exists to stop a clone filling the disk, so
+ * "we could not look" must not read as "small enough".
+ *
+ * `ENOENT` is the exception and it is the common case twice over — at the root
+ * because the first poll can fire before git has created the directory, and
+ * below it because a clone in progress creates and removes files constantly.
+ * Anything else is a measurement that did not happen, and it is raised.
+ */
+export async function directorySize(path: string): Promise<number> {
   let total = 0;
   const walk = async (dir: string): Promise<void> => {
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
     }
     for (const entry of entries) {
       const full = join(dir, entry.name);
@@ -257,17 +271,35 @@ function clone(
 
     // Measured while it grows rather than after it lands. A clone is the one
     // thing here that writes to disk without asking first.
+    let sizeUnmeasured = false;
     const sizeCheck = setInterval(() => {
-      void directorySize(path).then((bytes) => {
-        if (bytes > MAX_REPOSITORY_BYTES) {
-          finish(
-            new RepositoryRefusedError(
-              url,
-              `it passed ${Math.round(MAX_REPOSITORY_BYTES / 1_000_000)} MB while cloning`,
-            ),
-          );
-        }
-      });
+      void directorySize(path)
+        .then((bytes) => {
+          if (bytes > MAX_REPOSITORY_BYTES) {
+            finish(
+              new RepositoryRefusedError(
+                url,
+                `it passed ${Math.round(MAX_REPOSITORY_BYTES / 1_000_000)} MB while cloning`,
+              ),
+            );
+          }
+        })
+        .catch((error: unknown) => {
+          /*
+           * The poll could not measure, so the cap is not being enforced on
+           * this tick. Said once rather than per tick, and not fatal: a
+           * transient failure under load should not abort a clone that is
+           * behaving, and a later tick may measure it. Without the catch this
+           * was an unhandled rejection, which Node ends the process over — in
+           * a worker whose request would then be reclaimed and run again.
+           */
+          if (!sizeUnmeasured) {
+            sizeUnmeasured = true;
+            log?.('repository size could not be measured while cloning', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
     }, SIZE_POLL_MS);
 
     child.on('error', (error) => finish(error));
