@@ -103,15 +103,44 @@ describe('what the subject of a decision may write about it', () => {
   it('names no request-facing role that may write the verdict', async () => {
     // The catalogue form, so a column added to the decision next month is
     // covered by naming it here rather than by somebody remembering this file.
+    const PLATFORM_COLUMNS = [
+      'screening_status',
+      'screening_notes',
+      'screened_at',
+      'last_seen_at',
+      'last_liveness_status',
+      'consecutive_liveness_failures',
+      'last_reassessed_at',
+    ];
+
+    /*
+     * The column names are literals, so a rename takes one out of the question
+     * silently and a typo never put it in. The absence below would still be
+     * green, for a column no role was ever asked about.
+     */
+    const { rows: present } = await db.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'apps'
+          and column_name = any($1::text[])`,
+      [PLATFORM_COLUMNS],
+    );
+    const vanished = PLATFORM_COLUMNS.filter(
+      (name) => !present.some((row) => row.column_name === name),
+    );
+    expect(
+      vanished,
+      `Platform-authored columns this test names that public.apps does not have:\n  ${vanished.join('\n  ')}\n` +
+        'Renamed, or misspelt here. Either way nothing below is asking about them.',
+    ).toEqual([]);
+
     const { rows } = await db.query<{ grantee: string; column_name: string }>(
       `select grantee, column_name
          from information_schema.column_privileges
         where table_schema = 'public' and table_name = 'apps'
           and grantee in ('anon', 'authenticated', 'service_role', 'PUBLIC')
           and privilege_type in ('INSERT', 'UPDATE')
-          and column_name in ('screening_status', 'screening_notes', 'screened_at',
-                              'last_seen_at', 'last_liveness_status',
-                              'consecutive_liveness_failures', 'last_reassessed_at')`,
+          and column_name = any($1::text[])`,
+      [PLATFORM_COLUMNS],
     );
     expect(
       rows.map((row) => `${row.grantee}:${row.column_name}`),

@@ -172,9 +172,26 @@ describe('the shape of the mistake, not only this instance', () => {
        order by a.tbl, a.cmd, pair
     `);
 
-    const unreviewed = rows
-      .map((row) => `${row.tbl} ${row.cmd} ${row.pair}`)
-      .filter((entry) => !REVIEWED_OVERLAPS.includes(entry));
+    const found = rows.map((row) => `${row.tbl} ${row.cmd} ${row.pair}`);
+
+    /*
+     * The one reviewed overlap is this query's positive control.
+     *
+     * Everything below passes by finding nothing, and the query is eight joins
+     * and a role-name regex over the catalogue — plenty to stop matching
+     * quietly. If `memberships` no longer shows up as a pair, the query has
+     * broken rather than the schema having improved, and a sweep that finds
+     * nothing because it is looking in the wrong place reads exactly like a
+     * schema with nothing wrong with it.
+     */
+    const control = REVIEWED_OVERLAPS.filter((entry) => !found.includes(entry));
+    expect(
+      control,
+      `Reviewed overlaps the query no longer finds:\n  ${control.join('\n  ')}\n` +
+        'Either the policies changed and the entry is stale, or the query has stopped working.',
+    ).toEqual([]);
+
+    const unreviewed = found.filter((entry) => !REVIEWED_OVERLAPS.includes(entry));
 
     expect(
       unreviewed,

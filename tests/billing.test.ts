@@ -391,11 +391,37 @@ describe('applying events to our records', () => {
   });
 
   it('never stores anything resembling a card number', async () => {
-    const { rows } = await db.query(`
-      select column_name from information_schema.columns
-       where table_schema = 'public'
-         and (column_name ilike '%card%' or column_name ilike '%pan%' or column_name ilike '%cvv%'
-              or column_name ilike '%cvc%' or column_name ilike '%expiry%')`);
-    expect(rows).toHaveLength(0);
+    const columnsLike = async (patterns: readonly string[]) => {
+      const { rows } = await db.query<{ column_name: string }>(
+        `select table_name || '.' || column_name as column_name
+           from information_schema.columns
+          where table_schema = 'public'
+            and column_name ilike any($1::text[])
+          order by 1`,
+        [patterns],
+      );
+      return rows.map((row) => row.column_name);
+    };
+
+    /*
+     * A positive control, because the claim is an absence.
+     *
+     * The old form asked `information_schema.columns` for card-shaped column
+     * names and asserted none came back. A wrong schema name, a broken
+     * pattern, or a catalogue the migrations never reached answers none too,
+     * and the strongest statement in this file about never touching card data
+     * would have been passing on a question it had stopped asking. So the same
+     * query, with the same schema and the same operator, is first made to find
+     * something that is certainly there.
+     */
+    expect(
+      await columnsLike(['%email%']),
+      'the column catalogue answered nothing, so the absence below means nothing',
+    ).not.toEqual([]);
+
+    expect(
+      await columnsLike(['%card%', '%pan%', '%cvv%', '%cvc%', '%expiry%']),
+      'a column shaped like card data exists in public',
+    ).toEqual([]);
   });
 });

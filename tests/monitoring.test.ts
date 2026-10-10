@@ -898,8 +898,20 @@ describe('every kind of alert has a name a person can read', () => {
         where t.typname = 'alert_kind'
         order by e.enumsortorder`,
     );
-    const unnamed = rows.map((row) => row.label).filter((label) => !KIND_LABEL[label]);
-    expect(unnamed, 'alert kinds with no label in the console inbox').toEqual([]);
+    const kinds = rows.map((row) => row.label);
+    /*
+     * The enum name is a literal in that query. Rename the type and it returns
+     * nothing, every kind is covered, and the test is greenest at the moment it
+     * has stopped looking. So the two sets are compared rather than one being
+     * filtered by the other: that cannot pass on an empty catalogue answer, and
+     * it also catches the other direction — a label left in the console for a
+     * kind the database no longer has.
+     */
+    expect(
+      kinds.length,
+      'the catalogue knows no alert kinds, so this proves nothing',
+    ).toBeGreaterThan(10);
+    expect([...kinds].sort()).toEqual(Object.keys(KIND_LABEL).sort());
   });
 });
 

@@ -257,10 +257,19 @@ describe('how long a badge lasts', () => {
         where t.typname = 'plan_tier'
         order by e.enumsortorder`,
     );
-    const unanswered = rows
-      .map((row) => row.label)
-      .filter((label) => VALIDITY_MONTHS[label] === undefined);
-    expect(unanswered, 'plan tiers with no badge validity defined').toEqual([]);
+    const tiers = rows.map((row) => row.label);
+    /*
+     * Compared as sets rather than filtered, for the same reason as the alert
+     * kinds: `typname = 'plan_tier'` is a literal, and a renamed type answers
+     * nothing, which the filter form reads as every tier being covered. The
+     * reverse direction matters here too — a term defined for a tier the
+     * database dropped is a number nobody will ever use and nobody will notice.
+     */
+    expect(
+      tiers.length,
+      'the catalogue knows no plan tiers, so this proves nothing',
+    ).toBeGreaterThan(3);
+    expect([...tiers].sort()).toEqual(Object.keys(VALIDITY_MONTHS).sort());
   });
 
   it('refuses to issue rather than guess at a term nobody decided', async () => {
