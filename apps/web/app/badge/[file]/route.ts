@@ -3,6 +3,7 @@ import { renderBadgeSvg, renderBadgeUnavailableSvg, type BadgeStatus } from '@vi
 import { whyTheDatabaseRefused } from '@/lib/connection-string';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { writeAsService } from '@/lib/sql';
+import { originFrom } from '@/lib/verify-origin';
 
 /**
  * The badge image.
@@ -60,7 +61,17 @@ function badgeHeaders(cacheControl: string, extra: Record<string, string> = {}) 
   };
 }
 
-function originFrom(request: NextRequest): string | null {
+/**
+ * The origin of the page the badge is embedded on, from the referer.
+ *
+ * Named `originFrom` until 2026-10-10, which is also the name of the shared
+ * helper in `@/lib/verify-origin` that turns a configured value into the
+ * origin *we* are served from. Two different questions under one name, in the
+ * one file that needs both — and the line below that builds the verification
+ * URL read the environment variable raw rather than reaching for the shared
+ * one, which is exactly the mistake a shadowed name invites.
+ */
+function embeddingOriginOf(request: NextRequest): string | null {
   const referer = request.headers.get('referer');
   if (referer) {
     try {
@@ -182,8 +193,35 @@ async function serveBadge(
     });
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? '';
-  const verificationUrl = `${siteUrl.replace(/\/+$/, '')}/a/${badge.slug}`;
+  /*
+   * Through the shared resolver, which this route was the only caller not to
+   * use.
+   *
+   * It read the two variables raw and fell back to the empty string, so the
+   * two shapes `apps/web/lib/verify-origin.ts` exists to repair both reached
+   * the badge: a bare `vibefycode.com` became `vibefycode.com/a/slug`, which
+   * is a relative path wherever it is read; and the `.env.example` value
+   * `http://localhost:3000/verify` became `/verify/a/slug`, which is a 404,
+   * because the route is `/a/[slug]`. Both are written up in that file as
+   * defects it fixes "for every caller", and this caller was building the URL
+   * by hand ten lines from a local function with the same name as the shared
+   * one.
+   *
+   * With neither variable set it now reads the request, so a deployment that
+   * has configured nothing still produces the origin it is being served from
+   * rather than an empty string.
+   *
+   * The pure `originFrom` rather than `resolveVerifyOrigin`, because this
+   * route already has the request and the server wrapper reads `next/headers`
+   * — which is the split that file describes: "so the decision can be tested
+   * without a request, and without dragging Next's server-only modules into a
+   * test project that has no business resolving them". The first attempt used
+   * the wrapper and turned every success into a 503 under test.
+   */
+  const verificationUrl = `${originFrom(
+    process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL,
+    request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
+  )}/a/${badge.slug}`;
 
   const svg = renderBadgeSvg({
     status: badge.status,
@@ -194,7 +232,7 @@ async function serveBadge(
     ...(sizePx ? { sizePx } : {}),
   });
 
-  const observed = originFrom(request);
+  const observed = embeddingOriginOf(request);
   if (observed) {
     const mismatch = observed !== badge.certified_origin;
     // Fire and forget: telemetry must never delay or fail the image.

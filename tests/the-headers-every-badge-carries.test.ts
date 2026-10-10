@@ -73,7 +73,9 @@ async function ask(id: string) {
   return GET(
     {
       nextUrl: new URL(`https://vibefycode.com/badge/${id}.svg?size=240`),
-      headers: new Headers({ 'user-agent': 'vitest' }),
+      // A host header, because every real request carries one and the
+      // verification origin falls back to it.
+      headers: new Headers({ 'user-agent': 'vitest', host: 'vibefycode.com' }),
     },
     { params: Promise.resolve({ file: `${id}.svg` }) },
   );
@@ -100,6 +102,72 @@ const REQUIRED = [
   ],
   ['access-control-allow-origin', /\*/, 'it is embedded on somebody else’s site by design'],
 ] as const;
+
+describe('the verification URL the badge carries', () => {
+  /*
+   * `apps/web/lib/verify-origin.ts` exists to repair two shapes somebody
+   * writes into the variable, and it says it does so "for every caller": a
+   * bare `vibefycode.com`, which makes `vibefycode.com/a/slug` — a relative
+   * path wherever it is read — and the `.env.example` value
+   * `http://localhost:3000/verify`, which makes `/verify/a/slug`, a 404,
+   * because the route is `/a/[slug]`.
+   *
+   * This route was the only caller not using it. It read the two variables raw
+   * and fell back to the empty string, ten lines from a local function with
+   * the same name as the shared one — which is what a shadowed name invites.
+   */
+  const previousVerify = process.env.NEXT_PUBLIC_VERIFY_URL;
+
+  afterAll(() => {
+    if (previousVerify === undefined) delete process.env.NEXT_PUBLIC_VERIFY_URL;
+    else process.env.NEXT_PUBLIC_VERIFY_URL = previousVerify;
+  });
+
+  const verifyHeaderWith = async (configured: string | undefined) => {
+    if (configured === undefined) delete process.env.NEXT_PUBLIC_VERIFY_URL;
+    else process.env.NEXT_PUBLIC_VERIFY_URL = configured;
+    return (await ask('live-badge')).headers.get('x-vibefycode-verify');
+  };
+
+  it('is absolute when the variable is absolute', async () => {
+    expect(await verifyHeaderWith('https://vibefycode.com')).toBe(
+      'https://vibefycode.com/a/an-app',
+    );
+  });
+
+  it('is repaired when the variable is a bare host', async () => {
+    // Was `vibefycode.com/a/an-app`, which is a relative path.
+    expect(await verifyHeaderWith('vibefycode.com')).toBe('https://vibefycode.com/a/an-app');
+  });
+
+  it('is repaired when the variable carries a path', async () => {
+    // Was `http://localhost:3000/verify/a/an-app`, and the route is /a/[slug].
+    expect(await verifyHeaderWith('http://localhost:3000/verify')).toBe(
+      'http://localhost:3000/a/an-app',
+    );
+  });
+
+  it('falls back to the host the request arrived on, not to an empty string', async () => {
+    /*
+     * Was `/a/an-app`. A deployment that has configured nothing now gets the
+     * origin it is being served from, which is the whole reason
+     * `verify-origin.ts` reads the request at all.
+     *
+     * The first draft of this case gave the fake request no host header, which
+     * no real request lacks, and then asserted against a value the code could
+     * not produce — so it failed on the fixture rather than on the code. The
+     * harness carries a host now, like a request.
+     */
+    const previousSite = process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    try {
+      expect(await verifyHeaderWith(undefined)).toBe('https://vibefycode.com/a/an-app');
+    } finally {
+      if (previousSite === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+      else process.env.NEXT_PUBLIC_SITE_URL = previousSite;
+    }
+  });
+});
 
 describe('every outcome of a badge request', () => {
   const outcomes = ['live-badge', 'unknown', 'unavailable'] as const;
