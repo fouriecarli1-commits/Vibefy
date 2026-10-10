@@ -249,8 +249,12 @@ En as jy nie weet waar jou databasis staan nie:
 node tools/migration-audit.mjs > audit.sql
 ```
 
-Plak `audit.sql`. Dit lees net, skryf niks, en gee jou een reël per migrasie met
-"missing" of "nothing missing".
+Plak `audit.sql`. Dit lees net en skryf niks. Die laaste reël is die antwoord:
+"nothing missing", of 'n lys van die wat weg is — met die getal migrasies wat dit
+nagegaan het daarnaas.
+
+Maak dit elke keer nuut. 'n Ou `audit.sql` noem migrasies as weg wat lankal daar
+is; die boonste reël van die lêer sê wanneer dit gemaak is.
 
 Pro gee daaglikse rugsteun met 'n sewe-dae-venster. Point-in-time recovery is 'n
 aparte betaalde byvoeging en is **af** — die herstelverhaal vir 'n slegte
