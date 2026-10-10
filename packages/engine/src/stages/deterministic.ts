@@ -386,8 +386,39 @@ export const deterministicChecksStage: Stage = {
       }
     }
 
+    /*
+     * The same catch-all, and here it is harder.
+     *
+     * Four of the eight paths below — `/wp-admin`, `/phpmyadmin`,
+     * `/adminer.php`, `/administrator` — belong to software a Vite or Next
+     * application does not run. A catch-all answers all eight with the shell,
+     * which contains no sign-in prompt, so the guard above let every one
+     * through: eight findings at high severity, one of them saying the
+     * application served phpMyAdmin without asking who was asking.
+     *
+     * I looked at this loop an hour ago, decided an application serving its
+     * own shell at `/admin` *is* the finding its description names, and left
+     * it. That is true of `/admin` and plainly false of `/phpmyadmin`, and the
+     * two are indistinguishable from out here: both come back as the shell,
+     * byte for byte.
+     *
+     * So an identical body means nothing was established — which is what it
+     * always meant. The claim is about what the server does with an
+     * unauthenticated request, and a body it returns for every path, existing
+     * or not, is no evidence about any of them. It was right sometimes by
+     * accident. Finding client-side-only authorisation properly means looking
+     * at what the page fetches, which is a different check and not this one.
+     *
+     * The content-type test from the exposed paths does not belong here: an
+     * administrative page is legitimately HTML.
+     */
+    const adminAnsweredByCatchAll: string[] = [];
     for (const adminPath of ADMIN_PATHS) {
       const response = await http.probe(url, adminPath);
+      if (response && response.status === 200 && response.body.trim() === root.body.trim()) {
+        adminAnsweredByCatchAll.push(adminPath);
+        continue;
+      }
       if (
         response &&
         response.status === 200 &&
@@ -404,6 +435,17 @@ export const deterministicChecksStage: Stage = {
           evidenceIds: [response.evidenceId],
         });
       }
+    }
+
+    if (adminAnsweredByCatchAll.length >= ADMIN_PATHS.length) {
+      notTested.push({
+        criterion: 'SEC-05',
+        because: `All ${ADMIN_PATHS.length} requests for common administrative routes came back as the application's own page, byte for byte — a catch-all route answering everything. Nothing was established about any of them: a body returned for every path, existing or not, is no evidence about whether a particular one is protected.`,
+      });
+    } else if (adminAnsweredByCatchAll.length > 0) {
+      notes.push(
+        `${adminAnsweredByCatchAll.length} of ${ADMIN_PATHS.length} requests for common administrative routes came back as the application's own page rather than as that route: ${adminAnsweredByCatchAll.join(', ')}. Those were neither found nor ruled out.`,
+      );
     }
 
     const robots = await http.probe(url, '/robots.txt');

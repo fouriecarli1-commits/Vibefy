@@ -135,6 +135,93 @@ describe('a single-page application with a catch-all route', () => {
   });
 });
 
+describe('the administrative routes, under the same catch-all', () => {
+  /*
+   * Four of the eight paths probed belong to software a Vite or Next
+   * application does not run: `/wp-admin`, `/phpmyadmin`, `/adminer.php`,
+   * `/administrator`. A catch-all answers all eight with the shell, which
+   * contains no sign-in prompt, so every one produced a finding at high
+   * severity — one of them saying the application served phpMyAdmin without
+   * asking who was asking.
+   *
+   * I read this loop an hour before fixing the exposed paths and left it,
+   * reasoning that an application serving its own shell at `/admin` *is* the
+   * finding its description names. True of `/admin`, plainly false of
+   * `/phpmyadmin`, and the two are indistinguishable from out here.
+   */
+  let app: Awaited<ReturnType<typeof startApp>>;
+  let result: StageResult;
+
+  beforeAll(async () => {
+    app = await startApp(() => ({ status: 200, body: SHELL, type: 'text/html; charset=utf-8' }));
+    result = await deterministicChecksStage.run(contextFor(app.url));
+  }, 180_000);
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it('was asked about them', () => {
+    expect(app.asked.some((path) => path === '/phpmyadmin')).toBe(true);
+    expect(app.asked.some((path) => path === '/admin')).toBe(true);
+  });
+
+  it('is not accused of serving phpMyAdmin unprotected', () => {
+    const admin = result.findings.filter((finding) => finding.ruleId === 'SEC-05');
+    expect(
+      admin.map((finding) => finding.title),
+      'an application with no phpMyAdmin was told it serves one',
+    ).toEqual([]);
+  });
+
+  it('is told the criterion was not established', () => {
+    const notTested = (result.notTested ?? []).filter((entry) => entry.criterion === 'SEC-05');
+    expect(notTested).toHaveLength(1);
+    expect(notTested[0]!.because).toMatch(/byte for byte|catch-all/);
+  });
+
+  it('says why a body returned for every path is no evidence about one of them', () => {
+    const because = (result.notTested ?? []).find((entry) => entry.criterion === 'SEC-05')!.because;
+    expect(because).toMatch(/no evidence/);
+  });
+});
+
+describe('an administrative route that really is served unprotected', () => {
+  let app: Awaited<ReturnType<typeof startApp>>;
+  let result: StageResult;
+
+  beforeAll(async () => {
+    // Its own body, not the shell: the server is really serving that route.
+    app = await startApp((path) =>
+      path === '/admin'
+        ? {
+            status: 200,
+            body: '<!doctype html><html><body><h1>Admin</h1><table><tr><td>users</td></tr></table></body></html>',
+            type: 'text/html; charset=utf-8',
+          }
+        : path === '/'
+          ? { status: 200, body: SHELL, type: 'text/html; charset=utf-8' }
+          : { status: 404, body: 'not found', type: 'text/plain' },
+    );
+    result = await deterministicChecksStage.run(contextFor(app.url));
+  }, 180_000);
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it('is still found, which is the positive control for the case above', () => {
+    const admin = result.findings.filter((finding) => finding.ruleId === 'SEC-05');
+    expect(admin.map((finding) => finding.title).join(' | ')).toMatch(
+      /Administrative route \/admin served content/,
+    );
+  });
+
+  it('is not reported as unestablished, because it was established', () => {
+    expect((result.notTested ?? []).filter((entry) => entry.criterion === 'SEC-05')).toEqual([]);
+  });
+});
+
 describe('an application that serves the files it should not', () => {
   let app: Awaited<ReturnType<typeof startApp>>;
   let result: StageResult;
