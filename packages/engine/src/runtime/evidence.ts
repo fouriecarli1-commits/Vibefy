@@ -100,10 +100,51 @@ const REDACTION_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
 ];
 
 /**
+ * Headers whose value a finding is about, so the value has to survive capture.
+ *
+ * Every one of these is read by a check in `packages/engine/src/stages`, and a
+ * reviewer confirming that finding reads the artefact. Tied to the checks by
+ * `tests/the-header-a-finding-was-about.test.ts`, which reads the stage
+ * sources: a check that starts reading a new header fails until it is named
+ * here, and a name here that no check reads fails too.
+ */
+export const HEADERS_FINDINGS_READ: readonly string[] = [
+  'access-control-allow-credentials',
+  'access-control-allow-origin',
+  'content-security-policy',
+  'referrer-policy',
+  'server',
+  'set-cookie',
+  'strict-transport-security',
+  'x-content-type-options',
+  'x-frame-options',
+  'x-powered-by',
+];
+
+/**
  * Headers whose value is a credential and nothing else.
  *
  * Taken out whole: unlike a cookie, no finding is about any part of these.
+ *
+ * Five literal names before, which is a list of what to strip — so a custom
+ * header carrying an opaque token was stored unless somebody had thought of
+ * its name. `REDACTION_PATTERNS` covers a value shaped like a known
+ * credential, and an opaque random string is shaped like nothing.
+ *
+ * The rule is the other way round now: a header whose *name* says it carries a
+ * credential has its value taken out, unless a finding is about that value.
+ *
+ * The keep-list is what makes that safe to do, and it is not hypothetical:
+ * `access-control-allow-credentials` contains the word, and its value is
+ * exactly what the CORS check reports on. The check itself reads the live
+ * response rather than the artefact, as `redactHeaders` explains below, so a
+ * name rule alone would not have changed any verdict — it would have removed
+ * the line a reviewer confirms that verdict by, from the artefact whose whole
+ * purpose is to carry it. A finding nobody can check is one we may not
+ * publish.
  */
+const SENSITIVE_NAME = /auth|token|secret|credential|session|password|\bkey\b|api[-_]?key/i;
+
 const SENSITIVE_HEADERS = new Set([
   'authorization',
   'proxy-authorization',
@@ -111,6 +152,12 @@ const SENSITIVE_HEADERS = new Set([
   'x-auth-token',
   'api-key',
 ]);
+
+export function isSensitiveHeaderName(name: string): boolean {
+  const lower = name.toLowerCase();
+  if (HEADERS_FINDINGS_READ.includes(lower)) return false;
+  return SENSITIVE_HEADERS.has(lower) || SENSITIVE_NAME.test(lower);
+}
 
 /**
  * A cookie header with the values out and the names and attributes left in.
@@ -164,7 +211,7 @@ export function redactHeaders(headers: Readonly<Record<string, string>>): Record
   for (const [name, value] of Object.entries(headers)) {
     const key = name.toLowerCase();
     if (key === 'set-cookie' || key === 'cookie') storable[name] = redactCookieHeader(value);
-    else if (SENSITIVE_HEADERS.has(key)) {
+    else if (isSensitiveHeaderName(key)) {
       storable[name] = `[REDACTED:${key.toUpperCase().replace(/-/g, '_')}:${value.length}chars]`;
     } else storable[name] = value;
   }
