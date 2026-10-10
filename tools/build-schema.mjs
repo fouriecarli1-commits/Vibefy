@@ -51,10 +51,23 @@ function assemble() {
     ].join('\n');
   });
 
-  return HEADER + parts.join('\n') + '\n';
+  return { sql: HEADER + parts.join('\n') + '\n', count: files.length };
 }
 
-const assembled = assemble();
+const { sql: assembled, count } = assemble();
+
+/*
+ * How many it assembled from.
+ *
+ * Both messages below said only whether the file matched, which is also what
+ * an empty migrations directory and an empty snapshot would say to each other.
+ * The write path already printed the count; the check path, the one that runs
+ * in `pnpm verify`, did not.
+ */
+if (count === 0) {
+  console.error(`✗ no migrations found in ${MIGRATIONS}. Nothing was compared.`);
+  process.exit(1);
+}
 
 if (process.argv.includes('--check')) {
   let current = '';
@@ -71,11 +84,9 @@ if (process.argv.includes('--check')) {
     );
     process.exit(1);
   }
-  console.log(`✓ ${OUTPUT} matches the migrations.`);
+  console.log(`✓ ${OUTPUT} matches all ${count} migrations.`);
   process.exit(0);
 }
 
 writeFileSync(OUTPUT, assembled);
-console.log(
-  `✓ Wrote ${OUTPUT} from ${readdirSync(MIGRATIONS).filter((n) => n.endsWith('.sql')).length} migrations.`,
-);
+console.log(`✓ Wrote ${OUTPUT} from ${count} migrations.`);

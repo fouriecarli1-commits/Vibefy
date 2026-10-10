@@ -1237,6 +1237,30 @@ badge, and a gitignored `.env` cannot reach the repository scan because `git
 clone --depth 1` carries only tracked files. A hypothesis that reads well is the
 one most likely to become a fix nobody needed.
 
+Seven more on 2026-10-10, over the tests and the tooling rather than the
+product. Counts from that night.
+
+| Shape                                                         | Found | Live defects       |
+| ------------------------------------------------------------- | ----- | ------------------ |
+| Absence assertions over a database query, nothing positive    | 68    | 4                  |
+| …narrowed to catalogue queries (`pg_*`, `information_schema`) | 14    | 6, 2 false         |
+| …narrowed to `actingAs` blocks that seed nothing              | 4     | 4                  |
+| Source-pattern matchers with no count in front of them        | 15    | 2, 13 anchored     |
+| Gate tools run against an empty directory                     | 8     | 3                  |
+| Exported functions no shipped file outside their module calls | 81    | 2 dead, 1 untested |
+| Every marker asked before and after its own migration         | 64    | 2                  |
+
+Two things to carry forward from that night. The false-positive rate climbs
+sharply as a screen gets cheaper — thirteen of the fifteen source-pattern
+matchers were anchored in a sibling `it` that no regex of mine could see — so
+the block gets read before it gets changed, every time. And five of the seven
+screens turned up a checker that had tripped over the file written to check it:
+copy lint on the word inside the comment explaining the word, the migration
+audit's own word check on its own explanation, a leftover marker spelled out in
+a fixture, stub-check on the name of its directory list, and the seam guard on
+its own list of excused seams. When a rule is about the code, write the test's
+fixtures so they are built at runtime rather than written out.
+
 ## Proving the blocks he pastes actually work
 
 `tests/the-sql-i-ask-him-to-paste.test.ts` compares `docs/sql/OUTSTANDING.sql`

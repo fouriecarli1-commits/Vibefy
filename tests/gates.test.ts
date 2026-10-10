@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { lintText, runCopyLint, FORBIDDEN_PHRASES } from '../tools/copy-lint.mjs';
 import { scanText } from '../tools/secret-scan.mjs';
 import {
+  contrastCoverage,
   contrastRatio,
   relativeLuminance,
   runContrastChecks,
@@ -181,6 +182,26 @@ describe('contrast', () => {
     expect(contrastRatio('#FFFFFF', '#FFFFFF')).toBeCloseTo(1, 5);
     expect(relativeLuminance('#FFFFFF')).toBeCloseTo(1, 5);
     expect(relativeLuminance('#000000')).toBeCloseTo(0, 5);
+  });
+
+  it('looked at the pairs before saying they pass', () => {
+    /*
+     * `runContrastChecks()` returns failures only, so the assertion below is
+     * an absence with nothing anchoring it: an empty pair list returns an
+     * empty failure list. A tokens rebuild that dropped or renamed
+     * `contrastPairs` would leave this green and the gate printing "0 token
+     * pairs meet WCAG 2.2 AA" — which is true, and reads like success, on the
+     * gate for the standard we sell a score against.
+     */
+    const { pairs, forbiddenOnLight } = contrastCoverage();
+    expect(
+      pairs,
+      'no contrast pairs are declared, so passing them is passing nothing',
+    ).toBeGreaterThan(20);
+    expect(
+      forbiddenOnLight,
+      'no colour is declared unusable as body text, so the second half of the gate checks nothing',
+    ).toBeGreaterThan(0);
   });
 
   it('passes on the shipped tokens', () => {

@@ -31,6 +31,23 @@ export function resolveToken(path: string): string {
   return value;
 }
 
+/**
+ * What the gate looked at.
+ *
+ * `runContrastChecks()` returns only the failures, so the one test asserting
+ * `toEqual([])` passes just as well on an empty pair list as on a palette that
+ * is sound. A tokens rebuild that dropped `contrastPairs`, or renamed it,
+ * would leave the gate printing "0 token pairs meet WCAG 2.2 AA" — true, and
+ * indistinguishable from success, on the gate for the standard we sell a score
+ * against.
+ */
+export function contrastCoverage(): { pairs: number; forbiddenOnLight: number } {
+  return {
+    pairs: tokens.contrastPairs.length,
+    forbiddenOnLight: tokens.forbiddenAsBodyText.onLightSurface.length,
+  };
+}
+
 export function runContrastChecks(): string[] {
   const failures: string[] = [];
 
@@ -74,6 +91,10 @@ export function runContrastChecks(): string[] {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const failures = runContrastChecks();
   const total = tokens.contrastPairs.length;
+  if (total === 0) {
+    console.error('\n✗ Contrast check has no pairs to check. tokens.json declares none.\n');
+    process.exit(1);
+  }
   if (failures.length > 0) {
     console.error(`\n✗ Contrast check failed (${failures.length} of ${total} pairs):\n`);
     for (const f of failures) console.error(`  · ${f}`);
