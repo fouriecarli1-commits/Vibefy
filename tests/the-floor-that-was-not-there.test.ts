@@ -19,9 +19,11 @@
  * no defence at all: it carries no `min` or `max`, a server action is reachable
  * without a browser, and the value arrives as a string either way.
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Client } from 'pg';
+import { connect } from './setup/client.ts';
 import { optionalScore, readably } from '../apps/web/lib/typed-score.ts';
-import { evaluatePolicy } from '../packages/policy/src/index.ts';
+import { SEVERITY_ORDER, evaluatePolicy } from '../packages/policy/src/index.ts';
 import type { PolicyProfile, PolicySubject } from '../packages/policy/src/types.ts';
 
 const scoreOf = (input: string) => optionalScore(input, 'the overall score');
@@ -156,5 +158,44 @@ describe('a severity ceiling the evaluator does not recognise', () => {
 
   it('means no limit when there is none', () => {
     expect(evaluatePolicy(profile(null), subject).meetsPolicy).toBe(true);
+  });
+});
+
+describe('the severities the database knows', () => {
+  let db: Client;
+  beforeAll(async () => {
+    db = await connect();
+  });
+  afterAll(async () => {
+    await db.end();
+  });
+
+  it('are all ranked by the evaluator', async () => {
+    /*
+     * Asked of the catalogue, because the gap is between a SQL enum and a
+     * TypeScript object that never mention each other. `alter type
+     * public.finding_severity add value 'blocker'` is one line in a migration;
+     * `SEVERITY_RANK` is five lines in another package. A severity in the
+     * database and not in the map makes a ceiling set to it permit everything,
+     * which is the defect this file is about — and the refusal in the action
+     * and the guard in the evaluator are both a defence after the fact. This
+     * is the one that closes it.
+     *
+     * The same question `tests/badge-issuance.test.ts` asks about plan tiers,
+     * for the same reason, after a tier added to one and forgotten in the other
+     * handed out twelve-month badges.
+     */
+    const { rows } = await db.query<{ label: string }>(
+      `select e.enumlabel as label
+         from pg_enum e join pg_type t on t.oid = e.enumtypid
+        where t.typname = 'finding_severity'
+        order by e.enumsortorder`,
+    );
+    const severities = rows.map((row) => row.label);
+    // Compared as a set in both directions: a literal type name that no longer
+    // exists answers nothing, which a one-way filter reads as every severity
+    // being covered.
+    expect(severities.length, 'no finding_severity enum in the database').toBeGreaterThan(2);
+    expect(severities.slice().sort()).toEqual(SEVERITY_ORDER.slice().sort());
   });
 });

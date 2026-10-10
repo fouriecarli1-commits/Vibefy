@@ -351,10 +351,15 @@ export async function savePolicyProfile(
    * Empty means no limit; anything unrecognised is refused rather than stored.
    *
    * This was `includes(...) ? value : null`, and null is what the evaluator and
-   * the console both read as "no limit" — so a value we do not recognise,
-   * posted by a stale form or a renamed severity, turned the strictest-sounding
-   * rule in a procurement profile into the loosest one, and the page carried on
-   * saying what the column said.
+   * the console both read as "no limit" — so a value this list does not know
+   * turned the strictest-sounding rule in a procurement profile into the
+   * loosest one, at the moment of saving.
+   *
+   * The column is `public.finding_severity`, so a value nobody chose would be
+   * refused by the database anyway. What this catches is the other direction:
+   * a severity added to the enum and not to this list would have been accepted
+   * by the database, dropped here, and saved as no limit at all. Refusing says
+   * which list needs the new value.
    */
   const maxOpenSeverity = String(formData.get('maxOpenSeverity') ?? '').trim();
   const severities = ['critical', 'high', 'medium', 'low', 'info'];

@@ -14,15 +14,22 @@ import type {
   PolicySubject,
 } from './types.ts';
 
-const SEVERITY_RANK: Readonly<Record<PolicySeverity, number>> = {
-  info: 0,
-  low: 1,
-  medium: 2,
-  high: 3,
-  critical: 4,
-};
-
+/**
+ * The severities, weakest first, and the one list of them.
+ *
+ * This file had two: an order and a rank, five entries each, naming the same
+ * five values. Nothing held them in step, and a severity added to one and not
+ * the other is the defect the ceiling below is guarded against — so the rank is
+ * the position in the order now, and there is nothing to keep in step.
+ *
+ * `tests/the-floor-that-was-not-there.test.ts` asks `pg_enum` what
+ * `public.finding_severity` holds and compares it to this, in both directions.
+ */
 const SEVERITY_ORDER: readonly PolicySeverity[] = ['info', 'low', 'medium', 'high', 'critical'];
+
+const SEVERITY_RANK = Object.fromEntries(
+  SEVERITY_ORDER.map((severity, index) => [severity, index]),
+) as Readonly<Record<PolicySeverity, number>>;
 
 export function severityRank(severity: PolicySeverity): number {
   return SEVERITY_RANK[severity];
@@ -75,13 +82,19 @@ export function evaluatePolicy(profile: PolicyProfile, subject: PolicySubject): 
     /*
      * A ceiling this file does not recognise is not a ceiling of infinity.
      *
-     * `maxOpenSeverity` arrives from a column. A value that is not one of the
-     * five — a severity renamed, a row written by an older release, a
-     * hand-edited profile — makes `ceiling` undefined, and
+     * `maxOpenSeverity` arrives from a column typed `public.finding_severity`,
+     * so the database will not hold a value nobody chose. What it will hold is
+     * a value somebody adds later: `alter type ... add value 'blocker'` is one
+     * line in a migration, and this map is five lines in another package that
+     * the migration does not mention. Then `ceiling` is undefined,
      * `SEVERITY_RANK[finding.severity] > undefined` is false for every finding
-     * ever. So the strictest-sounding rule in a procurement profile would have
-     * permitted a critical open finding, silently, while the console carried on
-     * printing "No open finding worse than <whatever the column says>".
+     * ever, and the strictest-sounding rule in a procurement profile permits a
+     * critical open finding while the console carries on printing "No open
+     * finding worse than blocker".
+     *
+     * The same shape as the screening gate that named the statuses blocking a
+     * run, and `tests/the-floor-that-was-not-there.test.ts` now asks `pg_enum`
+     * what the severities are, so the gap closes rather than being guarded.
      *
      * The dimension floor above already decided this question for the case of
      * a missing score: "a dimension the assessment did not produce is not a
