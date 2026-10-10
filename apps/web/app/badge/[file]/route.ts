@@ -45,10 +45,29 @@ export async function GET(
   }
   const id = file.slice(0, -4);
 
-  // The embed snippet puts the customer's chosen size in the URL, so the served
-  // artwork matches the space it will occupy. Clamped rather than trusted: this
-  // is a public endpoint and the number only ever picks a layout.
-  const requested = Number(request.nextUrl.searchParams.get('size'));
+  /*
+   * The embed snippet puts the customer's chosen size in the URL, so the
+   * served artwork matches the space it will occupy. Clamped rather than
+   * trusted: this is a public endpoint.
+   *
+   * The absent case has to be spelled out. `searchParams.get` answers `null`
+   * when the parameter is not there, `Number(null)` is 0, and
+   * `Number.isFinite(0)` is true — so a URL with no `size` came through the
+   * branch meant for a size somebody chose and was clamped up to the floor of
+   * 64. A garbage value took the `undefined` branch correctly, which is the
+   * inversion: a missing parameter was treated as a choice and a nonsense one
+   * as no choice.
+   *
+   * What that cost: `renderBadgeUnavailableSvg` is the only renderer that uses
+   * this number, for the width and height of the frame shown when we cannot
+   * answer. Every badge URL without `?size=` served that frame at 64 by 64
+   * instead of full size — a small grey square where a badge should be, which
+   * is exactly how "the badge is not showing" is described. `docs/DOEN.md`
+   * sends him to `/badge/nonexistent-test-id.svg`, with no size parameter, as
+   * the first test of a deployment.
+   */
+  const raw = request.nextUrl.searchParams.get('size')?.trim();
+  const requested = raw ? Number(raw) : Number.NaN;
   const sizePx = Number.isFinite(requested)
     ? Math.min(Math.max(Math.round(requested), 64), 1024)
     : undefined;

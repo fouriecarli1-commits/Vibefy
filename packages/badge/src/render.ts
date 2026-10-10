@@ -32,10 +32,21 @@ export interface BadgeRenderFacts {
   /**
    * The width the badge will actually be rendered at, when the caller knows it.
    *
-   * The embed snippet knows, because the customer chose it, so it travels in the
-   * image URL. Below SEAL.minimumDetailPx the compact layout is served: the same
-   * mark and the same words, with the printed furniture removed rather than
-   * shrunk into illegibility.
+   * The embed snippet knows, because the customer chose it, so it travels in
+   * the image URL.
+   *
+   * `renderBadgeSvg` does not read it, and the comment here used to say it
+   * did: that below `SEAL.minimumDetailPx` a compact layout was served, the
+   * same mark and words with the printed furniture removed. That branch
+   * belonged to the version of this file which assembled the seal in code, and
+   * it went away with the reconstruction — the badge now embeds the supplied
+   * artwork, which scales as one picture. The option stays because
+   * `renderBadgeUnavailableSvg` does use it, for the width and height of the
+   * frame shown when a badge's status cannot be checked.
+   *
+   * Whether a small embed deserves its own layout is a question about the mark
+   * and therefore not one to answer by redrawing it. It is in
+   * `docs/OPEN_ITEMS.md`.
    */
   readonly sizePx?: number;
 }
