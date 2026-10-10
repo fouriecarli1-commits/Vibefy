@@ -1131,6 +1131,42 @@ matching `href={trustPage.<field>}` in the source, and a rename to
 test that finds its subject by a source pattern needs a count assertion in front
 of it. That one had one, which is the only reason the rename was caught.
 
+### Reading beats screening where the claim is strongest
+
+On 2026-10-10 five enumerable screens over the whole repository produced eleven
+defects across roughly twenty-five files. One close read of the five files that
+carry the badge's trust claim produced six, and two of them were the worst of
+the night:
+
+- `/verify` told a visitor **"VibefyCode did not issue it"** about a genuine
+  badge whenever our own key set was empty, which a missing environment
+  variable on our side is enough to cause. Nothing logged it.
+- `/.well-known/vibefycode-badge-key` would have **published the Ed25519
+  private scalar** of any retired key pasted in as a full JWK — which is the
+  natural thing to paste.
+
+Plus: the published canonicalisation rule said "score fixed to one decimal
+place" when the implementation writes `82`, so a third party following our own
+instructions computed different bytes and concluded a real badge was forged;
+the verification page sent them to a JOSE library for a scheme built without a
+JWS; the unavailable frame rendered at 64 pixels on every URL without
+`?size=`; and the 404 path carried none of the security headers the other two
+carried.
+
+No screen would have found any of them. A screen looks for a shape, and each of
+these was a sentence or a default that was wrong about something only a reader
+would know. So: **pick the file whose claim would hurt most if it were false,
+and read it line by line.** The badge path is five files and took under an hour.
+
+The two shapes worth carrying from it:
+
+- **A sentence stating a fact with two causes.** "VibefyCode did not issue it"
+  covered both "this is not our key" and "we have no keys". Every such sentence
+  is a candidate: ask what else produces the state it describes.
+- **An instruction we publish for somebody else to follow.** Nobody runs it, so
+  nothing checks it. Rebuild its output in a test and compare to the real
+  thing.
+
 ### Screening for the first signature instead of reading for it
 
 By 2026-10-10 the first signature had enough instances to be worth finding by

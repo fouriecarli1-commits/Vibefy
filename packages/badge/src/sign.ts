@@ -27,6 +27,7 @@ export function signBadge(payload: BadgePayload, key: SigningKey): SignedBadge {
 }
 
 export type VerificationFailure =
+  | 'no_published_keys'
   | 'unknown_key'
   | 'bad_signature'
   | 'malformed_payload'
@@ -74,6 +75,35 @@ export function verifyBadge(
       kid: null,
       failures: ['malformed_payload'],
       explanation: 'This is not a well-formed VibefyCode badge payload.',
+    };
+  }
+
+  /*
+   * No keys at all is our fault, and it is not the same answer.
+   *
+   * `unknown_key` used to cover both causes and said, as a fact, "VibefyCode
+   * did not issue it." The second cause is a key set that is empty — the
+   * signing variables unset in this deployment, or every retired entry
+   * dropped. `loadSigningKey` returns null when they are missing rather than
+   * throwing, so the page rendered "No." and that sentence for a genuine badge
+   * because of an environment variable on our side.
+   *
+   * For a product whose only asset is being believed, calling a customer's
+   * real badge a forgery over our own misconfiguration is the worst sentence
+   * it could emit — and nothing logged, nothing alerted, and the visitor had
+   * no way to tell. It is the distinction this codebase keeps having to make:
+   * "we could not look" is not "there is nothing there".
+   */
+  if (keySet.keys.length === 0) {
+    return {
+      signatureValid: false,
+      withinValidity: false,
+      payload,
+      kid: payload.kid,
+      failures: ['no_published_keys'],
+      explanation:
+        'VibefyCode is not publishing any signing keys just now, so this badge cannot be checked. ' +
+        'That is a fault on our side and says nothing about the badge or the application.',
     };
   }
 

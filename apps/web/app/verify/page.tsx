@@ -36,6 +36,25 @@ export default async function VerifyPage({
       )
     : null;
 
+  /*
+   * Our fault, and ours to notice.
+   *
+   * Nothing else in the system sees this. The page would have gone on saying
+   * "No." to every badge pasted into it for as long as the signing variables
+   * were missing, and the only record of it would have been in the memory of
+   * whoever read the answer and believed it.
+   */
+  const couldNotCheck = result?.failures.includes('no_published_keys') ?? false;
+  if (couldNotCheck) {
+    console.error('a badge could not be verified because we publish no signing keys', {
+      badgeId,
+      means:
+        'VIBEFYCODE_BADGE_SIGNING_KEY_B64 and VIBEFYCODE_BADGE_KEY_ID are not set for this ' +
+        'deployment, and no retired key survived. Until one is, this page tells every visitor ' +
+        'that it cannot check any badge.',
+    });
+  }
+
   return (
     <div className="max-w-2xl space-y-8">
       <header className="space-y-3">
@@ -92,8 +111,25 @@ export default async function VerifyPage({
             <h2 id="signature" className="font-semibold">
               1. Is the signature genuine?
             </h2>
-            <p className={`mt-2 font-medium ${result.signatureValid ? 'text-ok' : 'text-bad'}`}>
-              {result.signatureValid ? 'Yes — VibefyCode issued this.' : 'No.'}
+            {/*
+              Three answers, not two.
+              
+              `result.signatureValid ? 'Yes' : 'No.'` had no room for the third,
+              and the third is the one that is our fault: when we publish no
+              signing keys, a genuine badge cannot be checked. Rendering that as
+              "No." told a visitor a real badge was forged over an environment
+              variable on our side. Same shape as the trust page's three states.
+            */}
+            <p
+              className={`mt-2 font-medium ${
+                result.signatureValid ? 'text-ok' : couldNotCheck ? 'text-muted' : 'text-bad'
+              }`}
+            >
+              {result.signatureValid
+                ? 'Yes — VibefyCode issued this.'
+                : couldNotCheck
+                  ? 'We cannot tell you right now.'
+                  : 'No.'}
             </p>
             <p className="mt-2 text-sm text-muted">{result.explanation}</p>
           </section>
