@@ -7,7 +7,7 @@ PART 10 passes. **Do not start M1 until the founder confirms M0.**
 
 | Definition of Done                                                                          | Status                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Works end-to-end locally with one command                                                | ✅ `pnpm dev`. ⚠️ No deployed preview yet — blocked on the domain and hosting accounts (see `OPEN_ITEMS.md`)                                                                     |
+| 1. Works end-to-end locally with one command                                                | ✅ `pnpm dev`. ⚠️ Deployed to Vercel per Anré on 2026-10-09; not checkable from here, as this environment's network policy denies the host                                       |
 | 2. Tests pass, including payments, badge integrity, authorisation-to-test and personal data | ✅ 159 tests, all four areas covered                                                                                                                                             |
 | 3. The independence test passes                                                             | ✅ Identical apps, opposite wallets, byte-identical scores                                                                                                                       |
 | 4. RLS verified — user A cannot read user B's app, assessment, report or badge              | ✅ Asserted per table against a real Postgres                                                                                                                                    |
@@ -37,16 +37,16 @@ the parts to slip if anything slips.
 
 ## M1 — Assessment engine · complete, with the container image outstanding
 
-| Definition of Done                                             | Status                                                                                                                                             |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Works end-to-end locally with one command                   | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview                                                                                 |
-| 2. Tests pass, including the four mandatory areas              | ✅ 259 tests. The engine is proven against a deliberately flawed fixture app, not a mock                                                           |
-| 3. The independence test passes                                | ✅ Unchanged, and the scoring input still structurally cannot carry commercial data                                                                |
-| 4. RLS verified                                                | ✅ Extended to `finding_evidence`                                                                                                                  |
-| 5. No secrets in the repo                                      | ✅ Scanner now covers untracked files and requires a reason on every suppression                                                                   |
-| 6. Legal artefacts surfaced with acceptance recorded           | ✅ The authorisation warranty is accepted in-product, with version, hash, IP and user agent, in an append-only row                                 |
-| 7. Docs updated                                                | ✅ 40 decisions recorded                                                                                                                           |
-| 8. Cost per run recorded and visible on the internal dashboard | ✅ `/admin/costs` — cost per run by depth against the price of the tier it serves, daily spend against the global cap, and the most expensive runs |
+| Definition of Done                                             | Status                                                                                                                                                            |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Works end-to-end locally with one command                   | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Deployed to Vercel per Anré on 2026-10-09; not checkable from here, as this environment's network policy denies the host |
+| 2. Tests pass, including the four mandatory areas              | ✅ 259 tests. The engine is proven against a deliberately flawed fixture app, not a mock                                                                          |
+| 3. The independence test passes                                | ✅ Unchanged, and the scoring input still structurally cannot carry commercial data                                                                               |
+| 4. RLS verified                                                | ✅ Extended to `finding_evidence`                                                                                                                                 |
+| 5. No secrets in the repo                                      | ✅ Scanner now covers untracked files and requires a reason on every suppression                                                                                  |
+| 6. Legal artefacts surfaced with acceptance recorded           | ✅ The authorisation warranty is accepted in-product, with version, hash, IP and user agent, in an append-only row                                                |
+| 7. Docs updated                                                | ✅ 40 decisions recorded                                                                                                                                          |
+| 8. Cost per run recorded and visible on the internal dashboard | ✅ `/admin/costs` — cost per run by depth against the price of the tier it serves, daily spend against the global cap, and the most expensive runs                |
 
 ### What M1 built
 
@@ -76,16 +76,16 @@ tested; it is the inner half of that boundary, not a replacement for it.
 
 ## M2 — Reports & payments · complete, blocked only on a Stripe account
 
-| Definition of Done                                   | Status                                                                                                                                                      |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview                                                                                          |
-| 2. Tests pass, including the four mandatory areas    | ✅ 325 tests. Payments now have their own suite, run against a fake that signs with a real HMAC                                                             |
-| 3. The independence test passes                      | ✅ Extended: `packages/rubric` may not depend on `@vibefycode/billing`, `@vibefycode/report` or `stripe`, and a report renders the same score at both tiers |
-| 4. RLS verified                                      | ✅ Extended to `assessment_requests` and `billing_events`                                                                                                   |
-| 5. No secrets in the repo                            | ✅                                                                                                                                                          |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ The refund policy is summarised on the billing page and linked in full                                                                                   |
-| 7. Docs updated                                      | ✅ 55 decisions recorded                                                                                                                                    |
-| 8. Cost per run recorded and visible                 | ✅ Unchanged, and the per-run ceiling now comes from the customer's entitlement                                                                             |
+| Definition of Done                                   | Status                                                                                                                                                            |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Deployed to Vercel per Anré on 2026-10-09; not checkable from here, as this environment's network policy denies the host |
+| 2. Tests pass, including the four mandatory areas    | ✅ 325 tests. Payments now have their own suite, run against a fake that signs with a real HMAC                                                                   |
+| 3. The independence test passes                      | ✅ Extended: `packages/rubric` may not depend on `@vibefycode/billing`, `@vibefycode/report` or `stripe`, and a report renders the same score at both tiers       |
+| 4. RLS verified                                      | ✅ Extended to `assessment_requests` and `billing_events`                                                                                                         |
+| 5. No secrets in the repo                            | ✅                                                                                                                                                                |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ The refund policy is summarised on the billing page and linked in full                                                                                         |
+| 7. Docs updated                                      | ✅ 55 decisions recorded                                                                                                                                          |
+| 8. Cost per run recorded and visible                 | ✅ Unchanged, and the per-run ceiling now comes from the customer's entitlement                                                                                   |
 
 ### What M2 built
 
@@ -114,16 +114,16 @@ built and tested; it has never spoken to Stripe, because there is nothing to spe
 
 ## M3 — Badge system · complete
 
-| Definition of Done                                   | Status                                                                                                                    |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Still no deployed preview, and the `verify.` subdomain is a deployment concern   |
-| 2. Tests pass, including the four mandatory areas    | ✅ 368 tests. Badge integrity now has 43 of its own, covering forgery, tampering, rotation and every lifecycle transition |
-| 3. The independence test passes                      | ✅ Unchanged                                                                                                              |
-| 4. RLS verified                                      | ✅ The public verification surface is a view granted to `anon`; the `badges` table itself stays closed                    |
-| 5. No secrets in the repo                            | ✅ The signing key is generated to stdout and never to a file                                                             |
-| 6. Legal artefacts surfaced with acceptance recorded | ✅ The Badge Licence is accepted in-product, append-only, with version, hash, IP and user agent                           |
-| 7. Docs updated                                      | ✅ 68 decisions recorded                                                                                                  |
-| 8. Cost per run recorded and visible                 | ✅ Unchanged                                                                                                              |
+| Definition of Done                                   | Status                                                                                                                                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Works end-to-end locally with one command         | ✅ `pnpm dev` plus `pnpm dev:worker`. ⚠️ Deployed to Vercel per Anré on 2026-10-09; not checkable from here, as this environment's network policy denies the host; the `verify.` subdomain is still a deployment concern |
+| 2. Tests pass, including the four mandatory areas    | ✅ 368 tests. Badge integrity now has 43 of its own, covering forgery, tampering, rotation and every lifecycle transition                                                                                                |
+| 3. The independence test passes                      | ✅ Unchanged                                                                                                                                                                                                             |
+| 4. RLS verified                                      | ✅ The public verification surface is a view granted to `anon`; the `badges` table itself stays closed                                                                                                                   |
+| 5. No secrets in the repo                            | ✅ The signing key is generated to stdout and never to a file                                                                                                                                                            |
+| 6. Legal artefacts surfaced with acceptance recorded | ✅ The Badge Licence is accepted in-product, append-only, with version, hash, IP and user agent                                                                                                                          |
+| 7. Docs updated                                      | ✅ 68 decisions recorded                                                                                                                                                                                                 |
+| 8. Cost per run recorded and visible                 | ✅ Unchanged                                                                                                                                                                                                             |
 
 ### What M3 built
 
