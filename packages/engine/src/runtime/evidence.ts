@@ -110,6 +110,10 @@ const REDACTION_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
  */
 export const HEADERS_FINDINGS_READ: readonly string[] = [
   'access-control-allow-credentials',
+  // Read by the exposed-path check, to tell a file from the application's own
+  // page: none of those paths is ever legitimately HTML. Diagnostic, never a
+  // credential, and the reason a reviewer can see which of the two it was.
+  'content-type',
   'access-control-allow-origin',
   'content-security-policy',
   'referrer-policy',

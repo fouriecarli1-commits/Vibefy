@@ -279,9 +279,42 @@ export const deterministicChecksStage: Stage = {
     findings.push(...corsChecks(root, headerScan));
     findings.push(...bodyChecks(root));
 
+    const answeredByTheApplication: string[] = [];
     for (const candidate of EXPOSED_PATHS) {
       const response = await http.probe(url, candidate.path);
       if (response && response.status === 200 && response.body.trim().length > 0) {
+        /*
+         * A 200 with a body is not the file. It may be the application.
+         *
+         * A single-page application with a catch-all route — every path falls
+         * through to `index.html` — answers 200 with a non-empty body for
+         * every one of these paths. The condition above then produced a
+         * finding for all twelve, several of them critical, titled
+         * "Environment file is publicly readable" about an application with
+         * nothing wrong with it: the score gated to the floor, the badge
+         * withheld, and a report accusing somebody of publishing their
+         * secrets. We sell to people building with a framework that does
+         * exactly this by default, so it is closer to the common case than to
+         * an edge one.
+         *
+         * The mirror image of the firewall below, and in the same place:
+         * somebody reasoned carefully about probes that fail and not about
+         * probes that all succeed.
+         *
+         * Two tests, either of which settles it. None of these paths is ever
+         * legitimately HTML — they are dotfiles, key material and backups —
+         * so an HTML answer is the application's own page. And a body
+         * identical to the front page is the catch-all whatever its content
+         * type says.
+         *
+         * Not a finding and not silence: the path was neither found nor ruled
+         * out, which is what the note and the not-tested entry below say.
+         */
+        const contentType = (response.headers['content-type'] ?? '').toLowerCase();
+        if (contentType.includes('text/html') || response.body.trim() === root.body.trim()) {
+          answeredByTheApplication.push(candidate.path);
+          continue;
+        }
         findings.push({
           ruleId: 'SEC-08',
           dimension: 'security_posture',
@@ -314,15 +347,43 @@ export const deterministicChecksStage: Stage = {
      * measurement: "a lower bound nobody is told about is just a wrong number."
      */
     const unansweredExposed = http.unanswered.length;
+    const notEstablished = unansweredExposed + answeredByTheApplication.length;
+    /*
+     * Three ways nothing was established, and each gets its own sentence.
+     *
+     * The order matters and the first attempt had it wrong: putting the
+     * combined case above the firewall case made the firewall's own wording
+     * unreachable, because all-unanswered also sums to all-unestablished. An
+     * owner whose host drops scanner traffic and an owner whose application
+     * answers everything have different things to do about it, so they are
+     * told different things.
+     */
     if (unansweredExposed >= EXPOSED_PATHS.length) {
       notTested.push({
         criterion: 'SEC-08',
         because: `The application answered its own front page and then refused every one of the ${EXPOSED_PATHS.length} requests for commonly exposed files, so none of them was established either way. A host or firewall that drops a scanner's requests looks identical, from out here, to one with nothing to find.`,
       });
-    } else if (unansweredExposed > 0) {
-      notes.push(
-        `${unansweredExposed} of ${EXPOSED_PATHS.length} requests for commonly exposed files got no answer at all — not a refusal, no response. What the others found still stands; those paths were neither found nor ruled out.`,
-      );
+    } else if (answeredByTheApplication.length >= EXPOSED_PATHS.length) {
+      notTested.push({
+        criterion: 'SEC-08',
+        because: `Every one of the ${EXPOSED_PATHS.length} requests for commonly exposed files came back as the application's own page rather than as a file, which is what a single-page application with a catch-all route does. None of them was established either way. An application that answers everything looks identical, from out here, to one that is hiding nothing.`,
+      });
+    } else if (notEstablished >= EXPOSED_PATHS.length) {
+      notTested.push({
+        criterion: 'SEC-08',
+        because: `None of the ${EXPOSED_PATHS.length} requests for commonly exposed files was established either way: ${unansweredExposed} got no answer at all and ${answeredByTheApplication.length} came back as the application's own page rather than as a file. Nothing was ruled out, and nothing was found.`,
+      });
+    } else {
+      if (unansweredExposed > 0) {
+        notes.push(
+          `${unansweredExposed} of ${EXPOSED_PATHS.length} requests for commonly exposed files got no answer at all — not a refusal, no response. What the others found still stands; those paths were neither found nor ruled out.`,
+        );
+      }
+      if (answeredByTheApplication.length > 0) {
+        notes.push(
+          `${answeredByTheApplication.length} of ${EXPOSED_PATHS.length} requests for commonly exposed files came back as the application's own page rather than as a file — a catch-all route answering everything. Those paths were neither found nor ruled out: ${answeredByTheApplication.join(', ')}.`,
+        );
+      }
     }
 
     for (const adminPath of ADMIN_PATHS) {
