@@ -29,8 +29,54 @@
  */
 import type { ReportFinding } from './types.ts';
 
-/** The criteria in the published rubric that are about being able to use it. */
-export const ACCESSIBILITY_CRITERIA: readonly string[] = ['UX-02', 'UX-03', 'UX-04', 'UX-06'];
+/**
+ * The criteria in the published rubric that are about being able to use it.
+ *
+ * Four of the seven in the practicality dimension, and the reason each one is
+ * here is written beside it — because the list was four literals with no rule,
+ * and its own test was called "agrees with the rubric about which criteria
+ * those are" while reading nothing but this constant. A criterion that is
+ * about accessibility and is missing from here is a barrier that never reaches
+ * the statement a customer publishes in their own name.
+ *
+ * Rubric 1.1.0 added UX-07 after this list was written, which is the shape:
+ * four was complete on the day and nothing would have said otherwise.
+ * `NOT_ACCESSIBILITY_CRITERIA` is the other half, so the two together have to
+ * account for every criterion in the dimension and a new one cannot be
+ * classified by omission.
+ */
+export const ACCESSIBILITY_CRITERIA: readonly string[] = [
+  // Reflow. WCAG 2.2 AA 1.4.10: content at 320 CSS pixels wide without
+  // two-dimensional scrolling. The rubric measures 360, which is narrower than
+  // every phone sold and wider than the criterion asks.
+  'UX-02',
+  // The automated pass itself, named for the standard.
+  'UX-03',
+  // Keyboard access and a visible focus indicator. 2.1.1 and 2.4.7.
+  'UX-04',
+  // Legibility and placeholder text left in the page. Not a numbered success
+  // criterion on its own, and a page whose copy is unreadable is not usable by
+  // the people this statement is for.
+  'UX-06',
+];
+
+/**
+ * The criteria in the same dimension that are not, and why.
+ *
+ * Here so that the two lists together account for every criterion the rubric
+ * publishes in this dimension. `tests/accessibility-statement.test.ts` reads
+ * the rubric and insists on it, which is the check that was missing: a UX
+ * criterion added later is otherwise excluded from a legal statement by
+ * nobody's decision.
+ */
+export const NOT_ACCESSIBILITY_CRITERIA: Readonly<Record<string, string>> = {
+  'UX-01':
+    'Whether a first-run path to value is clear without instruction is usability. A confusing product is not an accessibility barrier, and calling it one in a statement a customer publishes would misdescribe both.',
+  'UX-05':
+    'Loading and error feedback for slow operations overlaps WCAG 2.2 AA 4.1.3 Status Messages, and is deliberately not treated as the same thing: 4.1.3 is about a status being programmatically determinable, and a finding here can as easily be a missing spinner. Treating the broader criterion as the narrower one would put a barrier in somebody\u2019s statement that an auditor would not accept, which is worse for them than leaving it out. If the rubric ever splits it, the narrower half belongs above.',
+  'UX-07':
+    'Type, spacing and control styles following a consistent scale is a design-coherence criterion added in rubric 1.1.0. Consistency has an accessibility dividend and is not a success criterion; 3.2.4 Consistent Identification is about functional components being named the same way, which this does not measure.',
+};
 
 export type Conformance = 'partially_conformant' | 'non_conformant' | 'none_found';
 

@@ -22,11 +22,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCESSIBILITY_CRITERIA,
+  NOT_ACCESSIBILITY_CRITERIA,
   STATEMENT_DISCLAIMER,
   draftAccessibilityStatement,
   type StatementInput,
 } from '../packages/report/src/index.ts';
 import type { ReportFinding } from '../packages/report/src/types.ts';
+import { getRubric, listRubricVersions } from '../packages/rubric/src/index.ts';
 
 const finding = (overrides: Partial<ReportFinding> = {}): ReportFinding => ({
   id: 'f1',
@@ -99,11 +101,56 @@ describe('what it will and will not claim', () => {
   });
 
   it('agrees with the rubric about which criteria those are', () => {
-    // A criterion that is about accessibility and is missing from this list is
-    // a barrier that never reaches the statement.
+    /*
+     * This test was called that while reading nothing but the constant: three
+     * memberships, hand-written, against a hand-written list. Its comment named
+     * the risk exactly — "a criterion that is about accessibility and is
+     * missing from this list is a barrier that never reaches the statement" —
+     * and nothing in it could have noticed one. UX-07 arrived in rubric 1.1.0
+     * after the list was written.
+     *
+     * It reads the rubric now, and the two lists together have to account for
+     * every criterion in the dimension: a UX criterion added later is
+     * otherwise excluded from a legal statement by nobody's decision.
+     */
+    const dimension = getRubric('1.1.0').dimensions.find(
+      (candidate) => candidate.id === 'practicality_ux',
+    );
+    expect(dimension, 'the rubric has no practicality dimension').toBeDefined();
+    const published = dimension!.criteria.map((criterion) => criterion.id).sort();
+    expect(published.length).toBeGreaterThan(4);
+
+    const classified = [...ACCESSIBILITY_CRITERIA, ...Object.keys(NOT_ACCESSIBILITY_CRITERIA)];
+    expect(
+      classified.sort(),
+      'every criterion in the dimension must be classified as a barrier or not, with a reason',
+    ).toEqual(published);
     expect(ACCESSIBILITY_CRITERIA).toContain('UX-03');
-    expect(ACCESSIBILITY_CRITERIA).toContain('UX-04');
-    expect(ACCESSIBILITY_CRITERIA).not.toContain('UX-07');
+  });
+
+  it('counts a criterion named for the standard as a barrier, whatever it is numbered', () => {
+    // The rule rather than the list: if the rubric publishes a criterion whose
+    // own label names WCAG, a finding against it belongs in a WCAG statement.
+    // This is what makes the classification above a decision rather than a
+    // habit.
+    for (const version of listRubricVersions()) {
+      for (const criterion of getRubric(version).dimensions.flatMap((d) => d.criteria)) {
+        if (!/wcag/i.test(criterion.label)) continue;
+        expect(
+          ACCESSIBILITY_CRITERIA,
+          `${version} ${criterion.id} names WCAG in its label and is not treated as a barrier`,
+        ).toContain(criterion.id);
+      }
+    }
+  });
+
+  it('gives a reason for every exclusion, in words a reader could argue with', () => {
+    for (const [criterion, why] of Object.entries(NOT_ACCESSIBILITY_CRITERIA)) {
+      expect(why.length, criterion).toBeGreaterThan(80);
+      // Each reason has to say what the criterion is instead, not merely that
+      // it is not this. "Not accessibility" is a conclusion, not a reason.
+      expect(why, criterion).toMatch(/usability|design|4\.1\.3|3\.2\.4|consistency/i);
+    }
   });
 });
 
