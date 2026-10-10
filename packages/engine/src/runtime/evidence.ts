@@ -307,14 +307,50 @@ export class EvidenceStore {
     if (summaryRedactions.length > 0) metadata.redactions = summaryRedactions;
 
     if (Buffer.isBuffer(input.body)) {
+      /*
+       * Bytes we cannot read, and the artefact now says so.
+       *
+       * Everything in this file exists to keep a credential out of storage:
+       * `redactHeaders` takes out a header whose name says it carries one,
+       * `redact` takes out anything shaped like one in a body, and
+       * `redactDeep` does the summary and the metadata because a URL is where
+       * a token in a query string lives. None of it applies to a buffer, and
+       * until 2026-10-10 that was simply not mentioned — the artefact carried
+       * no `redactions` key, exactly as an artefact we had read and found
+       * nothing in. One field, two causes: nothing to take out, and nothing
+       * attempted. The summary and the metadata are read on every path,
+       * including this one; it is the body that nothing reads.
+       *
+       * Two kinds arrive this way. A screenshot is a PNG and no text rule
+       * could read it. A Playwright trace is a zip, and it is the one that
+       * matters: measured on 2026-10-10 against a local page, a trace
+       * captured with `screenshots: false, snapshots: false` contains every
+       * action's parameters verbatim — the value typed into a password field,
+       * the address typed into an email field, and the full URL of every
+       * navigation, including a token in its query string. It does not
+       * contain response bodies or headers.
+       *
+       * So the provisioned synthetic password is in storage for thirty days,
+       * in a file nothing can clean, in the same repository whose
+       * `tests/the-password-we-were-never-given.test.ts` holds that a refusal
+       * must never quote the value it refused. `docs/OPEN_ITEMS.md` carries
+       * the choice: stop capturing traces and change what the rubric names as
+       * evidence for ten criteria, rewrite the zip before storing it, or keep
+       * it and shorten its reach.
+       */
       body = input.body;
       contentType = input.contentType ?? 'image/png';
+      metadata.bodyRedaction = 'not_readable';
     } else {
       const raw = typeof input.body === 'string' ? input.body : JSON.stringify(input.body, null, 2);
       const { text, redactions } = redact(raw);
       if (redactions.length > 0) {
         metadata.redactions = [...summaryRedactions, ...redactions];
       }
+      // Said either way. "We read this and took nothing out" and "we never
+      // read it" were the same silence, and the second one is the sentence
+      // somebody disputing a finding needs.
+      metadata.bodyRedaction = redactions.length > 0 ? 'applied' : 'read_nothing_found';
       body = Buffer.from(text, 'utf8');
       contentType =
         input.contentType ?? (typeof input.body === 'string' ? 'text/plain' : 'application/json');

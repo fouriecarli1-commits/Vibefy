@@ -29,6 +29,7 @@ codebase must appear here. Nothing leaves this list silently.
 | **We now own an application we rate.** What the independence policy should say, and whether futurebox keeps its badge | Nothing in code — and arguably the futurebox badge                     | VibefyCode is a product of FUTUREBOXSTUDIO (PTY) LTD. futurebox is the same company's application, and it carries badge number one. Section 4 of the independence policy says "reviewers must declare and recuse themselves from any application in which they have a commercial, employment or ownership interest" — you are the only reviewer, and you own both. Read strictly, that badge should not exist yet. I did not write a clause either way, because both answers are yours and one of them is a product change. **The options:** (a) an operator-owned label wherever such a rating appears, mirroring the marketing-client disclosure that already exists — one column, one sentence, two surfaces; (b) no badge for an application we own until there is a reviewer with no interest in it; (c) both. What I would not do is leave the policy saying one thing and the directory showing another: a rating product that publishes a rule it breaks on its own first badge has nothing left to sell.                                                                                                                                                                                                                                                                                  |
 | Whether “we could not look” should cost a score, not only a sentence                                                  | `packages/rubric`                                                      | A criterion nothing checked no longer renders as a tick, but it still costs nothing: `scoreAssessment` deducts for findings, and “we did not look” produces none. So an application can score 100, band Exemplary, be certification-eligible, and carry ten criteria beside the number saying they were not tested. GATE-NO-AUTHORISATION-COVERAGE is the precedent — it blocks certification with the published reason “we did not assess the product and must not certify it” — and the same sentence fits here. Doing it means a new gate and therefore rubric 1.2.0, because PART 8 publishes the rubric in full and a blocker that is not in it breaks that promise. It also changes who can be certified, which is why it is on this list and not in a commit. The alternative is to build the ten checks, which costs more and is the better answer.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Whether a customer is told their report is late                                                                       | `apps/worker/src/report.ts`                                            | When the sweep gives up rendering a report, that is now written to `audit_log` so we can answer who is waiting — but the customer is told nothing. They have an approved assessment, no report, and no reason given. Telling them needs an alert kind, which is a migration, and it needs a sentence that does not promise a date we cannot keep. Both are judgement calls about what to say to somebody whose paid deliverable is late, so they are here rather than in a commit. The audit record is enough for us to find them and write by hand, which is the right first version anyway.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| A Playwright trace carries the password that was typed into the application                                           | Whether we keep capturing them                                         | Measured, not assumed: a trace captured the way this engine captures them holds the value filled into a password field, the address filled into an email field, and the full URL of every navigation. It is a zip, so none of the redaction in `evidence.ts` touches it, and it sits in storage for thirty days where the owner's own team and our reviewers can download it. The published rubric names `playwright_trace` as the evidence for ten criteria. Three ways out, each with a cost: stop capturing traces and change what those ten criteria are evidenced by; rewrite the zip before storing it, which means a zip writer this repository does not have; or keep it, shorten its retention below thirty days and say in the authorisation what it contains. The credential is the synthetic one the owner provisioned for the run, not a real user's, which is why this is a judgement rather than an incident.                                                                                                                                                                                                                                                                                                                                                                       |
 
 ## Deferred by milestone
 
@@ -248,6 +249,46 @@ everybody needs an authenticator app first, is a real cost at a real moment.
 Whether that cost is worth paying is a judgement about who our customers are.
 Say which of the three surfaces should require it — or that none should — and
 the rest is ordinary work.
+
+## The trace that carries a password
+
+**What it is.** When the engine drives a browser through somebody's application it
+records what it did, as a Playwright trace, and stores that as evidence. The published
+rubric names that trace as the evidence for ten of its criteria.
+
+**What I measured.** On 2026-10-10, against a page served locally, a trace captured
+exactly the way this engine captures them contained:
+
+- the value typed into a password field, in full
+- the address typed into an email field, in full
+- the URL of every navigation, including anything in its query string
+
+It did not contain response bodies or response headers.
+
+**Why that matters here and not elsewhere.** Everything else captured as evidence is
+read on the way in: a header whose name says it carries a credential has its value
+taken out, and anything shaped like a known key is replaced in the body, the summary
+and the metadata. A trace is a zip. None of that reaches inside it. So the one
+password in the run — the synthetic account the owner provisioned for it — is in our
+storage, in the clear, for thirty days, where that owner's own team and our reviewers
+can download it. The same repository holds a test asserting that when the tool refuses
+a password it must never quote the value.
+
+**The three ways out, and what each costs.**
+
+- **Stop capturing traces.** Ten rubric criteria then need a different evidence kind
+  named for them, and the thing being evidenced — did the flow actually complete — is
+  what a trace is best at.
+- **Clean the zip before storing it.** Correct, and it needs code to read and rewrite a
+  zip, which this repository has no library for. A day's work and a new dependency.
+- **Keep it, shorten it, say so.** Reduce its retention below the thirty days a
+  screenshot gets, and state in the authorisation document that a trace of the session
+  is kept and what it contains. Cheapest, and it leaves the credential there.
+
+**What I need from you is which.** I would take the third today and the second when
+there is time, but it is your call: it is your customers' authorisation that says what
+we keep. Nothing is blocked while this is open — the artefact now records that nothing
+read its body, so neither of us can mistake it for one we checked.
 
 ## Stubs in the codebase
 
