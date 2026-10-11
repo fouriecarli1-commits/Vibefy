@@ -77,9 +77,22 @@ export async function revokeBadge(
     };
 
   revalidatePath('/review/badges');
+  /*
+   * "Stops showing", and the one thing it does not reach.
+   *
+   * This said "stops reading as verified", which is true of the picture and
+   * not of the page around it: the `alt` text in the snippet a customer pasted
+   * is fixed in their HTML at the moment they copied it, so a screen reader on
+   * their site still hears the sentence for a live badge. Our own two pages
+   * name the picture from its status now; somebody else's page is theirs, and
+   * the licence is what obliges them to take the mark down.
+   *
+   * Said to a reviewer because a reviewer is who acts on it — this is the
+   * sentence that decides whether they also write to the customer.
+   */
   return {
     notice:
-      'Revoked. Because we serve the image, every embedded instance stops reading as verified within minutes — there is no cached copy anywhere that says otherwise.',
+      'Revoked. Because we serve the image, every embedded instance stops showing as verified within minutes — no cached copy says otherwise. The alt text in a snippet they pasted stays as it was: the licence obliges them to remove the mark, and a screen reader on their site reads that text until they do.',
   };
 }
 

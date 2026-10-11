@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { MOBILE_CAPABILITIES } from '@vibefycode/api';
 import { NON_RELIANCE_LEGEND } from '@vibefycode/shared';
 import { supabase } from '@/lib/supabase.ts';
-import { registerForPush, unregisterPush } from '@/lib/push.ts';
+import { pushIsOnForThisDevice, registerForPush, unregisterPush } from '@/lib/push.ts';
 import { palette, spacing } from '@/lib/theme.ts';
 import { Button, styles } from '@/lib/ui.tsx';
 
@@ -32,12 +32,10 @@ export default function AccountScreen() {
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
-    void supabase
-      .from('device_tokens')
-      .select('id')
-      .is('disabled_at', null)
-      .limit(1)
-      .then(({ data }) => setPushOn((data ?? []).length > 0));
+    // This handset, not the account. The switch sits above copy that says "This
+    // device will receive alerts", and it used to read on because another phone
+    // of theirs was registered.
+    void pushIsOnForThisDevice().then(setPushOn);
   }, []);
 
   return (

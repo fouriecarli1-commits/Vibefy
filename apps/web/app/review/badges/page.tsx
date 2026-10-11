@@ -69,7 +69,9 @@ export default async function BadgeRegisterPage() {
         <p className="text-muted">
           Every state change here is written to an append-only log by the database, with its reason.
           Because the image is served from our origin, a revocation stops every embedded instance
-          reading as verified within minutes.
+          showing as verified within minutes. The alt text in a snippet somebody pasted is their own
+          HTML and keeps the old sentence until they remove the mark, which the licence obliges them
+          to do.
         </p>
       </header>
 

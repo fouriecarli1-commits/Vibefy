@@ -106,6 +106,42 @@ describe('what it costs', () => {
   });
 });
 
+describe('a ledger write that fails', () => {
+  /*
+   * The ceiling is computed from the rows this route writes, and this write was
+   * the only one in the route whose failure was swallowed without a word:
+   * `.catch(() => undefined)`. A run of failed inserts leaves every later
+   * check too low, in the function whose whole design is "do not spend what
+   * nobody agreed to" — and the first anybody would hear of it is the invoice
+   * that design exists to prevent. The worker's screening sweep already logs
+   * the same shape; this is the sentence that was missing.
+   */
+  const ledgerWrite = route.slice(
+    route.indexOf('insert into public.cost_records'),
+    route.indexOf('const text = reply.content'),
+  );
+
+  it('is still fire-and-forget, because the reply has already been paid for', () => {
+    // The positive control for the case below: if this ever starts blocking the
+    // response, the assertion about a logged failure is about something else.
+    expect(route).toContain('void writeAsService(');
+  });
+
+  it('says so, instead of discarding the error', () => {
+    expect(ledgerWrite).not.toContain('.catch(() => undefined)');
+    expect(ledgerWrite).toContain('console.error');
+    expect(ledgerWrite).toContain('the ceiling is short by this call');
+  });
+
+  it('says which workspace and how much, which is what makes the line usable', () => {
+    expect(ledgerWrite).toContain('organisationId: row.organisation_id');
+    expect(ledgerWrite).toContain('costUsd');
+    expect(ledgerWrite).toMatch(
+      /error: error instanceof Error \? error\.message : String\(error\)/,
+    );
+  });
+});
+
 describe('the ceiling', () => {
   it('is checked before the money is spent, not after', () => {
     // A limit read after the call is a receipt. The check has to sit above the

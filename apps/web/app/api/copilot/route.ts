@@ -252,9 +252,23 @@ export async function POST(request: NextRequest) {
       pricing.cacheReadMultiplier +
     (usage.output_tokens / 1_000_000) * pricing.output;
 
-  // Into the ledger the daily cap reads. Unattributed to an assessment on
-  // purpose: this is not what the assessment cost, and adding it there would
-  // make the unit economics dashboard quietly wrong.
+  /*
+   * Into the ledger the daily cap reads. Unattributed to an assessment on
+   * purpose: this is not what the assessment cost, and adding it there would
+   * make the unit economics dashboard quietly wrong.
+   *
+   * And said when it fails, which it was not. The ceiling forty lines above is
+   * computed from exactly these rows, and this is the only write in the route
+   * whose failure was swallowed without a word — so a run of failed inserts
+   * leaves every later check too low, in the one function whose design is "do
+   * not spend what nobody agreed to". The same shape in the worker's screening
+   * sweep logs; this did not, and the first anybody would hear of it is the
+   * invoice that function refuses to let arrive.
+   *
+   * The customer still gets their answer. The call has already been paid for
+   * by the time this runs, and refusing to return a reply we have been charged
+   * for helps nobody.
+   */
   void writeAsService(async (client) => {
     await client.query(
       `insert into public.cost_records
@@ -270,7 +284,13 @@ export async function POST(request: NextRequest) {
         costUsd.toFixed(6),
       ],
     );
-  }).catch(() => undefined);
+  }).catch((error: unknown) => {
+    console.error('copilot spend not recorded — the ceiling is short by this call', {
+      organisationId: row.organisation_id,
+      costUsd: Number(costUsd.toFixed(6)),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   const text = reply.content
     .filter((block): block is Anthropic.TextBlock => block.type === 'text')

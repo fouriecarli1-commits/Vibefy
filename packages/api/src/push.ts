@@ -148,15 +148,22 @@ export const expoPushSender: PushSender = async (messages) => {
  * argument and only its shape is named here, so nothing device-specific is
  * dragged along.
  */
+/**
+ * A delete that can be narrowed and then awaited, which is what a filter
+ * builder is. Named this way so the one call below can add a second condition
+ * without a second shape for the caller to satisfy.
+ */
+export interface DeviceTokenDelete extends PromiseLike<{ error: { message: string } | null }> {
+  eq(column: 'user_id' | 'token', value: string): DeviceTokenDelete;
+}
+
 /** The slice of the client this needs. Structural, so the real one satisfies it. */
 export interface DeviceTokenStore {
   readonly auth: {
     getUser(): PromiseLike<{ data: { user: { id: string } | null } }>;
   };
   from(table: 'device_tokens'): {
-    delete(): {
-      eq(column: 'user_id', value: string): PromiseLike<{ error: { message: string } | null }>;
-    };
+    delete(): DeviceTokenDelete;
   };
 }
 
@@ -172,7 +179,27 @@ export interface TokenRemoval {
   readonly reason?: string;
 }
 
-export async function removeDeviceTokens(store: DeviceTokenStore): Promise<TokenRemoval> {
+/**
+ * One handset, when we know which one.
+ *
+ * This deleted every token on the account, while the screen that calls it says
+ * "This device will no longer receive alerts" and this file's own comments
+ * reason about "this phone" throughout. A customer with a phone and a tablet
+ * who turned the switch off on the tablet stopped being pushed to on the
+ * phone — including the badge suspension the Badge Licence obliges us to give
+ * notice of, and which `setAlertEmailLevel` deliberately refuses to let anyone
+ * switch off.
+ *
+ * `token` is this handset's registration, which the app can read from the OS.
+ * Without it the old behaviour is what is left, and the one property worth
+ * keeping is the one this function was written for: a handset that has signed
+ * out must not go on receiving the previous account's alerts. So it clears the
+ * account and says that is what it did, rather than quietly doing it.
+ */
+export async function removeDeviceTokens(
+  store: DeviceTokenStore,
+  options: { readonly token?: string } = {},
+): Promise<TokenRemoval> {
   const {
     data: { user },
   } = await store.auth.getUser();
@@ -187,11 +214,20 @@ export async function removeDeviceTokens(store: DeviceTokenStore): Promise<Token
     };
   }
 
-  const { error } = await store.from('device_tokens').delete().eq('user_id', user.id);
+  let deleting = store.from('device_tokens').delete().eq('user_id', user.id);
+  if (options.token !== undefined) deleting = deleting.eq('token', options.token);
+  const { error } = await deleting;
   if (error) {
     return {
       removed: false,
       reason: `The registration for this device could not be removed (${error.message}). Until it is, this handset may still receive alerts for this account.`,
+    };
+  }
+  if (options.token === undefined) {
+    return {
+      removed: true,
+      reason:
+        'This device could not tell us which registration is its own, so alerts are now off for this account on every device. Turn them back on wherever you want them.',
     };
   }
   return { removed: true };

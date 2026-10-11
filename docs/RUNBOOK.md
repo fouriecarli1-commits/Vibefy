@@ -318,8 +318,15 @@ both need a written reason; the database refuses a revocation without one, and
 the transition is written to an append-only event log by trigger.
 
 Because the image is served from our origin with a five-minute cache, a
-revocation stops every embedded instance reading as verified within minutes.
+revocation stops every embedded instance showing as verified within minutes.
 There is no file anywhere that says otherwise.
+
+One thing it does not reach, and it is worth knowing before you write to a
+customer: the `alt` text in the snippet they pasted is fixed in their HTML at
+the moment they copied it. The picture changes; that sentence does not, so a
+screen reader on their site goes on hearing "Verified by VibefyCode" until they
+take the mark down — which the licence obliges them to do, and which only they
+can do. Our own two pages name the badge from its status.
 
 ## Continuous monitoring
 

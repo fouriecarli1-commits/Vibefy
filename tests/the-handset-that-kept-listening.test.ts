@@ -28,7 +28,11 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, Pool } from 'pg';
-import { removeDeviceTokens, type DeviceTokenStore } from '../packages/api/src/push.ts';
+import {
+  removeDeviceTokens,
+  type DeviceTokenDelete,
+  type DeviceTokenStore,
+} from '../packages/api/src/push.ts';
 import { findPendingPushes } from '../apps/worker/src/push.ts';
 import { connect } from './setup/client.ts';
 import { seedAccount, seedApp, type SeededAccount } from './setup/seed.ts';
@@ -53,18 +57,33 @@ afterAll(async () => {
   await db?.end();
 });
 
+/**
+ * A delete that can be narrowed and then awaited, like the real filter builder.
+ *
+ * `removeDeviceTokens` now adds a second condition when it knows which handset
+ * it is, so the fake has to be chainable rather than a single `eq` that
+ * resolves. Each condition is recorded, which is also what the assertions read.
+ */
+function deleting(
+  applied: [string, string][],
+  error: { message: string } | null,
+): DeviceTokenDelete {
+  const settled = Promise.resolve({ error });
+  const self: DeviceTokenDelete = {
+    eq: (column, value) => {
+      applied.push([column, value]);
+      return self;
+    },
+    then: settled.then.bind(settled),
+  };
+  return self;
+}
+
 /** A client that answers for a signed-in user and lets the delete through. */
-function willing(userId: string, deleted: string[]): DeviceTokenStore {
+function willing(userId: string, applied: [string, string][]): DeviceTokenStore {
   return {
     auth: { getUser: async () => ({ data: { user: { id: userId } } }) },
-    from: () => ({
-      delete: () => ({
-        eq: async (_column: 'user_id', value: string) => {
-          deleted.push(value);
-          return { error: null };
-        },
-      }),
-    }),
+    from: () => ({ delete: () => deleting(applied, null) }),
   };
 }
 
@@ -75,9 +94,7 @@ function refusing(
 ): DeviceTokenStore {
   return {
     auth: { getUser: async () => ({ data: { user: { id: userId } } }) },
-    from: () => ({
-      delete: () => ({ eq: async () => ({ error: { message } }) }),
-    }),
+    from: () => ({ delete: () => deleting([], { message }) }),
   };
 }
 
@@ -85,23 +102,26 @@ function refusing(
 const sessionless: DeviceTokenStore = {
   auth: { getUser: async () => ({ data: { user: null } }) },
   from: () => ({
-    delete: () => ({
-      eq: async () => {
-        throw new Error('nothing should reach the table without a user');
-      },
-    }),
+    delete: () => {
+      throw new Error('nothing should reach the table without a user');
+    },
   }),
 };
 
 describe('taking the handset off the list', () => {
   it('says it is done when the row went', async () => {
-    const deleted: string[] = [];
-    const result = await removeDeviceTokens(willing(owner.userId, deleted));
+    const applied: [string, string][] = [];
+    const result = await removeDeviceTokens(willing(owner.userId, applied), {
+      token: 'ExponentPushToken[this-one]',
+    });
     expect(result.removed).toBe(true);
     expect(result.reason).toBeUndefined();
-    // Scoped to this user, which is also what the RLS policy allows: a device
-    // token belongs to exactly one person.
-    expect(deleted).toEqual([owner.userId]);
+    // Scoped to this user — which is also what the RLS policy allows, since a
+    // device token belongs to exactly one person — and to this handset.
+    expect(applied).toEqual([
+      ['user_id', owner.userId],
+      ['token', 'ExponentPushToken[this-one]'],
+    ]);
   });
 
   it('says it is not done when the store refuses, and why', async () => {

@@ -60,5 +60,52 @@ export async function registerForPush(): Promise<{ registered: boolean; reason?:
  * says why it lives there.
  */
 export async function unregisterPush(): Promise<TokenRemoval> {
-  return removeDeviceTokens(supabase);
+  const token = await thisDeviceToken();
+  return removeDeviceTokens(supabase, token === null ? {} : { token });
+}
+
+/**
+ * This handset's registration, or null when the OS will not give one.
+ *
+ * Read rather than remembered: the token is the only device-shaped thing either
+ * side has, and storing a copy of it would be a second answer to "which phone
+ * is this" that can disagree with the first.
+ */
+export async function thisDeviceToken(): Promise<string | null> {
+  if (!Device.isDevice) return null;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return null;
+    return (await Notifications.getExpoPushTokenAsync()).data;
+  } catch {
+    // A revoked permission, a device with no network, an Expo outage. All of
+    // them mean the same thing here — we cannot name this handset — and the
+    // caller decides what to do about it. Nothing is logged because this runs
+    // on somebody's phone and the answer is the log.
+    return null;
+  }
+}
+
+/**
+ * Whether **this** handset is on the list.
+ *
+ * The account screen asked whether the account had any enabled token at all,
+ * and drew a switch labelled "Push notifications" beside copy that says "This
+ * device will receive alerts". On a second handset that switch read on before
+ * the handset had ever registered, so the one person who could have fixed it
+ * was shown the state of a different phone.
+ *
+ * A revoked OS permission reads as off, which is what it is: no push arrives,
+ * whatever row is in the table.
+ */
+export async function pushIsOnForThisDevice(): Promise<boolean> {
+  const token = await thisDeviceToken();
+  if (token === null) return false;
+  const { data } = await supabase
+    .from('device_tokens')
+    .select('id')
+    .eq('token', token)
+    .is('disabled_at', null)
+    .limit(1);
+  return (data ?? []).length > 0;
 }

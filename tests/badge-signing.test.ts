@@ -112,6 +112,21 @@ describe('a genuine badge', () => {
     const result = verifyBadge(signed, keySet, { now: new Date('2026-09-01') });
     expect(result.explanation).toMatch(/assessed Kettle against Rubric v1\.0\.0 on 2026-08-22/);
     expect(result.explanation).toMatch(/does not confirm the badge is currently active/i);
+    /*
+     * And the name spelled the way the mark is spelled.
+     *
+     * This sentence read "only vibefycode's verification page", lowercase, on
+     * the one page a sceptic opens to check a badge without trusting us. Small,
+     * and the kind of small that reads as a copy somebody else made.
+     *
+     * Asserted here rather than by a linter: `vibefycode` in lower case is
+     * correct in a URL, in a package name, in `apps/mobile/app.json`'s slug and
+     * scheme, and in the lowercased lists `claim-check.ts` matches against, so
+     * a rule over the repository would need more exclusions than it would catch
+     * slips. There was exactly one slip.
+     */
+    expect(result.explanation).toContain('VibefyCode\u2019s verification page');
+    expect(result.explanation).not.toMatch(/\bvibefycode\b/);
   });
 
   it('discloses a marketing relationship inside the signed payload, not only on the page', () => {
