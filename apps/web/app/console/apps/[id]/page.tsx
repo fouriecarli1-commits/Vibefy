@@ -27,7 +27,7 @@ import { currentVersionOf } from '@/lib/legal';
 import { Disclosure } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
 import { isPlaceholderOrigin } from '@/lib/verify-origin';
-import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
+import { resolveVerifyOriginWithSource } from '@/lib/verify-origin.server';
 
 export const metadata: Metadata = { title: 'Application' };
 
@@ -167,7 +167,9 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
   const status = current?.status ?? 'none';
   const copy = STATUS_COPY[status] ?? STATUS_COPY.none!;
   const host = app.primary_url ? new URL(app.primary_url as string).hostname : '';
-  const verifyOrigin = await resolveVerifyOrigin();
+  // With where it came from, because the snippet below is copied into somebody
+  // else's website and keeps whatever origin it was built from.
+  const { origin: verifyOrigin, source: originSource } = await resolveVerifyOriginWithSource();
 
   // The facts both snippet forms share, so the HTML and the JSX can never
   // describe two different badges.
@@ -522,6 +524,31 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
                       deployment could not work out which address it is served from, so the badge
                       URL below points at a placeholder. Set <code>NEXT_PUBLIC_SITE_URL</code> to
                       this site&apos;s address and the snippet corrects itself.
+                    </p>
+                  )}
+
+                  {/* The warning above is for an origin that did not resolve at
+                      all. This is for one that resolved and will not last.
+
+                      A snippet keeps the origin it was built from. Built from
+                      this request, it points at the address you are browsing —
+                      and the badge on futurebox was copied in August under a
+                      generated Vercel host, so when this app moved to its own
+                      domain the mark on their front page became alt text. It
+                      was blamed on the content-security policy and then on the
+                      connection string before anybody looked at the snippet,
+                      because all three failures look the same from outside. */}
+                  {originSource === 'request' && (
+                    <p role="alert" className="rounded-lg border border-line-strong p-4 text-sm">
+                      <strong className="text-warn">
+                        This snippet will point at {verifyOrigin}.
+                      </strong>{' '}
+                      That is the address you are browsing, not an address this deployment was
+                      configured with — a snippet keeps whatever origin it was copied under. If this
+                      is a preview or generated URL, the badge will break the day it changes, and
+                      the first sign will be a missing mark on your customer&apos;s page. Set{' '}
+                      <code>NEXT_PUBLIC_SITE_URL</code> to the permanent address, reload this page,
+                      and copy it again.
                     </p>
                   )}
 

@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { siteOriginFor, verifyOriginFor } from './verify-origin';
+import { siteOriginFor, verifyOriginFor, verifyOriginWithSource } from './verify-origin';
 
 /** The same decision, with the request read for it. */
 export async function resolveVerifyOrigin(): Promise<string> {
@@ -20,4 +20,20 @@ export async function resolveVerifyOrigin(): Promise<string> {
 export async function resolveSiteOrigin(): Promise<string> {
   const headerList = await headers();
   return siteOriginFor(headerList.get('x-forwarded-host') ?? headerList.get('host'));
+}
+
+/**
+ * The same origin, with where it came from, for the one page that needs it.
+ *
+ * The console's embed snippet is copied into somebody else's website and keeps
+ * the origin it was built from, so "resolved" is not enough: a snippet built
+ * from the request host points at whatever address the operator happened to be
+ * browsing, and on Vercel that is a generated host that changes. See
+ * `verifyOriginWithSource`.
+ */
+export async function resolveVerifyOriginWithSource(): Promise<
+  ReturnType<typeof verifyOriginWithSource>
+> {
+  const headerList = await headers();
+  return verifyOriginWithSource(headerList.get('x-forwarded-host') ?? headerList.get('host'));
 }

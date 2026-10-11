@@ -127,6 +127,49 @@ export function verifyOriginForRequest(request: HasHeaders): string {
 }
 
 /**
+ * Where the origin came from, which matters in exactly one place.
+ *
+ * `verifyOriginFor` answers with an origin and says nothing about how it got
+ * there, and for seven of its callers that is right — a badge image or a
+ * verification page only needs the address it is being served from.
+ *
+ * The console's embed snippet is the exception, because the snippet is copied
+ * into somebody else's website and keeps whatever origin it was built from.
+ * Built from a configured variable, it keeps pointing at the domain the
+ * operator chose. Built from the request, it keeps pointing at whatever
+ * address they happened to be browsing — and on Vercel that is a generated
+ * host that changes.
+ *
+ * That is not hypothetical. The snippet on futurebox was copied in August
+ * under this app's generated Vercel host, and when it moved to its own domain
+ * the mark on their front page became alt text. It was misattributed twice, to
+ * the content-security policy and then to the connection string, because all
+ * three failures look identical from outside. The host is not written out here
+ * because it carries the old brand name and the copy gate refuses it — which
+ * is the gate doing its job on a comment about the very rename that broke the
+ * snippet.
+ *
+ * `isPlaceholderOrigin` already warns about the reserved-TLD fallback, which
+ * is the case where nothing resolved at all. This is the case where something
+ * resolved and will not last: one answer covering two situations, which is the
+ * shape half of this file's history is about.
+ */
+export type OriginSource = 'configured' | 'request' | 'placeholder';
+
+export function verifyOriginWithSource(host: string | null): {
+  readonly origin: string;
+  readonly source: OriginSource;
+} {
+  const configured = process.env.NEXT_PUBLIC_VERIFY_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
+  const origin = originFrom(configured, host);
+  if (isPlaceholderOrigin(origin)) return { origin, source: 'placeholder' };
+  // Compared rather than inferred from whether the variable is set: a variable
+  // holding something unparseable falls through to the request host inside
+  // `originFrom`, and reading the variable here would call that configured.
+  return { origin, source: originFrom(configured, null) === origin ? 'configured' : 'request' };
+}
+
+/**
  * The origin the console itself is served from, which is not always the one
  * badges are.
  *
