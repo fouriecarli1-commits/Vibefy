@@ -48,7 +48,7 @@
       "requiresConsent": true,
       "consentDocumentType": "cookie_notice",
       "isDraft": true,
-      "sha256": "dfa8fa170a460c05ee37f09c8e30bed1dccf3b71f91116e544dc3fbbf257c2b4"
+      "sha256": "a8c6746087abd716649786bb2130567fbc0c109ee23a9a2fda4c81b32827fc82"
     },
     "data-processing-agreement.md": {
       "version": "1.0.0-draft",
@@ -80,7 +80,7 @@
       "requiresConsent": true,
       "consentDocumentType": "privacy_policy",
       "isDraft": true,
-      "sha256": "ec15fd079888fd17c685efb7921e84b89da30516c29d1cc9714dfaf89858104c"
+      "sha256": "a87aaeb4d0d16bf68c723e2e1be530f34601a0c07b144648f0b631c9c8135fd0"
     },
     "rating-methodology-and-independence.md": {
       "version": "1.1.0-draft",
