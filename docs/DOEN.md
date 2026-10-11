@@ -195,6 +195,10 @@ live nie** — jou eie briefing (`docs/ANTIGRAVITY.md`) sê geen agent stoot na
 **Om dit live te kry:** merge daardie branch op GitHub, of sê vir my "stoot dit
 na main" en ek doen dit.
 
+Die branch is bygewerk met `main` soos dit vanaand is — drie nuwe commits het
+intussen op `main` geland en nie een van hulle raak die voetstuk of die
+beeldbeleid nie, so die merge is skoon en daar is niks om op te los nie.
+
 **Klaar as:** die voetstuk op futurebox wys niks waar die badge was nie.
 
 ### Wanneer jy dit terugsit
