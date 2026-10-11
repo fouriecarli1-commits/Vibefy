@@ -411,6 +411,36 @@ const REPOSITORY_UNREADABLE =
 const NO_MANIFEST =
   'This repository has no readable package.json, so there was no list of declared dependencies to check against known advisories.';
 
+/**
+ * Every credential shape on one line, as the stage reports them.
+ *
+ * Exported so a test can ask what this scan can see without driving a whole
+ * assessment over a fixture repository. The reason that matters is in the note
+ * on `CREDENTIAL_PATTERNS` above: this list and `tools/secret-scan.mjs` are two
+ * readers of one rule — what a leaked credential looks like — and they had
+ * already drifted once, nine patterns against thirteen, with a comment claiming
+ * they were the same list. `tests/one-idea-of-a-leaked-credential.test.ts` now
+ * holds them equal by what each can detect rather than by how each is written,
+ * because the regexes differ in their lengths on purpose and always will.
+ *
+ * The shape is the first question and `confirm` is the second, for a shape
+ * shared by a credential and a value meant to be public: a Supabase project
+ * publishes its anon key in the same JWT shape as its service-role key, and
+ * flagging the shape alone would cap every correct Supabase application at 39.
+ */
+export function credentialsOnLine(
+  line: string,
+): { label: string; severity: RawFinding['severity'] }[] {
+  const found: { label: string; severity: RawFinding['severity'] }[] = [];
+  for (const { pattern, label, severity, confirm } of CREDENTIAL_PATTERNS) {
+    const match = pattern.exec(line);
+    if (match !== null && (confirm === undefined || confirm(match[0]))) {
+      found.push({ label, severity });
+    }
+  }
+  return found;
+}
+
 export const staticIntakeStage: Stage = {
   id: 'static_intake',
 
@@ -662,16 +692,11 @@ function scanForCredentials(root: string, files: string[], context: StageContext
       continue;
     }
     contents.split('\n').forEach((line, index) => {
-      for (const { pattern, label, severity, confirm } of CREDENTIAL_PATTERNS) {
-        const match = pattern.exec(line);
-        // The shape is the first question; `confirm` is the second, where a
-        // shape is shared by a credential and a value meant to be public.
-        if (match !== null && (confirm === undefined || confirm(match[0]))) {
-          const hit = { file: relativePath, line: index + 1, label, severity };
-          if (isExample) inExamples.push(hit);
-          else hits.push(hit);
-          filesWithHits.add(relativePath);
-        }
+      for (const { label, severity } of credentialsOnLine(line)) {
+        const hit = { file: relativePath, line: index + 1, label, severity };
+        if (isExample) inExamples.push(hit);
+        else hits.push(hit);
+        filesWithHits.add(relativePath);
       }
     });
   }
