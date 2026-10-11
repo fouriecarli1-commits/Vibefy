@@ -16,8 +16,10 @@ Laas nagegaan 2026-10-10.
 >
 > Vier ander foute in die badge-pad self is sedertdien reggemaak. Een daarvan
 > het elke badge sonder `?size=` in die URL as 'n klein grys raampie van 64
-> pixels gewys in plaas van volle grootte — presies wat jy gesien het. Die
-> redeploy bring almal saam.
+> pixels gewys in plaas van volle grootte — dit is wat jy op die toets-URL
+> hieronder sou gesien het. Die badge op futurebox is 'n ander saak: daardie
+> snit wys na 'n adres wat nie meer bestaan nie, en afdeling 1b hanteer dit.
+> Die redeploy bring die vier saam.
 >
 > **Klaar as:** die badge wys 'n telling in plaas van grys.
 >
@@ -183,13 +185,24 @@ die verduideliking, nie na die rou fout nie.
 
 ---
 
-## 1b · Futurebox — die embed wys na 'n dooie adres
+## 1b · Futurebox — die badge is uit, en hoe dit terugkom
 
-Aparte probleem van bo, en dit moet ná stap 1.
+Jy het op 11 Oktober gevra dat dit afkom totdat die badge reg is. Dit is uit
+op die branch `claude/badge-af-vir-nou` in `futurebox-app`. Dit is **nog nie
+live nie** — jou eie briefing (`docs/ANTIGRAVITY.md`) sê geen agent stoot na
+`main` nie, want `main` is direk aan Vercel.
 
-Die snit op futurebox is in Augustus gekopieer en wys na
-`vibefy-web-lyart.vercel.app`, wat nie meer bestaan nie. Daarom wys daar net
-woorde, selfs al werk alles aan ons kant.
+**Om dit live te kry:** merge daardie branch op GitHub, of sê vir my "stoot dit
+na main" en ek doen dit.
+
+**Klaar as:** die voetstuk op futurebox wys niks waar die badge was nie.
+
+### Wanneer jy dit terugsit
+
+Dit was nooit 'n badge-fout aan ons kant nie. Die snit op futurebox is in
+Augustus gekopieer en wys na `vibefy-web-lyart.vercel.app`, wat nie meer
+bestaan nie — daarom het daar net woorde gewys, selfs met alles reg aan ons
+kant. 'n Redeploy sou dit nie regmaak nie.
 
 Sodra die databasis antwoord:
 
@@ -197,7 +210,13 @@ Sodra die databasis antwoord:
 2. Gaan na die futurebox-toepassing se bladsy
 3. Onder **Your badge** → **Embed it**, kopieer die nuwe snit (dié een wys na
    `vibefycode.com`)
-4. Vervang die ou snit op futurebox se bladsy
+4. Sit dit terug in `app/components/SiteFooter.tsx`
+5. **Sit ook die `img-src`-reël vir die nuwe host terug in `next.config.mjs`**,
+   in dieselfde commit. Sonder dit blok die CSP-kop die prentjie: die voetstuk
+   wys niks en die enigste spoor is 'n fout in die console.
+
+Stap 5 staan ook boaan `SiteFooter.tsx` self, waar jy sal wees as jy dit
+terugsit.
 
 **Klaar as:** die badge wys op futurebox.
 
