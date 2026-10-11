@@ -37,6 +37,7 @@ let db: Client;
 let publicId: string;
 let slug: string;
 let appName: string;
+let appId: string;
 
 const before = {
   dsn: process.env.SUPABASE_DB_URL,
@@ -49,6 +50,7 @@ beforeAll(async () => {
   db = await connect();
   const seeded = await seedBadgedApp(db, `chain-${Date.now()}`);
   slug = seeded.slug;
+  appId = seeded.appId;
   const { rows } = await db.query<{ public_id: string; app_name: string }>(
     `select b.public_id, a.name as app_name
        from public.badges b join public.apps a on a.id = b.app_id
@@ -172,5 +174,120 @@ describe('a badge that does not', () => {
   it('is refused outright when the file is not an svg', async () => {
     const { response } = await fetchBadge(`${publicId}.png`);
     expect(response.status).toBe(404);
+  });
+});
+
+/**
+ * The two addresses a marketplace is told to use, against the same row.
+ *
+ * Both were changed on 2026-10-11 to carry the paid-relationship disclosure
+ * the independence policy promises wherever a rating appears, and both read a
+ * column that had to be added to a view for it. A change to a select list is
+ * exactly the kind that passes a source-reading test and fails against a
+ * database, so they are asked here too.
+ */
+describe('the machine-readable answers', () => {
+  interface StatusRoute {
+    GET: (
+      request: unknown,
+      context: { params: Promise<{ publicId: string }> },
+    ) => Promise<{ status: number; json: () => Promise<Record<string, unknown>> }>;
+  }
+  interface ListRoute {
+    GET: (request: unknown) => Promise<{
+      status: number;
+      json: () => Promise<{ badges: Record<string, unknown>[]; count: number }>;
+    }>;
+  }
+
+  const aRequest = () => ({
+    nextUrl: new URL('https://vibefycode.com/api'),
+    headers: new Headers({ host: 'vibefycode.com' }),
+  });
+
+  async function status(id: string) {
+    const here = '../apps/web/app/api/badge/[publicId]/status/route.ts';
+    const route = (await import(/* @vite-ignore */ here)) as StatusRoute;
+    const response = await route.GET(aRequest(), {
+      params: Promise.resolve({ publicId: id }),
+    });
+    return { response, body: await response.json() };
+  }
+
+  async function live() {
+    const here = '../apps/web/app/api/badges/live/route.ts';
+    const route = (await import(/* @vite-ignore */ here)) as ListRoute;
+    const response = await route.GET(aRequest());
+    return { response, body: await response.json() };
+  }
+
+  it('answers about one badge with the facts and the limits', async () => {
+    const { response, body } = await status(publicId);
+    expect(response.status).toBe(200);
+    expect(body.badgeId).toBe(publicId);
+    expect(body.isLive).toBe(true);
+    expect(body.state).toBe('live');
+    expect(body.appName).toBe(appName);
+    expect(body.verificationPage).toBe(`https://vibefycode.com/a/${slug}`);
+    expect(String(body.limits)).toMatch(/not a statement that the application has no defects/i);
+  });
+
+  it('says there is no paid relationship when there is none', async () => {
+    // Null rather than a sentence, because a disclosure on every badge is a
+    // disclosure on none.
+    const { body } = await status(publicId);
+    expect(body.paidRelationship).toBeNull();
+  });
+
+  it('discloses one when the owner has bought marketing services', async () => {
+    /*
+     * The column reached this answer through a view, which is the half a
+     * source-reading test cannot check. Set on the organisation, read back
+     * through `badge_verification`.
+     */
+    await db.query(
+      `update public.organisations set is_marketing_client = true, marketing_client_since = now()
+        where id = (select organisation_id from public.apps where id = $1)`,
+      [appId],
+    );
+    try {
+      const { body } = await status(publicId);
+      expect(String(body.paidRelationship)).toMatch(/purchased marketing services/i);
+    } finally {
+      await db.query(
+        `update public.organisations set is_marketing_client = false, marketing_client_since = null
+          where id = (select organisation_id from public.apps where id = $1)`,
+        [appId],
+      );
+    }
+  });
+
+  it('answers 404 with a sentence for a badge nobody issued', async () => {
+    const { response, body } = await status('never-issued-at-all');
+    expect(response.status).toBe(404);
+    expect(String(body.error)).toMatch(/no badge with that identifier/i);
+    // "We have never assessed this application" is a different claim, and not
+    // ours to make from an identifier.
+    expect(String(body.note)).toMatch(/says nothing about the application/i);
+  });
+
+  it('lists a badge whose owner chose to be listed, with the same disclosure field', async () => {
+    const { rows } = await db.query<{ organisation_id: string }>(
+      'select organisation_id from public.apps where id = $1',
+      [appId],
+    );
+    await db.query(
+      `insert into public.directory_listings (app_id, organisation_id, state)
+       values ($1, $2, 'listed'::public.listing_state)
+       on conflict (app_id) do update set state = excluded.state`,
+      [appId, rows[0]!.organisation_id],
+    );
+
+    const { response, body } = await live();
+    expect(response.status).toBe(200);
+    const mine = body.badges.find((entry) => entry.badgeId === publicId);
+    expect(mine, 'the listed badge is not in the document').toBeDefined();
+    expect(mine!.verificationPage).toBe(`https://vibefycode.com/a/${slug}`);
+    expect(mine!.paidRelationship).toBeNull();
   });
 });
