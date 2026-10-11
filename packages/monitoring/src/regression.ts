@@ -169,6 +169,39 @@ export function assessMateriality(
     };
   }
 
+  /*
+   * A run that looked at less is the second way a change can be ours.
+   *
+   * The same argument as the rubric version, and it needed its own branch
+   * rather than another cause folded into `comparable`: the sentence a customer
+   * reads is different, and one sentence for two causes is the defect this
+   * codebase keeps finding.
+   *
+   * Criteria go untested for reasons that are not about the application — no
+   * synthetic test account, so everything behind the sign-in is left alone; a
+   * target that did not answer, so every criterion read from the browser is
+   * unobserved; a criterion the rubric publishes with no check behind it yet.
+   * A deterministic stage that could not reach the application marks nine
+   * criteria untested and the static stage still succeeds, so the run completes
+   * with a score computed over what little was seen.
+   *
+   * Compare that with a full run and the score moves, sometimes a long way, for
+   * a reason the customer had no part in — and the drift sweep's verdict is
+   * what takes a badge down. So the findings stand and are reported, and the
+   * suspension is withheld with the reason said plainly. "We could not look" is
+   * not "there is nothing there", and it is not "it got worse" either.
+   */
+  if (drift.coverageShrank) {
+    return {
+      material: false,
+      reasons,
+      suspendBadge: false,
+      withheldBecause:
+        `This assessment left ${drift.notTestedAfter} criteria untested against ${drift.notTestedBefore} in the one before it, so it looked at less of the application than its predecessor did. ` +
+        'A change between two runs of different reach is not attributable to the application. What was found still stands and is reported; a badge is not suspended on a narrower look.',
+    };
+  }
+
   return {
     material: reasons.length > 0,
     reasons,

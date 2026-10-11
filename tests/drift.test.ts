@@ -34,6 +34,9 @@ function snapshot(id: string, overrides: Partial<AssessmentSnapshot> = {}): Asse
       { dimension: 'functional_integrity', score: 88 },
     ],
     findings: [],
+    // Both runs saw the same amount by default, so a case that is about a score
+    // or a finding is not quietly also about coverage.
+    notTestedCount: 3,
     ...overrides,
   };
 }

@@ -131,6 +131,7 @@ export function computeDrift(previous: AssessmentSnapshot, current: AssessmentSn
   escalatedFindings.sort(byKey);
 
   const rubricVersionChanged = previous.rubricVersion !== current.rubricVersion;
+  const coverageShrank = current.notTestedCount > previous.notTestedCount;
 
   return {
     previousAssessmentId: previous.assessmentId,
@@ -148,5 +149,8 @@ export function computeDrift(previous: AssessmentSnapshot, current: AssessmentSn
     certificationLost: previous.certificationEligible && !current.certificationEligible,
     rubricVersionChanged,
     comparable: !rubricVersionChanged,
+    notTestedBefore: previous.notTestedCount,
+    notTestedAfter: current.notTestedCount,
+    coverageShrank,
   };
 }

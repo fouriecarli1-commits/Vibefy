@@ -235,11 +235,15 @@ interface AssessmentRow {
   overall_score: string | null;
   certification_eligible: boolean;
   dimension_scores: { dimension: string; score: number }[] | null;
+  not_tested_count: number;
   assessed_at: string;
 }
 
 const SNAPSHOT_SELECT = `select a.id, a.app_id, a.organisation_id, a.rubric_version, a.overall_score,
                                 a.certification_eligible, a.dimension_scores,
+                                -- How much of the rubric this run could not look at. The column
+                                -- defaults to '[]', so this is a count and never null.
+                                jsonb_array_length(a.not_tested) as not_tested_count,
                                 coalesce(a.completed_at, a.created_at) as assessed_at
                            from public.assessments a`;
 
@@ -318,6 +322,10 @@ function toSnapshot(row: AssessmentRow, findings: ComparableFinding[]): Assessme
     certificationEligible: row.certification_eligible,
     dimensions,
     findings,
+    // Read rather than defaulted: `jsonb_array_length` over a column that
+    // defaults to '[]' cannot be null, and a `?? 0` here would quietly turn a
+    // query that forgot the column into "this run tested everything".
+    notTestedCount: Number(row.not_tested_count),
   };
 }
 

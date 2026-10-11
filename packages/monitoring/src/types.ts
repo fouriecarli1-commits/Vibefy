@@ -52,6 +52,18 @@ export interface AssessmentSnapshot {
   readonly certificationEligible: boolean;
   readonly dimensions: readonly ComparableDimension[];
   readonly findings: readonly ComparableFinding[];
+  /**
+   * How many criteria this run did not test, which is how much of the rubric it
+   * could not look at.
+   *
+   * A run leaves criteria untested for reasons that have nothing to do with the
+   * application: no synthetic test account, so everything behind the sign-in is
+   * left alone; a target that did not answer, so every criterion read from the
+   * browser is unobserved; a criterion the rubric publishes with no check
+   * behind it yet. Comparing a run that looked at twelve criteria with one that
+   * looked at forty is not a comparison about the application.
+   */
+  readonly notTestedCount: number;
 }
 
 export interface DimensionDelta {
@@ -89,6 +101,18 @@ export interface Drift {
   /** True when the two assessments were scored against different rubric versions. */
   readonly rubricVersionChanged: boolean;
   readonly comparable: boolean;
+  /** How many criteria each run left untested, and whether the later one saw less. */
+  readonly notTestedBefore: number;
+  readonly notTestedAfter: number;
+  /**
+   * True when the later run tested fewer criteria than the one before it.
+   *
+   * Kept apart from `comparable`, which means one thing — the rubric moved —
+   * and says so in its own sentence. Two causes behind one flag is the shape
+   * half of this codebase's history is about, and the two withholding reasons a
+   * customer reads are not interchangeable.
+   */
+  readonly coverageShrank: boolean;
 }
 
 // ---------------------------------------------------------------------------
