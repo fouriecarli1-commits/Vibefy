@@ -1349,6 +1349,15 @@ like card data`, ask the same catalogue, in the same schema, with the same
 - **Read the state before and after.** An update that returns no rows is
   indistinguishable from an update with nothing to update. Read the column, try
   the write, read it again.
+- **In the product, not only in a test.** The liveness sweep pings every
+  monitored customer and suspends a badge after a run of failures. Every probe
+  failing is not evidence about every customer; it is evidence about the worker,
+  whose outbound HTTPS can break for a dozen reasons. So the sweep probes an
+  address of ours first, through the same guard and fetch, and decides nothing
+  when that fails. The floor is kept as well — three or more applications all
+  failing together — because the control is blind to a partial route that
+  reaches our host and nothing else, and the floor is blind to a deployment with
+  one monitored application. Each covers what the other cannot see.
 
 The first anchor written for the RLS sweeps counted the population in a second
 query of its own. Pointing the sweep at schema `publik` left that count still

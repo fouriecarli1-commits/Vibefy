@@ -21,6 +21,7 @@
 import {
   applyProbe,
   assessMateriality,
+  classifyProbe,
   badgeExpiringAlert,
   rubricSupersededAlert,
   badgeSuspendedAlert,
@@ -32,6 +33,7 @@ import {
   isReassessmentDue,
   recoveredAlert,
   regressionAlert,
+  sharedCause,
   unreachableAlert,
   type AlertDraft,
   type AssessmentSnapshot,
@@ -724,6 +726,14 @@ export interface LivenessSweepResult {
   readonly restored: number;
   /** Checks we declined to make. Counted separately because they are not outages. */
   readonly refused: number;
+  /**
+   * Why this sweep decided nothing, or null when it decided normally.
+   *
+   * Set when the failures are better explained by this process than by the
+   * applications — see `sharedCause`. Nothing is written in that case: no
+   * counter, no status, no suspension, no alert.
+   */
+  readonly inconclusive: string | null;
 }
 
 /**
@@ -732,6 +742,20 @@ export interface LivenessSweepResult {
  * The URL checked is the badge's `certified_origin` — the exact origin the badge
  * asserts, which is also the origin the authorisation covers. Checking anything
  * else would be testing a target the customer did not authorise.
+ *
+ * Probed first, decided second, which is not how this read before. Each row was
+ * probed and written in the same pass, so the sweep could not notice the one
+ * thing no single row can show: that every application failed together, which
+ * is evidence about this process and not about any of them. `sharedCause` is
+ * that judgement and `controlOrigin` is what makes it possible with one
+ * customer as well as with fifty — an address of ours, probed through the same
+ * guard, dispatcher and fetch.
+ *
+ * `controlOrigin` is passed in rather than read from the environment here,
+ * because `announcementOrigin` in `badge.ts` is the one place that decides
+ * whether this deployment has a usable https origin, and a second copy of that
+ * rule is how two readers come to disagree. Null means no control was
+ * available, and then the count floor is the only layer.
  */
 export async function sweepLiveness(
   pool: Poolish,
@@ -739,6 +763,7 @@ export async function sweepLiveness(
   log: Logger = noop,
   now: Date = new Date(),
   limit = 50,
+  controlOrigin: string | null = null,
 ): Promise<LivenessSweepResult> {
   const client = await pool.connect();
   const result = { checked: 0, down: 0, suspended: 0, restored: 0, refused: 0 };
@@ -794,12 +819,40 @@ export async function sweepLiveness(
       [limit, plans, intervals],
     );
 
+    /*
+     * The probes, all of them, before anything is written.
+     *
+     * The control goes first and only when there is something to check: a sweep
+     * with no due applications has nothing to be inconclusive about, and
+     * pinging ourselves to find that out every five minutes is noise.
+     */
+    const control = rows.length > 0 && controlOrigin ? await probe(controlOrigin) : null;
+    const probed: { row: (typeof rows)[number]; outcome: Awaited<ReturnType<LivenessProbeFn>> }[] =
+      [];
     for (const row of rows) {
+      probed.push({ row, outcome: await probe(row.certified_origin) });
+      result.checked += 1;
+    }
+
+    const reason = sharedCause({
+      control: control ? classifyProbe(control) : null,
+      outcomes: probed.map((entry) => classifyProbe(entry.outcome)),
+    });
+    if (reason) {
+      // Loud, and the only place this can be said: every customer-facing
+      // surface would be a false accusation.
+      log('liveness sweep decided nothing, because the failures look like ours', {
+        reason,
+        checked: result.checked,
+        control: control ? classifyProbe(control) : 'not configured',
+        controlError: control?.error ?? control?.refusedReason ?? null,
+      });
+      return { ...result, inconclusive: reason };
+    }
+
+    for (const { row, outcome } of probed) {
       const plan = row.plan;
       const cadence = cadenceFor(plan);
-
-      const outcome = await probe(row.certified_origin);
-      result.checked += 1;
 
       const decision = applyProbe(
         {
@@ -907,7 +960,7 @@ export async function sweepLiveness(
     }
 
     if (result.checked > 0) log('liveness sweep', { ...result });
-    return result;
+    return { ...result, inconclusive: null };
   } finally {
     client.release();
   }

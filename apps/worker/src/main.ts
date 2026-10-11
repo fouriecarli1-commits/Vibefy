@@ -488,7 +488,17 @@ export async function start(): Promise<{ pool: Pool; stop: () => Promise<void> }
   const monitor = setInterval(() => {
     once('drift', () => sweepDriftDetection(pool, log));
     once('re-assessment', () => sweepScheduledReassessments(pool, log));
-    once('liveness', () => sweepLiveness(pool, undefined, log));
+    /*
+     * The sixth argument is the control address, and it is why this sweep can
+     * tell our outage from theirs: a probe of our own origin, through the same
+     * guard and fetch, before any customer's. `announcementOrigin` is the one
+     * place that decides whether this deployment has a usable https origin —
+     * null here means the count floor in `sharedCause` is the only layer, which
+     * is also what the start-up warning about that variable is about.
+     */
+    once('liveness', () =>
+      sweepLiveness(pool, undefined, log, new Date(), 50, announcementOrigin()),
+    );
     once('badge expiry', () => sweepBadgeExpiryWarnings(pool, log));
     // The standard moving on is a slow fact — a rubric is superseded a handful
     // of times a year — so it rides the five-minute monitoring beat rather than

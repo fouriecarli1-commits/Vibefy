@@ -46,6 +46,72 @@ export function classifyProbe(probe: LivenessProbe): LivenessOutcome {
   return 'up';
 }
 
+/**
+ * How many applications have to fail together before "all of them" means us.
+ *
+ * Three. With one or two monitored applications, both being down at once is an
+ * ordinary coincidence; with three or more it is not, and the cost of being
+ * wrong in the cautious direction is a badge that stays up five minutes longer
+ * than it should have.
+ */
+export const SHARED_CAUSE_MINIMUM = 3;
+
+/**
+ * What a whole sweep saw, which is more than any one probe can say.
+ *
+ * `control` is a probe against an address we control, made through the same
+ * guard, dispatcher and fetch as every other. It is the difference between "the
+ * customers' sites are not answering" and "this process cannot reach the
+ * internet".
+ */
+export interface SweepEvidence {
+  readonly control: LivenessOutcome | null;
+  /** One outcome per application checked, in any order. */
+  readonly outcomes: readonly LivenessOutcome[];
+}
+
+/**
+ * Whether this sweep's failures are better explained by us than by them.
+ *
+ * `applyProbe` is careful about one application at a time: a refusal is not an
+ * outage, and a suspension needs a run of consecutive failures. It cannot see
+ * the thing that matters most, because it is handed one row at a time — that
+ * every application failed in the same sweep, which is not evidence about every
+ * application. It is evidence about this process.
+ *
+ * What that costs if nobody checks: the worker loses outbound HTTPS — a broken
+ * egress proxy, a DNS resolver, a certificate bundle — and every probe returns
+ * `{ status: null, error: 'fetch failed' }`, which classifies as `down`. Each
+ * sweep advances every counter, and after the threshold every monitored
+ * customer's badge is suspended within minutes of the others, each with an
+ * alert and an email telling them their application stopped responding. It did
+ * not. This file's own first paragraph calls a badge on a dead site the worst
+ * artefact the system can produce and a false suspension the next worst; that
+ * is the next worst, delivered to everybody at once, by us.
+ *
+ * Two layers, because each covers the other's blind spot. The control catches
+ * it on a deployment with one monitored application, where no count would. The
+ * floor catches the case where the control host happens to be reachable and the
+ * wider internet is not — a proxy allowlist, a partial route — where the
+ * control would say everything is fine.
+ *
+ * Returns the reason rather than a boolean, because this is written into a log
+ * line somebody reads at two in the morning, and "inconclusive" on its own
+ * would send them looking at the customers' sites.
+ */
+export function sharedCause(evidence: SweepEvidence): string | null {
+  if (evidence.control === 'down') {
+    return 'The control address did not answer either, so this process could not reach anything. No counter was advanced and no badge was suspended.';
+  }
+
+  const checked = evidence.outcomes.length;
+  if (checked >= SHARED_CAUSE_MINIMUM && evidence.outcomes.every((one) => one === 'down')) {
+    return `All ${checked} applications checked in this sweep failed together, which is far more likely to be us than all of them. No counter was advanced and no badge was suspended.`;
+  }
+
+  return null;
+}
+
 export interface LivenessState {
   readonly consecutiveFailures: number;
   readonly badgeStatus: 'active' | 'suspended' | 'expired' | 'revoked' | null;
