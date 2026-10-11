@@ -294,6 +294,12 @@ export const deterministicChecksStage: Stage = {
     findings.push(...bodyChecks(root));
 
     const answeredByTheApplication: string[] = [];
+    // Where this loop's own unanswered probes start. `http.unanswered` is
+    // cumulative over the client, and the count below used to be read as the
+    // whole of it — true only while this was the first loop to probe anything,
+    // which is the kind of thing that stays true until somebody adds a probe
+    // above it.
+    const unansweredBeforeExposed = http.unanswered.length;
     for (const candidate of EXPOSED_PATHS) {
       const response = await http.probe(url, candidate.path);
       if (response && response.status === 200 && response.body.trim().length > 0) {
@@ -360,7 +366,7 @@ export const deterministicChecksStage: Stage = {
      * `game-checks.ts` puts the same rule in its own words about a different
      * measurement: "a lower bound nobody is told about is just a wrong number."
      */
-    const unansweredExposed = http.unanswered.length;
+    const unansweredExposed = http.unanswered.length - unansweredBeforeExposed;
     const notEstablished = unansweredExposed + answeredByTheApplication.length;
     /*
      * Three ways nothing was established, and each gets its own sentence.
@@ -427,6 +433,7 @@ export const deterministicChecksStage: Stage = {
      * administrative page is legitimately HTML.
      */
     const adminAnsweredByCatchAll: string[] = [];
+    const unansweredBeforeAdmin = http.unanswered.length;
     for (const adminPath of ADMIN_PATHS) {
       const response = await http.probe(url, adminPath);
       if (response && response.status === 200 && answeredByCatchAll(response, root)) {
@@ -451,15 +458,45 @@ export const deterministicChecksStage: Stage = {
       }
     }
 
-    if (adminAnsweredByCatchAll.length >= ADMIN_PATHS.length) {
+    /*
+     * The same three ways nothing was established, for the same reason.
+     *
+     * The catch-all case below was handled and the dropped-request case was
+     * not: all ten admin probes refused at the socket produced no finding, no
+     * note and no not-tested entry, so SEC-05 read as checked and clean on an
+     * application nobody could look at. The reasoning is already written out
+     * forty lines above this, for SEC-08, and it applies here word for word —
+     * which is the whole lesson. The ordering trap is the same too, so the
+     * firewall case comes first.
+     */
+    const unansweredAdmin = http.unanswered.length - unansweredBeforeAdmin;
+    const adminNotEstablished = unansweredAdmin + adminAnsweredByCatchAll.length;
+    if (unansweredAdmin >= ADMIN_PATHS.length) {
+      notTested.push({
+        criterion: 'SEC-05',
+        because: `The application answered its own front page and then gave no answer at all to any of the ${ADMIN_PATHS.length} requests for common administrative routes, so none of them was established either way. A host or firewall that drops a scanner's requests looks identical, from out here, to one with every route properly protected.`,
+      });
+    } else if (adminAnsweredByCatchAll.length >= ADMIN_PATHS.length) {
       notTested.push({
         criterion: 'SEC-05',
         because: `All ${ADMIN_PATHS.length} requests for common administrative routes came back as the application's own page, byte for byte — a catch-all route answering everything. Nothing was established about any of them: a body returned for every path, existing or not, is no evidence about whether a particular one is protected.`,
       });
-    } else if (adminAnsweredByCatchAll.length > 0) {
-      notes.push(
-        `${adminAnsweredByCatchAll.length} of ${ADMIN_PATHS.length} requests for common administrative routes came back as the application's own page rather than as that route: ${adminAnsweredByCatchAll.join(', ')}. Those were neither found nor ruled out.`,
-      );
+    } else if (adminNotEstablished >= ADMIN_PATHS.length) {
+      notTested.push({
+        criterion: 'SEC-05',
+        because: `None of the ${ADMIN_PATHS.length} requests for common administrative routes was established either way: ${unansweredAdmin} got no answer at all and ${adminAnsweredByCatchAll.length} came back as the application's own page rather than as that route. Nothing was ruled out, and nothing was found.`,
+      });
+    } else {
+      if (unansweredAdmin > 0) {
+        notes.push(
+          `${unansweredAdmin} of ${ADMIN_PATHS.length} requests for common administrative routes got no answer at all — not a refusal, no response. What the others found still stands; those routes were neither found nor ruled out.`,
+        );
+      }
+      if (adminAnsweredByCatchAll.length > 0) {
+        notes.push(
+          `${adminAnsweredByCatchAll.length} of ${ADMIN_PATHS.length} requests for common administrative routes came back as the application's own page rather than as that route: ${adminAnsweredByCatchAll.join(', ')}. Those were neither found nor ruled out.`,
+        );
+      }
     }
 
     /*
@@ -471,27 +508,45 @@ export const deterministicChecksStage: Stage = {
      * they publish one. A flattering untruth in a report somebody pays for is
      * still an untruth, and it is the half of this defect that does not shout.
      */
+    /*
+     * Three outcomes, not two, and the third was being reported as the first.
+     *
+     * `probe` returns null both for "the host said 404" and for "the host said
+     * nothing", and "No robots.txt was served" is only true of the first. On a
+     * host that drops a scanner's requests it was a statement about the
+     * application that we had not established — the unflattering twin of the
+     * catch-all case this comment block was written for, sitting in the same
+     * `if`.
+     */
+    const unansweredBeforeRobots = http.unanswered.length;
     const robots = await http.probe(url, '/robots.txt');
+    const robotsUnanswered = http.unanswered.length > unansweredBeforeRobots;
     const robotsServed = robots?.status === 200 && !answeredByCatchAll(robots, root);
     if (!robotsServed) {
       notes.push(
-        robots?.status === 200
-          ? 'A request for robots.txt came back as the application’s own page rather than as a file, so whether one is served could not be established. If there is none, it is worth adding before launch.'
-          : 'No robots.txt was served. That is not a defect, but it is worth adding before launch.',
+        robotsUnanswered
+          ? 'The request for robots.txt got no answer at all — not a refusal, no response — so whether one is served could not be established.'
+          : robots?.status === 200
+            ? 'A request for robots.txt came back as the application’s own page rather than as a file, so whether one is served could not be established. If there is none, it is worth adding before launch.'
+            : 'No robots.txt was served. That is not a defect, but it is worth adding before launch.',
       );
     }
 
     // The opposite of the list above: a path whose presence is good news. It is
     // a note rather than a finding because the published rubric has no criterion
     // for it, and inventing one would produce a score nobody can check.
+    const unansweredBeforeSecurityTxt = http.unanswered.length;
     const securityTxt = await http.probe(url, '/.well-known/security.txt');
+    const securityTxtUnanswered = http.unanswered.length > unansweredBeforeSecurityTxt;
     const securityTxtServed = securityTxt?.status === 200 && !answeredByCatchAll(securityTxt, root);
     notes.push(
       securityTxtServed
         ? 'A security.txt is published, so somebody who finds a defect knows where to send it.'
-        : securityTxt?.status === 200
-          ? 'A request for /.well-known/security.txt came back as the application’s own page rather than as a file, so no security.txt was found. Publishing one tells a finder where to report a defect instead of guessing.'
-          : 'No security.txt was served. Publishing one at /.well-known/security.txt tells a finder where to report a defect instead of guessing.',
+        : securityTxtUnanswered
+          ? 'The request for /.well-known/security.txt got no answer at all — not a refusal, no response — so whether one is published could not be established.'
+          : securityTxt?.status === 200
+            ? 'A request for /.well-known/security.txt came back as the application’s own page rather than as a file, so no security.txt was found. Publishing one tells a finder where to report a defect instead of guessing.'
+            : 'No security.txt was served. Publishing one at /.well-known/security.txt tells a finder where to report a defect instead of guessing.',
     );
 
     // --- Browser pass: accessibility, viewport, console -----------------------
