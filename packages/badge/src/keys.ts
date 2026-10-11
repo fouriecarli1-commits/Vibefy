@@ -188,17 +188,20 @@ export interface RetiredKeys {
   readonly unusable: number;
 }
 
-/** Retired public keys, published alongside the active one. */
-export function loadRetiredKeys(env: NodeJS.ProcessEnv = process.env): RetiredKeys {
-  const raw = env.VIBEFYCODE_BADGE_RETIRED_KEYS;
+/**
+ * Public JWKs out of one environment variable.
+ *
+ * Shared by the two variables that carry them, because the sanitising is the
+ * part that matters and a second copy of it is a second chance to publish a
+ * private component.
+ */
+function publicJwksFrom(raw: string | undefined, variable: string): RetiredKeys {
   if (!raw) return { keys: [], carriedPrivate: [], unusable: 0 };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new KeyError(
-      'VIBEFYCODE_BADGE_RETIRED_KEYS is not valid JSON. Refusing to publish an incomplete key set.',
-    );
+    throw new KeyError(`${variable} is not valid JSON. Refusing to publish an incomplete key set.`);
   }
   if (!Array.isArray(parsed)) return { keys: [], carriedPrivate: [], unusable: 0 };
 
@@ -215,4 +218,74 @@ export function loadRetiredKeys(env: NodeJS.ProcessEnv = process.env): RetiredKe
     else unusable += 1;
   }
   return { keys, carriedPrivate, unusable };
+}
+
+/** Retired public keys, published alongside the active one. */
+export function loadRetiredKeys(env: NodeJS.ProcessEnv = process.env): RetiredKeys {
+  return publicJwksFrom(env.VIBEFYCODE_BADGE_RETIRED_KEYS, 'VIBEFYCODE_BADGE_RETIRED_KEYS');
+}
+
+/**
+ * Every public key a serving deployment publishes, from public variables only.
+ *
+ * This exists because two true sentences could not both be followed. The
+ * runbook says `VIBEFYCODE_BADGE_SIGNING_KEY_B64` and `VIBEFYCODE_BADGE_KEY_ID`
+ * "belong on Render and nowhere else", for the right reason — every instance
+ * that can sign is another place the one key that ends the business can leak
+ * from. The key generator said the public half "is derived from the private key
+ * at start-up, so it does not need to be configured", which was also true of
+ * the code: `/.well-known/vibefycode-badge-key` built its answer from
+ * `loadSigningKey()`.
+ *
+ * Follow both and the console has no key to derive anything from, so the key
+ * set is empty — and an empty key set is not a quiet degradation. Every badge
+ * fails to verify, `/verify` tells each visitor it cannot check, and the
+ * conclusion a stranger reaches about a genuine badge is that we never issued
+ * it. The alternative anybody would reach for, putting the signing key on
+ * Vercel too, breaks the rule the runbook calls the one that must never cross.
+ *
+ * So the serving side reads public halves and nothing else:
+ *
+ *   · `VIBEFYCODE_BADGE_PUBLIC_KEYS` — the active key first, then any key still
+ *     needed to verify badges it signed. Public data: it is already served to
+ *     anybody who asks, so a build log, a dashboard field or a pasted message
+ *     costs nothing.
+ *   · `VIBEFYCODE_BADGE_RETIRED_KEYS` — kept, read and merged, because it is
+ *     already set on deployments that have rotated and dropping it would
+ *     unpublish exactly the keys it exists to keep published.
+ *
+ * First mention of a key id wins, so the active key stays first in the
+ * published set. The private pair is not read here at all, which is what makes
+ * "the console never holds the signing key" a property of the code rather than
+ * a promise in a document.
+ */
+export function loadPublishedKeys(env: NodeJS.ProcessEnv = process.env): RetiredKeys {
+  const announced = publicJwksFrom(
+    env.VIBEFYCODE_BADGE_PUBLIC_KEYS,
+    'VIBEFYCODE_BADGE_PUBLIC_KEYS',
+  );
+  const retired = loadRetiredKeys(env);
+
+  const keys: PublicJwk[] = [];
+  for (const jwk of [...announced.keys, ...retired.keys]) {
+    if (!keys.some((already) => already.kid === jwk.kid)) keys.push(jwk);
+  }
+  return {
+    keys,
+    carriedPrivate: [...announced.carriedPrivate, ...retired.carriedPrivate],
+    unusable: announced.unusable + retired.unusable,
+  };
+}
+
+/**
+ * The line to paste into a serving deployment, built from the key that signs.
+ *
+ * Printed by the generator and said once by the worker at start-up, so the
+ * public half never has to be derived by hand from the private one. Deriving it
+ * by hand is not hard; it is a step that puts the signing key on somebody's
+ * laptop and in their shell history, which is the thing this whole file is
+ * arranged to avoid.
+ */
+export function publishedKeysLine(active: PublicJwk): string {
+  return `VIBEFYCODE_BADGE_PUBLIC_KEYS=${JSON.stringify([active])}`;
 }

@@ -11,6 +11,7 @@
  */
 import { Pool, type PoolClient } from 'pg';
 import { resendFromEnvironment } from '@vibefycode/notify';
+import { loadSigningKey } from '@vibefycode/badge';
 import { runAssessmentJob } from './run-assessment.ts';
 import {
   claimNextRequest,
@@ -308,8 +309,16 @@ export async function withRunTimeout<T>(work: Promise<T>, requestId: string): Pr
  * this process has no request to infer an origin from, which is precisely why it
  * has to be told rather than left to work it out.
  *
- * A list rather than three `if`s so a deployment missing everything learns
+ * A list rather than four `if`s so a deployment missing everything learns
  * everything in one read of the log instead of one restart at a time.
+ *
+ * The fourth entry is the one that was absent, and it is the largest of them.
+ * Without a signing key this worker cannot issue a badge at all: assessments
+ * run, a reviewer approves, the licence is accepted, and the sweep returns zero
+ * every thirty seconds. `sweepBadgeIssuance` does say so, once, and its own
+ * detail field used to call that expected — true of a console, and on this
+ * process it is the product not existing. `docs/DOEN.md`, which is the list the
+ * founder actually works from, had nothing about the key in it at all.
  */
 export function startupWarnings(
   env: Record<string, string | undefined> = process.env,
@@ -341,6 +350,45 @@ export function startupWarnings(
         found: env.NEXT_PUBLIC_VERIFY_URL ?? env.NEXT_PUBLIC_SITE_URL ?? '(unset)',
         effect:
           'the owner is never told the badge they paid for exists, and nothing else reports it',
+      },
+    });
+  }
+
+  /*
+   * Loaded rather than merely looked for, because a key that is present and
+   * unreadable fails later and differently.
+   *
+   * `loadSigningKey` parses the base64 DER, so a truncated paste throws here
+   * instead of on the first sweep that finds a candidate — where it is one
+   * line in a catch block, every thirty seconds, with the customer waiting.
+   * Two messages because they are two different jobs for whoever reads them:
+   * one is "set this", the other is "what you set is not a key".
+   */
+  let signingKey = null;
+  let unreadable: string | null = null;
+  try {
+    signingKey = loadSigningKey(env);
+  } catch (error) {
+    unreadable = error instanceof Error ? error.message : String(error);
+  }
+
+  if (unreadable) {
+    warnings.push({
+      message: 'the badge signing key cannot be read — no customer can be issued a badge',
+      detail: {
+        needs: 'VIBEFYCODE_BADGE_SIGNING_KEY_B64, the whole value, base64 of PKCS#8 DER',
+        error: unreadable,
+        effect: 'every issuance sweep throws; nothing is issued and nothing is lost either',
+      },
+    });
+  } else if (!signingKey) {
+    warnings.push({
+      message: 'no badge signing key — no customer can be issued a badge, however many pass',
+      detail: {
+        needs: 'VIBEFYCODE_BADGE_SIGNING_KEY_B64 and VIBEFYCODE_BADGE_KEY_ID, on the worker only',
+        effect:
+          'the issuance sweep finds candidates and returns zero every thirty seconds; the console publishes an empty key set, so nothing verifies either',
+        fix: 'docs/DOEN.md section 1c — pnpm badge:keygen, two lines to Render and one to Vercel',
       },
     });
   }

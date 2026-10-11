@@ -12,7 +12,13 @@
  * one lands without anything having to remember to fire.
  */
 import { randomBytes } from 'node:crypto';
-import { loadSigningKey, signBadge, type BadgePayload, type SigningKey } from '@vibefycode/badge';
+import {
+  loadSigningKey,
+  publishedKeysLine,
+  signBadge,
+  type BadgePayload,
+  type SigningKey,
+} from '@vibefycode/badge';
 import {
   badgeIssuedAlert,
   badgeExpiredAlert,
@@ -453,6 +459,21 @@ async function announceIssuedBadge(
  */
 let saidTheKeyIsMissing = false;
 
+/**
+ * And the public half, said once, for the deployment that has to publish it.
+ *
+ * The console publishes the key set and is deliberately not given the signing
+ * key, so somebody has to carry the public half across. Deriving it by hand
+ * means the private key on a laptop and in a shell history, which is the one
+ * thing this file is arranged to prevent. So the process that already holds the
+ * key prints the exact line to paste, where the operator is already looking
+ * when they wonder why a badge will not verify.
+ *
+ * Public data: a JWK's `x` is the verification key. There is nothing here that
+ * is not already served at `/.well-known/vibefycode-badge-key`.
+ */
+let saidWhatToPublish: string | null = null;
+
 export async function sweepBadgeIssuance(
   pool: { connect(): Promise<PoolClient> },
   log: (message: string, detail?: Record<string, unknown>) => void = () => undefined,
@@ -469,12 +490,27 @@ export async function sweepBadgeIssuance(
       saidTheKeyIsMissing = true;
       log('no badge signing key in this process, so no badge can be issued here', {
         needs: 'VIBEFYCODE_BADGE_SIGNING_KEY_B64 and VIBEFYCODE_BADGE_KEY_ID',
-        expected: 'only on a deployment that does not issue badges',
+        // "Expected" on its own read as reassurance, and this is the worker:
+        // the one deployment where it is not expected at all. Nothing else can
+        // say so, because a missing key looks identical from both sides.
+        expected: 'on a deployment that does not issue badges — not on the worker',
+        means:
+          'If this is the worker, no customer will ever receive a badge, however many assessments pass. See docs/DOEN.md section 1c.',
       });
     }
     return 0;
   }
   saidTheKeyIsMissing = false;
+
+  if (saidWhatToPublish !== key.kid) {
+    saidWhatToPublish = key.kid;
+    log('badge signing key loaded; publish its public half on the console deployment', {
+      kid: key.kid,
+      paste: publishedKeysLine(key.jwk),
+      where: 'Vercel, as an environment variable, for Production as well as Preview',
+      why: 'Without it /.well-known/vibefycode-badge-key answers 503 and no badge verifies anywhere.',
+    });
+  }
 
   const client = await pool.connect();
   try {

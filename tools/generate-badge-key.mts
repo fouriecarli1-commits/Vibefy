@@ -15,24 +15,34 @@
  * Retired public keys stay published forever — removing one would silently break
  * every badge it ever signed, and a verifier that suddenly fails cannot tell
  * "forged" from "VibefyCode tidied up".
+ *
+ * The output used to say the public half "does not need to be configured"
+ * because it is derived from the private key at start-up. That was true of the
+ * code and impossible to follow: the runbook puts the private key on the worker
+ * alone, and the deployment that publishes the key set is the console. So the
+ * public line is printed as a variable to set rather than as a comment to keep.
  */
-import { generateSigningKey } from '@vibefycode/badge';
+import { generateSigningKey, publishedKeysLine } from '@vibefycode/badge';
 
 const kid = process.argv[2] ?? `vibefycode-badge-${new Date().toISOString().slice(0, 7)}`;
 const { privateKeyB64, jwk } = generateSigningKey(kid);
 
 const lines = [
-  '# Add these to the platform secret store. Never to the repository.',
+  '# The worker (Render). Secret store only, never the repository.',
   `VIBEFYCODE_BADGE_KEY_ID=${kid}`,
   `VIBEFYCODE_BADGE_SIGNING_KEY_B64=${privateKeyB64}`,
   '',
-  '# The public half is served at /.well-known/vibefycode-badge-key. It is derived',
-  '# from the private key at start-up, so it does not need to be configured —',
-  '# but keep a copy for the retired-keys list when you rotate:',
-  `# ${JSON.stringify(jwk)}`,
+  '# The console (Vercel). Public data: this is the half that verifies a badge,',
+  '# and it is served to anybody at /.well-known/vibefycode-badge-key. Without it',
+  '# that route answers 503 and no badge verifies anywhere.',
+  '#',
+  '# Rotating: put the new key first and keep the old entry, or move the old one',
+  '# to VIBEFYCODE_BADGE_RETIRED_KEYS. Never drop it — every badge it signed',
+  '# stops verifying, and a verifier cannot tell that from a forgery.',
+  publishedKeysLine(jwk),
 ];
 
 console.log(lines.join('\n'));
 console.error(
-  '\nGenerated. Copy the two variables into your secret store, then clear your terminal history.\n',
+  '\nGenerated. The first two go to the worker and the third to the console. Then clear your terminal history.\n',
 );

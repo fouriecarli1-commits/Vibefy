@@ -40,15 +40,13 @@ NEXT_PUBLIC_SITE_URL = https://vibefycode.com
 
 Sonder aanhalingstekens. Save Changes, wag vir die herbou, kyk in Logs.
 
-Jy wil **geen** van hierdie drie reëls sien nie:
+Jy wil **geen** van die reëls sien wat `docs/DOEN.md` afdeling 3 se "Klaar as"
+oplys nie. Die lys staan net daar, en net een keer: hierdie bladsy het sy eie
+afskrif gehad met drie reëls in, en toe die werker 'n vierde begin sê het, het
+hierdie afskrif stil verkeerd geword. 'n Reël wat jy nie gesê is om voor te kyk
+nie, se afwesigheid lees presies soos sukses.
 
-```
-email not configured — alerts will reach the console and phones only
-no model key — every submission waits for a reviewer at /review/screening
-no verification origin — badges will be issued and never announced
-```
-
-Elkeen noem die veranderlike wat kort. Niks sien nie, is die doel.
+Elkeen daar noem die veranderlike wat kort. Niks sien nie, is die doel.
 
 ## Nie vanaand nie
 

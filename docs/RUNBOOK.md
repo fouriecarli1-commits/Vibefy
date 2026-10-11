@@ -260,18 +260,38 @@ pnpm badge:keygen                 # a dated key id
 pnpm badge:keygen my-key-id       # a chosen one
 ```
 
-It writes to stdout and never to a file. Copy the two variables into the
-platform secret store, then clear your shell history. **Only the worker needs
-them** — the console never signs anything, deliberately.
+It writes to stdout and never to a file. It prints **three** lines, and they go
+to two different places:
+
+| Line                               | Where               | Why                                                                   |
+| ---------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| `VIBEFYCODE_BADGE_KEY_ID`          | Render, the worker  | Names the key a badge records, so rotation does not rewrite history   |
+| `VIBEFYCODE_BADGE_SIGNING_KEY_B64` | Render, the worker  | Signs. Secret. **Only the worker needs it** — the console never signs |
+| `VIBEFYCODE_BADGE_PUBLIC_KEYS`     | Vercel, the console | Verifies. Public. Without it no badge verifies anywhere               |
+
+Then clear your shell history.
+
+The third line is new, and the reason is worth keeping: the published key set
+used to be derived from the private key at start-up, which meant the deployment
+that publishes keys had to hold the key that signs them — the one thing the
+section below says must never happen. Follow that section and the console had
+nothing to publish, so `/.well-known/vibefycode-badge-key` answered with an
+empty set and every badge in the world failed to verify. Public halves are now
+configured as public halves.
+
+If the console is missing it and the key is already live, you do not need the
+private key to recover: the worker prints the exact line at start-up, in its
+Render log, the first time it loads a key.
 
 ### Rotating
 
 1. `pnpm badge:keygen` with a new id.
-2. Add the _previous_ public JWK to `VIBEFYCODE_BADGE_RETIRED_KEYS` (it is printed as
-   a comment by the generator; you can also read it from
-   `/.well-known/vibefycode-badge-key` before you switch).
+2. On Vercel, put the **new** public JWK first in `VIBEFYCODE_BADGE_PUBLIC_KEYS`
+   and keep the old entry (or move the old one to
+   `VIBEFYCODE_BADGE_RETIRED_KEYS` — both are read and merged). Do this
+   **before** step 3, so no badge is unverifiable in between.
 3. Point `VIBEFYCODE_BADGE_KEY_ID` and `VIBEFYCODE_BADGE_SIGNING_KEY_B64` at the new key.
-4. Restart the worker.
+4. Restart the worker, and check its log line names the new key id.
 
 Existing badges keep verifying, because they record which key signed them and the
 retired public key stays published. **Never remove a retired key**: a verifier
@@ -838,6 +858,8 @@ where it is _not_ needed is a credential in an extra place it can leak from.
 | `ANTHROPIC_API_KEY`                                         | only for the assistant at `/api/copilot`, which calls `new Anthropic()` and reads it implicitly          |
 | `STRIPE_*`, `PAYSTACK_*`                                    | when payments go live; without them the console says payments are not configured                         |
 | `RESEND_WEBHOOK_SECRET`                                     | for `POST /api/email/webhook`; without it that route answers 404 rather than accepting unsigned payloads |
+| `VIBEFYCODE_BADGE_PUBLIC_KEYS`                              | yes, once badges are issued — without it no badge verifies anywhere, and `/verify` says so to everybody  |
+| `VIBEFYCODE_BADGE_RETIRED_KEYS`                             | after a rotation, if the old key was not kept in the line above                                          |
 
 **Render — the worker (`apps/worker`)**
 
@@ -857,6 +879,15 @@ else. `packages/badge/src/keys.ts` says why: issuance needs a key and a deployme
 serves and verifies badges should not hold one. If that key leaks, every badge ever issued
 becomes forgeable, and the console gains nothing by holding it — verification needs only the
 public half, which is published.
+
+That last clause was true of the design and false of the code until 2026-10-11. Both web readers
+of the key set — `/.well-known/vibefycode-badge-key` and `/verify` — built it with
+`loadSigningKey()`, so following this paragraph left the console with no key at all: an empty key
+set, every badge failing to verify, and `/verify` telling each visitor it could not check one.
+Nothing in the system could notice, because from the inside it is indistinguishable from a
+deployment that is not meant to verify anything. Both now read `VIBEFYCODE_BADGE_PUBLIC_KEYS`,
+which holds public halves, and neither reads the signing pair — so this rule is now a property of
+the code rather than a promise in this document.
 
 `RESEND_API_KEY` is the same shape. Email is sent by the worker alone, and
 `packages/notify/src/resend.ts` states it: the key never leaves that module and never reaches the
@@ -983,13 +1014,12 @@ no detail that reached us. The manual route needs eight fields and has no schema
 while the queue is empty. That is the right design and it means startup is the only moment it can
 tell you what it is missing — afterwards, silence means both "fine" and "broken".
 
-So it says everything it cannot do, at once, in one read:
-
-```
-email not configured — alerts will reach the console and phones only
-no model key — every submission waits for a reviewer at /review/screening
-no verification origin — badges will be issued and never announced
-```
+So it says everything it cannot do, at once, in one read. The lines themselves are quoted in one
+place only — the "Klaar as" of section 3 in `docs/DOEN.md` — and
+`tests/the-lines-he-is-told-to-look-for.test.ts` holds that block equal to `startupWarnings` in
+both directions. They were written out here and in `docs/DNS.md` as well, and both copies were
+silently a line short the day the worker gained a fourth warning: a line nobody is told to look
+for is a line whose absence reads as success.
 
 Each names the variable to set and what stops happening. They are printed after the database pool
 is constructed, so seeing any of them also means `SUPABASE_DB_URL` was accepted. **Seeing none of

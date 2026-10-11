@@ -220,6 +220,54 @@ terugsit.
 
 **Klaar as:** die badge wys op futurebox.
 
+## 1c · Die badge-sleutel — twee plekke, en dit het nooit hier gestaan nie
+
+Hierdie lys het nog nooit van die badge-sleutel gepraat nie, en sonder dit kan
+die werker **geen badge uitreik nie**. Dit sê dit een keer in die Render-log en
+die reël lees soos iets normaals, so niks sou jou vertel het nie.
+
+Daar is twee helftes. Die een onderteken (geheim, net Render), die ander
+bevestig (openbaar, net Vercel). Tot vandag het die konsole die openbare helfte
+uit die geheime een afgelei — wat beteken die een plek wat nie 'n
+ondertekensleutel mag hê nie, moes een hê. Dit is nou twee aparte veranderlikes.
+
+**Eers: kyk of daar al 'n sleutel is.** Render → `vibefycode-worker` → Logs.
+
+_As jy hierdie reël sien_ — `badge signing key loaded; publish its public half`
+— dan bestaan die sleutel al. Kopieer die hele `VIBEFYCODE_BADGE_PUBLIC_KEYS=[{...}]`
+reël uit die log en gaan na stap 3. Dit is openbare data; dit mag in 'n log wees.
+
+_As jy hierdie reël sien_ — `no badge signing key in this process` — dan is daar
+nog geen sleutel nie. Doen al drie stappe:
+
+1. Maak die sleutel. In die Vibefy-gids op jou eie masjien:
+
+   ```
+   pnpm badge:keygen
+   ```
+
+   Dit druk drie reëls en skryf niks na 'n lêer nie. Kan jy dit nie daar
+   hardloop nie, sê vir my — ek kan dit nie vir jou in hierdie gesprek maak nie,
+   want die geheime helfte mag nie in 'n gesprek of in die repo wees nie, maar
+   daar is 'n paar ander plekke wat veilig is en ek wys jou die naaste een.
+
+2. Render → `vibefycode-worker` → Environment: die eerste twee reëls
+   (`VIBEFYCODE_BADGE_KEY_ID` en `VIBEFYCODE_BADGE_SIGNING_KEY_B64`). Save
+   Changes. **Hierdie twee hoort net hier** — as daardie sleutel uitlek is elke
+   badge wat ons ooit uitgereik het namaakbaar.
+
+3. Vercel → `vibefy-web` → Settings → Environment Variables → Add:
+   `VIBEFYCODE_BADGE_PUBLIC_KEYS` = die derde reël se waarde (die `[{...}]`
+   deel). Production, Preview, Development almal gemerk. Dan **Deployments →
+   boonste → ⋯ → Redeploy**.
+
+4. Vee jou terminaal-geskiedenis skoon.
+
+**Klaar as:** `https://vibefycode.com/.well-known/vibefycode-badge-key` wys 'n
+`keys`-lys met een sleutel in. Wys dit 'n fout, dan is stap 3 nie klaar nie — en
+tot dit klaar is sê `/verify` vir elke besoeker dat dit nie 'n badge kan nagaan
+nie, wat van 'n egte badge lees soos 'n vals een.
+
 ## 2 · Resend — druk Verify
 
 Die ses DNS-rye is in en reg. Daar is niks meer by Spaceship te doen nie.
@@ -240,13 +288,18 @@ NEXT_PUBLIC_SITE_URL = https://vibefycode.com
 
 Sonder aanhalingstekens. Save Changes.
 
-**Klaar as:** Logs wys **geen** van hierdie drie reëls nie:
+**Klaar as:** Logs wys **geen** van hierdie vier reëls nie:
 
 ```
 email not configured — alerts will reach the console and phones only
 no model key — every submission waits for a reviewer at /review/screening
 no verification origin — badges will be issued and never announced
+no badge signing key — no customer can be issued a badge, however many pass
 ```
+
+Die vierde is nuut en dit is die grootste van die vier: sonder daardie sleutel
+kan die werker niks uitreik nie, hoeveel beoordelings ook al deurgaan. Afdeling
+1c hierbo is die regmaak.
 
 ## 4 · Supabase — negentien migrasies
 

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { buildKeySet, loadRetiredKeys, loadSigningKey, verifyBadge } from '@vibefycode/badge';
+import { loadPublishedKeys, verifyBadge } from '@vibefycode/badge';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 
 export const metadata: Metadata = {
@@ -29,10 +29,19 @@ export default async function VerifyPage({
   const lookup = badgeId ? await lookUpBadge(badgeId) : null;
   const record = lookup?.kind === 'issued' ? lookup.record : null;
 
+  /*
+   * The published public halves, not the signing key.
+   *
+   * This read `buildKeySet(loadSigningKey(), ...)`, so on the deployment the
+   * runbook describes — signing key on the worker and nowhere else — it had no
+   * key to check anything with and answered "No." to every badge pasted into
+   * it. See `loadPublishedKeys`: the same trap caught both web readers, which is
+   * what a shared helper is for.
+   */
   const result = record
     ? verifyBadge(
         { payload: record.payload, signature: record.signature },
-        buildKeySet(loadSigningKey(), loadRetiredKeys().keys),
+        { keys: loadPublishedKeys().keys },
       )
     : null;
 
@@ -49,9 +58,10 @@ export default async function VerifyPage({
     console.error('a badge could not be verified because we publish no signing keys', {
       badgeId,
       means:
-        'VIBEFYCODE_BADGE_SIGNING_KEY_B64 and VIBEFYCODE_BADGE_KEY_ID are not set for this ' +
-        'deployment, and no retired key survived. Until one is, this page tells every visitor ' +
-        'that it cannot check any badge.',
+        'VIBEFYCODE_BADGE_PUBLIC_KEYS is not set for this deployment, and no retired key ' +
+        'survived. Until one is, this page tells every visitor that it cannot check any badge. ' +
+        'The signing key is not what is missing and must not be added here: paste the ' +
+        'public-only line the worker prints at start-up.',
     });
   }
 
