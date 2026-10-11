@@ -307,14 +307,40 @@ kan die werker niks uitreik nie, hoeveel beoordelings ook al deurgaan. Afdeling
 
 ## 4 · Supabase — negentien migrasies
 
-**Begin hier, nie by 0 nie.** Hierdie afdeling is die een wat nie kan wag nie;
-0 tot 3 is die badge, en die badge is 'n uitval, nie 'n gat nie.
+> **Op ys, op jou versoek, 11 Oktober saans.** Jy is op Antigravity besig en
+> daar mag nog blokke bykom. Niks hiervan verval — die vier gate bly oop tot
+> die blokke geloop het — en wanneer jy terugkom hoef jy niks te onthou nie:
+> as daar nuwe migrasies by is, nommer ek die lêer oor (`pnpm sql:blocks`) en
+> hierdie afdeling sê weer hoeveel daar is.
 
-`docs/sql/OUTSTANDING.sql`, van bo na onder, in Supabase se SQL-venster. Plak
-een blok op 'n slag. Elke blok begin met 'n verduideliking van wat dit regmaak
-en hoekom — jy hoef niks daarvan hier te lees nie.
+Wanneer jy wel begin: **begin hier, nie by 0 nie.** 0 tot 3 is die badge, en
+die badge is 'n uitval, nie 'n gat nie.
 
-**Klaar as:** al negentien het sonder 'n fout geloop.
+**Alles in een keer, nie blok vir blok nie.** Dit was my fout: ek het vroeër
+gesê plak een blok op 'n slag, en toe moes jy weet waar 'n blok begin. Dit hoef
+jy nie.
+
+1. Maak `docs/sql/OUTSTANDING.sql` oop
+2. **Ctrl+A** (Mac: Cmd+A) — dit merk die hele lêer
+3. **Ctrl+C** (Mac: Cmd+C)
+4. Supabase → jou projek → **SQL Editor** → **New query** → plak
+5. **Run**
+
+Die eerste twintig reëls van die lêer sê dieselfde vyf stappe, as jy dit later
+weer nodig het. Die volgorde is reeds reg, en alles in een keer is veiliger as
+stukke: 'n blok wat na 'n vroeëre een se tabel verwys, misluk as jy spring.
+
+Ek het dit getoets soos jy dit gaan hardloop — al negentien blokke in een plak,
+teen 'n databasis wat hulle nog nie het nie. Dit loop deur sonder 'n fout, en
+die skema wat oorbly is presies dié waarteen die toetse loop.
+
+**Klaar as:** dit loop deur sonder 'n fout. Loop dit 'n tweede keer en niks
+gebeur — elke blok slaan homself oor as dit al gedoen is.
+
+**As dit ergens stop:** bo elke blok staan nou 'n reël soos `-- BLOK 12 VAN 19`.
+Sê vir my die nommer. In `docs/sql/een-vir-een/` staan dieselfde negentien
+blokke as negentien aparte lêers, `01-` tot `19-`, as jy van daar af
+een-vir-een wil aangaan.
 
 As een misluk met iets soos "already exists", neem die nommer boaan daardie
 blok — die lang getal, soos `20261008030000` — en gee dit saam:

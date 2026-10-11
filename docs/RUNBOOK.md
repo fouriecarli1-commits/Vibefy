@@ -18,6 +18,7 @@ How to run, verify, debug and deploy VibefyCode. Written for one person with no 
 | `pnpm check:design`   | The design survey, pointed at our own pages. A report, not a gate — `--why` prints the measurements       |
 | `pnpm db:audit`       | Prints a read-only query that tells a database which migrations it already has                            |
 | `pnpm db:catch-up`    | Prints a re-runnable version of the migrations from a given one onward, for a paste that failed halfway   |
+| `pnpm sql:blocks`     | Numbers every block in `docs/sql/OUTSTANDING.sql` and re-splits it into `docs/sql/een-vir-een/`           |
 | `pnpm verify:all`     | `pnpm verify` plus the accessibility scan. What to run before saying something is finished                |
 
 Local URLs: console `:3000`, Supabase Studio `:54323`, mail catcher `:54324`.

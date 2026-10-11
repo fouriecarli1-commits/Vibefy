@@ -1,9 +1,36 @@
--- Negentien migrasies, in hierdie volgorde.
--- Gegenereer 2026-09-24, aangevul 2026-10-10.
+-- =============================================================================
+-- WAT OM TE DOEN — vier stappe, een keer.
+-- =============================================================================
 --
--- Onseker wat jou databasis het? node tools/migration-audit.mjs > audit.sql, en plak
--- daardie navraag in die SQL-venster. Dit lees net; dit skryf en sluit niks.
+--   1. Merk hierdie hele lêer:  Ctrl+A   (Mac: Cmd+A)
+--   2. Kopieer:                 Ctrl+C   (Mac: Cmd+C)
+--   3. Supabase → jou projek → SQL Editor → New query → plak
+--   4. Run
+--
+-- Dit is al. Jy hoef nie te weet waar 'n blok begin of eindig nie — alles gaan
+-- in een keer in, en die volgorde is reeds reg. Moenie dit in stukke breek nie:
+-- 'n blok wat na 'n vroeëre een se tabel verwys, misluk as jy spring.
+--
+-- Negentien migrasies, in hierdie volgorde. Gegenereer 2026-09-24, aangevul
+-- 2026-10-11.
+--
+-- Getoets soos jy dit gaan hardloop: al negentien blokke in een plak, teen 'n
+-- databasis wat hulle nog nie het nie. Dit loop deur sonder 'n fout, en die
+-- skema wat oorbly is presies dié waarteen die toetse loop.
+--
+-- Klaar as: dit loop deur sonder 'n fout. Loop dit 'n tweede keer en niks
+-- gebeur — elke blok is so geskryf dat dit homself nie twee keer doen nie.
+--
+-- As dit wél ergens stop: die reël "BLOK n VAN 19" bo elke blok sê waar jy is.
+-- Sê vir my die nommer, dan weet ek presies waarna om te kyk. In
+-- docs/sql/een-vir-een/ staan dieselfde negentien blokke as negentien aparte
+-- lêers, genommer 01 tot 19, as jy van daar af een-vir-een wil aangaan.
+--
+-- Onseker wat jou databasis al het? node tools/migration-audit.mjs > audit.sql,
+-- en plak daardie navraag in die SQL-venster. Dit lees net; dit skryf en sluit
+-- niks.
 
+-- BLOK 1 VAN 19
 -- =============================================================================
 -- 20260923110000_second_step_at_the_action.sql
 -- =============================================================================
@@ -155,6 +182,7 @@ create policy memberships_need_second_step_update on public.memberships
   for update to authenticated
   with check (public.session_passed_second_step());
 
+-- BLOK 2 VAN 19
 -- =============================================================================
 -- 20260923120000_accept_invitation.sql
 -- =============================================================================
@@ -321,6 +349,7 @@ comment on function public.accept_invitation is
 revoke all on function public.accept_invitation(text) from public, anon;
 grant execute on function public.accept_invitation(text) to authenticated;
 
+-- BLOK 3 VAN 19
 -- =============================================================================
 -- 20260923130000_create_workspace.sql
 -- =============================================================================
@@ -455,6 +484,7 @@ comment on function public.create_workspace is
 revoke all on function public.create_workspace(text, text, public.account_type) from public, anon;
 grant execute on function public.create_workspace(text, text, public.account_type) to authenticated;
 
+-- BLOK 4 VAN 19
 -- =============================================================================
 -- 20260923140000_name_the_role.sql
 -- =============================================================================
@@ -491,6 +521,7 @@ grant execute on function public.create_workspace(text, text, public.account_typ
 alter policy remediation_engagements_own on public.remediation_engagements to authenticated;
 alter policy remediation_workers_admin on public.remediation_workers to authenticated;
 
+-- BLOK 5 VAN 19
 -- =============================================================================
 -- 20260924100000_a_review_authorises_its_own_transition.sql
 -- =============================================================================
@@ -591,6 +622,7 @@ begin
 end;
 $$;
 
+-- BLOK 6 VAN 19
 -- =============================================================================
 -- 20260924110000_what_a_provider_told_us_stays_told.sql
 -- =============================================================================
@@ -667,6 +699,7 @@ begin
 end;
 $$;
 
+-- BLOK 7 VAN 19
 -- =============================================================================
 -- 20261006200000_one_score_wherever_it_is_read.sql
 -- =============================================================================
@@ -821,6 +854,7 @@ comment on function public.assert_score_is_not_pulled_from_under_a_badge() is
   'reissuing silently would hide the correction, so this refuses instead and '
   'names the three steps that are the published process anyway.';
 
+-- BLOK 8 VAN 19
 -- =============================================================================
 -- 20261006210000_a_refusal_is_written_down.sql
 -- =============================================================================
@@ -905,6 +939,7 @@ comment on function public.record_a_refusal_at_intake is
   'creating the row already refused. The other two are updates and write their '
   'own entries, so this fires on insert only and overlaps neither.';
 
+-- BLOK 9 VAN 19
 -- =============================================================================
 -- 20261008000000_a_statutory_record_is_not_cascaded_away.sql
 -- =============================================================================
@@ -952,6 +987,7 @@ alter table public.cost_records
 
 
 
+-- BLOK 10 VAN 19
 -- =============================================================================
 -- 20261008010000_a_grant_nobody_wrote.sql
 -- =============================================================================
@@ -1065,6 +1101,7 @@ revoke all on function public.seats_used(uuid) from public, anon, authenticated;
 revoke all on function public.seats_for_organisation(uuid) from public, anon, authenticated;
 revoke all on function public.platform_role_of(uuid) from public, anon, authenticated;
 
+-- BLOK 11 VAN 19
 -- =============================================================================
 -- 20261008020000_a_customer_may_not_write_their_own_score.sql
 -- =============================================================================
@@ -1160,6 +1197,7 @@ comment on table public.assessments is
   'connection; customers read their own and reviewers update status. No role '
   'reachable through PostgREST may write a score.';
 
+-- BLOK 12 VAN 19
 -- =============================================================================
 -- 20261008030000_the_acceptable_use_verdict_is_ours.sql
 -- =============================================================================
@@ -1338,6 +1376,7 @@ comment on function public.record_intake_screening is
   'What the intake screen read, written by our server and never by the account '
   'it is about. Clears, refuses or leaves pending, and only from pending.';
 
+-- BLOK 13 VAN 19
 -- =============================================================================
 -- 20261008040000_a_verified_authorisation_is_ours_to_record.sql
 -- =============================================================================
@@ -1510,6 +1549,7 @@ alter table public.authorisations
 comment on constraint authorisations_scope_within_verified_target on public.authorisations is
   'A verified authorisation covers the host it proved, its subdomains, and its apex. Nothing else.';
 
+-- BLOK 14 VAN 19
 -- =============================================================================
 -- 20261008050000_a_verified_domain_is_ours_to_record.sql
 -- =============================================================================
@@ -1591,6 +1631,7 @@ comment on function public.an_sso_domain_is_verified_by_us is
   'A workspace may claim a domain and may enforce one we have verified. Whether '
   'the DNS record was there is ours to record.';
 
+-- BLOK 15 VAN 19
 -- =============================================================================
 -- 20261008060000_only_an_owner_grants_ownership.sql
 -- =============================================================================
@@ -1701,6 +1742,7 @@ comment on policy memberships_only_an_owner_grants_ownership on public.membershi
 comment on policy memberships_only_an_owner_keeps_granting_ownership on public.memberships is
   'Only an owner may promote anybody to owner. The update half of the same rule.';
 
+-- BLOK 16 VAN 19
 -- =============================================================================
 -- 20261008070000_our_side_of_a_record_is_ours.sql
 -- =============================================================================
@@ -1816,6 +1858,7 @@ drop policy organisations_insert_own on public.organisations;
 drop policy organisations_update_admins on public.organisations;
 revoke insert, update on public.organisations from authenticated;
 
+-- BLOK 17 VAN 19
 -- =============================================================================
 -- 20261008080000_the_plan_is_not_the_customers_to_declare.sql
 -- =============================================================================
@@ -1884,6 +1927,7 @@ drop policy assessment_requests_insert_members on public.assessment_requests;
 revoke insert on public.assessment_requests from authenticated;
 
 
+-- BLOK 18 VAN 19
 -- =============================================================================
 -- 20261009210000_badge_expired_alert.sql
 -- =============================================================================
@@ -1935,6 +1979,7 @@ begin
 end
 $$;
 
+-- BLOK 19 VAN 19
 -- =============================================================================
 -- 20261010073000_listed_badges_discloses_paid_relationships.sql
 -- =============================================================================

@@ -37,6 +37,7 @@
     "badge:artwork": "tsx tools/build-badge-artwork.mts",
     "db:audit": "node tools/migration-audit.mjs",
     "db:catch-up": "node tools/idempotent-catch-up.mjs",
+    "sql:blocks": "node tools/outstanding-split.mjs",
     "check:design": "tsx tools/design-survey.mts",
     "providers": "node tools/providers.mjs"
   },

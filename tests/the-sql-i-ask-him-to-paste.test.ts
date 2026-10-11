@@ -29,7 +29,7 @@
  * this is about.
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const MIGRATIONS = 'supabase/migrations';
@@ -138,14 +138,65 @@ describe('the document he pastes', () => {
     ).toEqual([]);
   });
 
-  it('says how many there are, in the line he reads to know when he is done', () => {
+  it('says how many there are, in the part he reads before he pastes', () => {
+    /*
+     * The header, not the first line.
+     *
+     * It was the first line until 2026-10-11, and the first line is now the
+     * instruction — Ctrl+A, Ctrl+C, paste, Run — because of what he said when
+     * he opened this file: *"Ek weet nie waar 'n sql moet begin nie."* The
+     * count still has to be here and still has to be right; where it sits in
+     * the header is a question about what a person reads first, and the answer
+     * is not a number.
+     */
     const word = COUNT_WORDS[names.length];
     expect(word, `no Afrikaans word on file for ${names.length}; add it`).toBeDefined();
-    const first = document.split('\n')[0] ?? '';
+    const header = document.split(/^-- BLOK 1 VAN /m)[0] ?? '';
+    expect(header.length, 'the document has no header before its first block').toBeGreaterThan(200);
     expect(
-      first.toLowerCase(),
-      `the first line of the document should say "${word} migrasies" and says: ${first}`,
+      header.toLowerCase(),
+      `the header should say "${word} migrasies" and does not`,
     ).toContain(`${word} migrasies`);
+  });
+
+  it('numbers every block, so "it stopped at twelve" is a sentence he can say', () => {
+    /*
+     * One hundred kilobytes of SQL with nineteen blocks in it, and no way to
+     * tell from inside it where you are. The paste is still the whole file in
+     * one go — `tools/outstanding-split.mjs` only adds the numbers — but a
+     * number above each banner is the difference between "it broke" and "it
+     * stopped at block twelve", which is the half of the report I can act on.
+     */
+    const stamped = [...document.matchAll(/^-- BLOK (\d+) VAN (\d+)$/gm)].map((match) => ({
+      position: Number(match[1]),
+      total: Number(match[2]),
+    }));
+    expect(stamped).toHaveLength(names.length);
+    expect(stamped.map((entry) => entry.position)).toEqual(names.map((_, index) => index + 1));
+    for (const entry of stamped) {
+      expect(entry.total, 'a block says there are a different number of them').toBe(names.length);
+    }
+  });
+
+  it('is split into one file per block, with nothing lost and nothing stale', () => {
+    /*
+     * `docs/sql/een-vir-een/` is for the day a block fails and the rest should
+     * not be re-run. Generated from this document, so there is nothing to keep
+     * in step by hand — and asserted here, because a folder that is quietly one
+     * migration short is worse than no folder: it looks complete.
+     */
+    const folder = join(dirname(DOCUMENT), 'een-vir-een');
+    const files = readdirSync(folder).sort();
+    expect(files).toHaveLength(names.length);
+    names.forEach((name, index) => {
+      const expectedName = `${String(index + 1).padStart(2, '0')}-${name}`;
+      expect(files[index]).toBe(expectedName);
+      const split = statements(readFileSync(join(folder, expectedName), 'utf8'));
+      const inDocument = statements(bodies[index] ?? '');
+      expect(split.join('\n'), `${expectedName} is not what the document says`).toBe(
+        inDocument.join('\n'),
+      );
+    });
   });
 
   it('is counted the same way in the page that sends him there', () => {

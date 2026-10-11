@@ -203,6 +203,53 @@ before the first conversation, not after it.
 
 ---
 
+## 9. Where the code came from — a provenance and licence dimension
+
+**Said in passing, 11 October 2026, and then withdrawn in the next breath:** _"Wat ek
+ook wil sê wat vibefy moet soek binne coded apps is vir copyright issues. Ek kan nogal
+sien hoe mense baie in dit vasloop."_ The message after it said it had gone to the wrong
+app. So this is **not** a decision and nothing is built; it is written down because the
+thought is a good one and because an idea lost between two chat windows is an idea
+somebody has to have twice.
+
+**What it is.** A dimension, or a set of criteria inside `security_posture`'s neighbour,
+about where the code in an application came from and what its licence permits. For the
+class of customer we serve this is not a lawyer's abstraction. An assistant asked to
+"build me a dashboard" emits code it learned somewhere, pulls in a package because the
+name sounded right, and copies a component out of a tutorial; the builder ships it
+without ever seeing a licence file. Three things are checkable from outside or from a
+repository we are given, and all three are observations rather than opinions:
+
+· **A dependency whose licence forbids what the application does with it.** AGPL in a
+closed hosted product is the common one, and the licence text is in the package.
+· **A file carrying somebody else's copyright header**, verbatim, with no notice
+anywhere in the application.
+· **A bundled font, icon set, image or sound** whose licence requires attribution or
+forbids commercial use, served from the application with no attribution page.
+
+**Who pays.** Nobody extra. It would make the existing report worth more to the exact
+person who is most exposed — somebody who cannot afford to be wrong about this and has
+no way to check it.
+
+**What it needs that we do not have.** A licence identifier per dependency, which the
+static-intake stage already reads enough of the repository to get at; a list of licences
+and what each one requires, which is published data and belongs in the rubric rather
+than in code; and a published criterion per check, because an unpublished one is a score
+nobody can check.
+
+**What could go wrong, and it is the whole of it.** This is the first dimension where a
+finding is a statement about somebody's legal exposure, and we are not lawyers — the
+brief forbids presenting drafted legal text as advice, and "your licence does not permit
+this" is advice however it is phrased. Every finding would have to be an observation and
+a pointer: _this package declares AGPL-3.0, your application is hosted and closed, here
+is the clause, ask a lawyer._ The same shape the accessibility statement already uses,
+and the same discipline: say what was found, not what it means for them.
+
+**Size.** Medium, and the rubric half is the slow half: a new version, published
+criteria, and the notice that comes with changing a standard.
+
+---
+
 ## Ideas that fail, and why they are written down anyway
 
 **Paying to be higher in the directory.** No. The ordering rule is published on the page
