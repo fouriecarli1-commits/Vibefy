@@ -16,6 +16,36 @@ export const metadata: Metadata = {
     'Paste your own address and see the things that most often go wrong on a first look: no encryption, nothing telling a phone how to size itself, a key left in the page, no way for anybody to reach you. Free, no account, no score.',
 };
 
+/**
+ * A result page is not indexed, and the landing page is.
+ *
+ * `?url=` makes this page fetch somebody else's site and print what it did and
+ * did not find. Two reasons that answer must not enter a search index under our
+ * domain.
+ *
+ * The first is about them. This page is for somebody checking their own
+ * application, and the address they paste is still somebody's site: an indexed
+ * list of what is wrong with it, under our domain, is a published judgement
+ * nobody asked for. The same reasoning as `/trust-check`, and the same answer.
+ *
+ * The second is about us. The result is a shareable link on purpose, so these
+ * URLs end up in messages and posts, where crawlers and link-preview unfurlers
+ * follow them. Each follow makes our server fetch the target again. Indexed,
+ * that is a crawler walking a list of other people's sites with our IP address
+ * on every request, and the first we would hear of it is an abuse complaint.
+ *
+ * The rate limit that would bound the rest of it needs shared state, which is a
+ * decision in `docs/OPEN_ITEMS.md` rather than something to invent here.
+ */
+export function generateMetadata({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}): Metadata {
+  const asked = typeof searchParams?.url === 'string' && searchParams.url.trim().length > 0;
+  return asked ? { ...metadata, robots: { index: false, follow: false } } : metadata;
+}
+
 /** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
 const IN_SHORT = [
   'Paste your own address and see what a stranger would find in ten seconds.',

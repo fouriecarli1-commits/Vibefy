@@ -17,6 +17,39 @@ export const metadata: Metadata = {
     'Paste the web address of an app you are about to pay for. VibefyCode reports what its public page does and does not say — whether it can be cancelled, whether there is anyone to contact, and who the company is.',
 };
 
+/**
+ * A result page is not indexed, and the landing page is.
+ *
+ * `?url=` makes this page fetch somebody else's site and print what it did and
+ * did not find. Two reasons that answer must not enter a search index under our
+ * domain.
+ *
+ * The first is about them. An indexed page saying "Not found: a way to cancel"
+ * about a company that never asked us to look is a published judgement about an
+ * unconsenting third party, under our name, ranking for their name. The brief
+ * is explicit that the directory is first-party and consented; a tool that
+ * quietly builds a shadow directory out of query strings is the same thing
+ * through a side door. The check itself is fine — it is what any visitor could
+ * see for themselves in a browser — and publishing it is not.
+ *
+ * The second is about us. The result is a shareable link on purpose, so these
+ * URLs end up in messages and posts, where crawlers and link-preview unfurlers
+ * follow them. Each follow makes our server fetch the target again. Indexed,
+ * that is a crawler walking a list of other people's sites with our IP address
+ * on every request, and the first we would hear of it is an abuse complaint.
+ *
+ * The rate limit that would bound the rest of it needs shared state, which is a
+ * decision in `docs/OPEN_ITEMS.md` rather than something to invent here.
+ */
+export function generateMetadata({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}): Metadata {
+  const asked = typeof searchParams?.url === 'string' && searchParams.url.trim().length > 0;
+  return asked ? { ...metadata, robots: { index: false, follow: false } } : metadata;
+}
+
 /** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */
 const IN_SHORT = [
   'Paste the address of an app you are thinking of paying for.',
