@@ -158,6 +158,36 @@ export default async function ReviewQueuePage() {
   });
 
   const totalMinutes = items.reduce((sum, item) => sum + item.triage.estimatedMinutes, 0);
+  /*
+   * What is waiting in the other three queues, and how much of it is late.
+   *
+   * The four links below were plain words. An operator who opens this page sees
+   * the assessment queue measured three ways — waiting, needing a closer look,
+   * minutes — and four chips that read the same whether there is nothing behind
+   * them or an appeal whose fourteen days ran out on Tuesday. The worker's log
+   * now says so once a day; this is the page somebody is actually on.
+   *
+   * Counted with `head: true`, so each of these is a count and not a page of
+   * rows. `badges` has no number because nothing waits there: it is the surface
+   * for suspending or revoking a live badge, not a queue.
+   */
+  const now = new Date().toISOString();
+  const rows = (table: 'apps' | 'appeals' | 'data_requests') =>
+    supabase.from(table).select('id', { count: 'exact', head: true });
+  const count = async (query: PromiseLike<{ count: number | null }>) => (await query).count ?? 0;
+
+  const [screeningWaiting, appealsOpen, appealsOverdue, requestsOpen, requestsOverdue] =
+    await Promise.all([
+      count(rows('apps').eq('screening_status', 'pending').is('archived_at', null)),
+      count(rows('appeals').in('status', ['open', 'under_review'])),
+      count(rows('appeals').in('status', ['open', 'under_review']).lt('due_at', now)),
+      count(rows('data_requests').not('status', 'in', '(completed,refused)')),
+      count(rows('data_requests').not('status', 'in', '(completed,refused)').lt('due_at', now)),
+    ]);
+
+  /** "Appeals 2" rather than "Appeals", and "· 1 late" when one is. */
+  const chipLabel = (label: string, open: number, overdue = 0) =>
+    open === 0 ? label : `${label} ${open}${overdue > 0 ? ` · ${overdue} late` : ''}`;
   const needingAttention = items.filter((item) => item.triage.attention.length > 0).length;
 
   return (
@@ -173,16 +203,16 @@ export default async function ReviewQueuePage() {
 
       <nav aria-label="Review queues" className="flex flex-wrap gap-2">
         <Link href="/review/screening" className="chip">
-          Screening
+          {chipLabel('Screening', screeningWaiting)}
         </Link>
         <Link href="/review/badges" className="chip">
           Badges
         </Link>
         <Link href="/review/appeals" className="chip">
-          Appeals
+          {chipLabel('Appeals', appealsOpen, appealsOverdue)}
         </Link>
         <Link href="/review/requests" className="chip">
-          Data requests
+          {chipLabel('Data requests', requestsOpen, requestsOverdue)}
         </Link>
       </nav>
 

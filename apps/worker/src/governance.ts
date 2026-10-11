@@ -414,14 +414,33 @@ export async function sweepRetention(
 export interface DeadlineSweepResult {
   readonly overdueRequests: number;
   readonly overdueAppeals: number;
+  /** Open, including the overdue ones: what is waiting for a person at all. */
+  readonly openRequests: number;
+  readonly openAppeals: number;
+  /** The soonest deadline not yet missed, or null when there is none left to keep. */
+  readonly nextRequestDueAt: Date | null;
+  readonly nextAppealDueAt: Date | null;
 }
 
 /**
- * Notices a deadline we published and are about to miss.
+ * Notices a deadline we published and are about to miss, and then that we have.
  *
  * It does not answer anything — a data-subject request and an appeal both need a
  * person. What it does is make missing one loud, because a thirty-day statutory
  * deadline that nobody is watching is the same as no deadline at all.
+ *
+ * The sentence above it used to be the whole of what this claimed to do, and
+ * the code only ever said something once `due_at` was already behind us. "About
+ * to miss" and "missed" are not the same notice, and for the person this log is
+ * written for — one founder, reading it when something else prompts them to —
+ * the second one arrives at the only moment it can no longer help. An appeal
+ * exists because an AI-assisted finding can be wrong; it arrives silently, sits
+ * in a queue nobody is paged about, and the first line the log ever wrote about
+ * it said the fourteen days were up.
+ *
+ * So a line a day per kind for what is open, with the soonest deadline still
+ * standing, and the per-row overdue lines unchanged beneath it. No threshold to
+ * argue about: the count and the date are the warning, and a reader decides.
  */
 export async function sweepGovernanceDeadlines(
   pool: Poolish,
@@ -469,7 +488,61 @@ export async function sweepGovernanceDeadlines(
       }
     }
 
-    return { overdueRequests: overdueRequests.length, overdueAppeals: overdueAppeals.length };
+    /*
+     * And what is still inside its deadline, which is the half that can be
+     * acted on. Keyed by kind rather than by row: this is one line about a
+     * queue, not a line per thing in it, and the thing an operator needs from
+     * it is how long they have.
+     */
+    const soonest = (rows: readonly { due_at: string }[]): Date | null => {
+      const upcoming = rows
+        .map((row) => new Date(row.due_at))
+        .filter((due) => due.getTime() >= now.getTime())
+        .sort((a, b) => a.getTime() - b.getTime());
+      return upcoming[0] ?? null;
+    };
+    const nextRequestDueAt = soonest(requests.rows);
+    const nextAppealDueAt = soonest(appeals.rows);
+
+    const waiting: [string, string, number, number, Date | null][] = [
+      [
+        'data-subject requests waiting for a person',
+        'requests',
+        requests.rows.length,
+        overdueRequests.length,
+        nextRequestDueAt,
+      ],
+      [
+        'appeals waiting for a person',
+        'appeals',
+        appeals.rows.length,
+        overdueAppeals.length,
+        nextAppealDueAt,
+      ],
+    ];
+    for (const [message, key, open, overdue, next] of waiting) {
+      if (open === 0) continue;
+      if (!deadlineNotices.due(`open:${key}`, now)) continue;
+      log(message, {
+        open,
+        overdue,
+        ...(next === null
+          ? {}
+          : {
+              nextDueAt: next.toISOString(),
+              daysLeft: Math.floor((next.getTime() - now.getTime()) / 86_400_000),
+            }),
+      });
+    }
+
+    return {
+      overdueRequests: overdueRequests.length,
+      overdueAppeals: overdueAppeals.length,
+      openRequests: requests.rows.length,
+      openAppeals: appeals.rows.length,
+      nextRequestDueAt,
+      nextAppealDueAt,
+    };
   } finally {
     client.release();
   }
