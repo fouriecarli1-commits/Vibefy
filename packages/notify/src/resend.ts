@@ -7,7 +7,17 @@
  * interface, and nothing above it changes.
  *
  * The API key never leaves this module and never reaches the browser or the
- * phone — email is sent by the worker only.
+ * phone. It said "email is sent by the worker only", and that part was wrong:
+ * `apps/web/app/console/workspace/actions.ts` sends the workspace invitation
+ * from the console, and it has to. The invitation link carries a token that
+ * exists in that request and nowhere else — the database keeps only its hash —
+ * so there is nothing for a sweep to pick up later.
+ *
+ * Which means both deployments need `RESEND_API_KEY` and `ALERT_EMAIL_FROM`,
+ * and the runbook said the console's only email concern was the inbound bounce
+ * webhook. Follow that and every invitation goes out by hand: the console falls
+ * back to showing the inviter the link, honestly, and the person they invited
+ * hears nothing at all.
  */
 import type { EmailMessage, EmailProvider, SendResult } from './provider.ts';
 

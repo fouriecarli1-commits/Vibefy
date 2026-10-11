@@ -858,6 +858,7 @@ where it is _not_ needed is a credential in an extra place it can leak from.
 | `ANTHROPIC_API_KEY`                                         | only for the assistant at `/api/copilot`, which calls `new Anthropic()` and reads it implicitly          |
 | `STRIPE_*`, `PAYSTACK_*`                                    | when payments go live; without them the console says payments are not configured                         |
 | `RESEND_WEBHOOK_SECRET`                                     | for `POST /api/email/webhook`; without it that route answers 404 rather than accepting unsigned payloads |
+| `RESEND_API_KEY`, `ALERT_EMAIL_FROM`                        | together, or a workspace invitation is never emailed and the inviter has to send the link themselves     |
 | `VIBEFYCODE_BADGE_PUBLIC_KEYS`                              | yes, once badges are issued — without it no badge verifies anywhere, and `/verify` says so to everybody  |
 | `VIBEFYCODE_BADGE_RETIRED_KEYS`                             | after a rotation, if the old key was not kept in the line above                                          |
 
@@ -889,10 +890,22 @@ deployment that is not meant to verify anything. Both now read `VIBEFYCODE_BADGE
 which holds public halves, and neither reads the signing pair — so this rule is now a property of
 the code rather than a promise in this document.
 
-`RESEND_API_KEY` is the same shape. Email is sent by the worker alone, and
-`packages/notify/src/resend.ts` states it: the key never leaves that module and never reaches the
-browser or the phone. The console's only email concern is the inbound bounce webhook, which needs
-the _webhook secret_, a different value.
+`RESEND_API_KEY` is **not** the same shape, and this paragraph used to say it was: "email is
+sent by the worker alone … the console's only email concern is the inbound bounce webhook". The
+console sends the workspace invitation, and it cannot do otherwise — the link carries a token that
+exists in that one request and nowhere else, because the database keeps only its hash, so there is
+nothing for a sweep to send later. Follow the old sentence and every invitation went out by hand:
+the console falls back to showing the inviter the link, which is honest and still means the person
+they invited hears nothing.
+
+So `RESEND_API_KEY` and `ALERT_EMAIL_FROM` belong on **both**, and
+`packages/notify/src/resend.ts` says what is true of them — the key never leaves that module and
+never reaches the browser or the phone. The bounce webhook needs `RESEND_WEBHOOK_SECRET` as well,
+which is a different value and only the console's.
+
+Found by asking tonight's badge-key question of the rest of this section, which is the one
+reliable thing about a defect of this kind: it is never alone, and the second one is in the
+paragraph that explains the first.
 
 **Vercel's three environments.** Set every one of the above for Production, Preview and
 Development unless there is a reason not to — a Preview deployment with no database is a preview
@@ -1400,6 +1413,51 @@ The fix is rarely to enforce it silently. `evidenceShortfall` says what is
 missing and keeps the finding; `termWithinPublished` refuses to issue rather
 than clamping. Enforcing a published promise by quietly changing what a
 customer gets is the same defect pointed the other way.
+
+### Two instructions, each correct, that cannot both be followed
+
+The sharpest finds of 2026-10-11 were a pair, and the second was inside the
+paragraph explaining the first.
+
+- "`VIBEFYCODE_BADGE_SIGNING_KEY_B64` belongs on Render and nowhere else" is
+  right. "The public half is derived from the private key at start-up, so it
+  does not need to be configured" was right about the code. Follow both and the
+  console publishes an empty key set: every badge fails to verify, everywhere,
+  and `/verify` tells each visitor it cannot check one.
+- "Email is sent by the worker alone, and the console's only email concern is
+  the inbound bounce webhook" was in the next paragraph. The console sends the
+  workspace invitation and has to, because the link carries a token that exists
+  in that one request. Follow the sentence and every invitation goes out by
+  hand.
+
+Neither is a wrong statement about the system. Each is a true statement about
+one half, and the contradiction lives in the gap between them — which is why
+reading either document alone finds nothing, and why the code agreed with both.
+
+How to run the sweep: for each deployment, list the environment variables its
+entry points can reach, transitively through the workspace packages, and compare
+that list against the table somebody configures that deployment from.
+`tests/which-deployment-holds-which-variable.test.ts` is that comparison as a
+standing assertion, with every exception carrying the reason it is one.
+
+What it cannot do is say which side is wrong. The badge case would have been
+"fixed" by adding the signing key to the Vercel table, which is the one thing
+that section forbids; the right answer was to stop the console reading it. A
+disagreement between code and deployment is a decision, not a lint.
+
+### The complete document is not the one being followed
+
+`docs/RUNBOOK.md` has had the badge signing pair in its Render table since M3.
+`docs/DOEN.md` — which opens "Alles wat op jou wag, in volgorde" and is the file
+the founder actually works from — had nothing about the key at all. Follow it to
+the end and the worker can issue no badge for anybody, with one line in a log
+said once, whose own detail field called that expected.
+
+The tell is a second audience. Where two documents describe the same setup and
+one of them is the one being used, correctness in the thorough document buys
+nothing. Ask of the shorter list, not the longer one: if somebody did exactly
+this and stopped, what would not work? And then make the code say it — that gap
+is now a startup warning, which is the only copy that cannot drift.
 
 ### The sweeps, and what each measured
 
