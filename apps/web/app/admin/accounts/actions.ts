@@ -69,13 +69,21 @@ async function requireAdmin() {
 /**
  * Puts a workspace on a plan.
  *
- * Until Stripe writes these rows from its webhook, this is how a plan is set —
- * and the row written here is the same shape the webhook will write, so nothing
- * has to be undone when billing arrives.
+ * This said "until Stripe writes these rows from its webhook", and the webhook
+ * has been writing them since M2. Left as it was, the comment reads as
+ * scaffolding — which invites the next reader either to delete it as finished
+ * work or to trust it as the only way a plan is set, and it is neither. It is
+ * the operator override: a comped plan, a plan a provider charged for and
+ * failed to tell us about, a support fix at the end of a bad week. The row is
+ * the same shape the webhook writes, which is what lets the two coexist.
  *
- * The plan is not cosmetic. It decides how deep an assessment runs, how much
- * one may cost, and whether the workspace can hold a badge at all. So it is
- * logged, with what it was before.
+ * It is therefore one of exactly two paths that can write
+ * `public.subscriptions`, and the only one a person can reach. The plan is not
+ * cosmetic — it decides how deep an assessment runs, how much one may cost, and
+ * whether the workspace can hold a badge at all — so the caller is re-checked
+ * here rather than at the page, and the change is logged with what it was
+ * before. `tests/a-payment-nobody-confirmed.test.ts` holds the two-path claim;
+ * `tests/admin-console.test.ts` holds this path's own rules.
  */
 export async function setPlan(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const admin = await requireAdmin();

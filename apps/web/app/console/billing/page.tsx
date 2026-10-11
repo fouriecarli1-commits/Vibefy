@@ -154,10 +154,32 @@ export default async function BillingPage({
         </p>
       </header>
 
+      {/* The return from a checkout, which is not a receipt.
+
+          This said "Payment received", in the colour this app uses for good
+          news, and the only thing it read was `?purchased=1` — a parameter the
+          provider appends on its way back here and anybody can equally type
+          into the address bar. Nothing on this path asks the provider whether
+          the money moved, and nothing should: a plan is recorded by the signed
+          webhook and by nothing else, which is the right design and is exactly
+          why this page cannot confirm a payment.
+
+          So the claim came out and what is left is what is true — the checkout
+          closed, the plan below is what the provider has confirmed to us — plus
+          the one thing a customer needs when the webhook does not arrive, which
+          is to look at the invoices before paying a second time. Somebody who
+          believes the first sentence and sees the free tier still on the page
+          buys it again.
+
+          There is no sweep behind this for a payment we never heard about.
+          `retrieveSession` exists on all three providers and has no caller
+          anywhere; that gap is a founder decision in `docs/OPEN_ITEMS.md`
+          rather than a silence. */}
       {purchased && (
-        <p role="status" className="rounded-xl border border-line bg-surface-muted p-4 text-ok">
-          Payment received. Your plan updates as soon as the provider confirms it, usually within
-          seconds.
+        <p role="status" className="rounded-xl border border-line bg-surface-muted p-4">
+          Checkout closed. Your plan below changes when the provider confirms the payment, usually
+          within seconds — this page cannot see it any sooner. If it has not changed in a few
+          minutes, check <a href="#invoices">your invoices</a> before paying again.
         </p>
       )}
       {cancelled && (

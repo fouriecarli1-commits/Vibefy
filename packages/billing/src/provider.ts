@@ -204,6 +204,20 @@ export interface PaymentProvider {
   /** The one currency this provider is configured to charge in. */
   readonly currency: Currency;
   createCheckoutSession(request: CheckoutRequest): Promise<CheckoutSession>;
+  /**
+   * Asks the provider what became of one checkout.
+   *
+   * **Nothing calls this.** All three providers implement it and no shipped
+   * file outside this package mentions it, which makes it the visible end of a
+   * path that does not exist: if a webhook is never delivered, nobody ever
+   * asks. The payment is taken, our records say free tier, and the only person
+   * who can tell is the customer looking at their bank statement.
+   *
+   * Said here rather than left to be inferred from a grep, because the shape
+   * that hides this is a method that looks like it is in use. Whether a
+   * reconciliation sweep is worth building is a founder decision in
+   * `docs/OPEN_ITEMS.md`; the day it is, this is what it calls.
+   */
   retrieveSession(sessionId: string): Promise<SettledPayment>;
   refund(request: RefundRequest): Promise<RefundResult>;
   /**
