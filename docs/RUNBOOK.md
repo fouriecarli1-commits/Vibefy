@@ -445,6 +445,20 @@ pnpm verify:all    # both, plus everything else
 `pnpm verify` deliberately leaves the page scan out — it needs a build and a
 server, and the fast gate should stay fast. CI runs it as its own job.
 
+**Which means `pnpm verify` cannot see a page that does not build.** It
+typechecks, and a file can typecheck and still be rejected by Next: the rule
+broken on 2026-10-11 was "metadata and generateMetadata cannot be exported at
+the same time", which is a framework constraint and not a type error. `verify`
+was green, the commit went out, and the accessibility job failed on the
+production build — doing its second job, which is being the only gate that
+renders anything.
+
+So: **a change to a page's exports is a build-shape change, and build-shape
+changes need `pnpm verify:all` before they are pushed.** The exports that decide
+the shape are `metadata`, `generateMetadata`, `generateStaticParams`, `dynamic`,
+`revalidate`, `runtime` and the default export's own signature. Editing the body
+of a component is not in that list.
+
 ### When it fails
 
 The output names the rule, the impact, the element and a link to the rule's

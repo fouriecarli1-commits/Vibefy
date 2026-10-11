@@ -11,7 +11,15 @@ import {
   type TrustCheckResult,
 } from '@vibefycode/trustcheck';
 
-export const metadata: Metadata = {
+/**
+ * Not exported, because `generateMetadata` below is.
+ *
+ * Next refuses a file that exports both: "metadata and generateMetadata
+ * cannot be exported at the same time". `pnpm verify` renders no page and was
+ * green with both in place; `pnpm check:a11y` builds for production and failed
+ * on it, which is what that gate is for.
+ */
+const BASE: Metadata = {
   title: 'Check an app before you pay',
   description:
     'Paste the web address of an app you are about to pay for. VibefyCode reports what its public page does and does not say — whether it can be cancelled, whether there is anyone to contact, and who the company is.',
@@ -47,7 +55,7 @@ export function generateMetadata({
   searchParams?: Record<string, string | string[] | undefined>;
 }): Metadata {
   const asked = typeof searchParams?.url === 'string' && searchParams.url.trim().length > 0;
-  return asked ? { ...metadata, robots: { index: false, follow: false } } : metadata;
+  return asked ? { ...BASE, robots: { index: false, follow: false } } : BASE;
 }
 
 /** The plain-language summary, in the shape `tests/plain-language.test.ts` holds. */

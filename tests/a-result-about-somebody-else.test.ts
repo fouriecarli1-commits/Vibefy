@@ -45,6 +45,11 @@ describe('a result page', () => {
 
       it('refuses indexing once an address has been asked about', () => {
         expect(code).toContain('generateMetadata');
+        // And exports it alone. Next refuses a file exporting both this and a
+        // static `metadata`, which is a production build failure that `pnpm
+        // verify` cannot see — it renders no page. I shipped exactly that an
+        // hour ago and `pnpm check:a11y` caught it.
+        expect(code).not.toMatch(/export const metadata/);
         expect(code).toMatch(/robots: \{ index: false, follow: false \}/);
       });
 
@@ -53,11 +58,11 @@ describe('a result page', () => {
         // this page a judgement about somebody is `?url=`, so that is what
         // decides. `asked` is also what the body uses to run the check.
         expect(code).toMatch(/searchParams\?\.url/);
-        expect(code).toMatch(/asked \? \{ \.\.\.metadata, robots/);
+        expect(code).toMatch(/asked \? \{ \.\.\.BASE, robots/);
       });
 
       it('leaves the landing page indexable, because nobody can find it otherwise', () => {
-        expect(code).toMatch(/: metadata;/);
+        expect(code).toMatch(/: BASE;/);
         expect(PUBLIC_PATHS).toContain(page.path);
         for (const prefix of PRIVATE_PREFIXES) {
           expect(page.path.startsWith(prefix), `${page.path} under ${prefix}`).toBe(false);

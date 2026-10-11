@@ -3,7 +3,7 @@
 Alles wat op jou wag, in volgorde. Niks hiervan kan ek vir jou doen nie — ek het
 nie toegang tot Vercel, Supabase, Render of Resend nie.
 
-Laas nagegaan 2026-10-10.
+Laas nagegaan 2026-10-11.
 
 > **Eerste, en dit neem een minuut: Vercel → Deployments → boonste een → ⋯ →
 > Redeploy.**
@@ -276,7 +276,7 @@ Resend → Domains → `send.vibefycode.com` → **Verify**.
 
 Misluk dit, probeer nog een keer voor jy iets verander.
 
-## 3 · Render — drie veranderlikes
+## 3 · Render — drie veranderlikes, en vier reëls om na te kyk
 
 `vibefycode-worker` → Environment:
 
@@ -387,3 +387,7 @@ Nie werk nie — net 'n antwoord. Al die detail staan in `docs/OPEN_ITEMS.md`.
 | Regsentiteit en jurisdiksie                                               | Die regsdokumente kan nie finaal word nie |
 | Handelsmerk-soektog vir "VibefyCode"                                      | Bemarkingsbesteding en bekendstelling     |
 | 'n Vektor-oorspronklike van die kleurmerk                                 | Die laaste getrekte weergawe              |
+| Wat 'n eenmalige aankoop daarna toelaat (dit laat nou alles toe)          | Niks — dit kos net geld                   |
+| Of ons glad analitika wil hê (die koekie-nota het dit belowe)             | Niks                                      |
+| Of die rubriek 'n dekkingshek moet publiseer                              | Niks in kode — 'n rubriek-weergawe        |
+| Hoe ons die gratis gereedskap teen misbruik beperk                        | Niks — vier opsies staan reeds daar       |
