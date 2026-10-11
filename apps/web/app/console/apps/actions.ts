@@ -531,13 +531,20 @@ export async function requestAssessment(
 
     const plan = await resolvePlan(client, { organisationId: row.organisation_id, appId });
 
-    const history = await client.query<{ completed_at: string; paid: boolean }>(
-      `select a.completed_at,
-              exists (
-                select 1 from public.invoices i
-                 where i.app_id = $1 and i.status = 'paid'
-                   and i.paid_at <= a.completed_at
-              ) as paid
+    /*
+     * When this application was last assessed, for the free tier's
+     * cooling-off period.
+     *
+     * Each row used to carry a `paid` flag from a correlated subquery over
+     * invoices, meaning "a payment for this app had happened by the time this
+     * assessment finished". Nothing reads it now and nothing should: it was
+     * true of every run after the first purchase, and reading it as "this run
+     * was paid for" is what granted a free re-test credit for ever. The
+     * payment's own date is asked for below, which is the fact the re-test
+     * window actually needs.
+     */
+    const history = await client.query<{ completed_at: string }>(
+      `select a.completed_at
          from public.assessments a
         where a.app_id = $1 and a.completed_at is not null
         order by a.completed_at desc
@@ -598,7 +605,6 @@ export async function requestAssessment(
         appsInWorkspace: appCount.rows[0]?.n ?? 1,
         previousAssessments: history.rows.map((entry) => ({
           completedAt: new Date(entry.completed_at),
-          paid: entry.paid,
         })),
         lastPaidAt,
         reTestsUsed: reTests.rows[0]?.n ?? 0,

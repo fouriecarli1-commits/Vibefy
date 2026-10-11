@@ -142,11 +142,18 @@ export interface AssessmentRequestContext {
   /**
    * Completed assessments of this app, newest first.
    *
-   * The free tier's cooling-off period is the only thing that reads this now.
-   * The re-test window used to as well, and that is what broke it — see
-   * `reTestWindow` below.
+   * The free tier's cooling-off period is the only thing that reads this, and
+   * all it needs is when the last one finished.
+   *
+   * Each row used to carry `paid`, and nothing reads it any more. It is gone
+   * rather than left for later, because of what it meant: `exists (an invoice
+   * for this app paid before this assessment completed)` — so it was true of
+   * every run after the first purchase, free re-tests included. A field called
+   * `paid` that means "a payment had happened by then" is a field the next
+   * reader will use as "this one was paid for", which is precisely how the
+   * re-test credit came to be granted for ever.
    */
-  readonly previousAssessments: readonly { readonly completedAt: Date; readonly paid: boolean }[];
+  readonly previousAssessments: readonly { readonly completedAt: Date }[];
   /**
    * When this application's purchase was paid, which is when its re-test
    * window starts. Null when nothing has been bought for it.
@@ -258,7 +265,19 @@ export function decideAssessmentRequest(context: AssessmentRequestContext): Enti
         allowed: false,
         refusal: {
           code: 'cooldown_active',
-          message: `A free assessment of this application ran on ${last.completedAt.toISOString().slice(0, 10)}. The next free one is available from ${nextAllowed.toISOString().slice(0, 10)}; a paid report has no waiting period.`,
+          /*
+           * "This application was assessed", not "a free assessment ran".
+           *
+           * The cooling-off period belongs to the free tier, and a workspace
+           * lands on the free tier two ways: it never bought anything, or its
+           * subscription lapsed. In the second case the run this date refers to
+           * was very likely a paid one, and telling somebody their paid
+           * assessment was free is both wrong and the sort of wrong that gets
+           * quoted back in a support thread. The date and the remedy are what
+           * they need; which tier it was on is not ours to assert from a
+           * timestamp.
+           */
+          message: `This application was assessed on ${last.completedAt.toISOString().slice(0, 10)}. The next free assessment is available from ${nextAllowed.toISOString().slice(0, 10)}; a paid report has no waiting period.`,
           retryAfter: nextAllowed,
         },
       };

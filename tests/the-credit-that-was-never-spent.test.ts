@@ -76,7 +76,7 @@ describe('the window', () => {
       request({
         reTestsUsed: 0,
         now: day(PAID, 31),
-        previousAssessments: [{ completedAt: day(PAID, 30), paid: true }],
+        previousAssessments: [{ completedAt: day(PAID, 30) }],
       }),
     );
     expect(late.usesReTestCredit).toBe(false);
@@ -147,7 +147,6 @@ describe('what the sixth run on one purchase was', () => {
     // "paid" in the only sense that query can mean, and the sixth asked for.
     const history = [30, 60, 90, 120, 150].map((offset) => ({
       completedAt: day(PAID, offset),
-      paid: true,
     }));
     const decision = decideAssessmentRequest(
       request({

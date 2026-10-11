@@ -82,20 +82,32 @@ describe('the free tier', () => {
   it('holds a second one for ninety days, and says when', () => {
     const decision = decideAssessmentRequest(
       request({
-        previousAssessments: [{ completedAt: new Date('2026-08-01T00:00:00Z'), paid: false }],
+        previousAssessments: [{ completedAt: new Date('2026-08-01T00:00:00Z') }],
       }),
     );
     expect(decision.allowed).toBe(false);
     expect(decision.refusal?.code).toBe('cooldown_active');
     expect(decision.refusal?.message).toContain('2026-10-30');
     expect(decision.refusal?.message).toMatch(/a paid report has no waiting period/);
+    /*
+     * And it does not call the earlier run free.
+     *
+     * A workspace lands on this tier two ways: it never bought anything, or
+     * its subscription lapsed. In the second case the run this date refers to
+     * was very likely paid for, and the refusal used to open "A free
+     * assessment of this application ran on …". The date and the remedy are
+     * what the reader needs; which tier it was on is not ours to assert from a
+     * timestamp.
+     */
+    expect(decision.refusal?.message).not.toMatch(/free assessment of this application/i);
+    expect(decision.refusal?.message).toMatch(/was assessed on/);
   });
 
   it('allows it again once the ninety days have passed', () => {
     expect(
       decideAssessmentRequest(
         request({
-          previousAssessments: [{ completedAt: new Date('2026-04-01T00:00:00Z'), paid: false }],
+          previousAssessments: [{ completedAt: new Date('2026-04-01T00:00:00Z') }],
         }),
       ).allowed,
     ).toBe(true);
@@ -119,7 +131,7 @@ describe('paid plans', () => {
       decideAssessmentRequest(
         request({
           plan: 'one_off',
-          previousAssessments: [{ completedAt: new Date('2026-08-21T00:00:00Z'), paid: true }],
+          previousAssessments: [{ completedAt: new Date('2026-08-21T00:00:00Z') }],
         }),
       ).allowed,
     ).toBe(true);
