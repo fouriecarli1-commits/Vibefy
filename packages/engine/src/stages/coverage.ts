@@ -148,3 +148,90 @@ export function withoutACheck(isGame: boolean): { criterion: string; because: st
   if (!isGame) entries.push(...Object.entries(WITHOUT_A_CHECK_UNLESS_A_GAME));
   return entries.map(([criterion, because]) => ({ criterion, because }));
 }
+
+/**
+ * Which criteria each stage asks about.
+ *
+ * A stage that fails has asked nothing, and nothing asked is a dimension that
+ * keeps its full marks: scoring starts at 100 and deducts for findings, so a
+ * security pass that crashed on its second attempt produced the same score as
+ * one that found nothing wrong. The pipeline said so in a note — "what they did
+ * not look at is not evidence that there was nothing to find" — and the
+ * published question above it still showed a tick, because `assuranceFor` only
+ * withholds one for a criterion the run reports as not tested.
+ *
+ * Which is the third member of a family this file already holds two of: a
+ * criterion the rubric does not define, and a criterion nothing in the engine
+ * asks. This is the one where the check exists and did not run.
+ *
+ * The lists are by stage id, not by the coverage kind above, because a kind is
+ * shared: `static_intake` and `deterministic_checks` both read for an exposed
+ * key, so one of them failing is not a criterion nobody asked. They are kept
+ * here rather than on each stage so that one file answers "who asks this", and
+ * `tests/the-criteria-nobody-checks.test.ts` holds them against the `ruleId:`
+ * literals in the stage sources and against `CRITERION_COVERAGE` — a list of
+ * criteria written by hand is otherwise a list that goes stale the first time a
+ * check is added.
+ */
+export const ASKED_BY_STAGE: Readonly<Record<string, readonly string[]>> = {
+  static_intake: ['PRD-04', 'SEC-04', 'SEC-10'],
+  deterministic_checks: [
+    'FI-01',
+    'FI-07',
+    'FI-08',
+    'PRD-02',
+    'PRD-04',
+    'PRD-05',
+    'PRD-06',
+    'PRI-01',
+    'PRI-07',
+    'SEC-01',
+    'SEC-02',
+    'SEC-03',
+    'SEC-04',
+    'SEC-05',
+    'SEC-08',
+    'SEC-11',
+    'SEC-12',
+    'SEC-13',
+    'UX-02',
+    'UX-03',
+    'UX-04',
+    'UX-06',
+    'UX-07',
+  ],
+  functional_exploration: ['FI-01', 'FI-03', 'FI-04', 'FI-05', 'FI-06', 'UX-01', 'UX-05'],
+  adversarial_practicality: ['SEC-06', 'SEC-07', 'SEC-09'],
+  store_readiness: ['STR-01', 'STR-02', 'STR-04', 'STR-05', 'STR-06', 'STR-07'],
+  /*
+   * The model pass for a game asks no criterion of its own. The five a game is
+   * measured against are emitted by `game-checks.ts`, which runs inside
+   * `deterministic_checks`, and `CRITERION_COVERAGE` attributes them there.
+   * Written out as an empty list rather than left out, so that a stage missing
+   * from this table is a mistake the test can see.
+   */
+  game_experience: [],
+};
+
+/**
+ * The criteria nothing asked about on this run, because the stage that asks
+ * them did not finish and no stage that did finish asks them too.
+ *
+ * Phrased for the owner. "The pass did not finish" is our fault and reads as
+ * ours; anything shorter reads as a result about their application.
+ */
+export function unasked(
+  didNotFinish: readonly string[],
+  finished: readonly string[],
+): { criterion: string; because: string }[] {
+  const asked = new Set(finished.flatMap((stage) => ASKED_BY_STAGE[stage] ?? []));
+  const missed = new Set(didNotFinish.flatMap((stage) => ASKED_BY_STAGE[stage] ?? []));
+  return [...missed]
+    .filter((criterion) => !asked.has(criterion))
+    .sort()
+    .map((criterion) => ({
+      criterion,
+      because:
+        'The pass that asks this did not finish on this run, so nothing looked at it. That is a gap in our assessment and not something found in the application.',
+    }));
+}

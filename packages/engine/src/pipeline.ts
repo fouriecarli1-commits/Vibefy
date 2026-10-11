@@ -36,7 +36,7 @@ import {
   storeReadinessStage,
 } from './stages/model-stages.ts';
 import { synthesise, type ReportNarrative } from './stages/synthesis.ts';
-import { withoutACheck } from './stages/coverage.ts';
+import { unasked, withoutACheck } from './stages/coverage.ts';
 import type { EvidenceArtefact } from './runtime/evidence.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './stages/types.ts';
 
@@ -172,6 +172,27 @@ export function evidenceShortfall(
     .sort((a, b) => a.criterion.localeCompare(b.criterion));
 }
 
+/**
+ * One entry per criterion, keeping the first reason given.
+ *
+ * Three lists meet here: what a stage reported it could not reach, the criteria
+ * nothing in this engine asks, and the criteria a pass that did not finish
+ * would have asked. They overlap — FI-07 is behind a sign-in *and* read by a
+ * deterministic check — and `assuranceFor` only ever shows the first reason, so
+ * the second copy was invisible there and a repeated line in the report's list
+ * of what was not assessed everywhere else.
+ *
+ * The first is kept because the lists are assembled most specific first: what a
+ * stage said about its own run, then the facts about this engine.
+ */
+function onceEach(
+  entries: readonly { criterion: string; because: string }[],
+): { criterion: string; because: string }[] {
+  const seen = new Map<string, { criterion: string; because: string }>();
+  for (const entry of entries) if (!seen.has(entry.criterion)) seen.set(entry.criterion, entry);
+  return [...seen.values()];
+}
+
 export async function runPipeline(options: RunPipelineOptions): Promise<AssessmentOutcome> {
   const { context } = options;
   const rubricVersion = options.rubricVersion ?? '1.0.0';
@@ -180,6 +201,17 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
 
   const stageResults: StageResult[] = [];
   let stopped: StopReason | null = null;
+  /*
+   * The stages the run never got to, kept apart from the ones that did not
+   * apply.
+   *
+   * Both are `skipped`, and they mean opposite things to a reader of the
+   * published questions: a stage that does not apply to this application is
+   * answered by the claim's own `applies`, while a stage the run stopped short
+   * of asked nothing and left its criteria looking clean. Collected here rather
+   * than read back off the skip note, because a note is prose.
+   */
+  const unreached: string[] = [];
 
   for (const stage of stages) {
     if (stopped) {
@@ -189,6 +221,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
         findings: [],
         notes: [`Skipped: the run ${STOP_LABEL[stopped]} at an earlier stage and stopped.`],
       });
+      unreached.push(stage.id);
       continue;
     }
     if (!stage.appliesTo(context)) {
@@ -382,6 +415,39 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     );
   }
 
+  /*
+   * And the same sentence where it is read rather than where it is written.
+   *
+   * The note above is prose in the report. The published question above each
+   * criterion is drawn from `notTestedCriteria`, and until this line a stage
+   * that crashed left nothing there — so "are its keys exposed?" ticked on the
+   * strength of a security pass that never finished. Scoring works the same
+   * way: a dimension starts at full marks and deducts for findings, and a pass
+   * that asked nothing produces none.
+   *
+   * A stage the run stopped short of counts the same as one that failed. It is
+   * not the same as a stage that does not apply — `applies` answers that, and
+   * answering it twice would put "not tested" under a question about payments
+   * for an application that takes none.
+   */
+  notTested.push(
+    ...unasked(
+      /*
+       * Failed, aborted, or never reached. The middle one is the case this
+       * missed first time round and a test caught: a stage that stopped on a
+       * ceiling halfway through its own questions has not asked them, and
+       * `failedStages` above means `status === 'failed'` only.
+       */
+      [
+        ...executed
+          .filter((result) => result.status === 'failed' || result.status === 'aborted')
+          .map((result) => result.stage),
+        ...unreached,
+      ],
+      executed.filter((result) => result.status === 'succeeded').map((result) => result.stage),
+    ),
+  );
+
   let narrative: ReportNarrative | null = null;
   if (!stopped) {
     try {
@@ -434,7 +500,10 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     nonRelianceLegend: NON_RELIANCE_LEGEND,
     aiDisclosure: AI_DISCLOSURE,
     notes,
-    notTestedCriteria: [...stageResults.flatMap((result) => result.notTested ?? []), ...notTested],
+    notTestedCriteria: onceEach([
+      ...stageResults.flatMap((result) => result.notTested ?? []),
+      ...notTested,
+    ]),
     exitMeasurement:
       stageResults.find((result) => result.exitMeasurement !== undefined)?.exitMeasurement ?? null,
   };
