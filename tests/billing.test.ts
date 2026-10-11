@@ -27,6 +27,11 @@ const request = (over: Partial<AssessmentRequestContext> = {}): AssessmentReques
   subscriptionStatus: 'active',
   appsInWorkspace: 1,
   previousAssessments: [],
+  // Nothing bought, and so no re-test window open. The three cases below that
+  // are about credits set these, and `tests/the-credit-that-was-never-spent.test.ts`
+  // is where the arithmetic itself is held.
+  lastPaidAt: null,
+  reTestsUsed: 0,
   appIsAuthorised: true,
   now: NOW,
   ...over,
@@ -124,7 +129,8 @@ describe('paid plans', () => {
     const decision = decideAssessmentRequest(
       request({
         plan: 'one_off',
-        previousAssessments: [{ completedAt: new Date('2026-08-10T00:00:00Z'), paid: true }],
+        lastPaidAt: new Date('2026-08-10T00:00:00Z'),
+        reTestsUsed: 0,
       }),
     );
     expect(decision.allowed).toBe(true);
@@ -132,16 +138,31 @@ describe('paid plans', () => {
   });
 
   it('stops spending credits once they are used up', () => {
+    /*
+     * This case passed before the window was fixed, and for the wrong reason.
+     *
+     * It used to hand over a history whose newest row carried `paid: false`,
+     * and the old guard was `previousAssessments[0]?.paid` — so the credit
+     * branch was skipped before any counting happened. The count itself was
+     * `assessments completed after the most recent one`, which is empty by
+     * construction and was therefore always zero.
+     *
+     * The fixture could not occur either: `paid` on a history row is
+     * `exists (an invoice for this app paid before this assessment completed)`,
+     * so once anything is bought every later row is true, free re-tests
+     * included. A green test over an impossible fixture.
+     */
     const decision = decideAssessmentRequest(
       request({
         plan: 'one_off',
-        previousAssessments: [
-          { completedAt: new Date('2026-08-15T00:00:00Z'), paid: false },
-          { completedAt: new Date('2026-08-10T00:00:00Z'), paid: true },
-        ],
+        lastPaidAt: new Date('2026-08-10T00:00:00Z'),
+        reTestsUsed: 1,
       }),
     );
     expect(decision.usesReTestCredit).toBe(false);
+    // Still permitted today, which is the money question in docs/OPEN_ITEMS.md
+    // rather than something to decide in a test at four in the morning.
+    expect(decision.allowed).toBe(true);
   });
 
   it('refuses a lapsed subscription', () => {

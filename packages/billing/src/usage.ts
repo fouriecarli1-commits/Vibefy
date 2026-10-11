@@ -10,7 +10,15 @@
  * Pure functions on purpose. Reading rows out of the database and deciding what
  * they mean are two jobs, and only the second one is worth testing exhaustively.
  */
-import { entitlementFor, type Entitlement, type PlanTier } from './entitlements.ts';
+import { entitlementFor, type Entitlement, type PlanTier, reTestWindow } from './entitlements.ts';
+
+/**
+ * Re-exported, because this is where the meter's readers look for it while the
+ * decision that grants the credit is where it now lives. One definition under
+ * two import paths, which is the opposite of what this was: two definitions,
+ * one on the screen and one in the decision, quietly disagreeing.
+ */
+export { reTestWindow };
 
 /**
  * One capability, phrased the same way for every plan so a reader can compare
@@ -111,11 +119,18 @@ export function usageMeters(input: UsageInput): UsageMeter[] {
     const open = window !== null && window > now;
     meters.push({
       label: 'Free re-tests',
-      // A credit outside its window is not a credit you still hold, so the meter
-      // shows it spent rather than pretending it is available.
-      used: open
-        ? Math.min(input.reTestsUsed, entitlement.reTestCredits)
-        : entitlement.reTestCredits,
+      /*
+       * A credit outside its window is not a credit you still hold, so the
+       * meter shows it spent rather than pretending it is available.
+       *
+       * Inside the window it is the true count and no longer clamped to the
+       * limit. `Math.min` here is what hid a credit being granted after it
+       * should have run out: the decision in `decideAssessmentRequest` handed
+       * out an unbounded number of them and this screen said "1 of 1". If the
+       * two ever disagree again, the number a customer can see is the one that
+       * should be too large, not the one that looks right.
+       */
+      used: open ? input.reTestsUsed : entitlement.reTestCredits,
       limit: entitlement.reTestCredits,
       detail: open
         ? `Until ${window.toISOString().slice(0, 10)}, ${entitlement.reTestWindowDays} days after your last paid assessment.`
@@ -126,14 +141,6 @@ export function usageMeters(input: UsageInput): UsageMeter[] {
   }
 
   return meters;
-}
-
-/** When the free re-test window closes, or null if it never opened. */
-export function reTestWindow(entitlement: Entitlement, lastPaidAt: Date | null): Date | null {
-  if (!lastPaidAt || entitlement.reTestCredits === 0) return null;
-  const ends = new Date(lastPaidAt);
-  ends.setUTCDate(ends.getUTCDate() + entitlement.reTestWindowDays);
-  return ends;
 }
 
 /**

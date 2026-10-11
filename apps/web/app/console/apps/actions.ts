@@ -545,6 +545,37 @@ export async function requestAssessment(
       [appId],
     );
 
+    /*
+     * When the purchase was paid, and how many re-tests have been taken since.
+     *
+     * The same two facts `usageMeters` reads for the meter on
+     * `/console/billing`, because the number a customer sees and the decision
+     * that grants the credit have to be one rule. They were two: this passed a
+     * history of completions and `decideAssessmentRequest` measured the window
+     * from the newest one, so every re-test moved the window and the credit was
+     * never counted as spent.
+     *
+     * Per application rather than per workspace, which is how `resolvePlan`
+     * attaches a one-off purchase: buying a deep report on one application does
+     * not open a re-test window on another.
+     */
+    const purchase = await client.query<{ paid_at: string | null }>(
+      `select max(coalesce(paid_at, issued_at)) as paid_at
+         from public.invoices
+        where app_id = $1 and status = 'paid'
+          and amount_paid_cents > amount_refunded_cents`,
+      [appId],
+    );
+    const lastPaidAt = purchase.rows[0]?.paid_at ? new Date(purchase.rows[0].paid_at) : null;
+
+    const reTests = lastPaidAt
+      ? await client.query<{ n: number }>(
+          `select count(*)::int as n from public.assessments
+            where app_id = $1 and uses_retest_credit = true and created_at > $2`,
+          [appId, lastPaidAt.toISOString()],
+        )
+      : { rows: [{ n: 0 }] };
+
     const appCount = await client.query<{ n: number }>(
       `select count(*)::int as n from public.apps
         where organisation_id = $1 and archived_at is null`,
@@ -569,6 +600,8 @@ export async function requestAssessment(
           completedAt: new Date(entry.completed_at),
           paid: entry.paid,
         })),
+        lastPaidAt,
+        reTestsUsed: reTests.rows[0]?.n ?? 0,
         appIsAuthorised: row.authorised === true,
       }),
     };

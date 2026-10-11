@@ -139,10 +139,44 @@ export interface AssessmentRequestContext {
     | 'incomplete'
     | null;
   readonly appsInWorkspace: number;
-  /** Completed assessments of this app, newest first. */
+  /**
+   * Completed assessments of this app, newest first.
+   *
+   * The free tier's cooling-off period is the only thing that reads this now.
+   * The re-test window used to as well, and that is what broke it — see
+   * `reTestWindow` below.
+   */
   readonly previousAssessments: readonly { readonly completedAt: Date; readonly paid: boolean }[];
+  /**
+   * When this application's purchase was paid, which is when its re-test
+   * window starts. Null when nothing has been bought for it.
+   */
+  readonly lastPaidAt: Date | null;
+  /** How many re-tests have been taken since that payment. */
+  readonly reTestsUsed: number;
   readonly appIsAuthorised: boolean;
   readonly now?: Date;
+}
+
+/**
+ * When the free re-tests stop being free.
+ *
+ * Measured in days from the **payment**, not from the last assessment, and the
+ * difference is the whole of this: with the window measured from the last
+ * assessment, using a re-test moved the window, so a customer who assessed once
+ * a month had a window that never closed.
+ *
+ * Defined here rather than in `usage.ts` because the meter a customer reads and
+ * the decision that grants the credit have to be the same arithmetic. They were
+ * not. `usage.ts` computed it from `lastPaidAssessmentAt` and
+ * `decideAssessmentRequest` computed it from `previousAssessments[0]`, and the
+ * screen showed one answer while the decision used another.
+ */
+export function reTestWindow(entitlement: Entitlement, lastPaidAt: Date | null): Date | null {
+  if (!lastPaidAt || entitlement.reTestCredits === 0) return null;
+  const ends = new Date(lastPaidAt);
+  ends.setUTCDate(ends.getUTCDate() + entitlement.reTestWindowDays);
+  return ends;
 }
 
 export interface EntitlementDecision {
@@ -231,15 +265,52 @@ export function decideAssessmentRequest(context: AssessmentRequestContext): Enti
     }
   }
 
-  // A re-test inside the window is free, and is spent explicitly rather than
-  // silently, so a customer can see that it was used.
-  if (entitlement.reTestCredits > 0 && last?.paid) {
-    const windowEnds = new Date(last.completedAt);
-    windowEnds.setUTCDate(windowEnds.getUTCDate() + entitlement.reTestWindowDays);
-    const creditsUsed = context.previousAssessments.filter(
-      (assessment) => !assessment.paid && assessment.completedAt > last.completedAt,
-    ).length;
-    if (windowEnds > now && creditsUsed < entitlement.reTestCredits) {
+  /*
+   * A re-test inside the window is free, and is spent explicitly rather than
+   * silently, so a customer can see that it was used.
+   *
+   * ## What this did instead, measured on 2026-10-11
+   *
+   * It was:
+   *
+   *     const last = context.previousAssessments[0];
+   *     if (entitlement.reTestCredits > 0 && last?.paid) {
+   *       const windowEnds = last.completedAt + reTestWindowDays;
+   *       const creditsUsed = context.previousAssessments.filter(
+   *         (a) => !a.paid && a.completedAt > last.completedAt,
+   *       ).length;
+   *
+   * Three things were wrong and each hid the next.
+   *
+   *   · `creditsUsed` counts assessments completed strictly **after the most
+   *     recent one**, which is empty by construction. It was always zero, for
+   *     every plan. A credit was never spent, so `reTestCredits` — 1, 2, 4, 8
+   *     — never mattered.
+   *   · The window ran from the most recent assessment rather than from the
+   *     payment, so taking a re-test moved the window forward thirty days.
+   *     Assess once a month and it never closes.
+   *   · `paid` on a history row is `exists (an invoice for this app paid before
+   *     this assessment completed)`, which is true of every assessment after
+   *     the first purchase — including the free re-tests. So `last?.paid` was
+   *     true for all of them and the guard let every one through.
+   *
+   * Measured rather than read: a one-off purchase with five runs a month apart
+   * returned `usesReTestCredit: true` on the sixth, five months after the
+   * purchase, with the single included credit long gone. The meter on
+   * `/console/billing` clamped the count it displays to the limit, so the one
+   * screen that would have shown it showed "1 of 1".
+   *
+   * `tests/billing.test.ts` had a case called "stops spending credits once they
+   * are used up" and it passed — on a history whose newest row carried
+   * `paid: false`, which that query cannot produce once anything is bought.
+   *
+   * Now: the window comes from the payment, and the credits spent are counted
+   * by the same rule the meter counts them by, which is `uses_retest_credit`
+   * on the assessments since that payment.
+   */
+  if (entitlement.reTestCredits > 0) {
+    const windowEnds = reTestWindow(entitlement, context.lastPaidAt);
+    if (windowEnds && windowEnds > now && context.reTestsUsed < entitlement.reTestCredits) {
       return { ...base, allowed: true, usesReTestCredit: true };
     }
   }

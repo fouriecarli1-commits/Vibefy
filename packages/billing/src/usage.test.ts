@@ -128,7 +128,19 @@ describe('the re-test meter', () => {
     expect(reTests.detail).toMatch(/opens when you buy/i);
   });
 
-  it('never reports more used than the plan grants', () => {
+  it('reports more used than the plan grants, when that is what happened', () => {
+    /*
+     * This asserted the opposite — "never reports more used than the plan
+     * grants" — and the clamp it was holding in place is what hid the defect
+     * it was written beside. `decideAssessmentRequest` granted an unbounded
+     * number of re-test credits on a single purchase, and this screen, the one
+     * place a customer or an operator would have seen it, said "1 of 1".
+     *
+     * A meter that cannot read high cannot report an overrun. Nothing in the
+     * product can now produce a count above the limit — the decision counts the
+     * credits it has spent — so the only way this number exceeds the limit
+     * again is a fault, and a fault is exactly what it should show.
+     */
     const entitlement = entitlementFor('one_off');
     const meters = usageMeters({
       plan: 'one_off',
@@ -138,7 +150,8 @@ describe('the re-test meter', () => {
       now: NOW,
     });
     const reTests = meters.find((meter) => meter.label === 'Free re-tests')!;
-    expect(reTests.used).toBe(entitlement.reTestCredits);
+    expect(reTests.used).toBe(99);
+    expect(reTests.limit).toBe(entitlement.reTestCredits);
   });
 });
 
