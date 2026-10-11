@@ -341,7 +341,9 @@ describe('alert wording', () => {
   const drift = computeDrift(snapshot('a'), snapshot('b', { overallScore: 70 }));
 
   it('gives every alert a dedupe key tied to what it is about', () => {
-    expect(driftAlert('Kettle', 'app-1', drift).dedupeKey).toBe('drift:b');
+    expect(driftAlert('Kettle', 'app-1', drift, assessMateriality(drift)).dedupeKey).toBe(
+      'drift:b',
+    );
     expect(regressionAlert('Kettle', 'app-1', drift, assessMateriality(drift)).dedupeKey).toBe(
       'regression:b',
     );
@@ -349,7 +351,7 @@ describe('alert wording', () => {
 
   it('uses only the exact wordmark and no absolute claims', () => {
     const drafts = [
-      driftAlert('Kettle', 'app-1', drift),
+      driftAlert('Kettle', 'app-1', drift, assessMateriality(drift)),
       regressionAlert('Kettle', 'app-1', drift, assessMateriality(drift)),
       badgeExpiringAlert('Kettle', 'app-1', 'badge-1', new Date('2026-09-01'), 10),
     ];

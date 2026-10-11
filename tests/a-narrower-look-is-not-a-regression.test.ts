@@ -35,6 +35,7 @@ import { Client, Pool } from 'pg';
 import {
   assessMateriality,
   computeDrift,
+  driftAlert,
   type AssessmentSnapshot,
   type ComparableFinding,
 } from '../packages/monitoring/src/index.ts';
@@ -119,6 +120,40 @@ describe('a run that saw less of the application', () => {
     expect(verdict.reasons.map((reason) => reason.explanation).join(' ')).toMatch(
       /critical|score/i,
     );
+  });
+});
+
+describe('the sentence the customer actually receives', () => {
+  const before = snapshot('a', { notTestedCount: 3 });
+  const narrow = snapshot('b', { notTestedCount: 12, overallScore: 41 });
+
+  it('carries the reason the badge stayed up, rather than computing it and dropping it', () => {
+    // `withheldBecause` had no reader anywhere. The drift alert wrote its own
+    // version of the rubric caveat from `drift.comparable` — a second copy of
+    // one rule — and had nothing at all to say about a narrower run. So a
+    // customer saw a forty-point drop reported with no explanation beside it
+    // and a badge still standing, which reads as our own system disagreeing
+    // with itself.
+    const drift = computeDrift(before, narrow);
+    const verdict = assessMateriality(drift);
+    const alert = driftAlert('Kettle', 'app-1', drift, verdict);
+    expect(alert.body).toContain(verdict.withheldBecause!);
+    expect(alert.body).toContain('12 criteria untested against 3');
+  });
+
+  it('still carries the rubric reason, in the verdict words rather than a second copy', () => {
+    const drift = computeDrift(snapshot('a', { rubricVersion: '1.0.0' }), snapshot('b'));
+    const verdict = assessMateriality(drift);
+    expect(verdict.withheldBecause).toMatch(/different rubric versions/);
+    expect(driftAlert('Kettle', 'app-1', drift, verdict).body).toContain(verdict.withheldBecause!);
+  });
+
+  it('says nothing extra when nothing was withheld', () => {
+    const drift = computeDrift(before, snapshot('b', { overallScore: 81 }));
+    const verdict = assessMateriality(drift);
+    expect(verdict.withheldBecause).toBeNull();
+    const alert = driftAlert('Kettle', 'app-1', drift, verdict);
+    expect(alert.body).not.toMatch(/untested|rubric/i);
   });
 });
 

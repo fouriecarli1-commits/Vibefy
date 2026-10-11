@@ -448,9 +448,12 @@ export async function recordDriftFor(
       return null;
     }
 
-    await raiseAlert(client, current.organisationId, driftAlert(appName, current.appId, drift), {
-      driftReportId,
-    });
+    await raiseAlert(
+      client,
+      current.organisationId,
+      driftAlert(appName, current.appId, drift, verdict),
+      { driftReportId },
+    );
 
     let badgeSuspended = false;
     if (verdict.material) {

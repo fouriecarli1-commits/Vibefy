@@ -52,11 +52,28 @@ function movement(drift: Drift): string {
 }
 
 /** The neutral "we looked again and here is what moved" alert. */
-export function driftAlert(appName: string, appId: string, drift: Drift): AlertDraft {
+/**
+ * The caveat is the verdict's own sentence, not a second copy of it.
+ *
+ * This read `drift.comparable` and wrote its own version of the rubric-change
+ * caveat — a second copy of one rule, in different words, and the shape that
+ * has cost most tonight. `assessMateriality` composes `withheldBecause` for
+ * every cause it withholds on, and until now nothing read it: the explanation
+ * for why a badge stayed up was computed, correct, and delivered to nobody.
+ *
+ * That mattered the moment there were two causes. A coverage change withholds
+ * the suspension, so a customer saw a drift alert reporting a forty-point drop
+ * with no explanation beside it and a badge still standing — which reads as our
+ * system disagreeing with itself. Now the reason travels with the movement.
+ */
+export function driftAlert(
+  appName: string,
+  appId: string,
+  drift: Drift,
+  verdict: MaterialityVerdict,
+): AlertDraft {
   const counts = `${drift.newFindings.length} new, ${drift.resolvedFindings.length} resolved, ${drift.persistingFindings.length} unchanged`;
-  const caveat = drift.comparable
-    ? ''
-    : ' These two assessments used different rubric versions, so part of the movement is a change in the standard rather than in the application.';
+  const caveat = verdict.withheldBecause ? ` ${verdict.withheldBecause}` : '';
   return {
     kind: 'drift_detected',
     severity: drift.scoreDelta < 0 ? 'warning' : 'info',
