@@ -295,6 +295,27 @@ export async function sweepPendingReports(
   const client = await pool.connect();
   try {
     const pending = await client.query<{ id: string; organisation_id: string; app_id: string }>(
+      /*
+       * Missing, or older than the review that changed what it says.
+       *
+       * This asked only whether an HTML report existed, and `adjustAssessment`
+       * on `/review/[id]` writes a new `overall_score` and a new `reviewed_at`
+       * to an assessment that already has one. So after an adjustment —
+       * including one made because a customer appealed and was right — the
+       * console page, which renders live, showed the corrected score while the
+       * stored bytes went on saying the old one. The PDF download serves those
+       * bytes deliberately, so that "two copies of the same report" cannot
+       * differ; freezing them is only honest while the facts behind them
+       * cannot change, and this is the path that changes them.
+       *
+       * A condition rather than a delete in the console action: the sweep is
+       * the self-healing half of this design, and it now heals a stale report
+       * whatever made it stale, including a path nobody has written yet.
+       *
+       * `reviewed_at is null` keeps the original behaviour for a row that has
+       * no review timestamp — otherwise a null comparison would mark every one
+       * of them stale for ever.
+       */
       `select a.id, a.organisation_id, a.app_id
          from public.assessments a
         where a.status in ('approved', 'published')
@@ -302,6 +323,7 @@ export async function sweepPendingReports(
           and not exists (
             select 1 from public.reports r
              where r.assessment_id = a.id and r.format = 'html'
+               and (a.reviewed_at is null or r.generated_at >= a.reviewed_at)
           )
         order by a.reviewed_at
         limit 20`,

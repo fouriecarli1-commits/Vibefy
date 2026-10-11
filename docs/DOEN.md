@@ -409,15 +409,16 @@ daar. Die webwerf werk, so dit is netheid.
 
 Nie werk nie — net 'n antwoord. Al die detail staan in `docs/OPEN_ITEMS.md`.
 
-| Vraag                                                                     | Wat dit blokkeer                          |
-| ------------------------------------------------------------------------- | ----------------------------------------- |
-| Watter bladsy lees te veel? Noem een, ek sny dit.                         | Niks                                      |
-| Mag 'n eienaar sy naam op sy verifikasie-bladsy sit?                      | Niks                                      |
-| Moet die tweede stap verpligtend wees vir 'n rekening wat badges uitreik? | Niks                                      |
-| Regsentiteit en jurisdiksie                                               | Die regsdokumente kan nie finaal word nie |
-| Handelsmerk-soektog vir "VibefyCode"                                      | Bemarkingsbesteding en bekendstelling     |
-| 'n Vektor-oorspronklike van die kleurmerk                                 | Die laaste getrekte weergawe              |
-| Wat 'n eenmalige aankoop daarna toelaat (dit laat nou alles toe)          | Niks — dit kos net geld                   |
-| Of ons glad analitika wil hê (die koekie-nota het dit belowe)             | Niks                                      |
-| Of die rubriek 'n dekkingshek moet publiseer                              | Niks in kode — 'n rubriek-weergawe        |
-| Hoe ons die gratis gereedskap teen misbruik beperk                        | Niks — vier opsies staan reeds daar       |
+| Vraag                                                                           | Wat dit blokkeer                          |
+| ------------------------------------------------------------------------------- | ----------------------------------------- |
+| Watter bladsy lees te veel? Noem een, ek sny dit.                               | Niks                                      |
+| Mag 'n eienaar sy naam op sy verifikasie-bladsy sit?                            | Niks                                      |
+| Moet die tweede stap verpligtend wees vir 'n rekening wat badges uitreik?       | Niks                                      |
+| Regsentiteit en jurisdiksie                                                     | Die regsdokumente kan nie finaal word nie |
+| Handelsmerk-soektog vir "VibefyCode"                                            | Bemarkingsbesteding en bekendstelling     |
+| 'n Vektor-oorspronklike van die kleurmerk                                       | Die laaste getrekte weergawe              |
+| Wat 'n eenmalige aankoop daarna toelaat (dit laat nou alles toe)                | Niks — dit kos net geld                   |
+| Of ons glad analitika wil hê (die koekie-nota het dit belowe)                   | Niks                                      |
+| Of die rubriek 'n dekkingshek moet publiseer                                    | Niks in kode — 'n rubriek-weergawe        |
+| Hoe ons die gratis gereedskap teen misbruik beperk                              | Niks — vier opsies staan reeds daar       |
+| Of 'n beoordelaar 'n bevinding moet kan terugtrek (die appèl-beleid belowe dit) | Niks — net die beleid                     |
