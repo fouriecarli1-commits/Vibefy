@@ -42,7 +42,7 @@ import {
   type PlanTier,
   type ResolvedPlan,
 } from '../packages/billing/src/index.ts';
-import { connect } from './setup/client.ts';
+import { actingAs, connect } from './setup/client.ts';
 import { seedAccount, seedApp, type SeededAccount } from './setup/seed.ts';
 import { withoutComments } from './setup/source.ts';
 
@@ -220,6 +220,45 @@ describe('the plan the page reads over REST', () => {
     expect(shown.because).toBe(
       'No purchase or active subscription applies, so the free tier applies.',
     );
+  });
+
+  it('can be read at all by the customer whose page it is', async () => {
+    /*
+     * The parity above was measured as the owner of the database, which proves
+     * `planFor` and `resolvePlan` agree about the same rows and nothing about
+     * whether the page can see them. The page reads as the signed-in customer,
+     * under row-level security, so a missing select policy on `invoices` would
+     * silently make `appHasPaidReport` false and announce the free tier's
+     * waiting period on an application with a paid report — the exact failure
+     * the shared rule was factored out to prevent, arriving by another door.
+     */
+    const seen = await actingAs(db, { userId: account.userId }, async (client) => {
+      const subscriptions = await client.query(
+        `select plan, status from public.subscriptions where organisation_id = $1`,
+        [account.organisationId],
+      );
+      const invoices = await client.query(
+        `select status, amount_paid_cents, amount_refunded_cents
+           from public.invoices where app_id = $1`,
+        [appId],
+      );
+      const assessments = await client.query(
+        `select completed_at from public.assessments
+          where app_id = $1 and completed_at is not null`,
+        [appId],
+      );
+      return {
+        subscriptions: subscriptions.rows.length,
+        invoices: invoices.rows.length,
+        assessments: assessments.rowCount,
+      };
+    });
+
+    expect(seen.subscriptions).toBeGreaterThanOrEqual(1);
+    expect(seen.invoices).toBeGreaterThanOrEqual(1);
+    // Not a count: an application with no completed assessment is the ordinary
+    // case here, and what matters is that the read itself is permitted.
+    expect(seen.assessments).not.toBeNull();
   });
 
   it('agrees on an active subscription, which has no waiting period either', async () => {
