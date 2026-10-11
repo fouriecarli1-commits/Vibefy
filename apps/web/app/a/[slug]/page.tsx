@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { badgeDescription } from '@vibefycode/badge';
 import {
   scopeStatement,
   AI_DISCLOSURE,
@@ -232,8 +233,31 @@ export async function generateMetadata({
   if (!badge) return { title: 'Badge not found' };
 
   const assessedOn = new Date(badge.assessed_at).toISOString().slice(0, 10);
-  const title = `${badge.app_name} — Verified by VibefyCode`;
-  const description = `${badge.app_name} was assessed against VibefyCode Rubric v${badge.rubric_version} on ${assessedOn}. Scope-limited assessment, not a security guarantee.`;
+  /*
+   * The status is in the title and the description, because `robots` cannot
+   * reach the place this text is actually read.
+   *
+   * A suspended or revoked badge is already excluded from the index below —
+   * and a share preview is not fetched by an indexer. Somebody pastes the link
+   * into a message and the card is built from these two strings, which said
+   * "Kettle — Verified by VibefyCode" whatever the badge's state. The one link
+   * this product has that people send to each other, saying the thing the page
+   * underneath it exists to deny.
+   *
+   * The description is `badgeDescription`, the same sentence the badge file is
+   * labelled with and the console names the picture with. One author for the
+   * claim and its qualifier: this function used to write both out by hand.
+   */
+  const description = badgeDescription({
+    status: badge.status,
+    appName: badge.app_name,
+    rubricVersion: badge.rubric_version,
+    assessedOn,
+  });
+  const title =
+    badge.status === 'active'
+      ? `${badge.app_name} — Verified by VibefyCode`
+      : `${badge.app_name} — not currently verified by VibefyCode`;
   const origin = await resolveVerifyOrigin();
 
   return {
@@ -316,10 +340,30 @@ export default async function VerificationPage({ params }: { params: Promise<{ s
     <article className="max-w-3xl space-y-10">
       <header className="space-y-4">
         <div className="flex flex-wrap items-center gap-5">
+          {/*
+            The accessible name of the picture, and the status is part of it.
+
+            An SVG fetched through `<img src>` is a replaced element: nothing
+            inside it reaches the page, so the `role="img"` and `aria-label`
+            the renderer writes into the document are not read by anything
+            here. The `alt` attribute is the only name this image has — and it
+            was the sentence for an active badge, written out by hand, on every
+            one of the four states. A suspended or revoked badge showed the
+            drained artwork beside a red status line and announced itself to a
+            screen reader as "Verified by VibefyCode — <app>, assessed <date>".
+
+            `badgeDescription` is the function the renderer itself labels the
+            file with, so the picture and its name now say the same thing.
+          */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/badge/${badge.public_id}.svg`}
-            alt={`Verified by VibefyCode — ${badge.app_name}, Rubric v${badge.rubric_version}, assessed ${assessedOn}. Scope-limited assessment, not a security guarantee.`}
+            alt={badgeDescription({
+              status: badge.status,
+              appName: badge.app_name,
+              rubricVersion: badge.rubric_version,
+              assessedOn,
+            })}
             width={128}
             height={128}
           />

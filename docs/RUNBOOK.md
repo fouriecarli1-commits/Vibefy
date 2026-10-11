@@ -1483,6 +1483,28 @@ nothing. Ask of the shorter list, not the longer one: if somebody did exactly
 this and stopped, what would not work? And then make the code say it — that gap
 is now a startup warning, which is the only copy that cannot drift.
 
+### The only name a picture has
+
+`/a/<slug>` and the console both showed a badge and both wrote its `alt`
+attribute by hand, as the sentence for an active badge — on all four statuses.
+Everything that would have corrected it was out of reach: the `role="img"` and
+`aria-label` the renderer writes live inside an SVG fetched through `<img src>`,
+which contributes nothing to the page, and the red status line beside the
+picture is a separate element. So a revoked badge announced itself as "Verified
+by VibefyCode" to a screen reader, on the page that exists to say precisely what
+is and is not true.
+
+Two tells, and either one is enough to go looking:
+
+- An `alt` attribute built from a template literal rather than from a function.
+  A sentence assembled at the point of use is one copy of a claim, and a claim
+  with two copies has already drifted or will.
+- A picture that has states, and a name that does not take the state. Ask what
+  the name says in each state, not in the state you were looking at.
+
+The screen is cheap: `grep -rn "alt=" --include=*.tsx apps/web` and read every
+one against the thing it names. Four of them, two of which were wrong.
+
 ### The sweeps, and what each measured
 
 Five enumerations, each over a shape rather than a hunch. Worth re-running as

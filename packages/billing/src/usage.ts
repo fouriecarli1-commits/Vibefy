@@ -10,15 +10,21 @@
  * Pure functions on purpose. Reading rows out of the database and deciding what
  * they mean are two jobs, and only the second one is worth testing exhaustively.
  */
-import { entitlementFor, type Entitlement, type PlanTier, reTestWindow } from './entitlements.ts';
+import {
+  entitlementFor,
+  type Entitlement,
+  nextAssessmentAvailable,
+  type PlanTier,
+  reTestWindow,
+} from './entitlements.ts';
 
 /**
- * Re-exported, because this is where the meter's readers look for it while the
- * decision that grants the credit is where it now lives. One definition under
+ * Re-exported, because this is where the meter's readers look for them while
+ * the decisions they belong to are where they now live. One definition under
  * two import paths, which is the opposite of what this was: two definitions,
  * one on the screen and one in the decision, quietly disagreeing.
  */
-export { reTestWindow };
+export { nextAssessmentAvailable, reTestWindow };
 
 /**
  * One capability, phrased the same way for every plan so a reader can compare
@@ -141,19 +147,4 @@ export function usageMeters(input: UsageInput): UsageMeter[] {
   }
 
   return meters;
-}
-
-/**
- * When this application may next be assessed, or null if there is no wait.
- *
- * Rendered beside the application rather than only refused at the moment of
- * asking. "Available from 28 November" answers the question; a button that
- * turns grey does not.
- */
-export function nextAssessmentAvailable(plan: PlanTier, lastCompletedAt: Date | null): Date | null {
-  const entitlement = entitlementFor(plan);
-  if (entitlement.cooldownDays === null || !lastCompletedAt) return null;
-  const next = new Date(lastCompletedAt);
-  next.setUTCDate(next.getUTCDate() + entitlement.cooldownDays);
-  return next;
 }

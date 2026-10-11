@@ -11,6 +11,15 @@ import {
   STOP_HEADLINE,
   type StopReason,
 } from '@vibefycode/shared';
+import { badgeDescription, type BadgeStatus } from '@vibefycode/badge';
+import {
+  entitlementFor,
+  invoiceStillPaid,
+  nextAssessmentAvailable,
+  planFor,
+  type PlanTier,
+  type ResolvedPlan,
+} from '@vibefycode/billing';
 import {
   acceptBadgeLicence,
   requestAssessment,
@@ -152,6 +161,58 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
     .from('policy_profiles')
     .select('id, name')
     .eq('organisation_id', app.organisation_id);
+
+  /*
+   * When this application may next be assessed, said here rather than only on
+   * being refused.
+   *
+   * The free tier allows one assessment per application every 90 days. The
+   * button below looked exactly as available on day two as on day ninety-one,
+   * and the waiting period arrived as a refusal after pressing it — "Available
+   * from 28 November" answers the question; a button that turns grey does not,
+   * and a button that says nothing at all is worse than either.
+   *
+   * The plan is decided by `planFor`, the same rule `resolvePlan` hands the
+   * server action, so an application with a paid report is not shown the free
+   * tier's waiting period. The date is `nextAssessmentAvailable`, which is also
+   * what the refusal message is built from, so the two cannot differ by a day.
+   */
+  const { data: subscriptions } = await supabase
+    .from('subscriptions')
+    .select('plan, status')
+    .eq('organisation_id', app.organisation_id);
+
+  const { data: appInvoices } = await supabase
+    .from('invoices')
+    .select('status, amount_paid_cents, amount_refunded_cents')
+    .eq('app_id', id);
+
+  const { data: lastCompleted } = await supabase
+    .from('assessments')
+    .select('completed_at')
+    .eq('app_id', id)
+    .not('completed_at', 'is', null)
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const appPlan = planFor({
+    subscriptions: (subscriptions ?? []).map((row) => ({
+      plan: String(row.plan) as PlanTier,
+      status: String(row.status) as ResolvedPlan['subscriptionStatus'],
+    })),
+    appHasPaidReport: (appInvoices ?? []).some(invoiceStillPaid),
+  });
+  const lastAssessedAt = lastCompleted?.completed_at
+    ? new Date(String(lastCompleted.completed_at))
+    : null;
+  const nextAssessmentAt = nextAssessmentAvailable(appPlan.plan, lastAssessedAt);
+  // One value rather than two, so the sentence cannot be assembled from a date
+  // that is there and an assessment date that is not.
+  const waiting =
+    nextAssessmentAt && lastAssessedAt && nextAssessmentAt > new Date()
+      ? { since: lastAssessedAt, until: nextAssessmentAt }
+      : null;
 
   const trend: TrendPoint[] = (history ?? [])
     .filter((row) => row.overall_score !== null)
@@ -411,6 +472,16 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
             </p>
           ) : (
             <div className="rounded-xl border border-line p-5">
+              {waiting && (
+                <p className="mb-4 rounded-lg border border-line bg-surface-muted p-4 text-sm">
+                  This application was assessed on {waiting.since.toISOString().slice(0, 10)}. The{' '}
+                  {appPlan.plan.replace(/_/g, ' ')} tier allows one assessment per application every{' '}
+                  {entitlementFor(appPlan.plan).cooldownDays} days, so the next free assessment is
+                  available from <strong>{waiting.until.toISOString().slice(0, 10)}</strong>. A paid
+                  report has no waiting period —{' '}
+                  <Link href="/console/billing">see what the plans cover</Link>.
+                </p>
+              )}
               <p className="mb-4 text-sm text-muted">
                 What runs depends on your plan: how deep the assessment goes and how much of the
                 report you see. It never depends on what you paid for the score itself.
@@ -485,9 +556,19 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
             <div className="space-y-5 rounded-xl border border-line p-6">
               <div className="flex flex-wrap items-center gap-5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* The status belongs in the name of the picture, not only in
+                    the line beside it: an SVG behind `<img src>` contributes
+                    nothing of its own to the page, so this attribute is the
+                    whole of what a screen reader is told. It said "Verified by
+                    VibefyCode" for a suspended badge. */}
                 <img
                   src={`/badge/${badge.public_id}.svg`}
-                  alt={`Verified by VibefyCode — ${app.name}, Rubric v${badge.rubric_version}, assessed ${new Date(badge.assessed_at as string).toISOString().slice(0, 10)}. Scope-limited assessment, not a security guarantee.`}
+                  alt={badgeDescription({
+                    status: badge.status as BadgeStatus,
+                    appName: app.name as string,
+                    rubricVersion: String(badge.rubric_version),
+                    assessedOn: new Date(badge.assessed_at as string).toISOString().slice(0, 10),
+                  })}
                   width={128}
                   height={128}
                 />

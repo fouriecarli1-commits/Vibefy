@@ -7,6 +7,7 @@ import {
   PLAN_TIERS,
   currencyForCountry,
   entitlementFor,
+  invoiceStillPaid,
   priceIn,
   usageMeters,
   type Currency,
@@ -122,11 +123,7 @@ export default async function BillingPage({
     .from('apps')
     .select('id', { count: 'exact', head: true });
 
-  const paidInvoice = (invoices ?? []).find(
-    (invoice) =>
-      String(invoice.status) === 'paid' &&
-      Number(invoice.amount_paid_cents ?? 0) > Number(invoice.amount_refunded_cents ?? 0),
-  );
+  const paidInvoice = (invoices ?? []).find(invoiceStillPaid);
   const lastPaidAt = paidInvoice?.issued_at ? new Date(String(paidInvoice.issued_at)) : null;
 
   const { data: sincePaid } = lastPaidAt

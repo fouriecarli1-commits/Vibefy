@@ -186,6 +186,28 @@ export function reTestWindow(entitlement: Entitlement, lastPaidAt: Date | null):
   return ends;
 }
 
+/**
+ * When this application may next be assessed, or null if there is no wait.
+ *
+ * Rendered beside the application rather than only refused at the moment of
+ * asking. "Available from 28 November" answers the question; a button that
+ * turns grey does not.
+ *
+ * Here rather than in `usage.ts` for the reason above it: the date a customer
+ * reads and the date the refusal quotes are the same arithmetic, written once.
+ * They were written twice — this function, and the two lines inside
+ * `decideAssessmentRequest` that the refusal message was built from — and the
+ * copy in `usage.ts` had no reader at all, so the sentence above it described
+ * a screen that did not exist.
+ */
+export function nextAssessmentAvailable(plan: PlanTier, lastCompletedAt: Date | null): Date | null {
+  const entitlement = entitlementFor(plan);
+  if (entitlement.cooldownDays === null || !lastCompletedAt) return null;
+  const next = new Date(lastCompletedAt);
+  next.setUTCDate(next.getUTCDate() + entitlement.cooldownDays);
+  return next;
+}
+
 export interface EntitlementDecision {
   readonly allowed: boolean;
   readonly depth: AssessmentDepth;
@@ -256,9 +278,8 @@ export function decideAssessmentRequest(context: AssessmentRequestContext): Enti
   }
 
   const last = context.previousAssessments[0];
-  if (entitlement.cooldownDays !== null && last) {
-    const nextAllowed = new Date(last.completedAt);
-    nextAllowed.setUTCDate(nextAllowed.getUTCDate() + entitlement.cooldownDays);
+  const nextAllowed = nextAssessmentAvailable(context.plan, last?.completedAt ?? null);
+  if (last && nextAllowed) {
     if (nextAllowed > now) {
       return {
         ...base,
@@ -342,6 +363,17 @@ export function decideAssessmentRequest(context: AssessmentRequestContext): Enti
 // ---------------------------------------------------------------------------
 
 /** The smallest database surface this needs. `pg.PoolClient` satisfies it. */
+/**
+ * The subscription states that can still say something about a plan. A
+ * cancelled or incomplete subscription says nothing, and the free tier applies.
+ */
+export const SUBSCRIPTIONS_STILL_IN_FORCE = [
+  'trialing',
+  'active',
+  'past_due',
+  'paused',
+] as const satisfies readonly ResolvedPlan['subscriptionStatus'][];
+
 export interface EntitlementSql {
   query<T = Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
 }
@@ -362,26 +394,58 @@ export interface ResolvedPlan {
 }
 
 /**
+ * A payment that still stands.
+ *
+ * "Paid" on its own is not the question: an invoice can be paid and then
+ * refunded, and a refunded purchase buys nothing. The condition is written
+ * once here because three places ask it — the plan lookup in SQL, the billing
+ * page's meter, and the console's own reading of whether an application has a
+ * paid report — and a fourth asking it slightly differently is how a refunded
+ * customer keeps a paid plan.
+ */
+export function invoiceStillPaid(invoice: {
+  readonly status: string | null;
+  readonly amount_paid_cents: number | string | null;
+  readonly amount_refunded_cents: number | string | null;
+}): boolean {
+  return (
+    String(invoice.status) === 'paid' &&
+    Number(invoice.amount_paid_cents ?? 0) > Number(invoice.amount_refunded_cents ?? 0)
+  );
+}
+
+/**
+ * Which plan applies, given the facts that decide it.
+ *
  * A one-off purchase attaches to the app it was bought for, so buying a deep
  * report on one application does not silently upgrade every other application
  * in the workspace. A subscription covers the whole workspace.
+ *
+ * Separated from the reading because there are two readers. `resolvePlan`
+ * below reads those facts over SQL, which is what the worker and the server
+ * actions have. A server component has no pool and reads the same two rows
+ * through Supabase's client — and when it decided from them itself, it decided
+ * only the first half: an application with a paid one-off report was shown the
+ * free tier's rules. One rule, two readers.
  */
-export async function resolvePlan(
-  sql: EntitlementSql,
-  input: { organisationId: string; appId?: string | null },
-): Promise<ResolvedPlan> {
-  const subscription = await sql.query<{
-    plan: PlanTier;
-    status: ResolvedPlan['subscriptionStatus'];
-  }>(
-    `select plan, status from public.subscriptions
-      where organisation_id = $1 and status in ('trialing', 'active', 'past_due', 'paused')
-      order by case status when 'active' then 0 when 'trialing' then 1 else 2 end
-      limit 1`,
-    [input.organisationId],
-  );
-
-  const live = subscription.rows[0];
+export function planFor(input: {
+  /**
+   * Every subscription of the workspace that is not finished with, in any
+   * order. The pick is made here rather than by an `order by` so that it is
+   * the same pick for a caller holding rows from a REST client.
+   */
+  readonly subscriptions: readonly {
+    readonly plan: PlanTier;
+    readonly status: ResolvedPlan['subscriptionStatus'];
+  }[];
+  readonly appHasPaidReport: boolean;
+}): ResolvedPlan {
+  const rank = (status: ResolvedPlan['subscriptionStatus']) =>
+    status === 'active' ? 0 : status === 'trialing' ? 1 : 2;
+  const live =
+    [...input.subscriptions]
+      .filter((row) => SUBSCRIPTIONS_STILL_IN_FORCE.some((status) => status === row.status))
+      .sort((a, b) => rank(a.status) - rank(b.status))[0] ?? null;
   if (live && (live.status === 'active' || live.status === 'trialing') && live.plan !== 'free') {
     return {
       plan: live.plan,
@@ -391,22 +455,13 @@ export async function resolvePlan(
     };
   }
 
-  if (input.appId) {
-    const purchase = await sql.query<{ id: string }>(
-      `select id from public.invoices
-        where organisation_id = $1 and app_id = $2 and status = 'paid'
-          and amount_paid_cents > amount_refunded_cents
-        limit 1`,
-      [input.organisationId, input.appId],
-    );
-    if (purchase.rows.length > 0) {
-      return {
-        plan: 'one_off',
-        entitlement: entitlementFor('one_off'),
-        subscriptionStatus: live?.status ?? null,
-        because: 'A deep report was purchased for this application.',
-      };
-    }
+  if (input.appHasPaidReport) {
+    return {
+      plan: 'one_off',
+      entitlement: entitlementFor('one_off'),
+      subscriptionStatus: live?.status ?? null,
+      because: 'A deep report was purchased for this application.',
+    };
   }
 
   return {
@@ -417,4 +472,34 @@ export async function resolvePlan(
       ? `Your subscription is ${live.status}, so the free tier applies until it is active again.`
       : 'No purchase or active subscription applies, so the free tier applies.',
   };
+}
+
+/** The same facts, read over SQL. */
+export async function resolvePlan(
+  sql: EntitlementSql,
+  input: { organisationId: string; appId?: string | null },
+): Promise<ResolvedPlan> {
+  const subscriptions = await sql.query<{
+    plan: PlanTier;
+    status: ResolvedPlan['subscriptionStatus'];
+  }>(
+    `select plan, status from public.subscriptions
+      where organisation_id = $1 and status = any($2)`,
+    [input.organisationId, [...SUBSCRIPTIONS_STILL_IN_FORCE]],
+  );
+
+  const purchase = input.appId
+    ? await sql.query<{ id: string }>(
+        `select id from public.invoices
+          where organisation_id = $1 and app_id = $2 and status = 'paid'
+            and amount_paid_cents > amount_refunded_cents
+          limit 1`,
+        [input.organisationId, input.appId],
+      )
+    : { rows: [] };
+
+  return planFor({
+    subscriptions: subscriptions.rows,
+    appHasPaidReport: purchase.rows.length > 0,
+  });
 }
