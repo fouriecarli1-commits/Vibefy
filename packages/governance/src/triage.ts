@@ -41,8 +41,31 @@ export interface TriageInput {
   readonly certificationEligible: boolean;
   readonly gateFailures: readonly string[];
   readonly findings: readonly TriageFinding[];
-  /** The stages that did not succeed, if any. A partial run is not a result. */
+  /**
+   * The stages that did not succeed, if any. A partial run is not a result.
+   *
+   * Stages that were **skipped** do not belong here, and the caller has to be
+   * the one to know it: `appliesTo` and the depth table skip the game pass for
+   * a web application and several others besides, so a plain assessment always
+   * has some. `apps/web/app/review/[id]/page.tsx` passed every run whose status
+   * was not `succeeded`, which included every skipped one — so "a partial run
+   * is not a result" fired on essentially every assessment a reviewer opened,
+   * and the one warning that reports a genuinely incomplete run was noise.
+   * `persistOutcome` stores a skipped stage as `cancelled`, and says in a
+   * comment that this is "the database's word for did not run, which is not the
+   * same as failing".
+   */
   readonly failedStages?: readonly string[];
+  /**
+   * The criteria this run did not test, and how many the rubric publishes.
+   *
+   * Shown to the reviewer because the verification page shows it to a stranger.
+   * The person whose approval is the gate on a badge could not see how much of
+   * the rubric the run had been unable to look at, while anybody reading the
+   * badge afterwards could.
+   */
+  readonly notTestedCount?: number;
+  readonly criteriaCount?: number;
   /** The last reviewed score for the same application, when there is one. */
   readonly previousScore?: number | null;
 }
@@ -223,6 +246,25 @@ export function triageAssessment(input: TriageInput): Triage {
     routine.push('Every finding is medium or high confidence.');
   }
   if (failed.length === 0) routine.push('Every stage completed.');
+
+  /*
+   * How much of the rubric this run could not look at, said either way.
+   *
+   * Stated rather than ranked: how much untested is too much to certify is a
+   * published question — the rubric's own gate says "if the authorised scope
+   * did not permit exercising the core flows, we did not assess the product and
+   * must not certify it" — and a threshold invented here would be a second,
+   * unpublished gate. So the reviewer gets the numbers and decides, and the
+   * question of a coverage gate is in `docs/OPEN_ITEMS.md` where a decision
+   * about the rubric belongs.
+   */
+  if (input.notTestedCount !== undefined && input.criteriaCount !== undefined) {
+    routine.push(
+      input.notTestedCount === 0
+        ? `Every one of the ${input.criteriaCount} published criteria was tested.`
+        : `${input.notTestedCount} of ${input.criteriaCount} published criteria were not tested. Each carries its reason on the report, and what was not looked at cannot be reported as clean.`,
+    );
+  }
   if (input.gateFailures.length > 0) {
     routine.push(
       `The rubric gate already blocks certification: ${input.gateFailures.join('; ')}. Approving publishes the report without a badge.`,

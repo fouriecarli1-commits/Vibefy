@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import {
   triageAssessment,
   type TriageFinding,
@@ -120,6 +121,75 @@ describe('what it raises for a person', () => {
       }),
     );
     expect(triage.attention.map((entry) => entry.id)).not.toContain('critical_finding');
+  });
+});
+
+describe('how much of the rubric the run could look at', () => {
+  /*
+   * The reviewer could not see this, and a stranger reading the badge could.
+   *
+   * `/a/[slug]` renders every untested criterion with its reason, which is
+   * right. The screen where somebody decides whether the badge exists at all
+   * showed the findings, the score and the stages — and nothing about what the
+   * run had been unable to examine.
+   */
+  it('says how many criteria were not tested, and does not rank it', () => {
+    const triage = triageAssessment(input({ notTestedCount: 12, criteriaCount: 40 }));
+    expect(triage.routine.join(' ')).toContain('12 of 40 published criteria were not tested');
+    // Not an attention item. How much untested is too much to certify is a
+    // published question — the rubric has a gate whose rationale is exactly
+    // that — and a threshold invented in a triage would be a second gate
+    // nobody published.
+    expect(triage.attention.map((entry) => entry.id)).not.toContain('incomplete_run');
+  });
+
+  it('says so the other way when everything was tested', () => {
+    // Silence is ambiguous, which is what the routine list is for.
+    const triage = triageAssessment(input({ notTestedCount: 0, criteriaCount: 40 }));
+    expect(triage.routine.join(' ')).toContain('Every one of the 40 published criteria was tested');
+  });
+
+  it('says nothing when the caller does not know', () => {
+    const triage = triageAssessment(input());
+    expect(triage.routine.join(' ')).not.toMatch(/criteria were not tested|criteria was tested/);
+  });
+});
+
+describe('a stage that was skipped is not a stage that failed', () => {
+  /*
+   * The review page passed every run whose status was not `succeeded`, and
+   * `persistOutcome` stores a skipped stage as `cancelled` — "the database's
+   * word for did not run, which is not the same as failing". The depth table
+   * skips several stages on an ordinary web application, so the list was never
+   * empty: "a partial run is not a result, consider rejecting and re-running"
+   * fired on every assessment a reviewer ever opened, and the routine line
+   * saying every stage completed could never appear.
+   *
+   * The filter is the page's, so this holds the page's source. The rule it has
+   * to match is `persistOutcome`'s mapping, which is why both are read here.
+   */
+  const page = readFileSync(join(process.cwd(), 'apps/web/app/review/[id]/page.tsx'), 'utf8');
+  const persist = readFileSync(join(process.cwd(), 'apps/worker/src/persist.ts'), 'utf8');
+
+  it('is what the writer calls it, so the reader has something to match', () => {
+    expect(withoutComments(persist)).toMatch(/case 'skipped':\s*return 'cancelled';/);
+  });
+
+  it('is excluded where the page decides what did not complete', () => {
+    expect(withoutComments(page)).toContain(
+      "!['succeeded', 'cancelled'].includes(String(run.status))",
+    );
+  });
+
+  it('leaves the warning for a run that actually failed', () => {
+    const triage = triageAssessment(input({ failedStages: ['deterministic_checks'] }));
+    expect(triage.attention.map((entry) => entry.id)).toContain('incomplete_run');
+    expect(triage.routine.join(' ')).not.toContain('Every stage completed');
+  });
+
+  it('and the reassurance for one where nothing failed', () => {
+    const triage = triageAssessment(input({ failedStages: [] }));
+    expect(triage.routine.join(' ')).toContain('Every stage completed');
   });
 });
 

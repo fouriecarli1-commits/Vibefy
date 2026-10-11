@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { triageAssessment, type TriageFinding } from '@vibefycode/governance';
+import { getRubric } from '@vibefycode/rubric';
 import { adjustAssessment, approveAssessment, rejectAssessment } from '../actions';
 import { ActionForm, Checkbox, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
@@ -125,9 +126,29 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           .length,
       }),
     ),
+    /*
+     * Did not complete, which is not the same as did not run.
+     *
+     * This was `status !== 'succeeded'`, and `persistOutcome` stores a skipped
+     * stage as `cancelled` — its own comment calls that "the database's word
+     * for did not run, which is not the same as failing". The depth table and
+     * `appliesTo` skip several stages on an ordinary web application, so every
+     * assessment arrived here with a non-empty list: "a partial run is not a
+     * result — consider rejecting and re-running" fired on all of them, which
+     * is how the one warning about a genuinely incomplete run became noise. It
+     * also suppressed the routine line that says every stage completed, so a
+     * reviewer could not get the reassurance either.
+     */
     failedStages: (runs ?? [])
-      .filter((run) => String(run.status) !== 'succeeded')
+      .filter((run) => !['succeeded', 'cancelled'].includes(String(run.status)))
       .map((run) => String(run.stage)),
+    // What the run could not look at, which a stranger reading the badge can
+    // already see on the verification page.
+    notTestedCount: ((assessment.not_tested as unknown[] | null) ?? []).length,
+    criteriaCount: getRubric(String(assessment.rubric_version)).dimensions.reduce(
+      (total, dimension) => total + dimension.criteria.length,
+      0,
+    ),
     previousScore: prior?.overall_score === undefined ? null : Number(prior.overall_score),
   });
 
