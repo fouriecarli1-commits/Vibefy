@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { loadPublishedKeys } from '@vibefycode/badge';
+import { providerLabel } from '@vibefycode/shared';
+import { enabledProviders } from '@/lib/providers-enabled';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from '@/lib/connection-string';
 import { createClient } from '@/lib/supabase/server';
@@ -176,6 +178,54 @@ function signingKeys(): Check {
   };
 }
 
+/**
+ * Who can get in, and the one line each provider's own console has to carry.
+ *
+ * Google answered "Error 400: redirect_uri_mismatch" on 2026-10-18 and the
+ * sign-in was dead in the water, which also means this page was unreachable —
+ * it needs an administrator. The mismatch is never about this deployment: the
+ * address Google is handed is Supabase's own callback, and it has to be in the
+ * OAuth client's authorised list in Google Cloud. So the exact string is
+ * printed here, for every provider that is on, because the alternative is
+ * remembering what it looks like while reading an error page from Google.
+ *
+ * Not a secret: the project reference is in `NEXT_PUBLIC_SUPABASE_URL`, which
+ * ships to every browser by design.
+ */
+async function signInProviders(): Promise<Check> {
+  const question = 'Can anybody sign in?';
+  const { enabled, unavailable } = await enabledProviders();
+  if (unavailable) {
+    return {
+      question,
+      answer: `Cannot tell which providers are on: ${unavailable}`,
+      tone: 'unknown',
+      then: 'An email address and a password still work, which is how to reach this page when a provider will not let you in.',
+    };
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const callback = url ? `${url.replace(/\/+$/, '')}/auth/v1/callback` : null;
+  if (enabled.length === 0) {
+    return {
+      question,
+      answer: 'An email address and a password. No social provider is turned on in Supabase.',
+      tone: 'ok',
+    };
+  }
+
+  return {
+    question,
+    answer: `An email address and a password, and ${enabled.map(providerLabel).join(', ')}.`,
+    tone: 'ok',
+    ...(callback
+      ? {
+          then: `Each of those has to list ${callback} as an authorised redirect address in its own console — in Google Cloud under Credentials, for Google. A provider that does not answers the sign-in with "Error 400: redirect_uri_mismatch", which is a setting there and nothing in this deployment. Supabase prints the same string under Authentication → Providers.`,
+        }
+      : {}),
+  };
+}
+
 export default async function HealthPage() {
   const supabase = await createClient();
   const {
@@ -228,6 +278,7 @@ export default async function HealthPage() {
   const checks: Check[] = [
     connectionString(),
     publicApiKeys(),
+    await signInProviders(),
     await badgeLookup(),
     signingKeys(),
     {

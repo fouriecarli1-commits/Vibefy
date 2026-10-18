@@ -76,6 +76,20 @@ describe('what it prints', () => {
     expect(page).toContain('Neither route answered');
   });
 
+  it('prints the address a provider console has to carry', () => {
+    /*
+     * Google answered "Error 400: redirect_uri_mismatch" and the sign-in was
+     * dead, which also locked this page — it needs an administrator. The
+     * mismatch is never about this deployment: the address Google is handed is
+     * Supabase's own callback, and it has to be in the OAuth client's
+     * authorised list in Google Cloud. Printing the exact string beats
+     * remembering its shape while reading an error page.
+     */
+    expect(page).toContain('/auth/v1/callback');
+    expect(page).toContain('redirect_uri_mismatch');
+    expect(page).toContain('enabledProviders');
+  });
+
   it('reports a count it could not read as that, not as none', () => {
     // A zero reads as "nothing exists", and under row-level security a read
     // that returns nothing is not the same statement.
