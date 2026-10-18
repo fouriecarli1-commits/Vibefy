@@ -28,11 +28,25 @@ import {
 
 const DOEN = readFileSync('docs/DOEN.md', 'utf8');
 
+/*
+ * Found by a sentence whose words are fixed and whose line breaks are not.
+ *
+ * This searched for the literal `Elke vorm wat dit`, and the sentence moved one
+ * word onto the next line when the paragraph around it was rewritten — so the
+ * file still introduced the table, in the same words, and this threw "docs/DOEN.md
+ * no longer introduces the message forms". A test about a table should not fail
+ * because Prettier rewrapped the sentence above it.
+ */
+const flattened = DOEN.replace(/\s+/g, ' ');
+
 /** The table's left column: the phrases the document tells him to look for. */
 const phrases = (() => {
-  const intro = DOEN.indexOf('Elke vorm wat dit');
+  const intro = flattened.indexOf('Elke vorm wat dit');
   if (intro < 0) throw new Error('docs/DOEN.md no longer introduces the message forms');
-  const table = DOEN.slice(intro, DOEN.indexOf('\n\n', DOEN.indexOf('|', intro)));
+  // Rows are read off the real document, because `^\\|` needs its line breaks.
+  const start = DOEN.indexOf('| Die sin bevat');
+  if (start < 0) throw new Error('docs/DOEN.md no longer carries the message table');
+  const table = DOEN.slice(start, DOEN.indexOf('\n\n', start));
   return [...table.matchAll(/^\| `([^`]+)`(?:[^|]*`([^`]+)`)?/gm)].flatMap((row) =>
     [row[1], row[2]].filter((value): value is string => typeof value === 'string'),
   );

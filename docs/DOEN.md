@@ -155,11 +155,17 @@ https://vibefycode.com/badge/nonexistent-test-id.svg
 ```
 
 - **Badge wat "revoked" sê** → klaar. Gaan na stap 1b.
-- **Grys raampie** → Vercel → Logs (tyd-kieser op **Live**) → tref die bladsy
-  weer → klik die `/badge/...`-reël → maak die **Logs**-paneel onder oop.
+- **Grys raampie** → maak `https://vibefycode.com/admin/health` oop. Jy moet as
+  admin ingeteken wees. Vyf reëls, elkeen 'n vraag met 'n antwoord: is die
+  verbindingstring gestel en is sy vorm reg, kan Supabase oor HTTPS bereik word,
+  watter van die badge se twee roetes antwoord, is die sleutels gepubliseer, en
+  is daar enige badge om na te kyk. Dit lees die ontplooiing self, op daardie
+  oomblik — geen logs nie.
 
-Die boodskap daar is nou 'n vol sin wat sê wat om te verander. Elke vorm wat dit
-kan wees, en wat dit beteken:
+Wil jy dieselfde in die log self sien: Vercel → Logs (tyd-kieser op **Live**) →
+tref die bladsy weer → klik die `/badge/...`-reël → maak die **Logs**-paneel
+onder oop. Die boodskap daar is 'n vol sin wat sê wat om te verander. Elke vorm
+wat dit kan wees, en wat dit beteken:
 
 | Die sin bevat                           | Beteken                                           |
 | --------------------------------------- | ------------------------------------------------- |
