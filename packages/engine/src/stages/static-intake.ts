@@ -28,6 +28,7 @@
 import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
 import { basename, extname, join, relative } from 'node:path';
 import advisoryData from '../data/advisories.json' with { type: 'json' };
+import { LICENCE_FILENAMES, isCopyleft } from './provenance.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
 interface Advisory {
@@ -363,17 +364,14 @@ const CREDENTIAL_PATTERNS: readonly {
 ];
 
 /** Licences that make a dependency a commercial problem rather than a technical one. */
-const COPYLEFT = ['gpl-3.0', 'gpl-2.0', 'agpl-3.0', 'agpl', 'sspl'];
-
-const LICENCE_FILENAMES = [
-  'LICENSE',
-  'LICENCE',
-  'LICENSE.md',
-  'LICENCE.md',
-  'LICENSE.txt',
-  'LICENCE.txt',
-  'COPYING',
-];
+/*
+ * Both lists moved to `provenance.ts`, which is imported above.
+ *
+ * They were written here first and copied there the same evening, which is the
+ * duplication this codebase spends its time removing: one list calling
+ * LGPL-3.0 copyleft and the other not is a disagreement nobody would notice
+ * until two sentences in one report disagreed with each other.
+ */
 
 /**
  * SEC-10 said out loud when the dependency check did not run.
@@ -1094,11 +1092,6 @@ function readDeclaredLicence(manifestPath: string): { licence: string | null; re
   } catch {
     return { licence: null, readable: false };
   }
-}
-
-function isCopyleft(licence: string): boolean {
-  const lowered = licence.toLowerCase();
-  return COPYLEFT.some((candidate) => lowered.includes(candidate));
 }
 
 function checkLicence(root: string, context: StageContext, notes: string[]): RawFinding[] {

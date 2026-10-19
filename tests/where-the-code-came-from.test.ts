@@ -23,7 +23,10 @@
  *     belongs in the published rubric is the founder's decision, recorded in
  *     `docs/OPEN_ITEMS.md` and not taken here.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { withoutComments } from './setup/source.ts';
 import {
   copyrightHolders,
   isCopyleft,
@@ -222,6 +225,26 @@ describe('a font dropped into the repository', () => {
       }),
     );
     expect(observed.map((entry) => entry.id)).not.toContain('bundled_font_without_a_licence');
+  });
+});
+
+describe('one list, two readers', () => {
+  it('is the only place a licence family is named', () => {
+    /*
+     * `static-intake.ts` had its own `COPYLEFT` and `LICENCE_FILENAMES` and its
+     * own `isCopyleft`, written first and copied here the same evening. Two
+     * lists is how one of them comes to call LGPL-3.0 copyleft while the other
+     * does not — a disagreement nobody notices until two sentences in one
+     * report contradict each other.
+     */
+    const intake = readFileSync(
+      join(process.cwd(), 'packages/engine/src/stages/static-intake.ts'),
+      'utf8',
+    );
+    expect(intake).toContain("from './provenance.ts'");
+    expect(withoutComments(intake)).not.toMatch(/const COPYLEFT\s*=/);
+    expect(withoutComments(intake)).not.toMatch(/const LICENCE_FILENAMES\s*=/);
+    expect(withoutComments(intake)).not.toMatch(/function isCopyleft/);
   });
 });
 
