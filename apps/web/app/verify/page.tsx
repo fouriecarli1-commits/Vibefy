@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { loadPublishedKeys, verifyBadge } from '@vibefycode/badge';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
+import { sayItAgain } from '@/lib/said-recently';
 
 export const metadata: Metadata = {
   title: 'Check a badge',
@@ -256,10 +257,32 @@ async function lookUpBadge(badgeId: string): Promise<BadgeLookup> {
     // connection string is still something somebody is told about.
     const { row } = await lookUpBadgeVerification(badgeId);
     return row === null ? { kind: 'never_issued' } : { kind: 'issued', record: row };
-  } catch {
-    // Deliberately carries no detail to the page. What went wrong on our side
-    // is ours to read in the logs; a visitor needs to know only that we did not
-    // establish anything.
+  } catch (error) {
+    /*
+     * Deliberately carries no detail to the page. What went wrong on our side
+     * is ours to read in the logs; a visitor needs to know only that we did not
+     * establish anything.
+     *
+     * Which is what the second half of that sentence used to be worth: this was
+     * `catch { return { kind: 'unavailable' } }`, and nothing wrote a line. The
+     * page said "we could not establish anything" and the logs held whatever
+     * the layer below happened to say on its own — nothing at all when the
+     * failure came from a query rather than a connection. A comment promising a
+     * log that does not exist is how a fault lasts a week.
+     *
+     * Once a minute, keyed on the message: this page is public and a bad state
+     * here lasts until somebody fixes it.
+     */
+    const detail = error instanceof Error ? error.message : String(error);
+    if (sayItAgain(`verify-unavailable:${detail}`)) {
+      console.error('a badge could not be looked up', {
+        badgeId,
+        error: detail,
+        means:
+          'Neither the direct connection nor the published view over HTTPS could answer, so this ' +
+          'page is telling visitors it cannot establish anything about any badge.',
+      });
+    }
     return { kind: 'unavailable' };
   }
 }

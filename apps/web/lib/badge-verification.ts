@@ -117,7 +117,83 @@ export async function lookUpBadgeVerification(publicId: string): Promise<BadgeVe
     const detail = error instanceof Error ? error.message : String(error);
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) throw error;
+
+    /*
+     * No spare route, and that used to be the one case nobody was told about.
+     *
+     * This was `if (!url || !key) throw error`, straight out, before any line
+     * was written. Every caller turns the throw into a grey badge or "we could
+     * not establish anything", and the only log on the direct path is the one
+     * `connectAndExplainRefusals` writes when the *connection* is refused — so
+     * a deployment missing its public keys, failing on anything other than a
+     * refused connection, produced a grey badge everywhere and not one word
+     * anywhere. That is the state this product spent a week in, and the week
+     * was spent because nothing said so.
+     */
+    if (!url || !key) {
+      if (sayItAgain(`no-spare-route:${detail}`)) {
+        console.error('badge verification failed and has no spare route configured', {
+          publicId,
+          direct: detail,
+          means:
+            'The direct connection on SUPABASE_DB_URL could not answer, and NEXT_PUBLIC_SUPABASE_URL ' +
+            'or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing, so the published view could not be read over ' +
+            'HTTPS either. Every badge is grey until one of the two is fixed.',
+        });
+      }
+      throw error;
+    }
+
+    /*
+     * The fallback, and what is said about it afterwards rather than before.
+     *
+     * The "fell back to the Supabase API" line used to be written here, above
+     * the call, and it ends with "The badge works; the connection string still
+     * needs fixing." When the API then failed as well, that sentence was the
+     * only record of the event — a log asserting the badge works, at the moment
+     * every badge went grey. A line that states the opposite of what happened
+     * is worse than no line, because it sends the reader to the wrong fault.
+     *
+     * The call is wrapped too. `maybeSingle` returns its error for a refusal
+     * from Postgrest, but a transport failure — DNS, a refused socket, a proxy
+     * — rejects, and a rejection here used to leave this function entirely with
+     * the API's error in place of the direct one. The comment below has always
+     * said the original is the more useful of the two because it is the one
+     * that is supposed to work; the throwing path quietly did the opposite.
+     */
+    let row: BadgeVerificationRow | null = null;
+    let apiDetail: string | null = null;
+    try {
+      const api = createClient(url, key, { auth: { persistSession: false } });
+      const { data, error: apiError } = await api
+        .from('badge_verification')
+        .select(COLUMNS)
+        .eq('public_id', publicId)
+        .maybeSingle();
+      if (apiError) apiDetail = apiError.message;
+      else row = (data as BadgeVerificationRow | null) ?? null;
+    } catch (apiFailure) {
+      apiDetail = apiFailure instanceof Error ? apiFailure.message : String(apiFailure);
+    }
+
+    if (apiDetail !== null) {
+      // Both routes failed, said as that rather than as a fallback. Once a
+      // minute and keyed on the direct failure, because this state can hold for
+      // days across every impression of every badge.
+      if (sayItAgain(`neither-route:${detail}`)) {
+        console.error('badge verification could not answer by either route', {
+          publicId,
+          direct: detail,
+          api: apiDetail,
+          means:
+            'The direct connection and the published view over HTTPS both failed, so every badge is ' +
+            'grey and /verify can establish nothing. The direct failure is the one to fix first.',
+        });
+      }
+      // The original is the more useful of the two to report, because it is the
+      // one that is supposed to work.
+      throw error;
+    }
 
     // Said at error level, not warn. The badge is being served from the spare
     // route, which means the main one is down, and the only thing worse than a
@@ -136,17 +212,6 @@ export async function lookUpBadgeVerification(publicId: string): Promise<BadgeVe
       });
     }
 
-    const api = createClient(url, key, { auth: { persistSession: false } });
-    const { data, error: apiError } = await api
-      .from('badge_verification')
-      .select(COLUMNS)
-      .eq('public_id', publicId)
-      .maybeSingle();
-    if (apiError) {
-      // Both routes failed. The original is the more useful of the two to
-      // report, because it is the one that is supposed to work.
-      throw error;
-    }
-    return { row: (data as BadgeVerificationRow | null) ?? null, source: 'api' };
+    return { row, source: 'api' };
   }
 }
