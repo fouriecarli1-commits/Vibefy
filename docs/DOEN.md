@@ -428,3 +428,4 @@ Nie werk nie — net 'n antwoord. Al die detail staan in `docs/OPEN_ITEMS.md`.
 | Of die rubriek 'n dekkingshek moet publiseer                                    | Niks in kode — 'n rubriek-weergawe        |
 | Hoe ons die gratis gereedskap teen misbruik beperk                              | Niks — vier opsies staan reeds daar       |
 | Of 'n beoordelaar 'n bevinding moet kan terugtrek (die appèl-beleid belowe dit) | Niks — net die beleid                     |
+| Waar lisensies en herkoms in die rubriek hoort (die speurder is klaar)          | Niks — die nuwe afdeling                  |

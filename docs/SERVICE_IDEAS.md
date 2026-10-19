@@ -208,9 +208,21 @@ before the first conversation, not after it.
 **Said in passing, 11 October 2026, and then withdrawn in the next breath:** _"Wat ek
 ook wil sê wat vibefy moet soek binne coded apps is vir copyright issues. Ek kan nogal
 sien hoe mense baie in dit vasloop."_ The message after it said it had gone to the wrong
-app. So this is **not** a decision and nothing is built; it is written down because the
-thought is a good one and because an idea lost between two chat windows is an idea
-somebody has to have twice.
+app.
+
+**Asked for outright on 18 October 2026**, with a link to GitHub's changelog of two days
+before — open-source licence compliance generally available, for Enterprise Cloud
+repositories with Code Security on, enforced by a ruleset that blocks a pull request
+whose dependency licences are against the policy — and one sentence: _"Hierdie moet deel
+word van die produk."_ So it is a decision now, and the half that is code exists:
+`packages/engine/src/stages/provenance.ts` reads a clone and reports what is there, with
+`tests/where-the-code-came-from.test.ts` holding every case. What it has nowhere to go is
+a criterion, and that is the half below that was always the slow one. `docs/OPEN_ITEMS.md`
+carries the fork.
+
+GitHub shipping it is the argument rather than the competition: their answer is for an
+enterprise with a security budget, and the people most likely to be carrying somebody
+else's code are the ones furthest from one.
 
 **What it is.** A dimension, or a set of criteria inside `security_posture`'s neighbour,
 about where the code in an application came from and what its licence permits. For the
