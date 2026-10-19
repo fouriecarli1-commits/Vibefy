@@ -122,7 +122,11 @@ describe('what the page does with the third answer', () => {
   });
 
   it('says so in the log, because nothing else in the system can see it', () => {
+    // Through `couldNot` since 2026-10-19, which rate limits itself — this page
+    // is public, and a line per pageview buries the one that matters — and
+    // which requires the page to say what the visitor was shown instead.
     expect(page).toMatch(/we publish no signing keys/);
-    expect(page).toMatch(/console\.error/);
+    expect(page).toMatch(/couldNot\(/);
+    expect(page).toMatch(/shown:/);
   });
 });

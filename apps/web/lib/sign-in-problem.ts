@@ -22,7 +22,9 @@
  */
 const PROBLEMS: Readonly<Record<string, string>> = {
   missing_code:
-    'That sign-in link had nothing left to exchange — it was probably opened twice, or opened after it expired. Starting again below works.',
+    'That sign-in link arrived with nothing on it to exchange. That usually means it was opened in a different browser from the one that asked for it, or that something along the way shortened the address. Signing in below works.',
+  link_expired:
+    'That confirmation link has expired or had already been used. Some mail apps and security scanners open links before you do, which uses them up — so this is often not something you did. Ask for a new one by signing in below; if it keeps happening, an email address and a password will get you in.',
   exchange_failed:
     'Your sign-in could not be completed. Starting again usually works; if it does not, an email address and a password will get you in.',
   provider_refused:

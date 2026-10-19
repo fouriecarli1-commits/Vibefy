@@ -1,25 +1,92 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { readSignInLink } from '@/lib/sign-in-link';
 import { missingConsents, recordProviderConsents, recordSignUpConsents } from '@/lib/consent';
 
 /**
- * Exchanges the email confirmation code for a session. `next` is resolved
- * against our own origin only — an open redirect on an auth callback is how
- * phishing gets a foothold.
+ * Turns a confirmation link into a session, whichever shape it arrives in.
+ *
+ * Three of them reach this route: a `code` to exchange, a `token_hash` and a
+ * `type` to verify, and a refusal the provider is handing back. It read the
+ * first and ignored the other two, so an expired link, a link a mail scanner
+ * had already spent, and a project whose email template is the newer one all
+ * ended on the sign-in page saying "that link had nothing left to exchange" —
+ * a sentence written for one of those three and true of one of them.
+ *
+ * `next` is resolved against our own origin only — an open redirect on an auth
+ * callback is how phishing gets a foothold.
  */
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
-  const code = searchParams.get('code');
   const requestedNext = searchParams.get('next') ?? '/console';
   const next =
     requestedNext.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/console';
 
-  if (!code) {
+  const supabase = await createClient();
+  const link = readSignInLink(searchParams);
+
+  if (link.kind === 'refused') {
+    // The provider's words go to the log, never to the page: the page renders a
+    // sentence of ours, chosen by a code of ours.
+    console.error('a sign-in link came back from the provider with an error', {
+      error: searchParams.get('error'),
+      code: searchParams.get('error_code'),
+      description: searchParams.get('error_description'),
+      means:
+        'The link was refused before any session existed. otp_expired or access_denied is an ' +
+        'expired or already-used email link — mail scanners follow links before the recipient ' +
+        'does, which spends them.',
+    });
+    return NextResponse.redirect(
+      `${origin}/sign-in?error=${link.spent ? 'link_expired' : 'provider_refused'}`,
+    );
+  }
+
+  if (link.kind === 'email_link_unknown_type') {
+    console.error('a sign-in link named a kind of confirmation this route does not accept', {
+      type: searchParams.get('type'),
+    });
+    return NextResponse.redirect(`${origin}/sign-in?error=provider_refused`);
+  }
+
+  if (link.kind === 'email_link') {
+    const { error: otpError } = await supabase.auth.verifyOtp({
+      token_hash: searchParams.get('token_hash') ?? '',
+      type: link.type,
+    });
+    if (otpError) {
+      console.error('an email confirmation link could not be verified', {
+        type: link.type,
+        error: otpError.message,
+      });
+      const spent = /expired|invalid/i.test(otpError.message);
+      return NextResponse.redirect(
+        `${origin}/sign-in?error=${spent ? 'link_expired' : 'exchange_failed'}`,
+      );
+    }
+    return await onceSignedIn(origin, next, searchParams);
+  }
+
+  if (link.kind === 'nothing') {
+    /*
+     * Nothing to exchange, and now it is written down.
+     *
+     * The page has always said this plainly; the log said nothing, so a
+     * deployment where every confirmation landed here looked, from the inside,
+     * like a deployment nobody was using. The parameter names are reported and
+     * never their values: a token on this URL is a session.
+     */
+    console.error('a sign-in callback arrived with nothing to exchange', {
+      parameters: [...searchParams.keys()].sort(),
+      means:
+        'No code, no token_hash and no error. A link opened from a different browser than the ' +
+        'one that asked for it, or a redirect that dropped the query string.',
+    });
     return NextResponse.redirect(`${origin}/sign-in?error=missing_code`);
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { error } = await supabase.auth.exchangeCodeForSession(link.code);
 
   if (error) {
     /*
@@ -37,6 +104,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/sign-in?error=exchange_failed`);
   }
 
+  return await onceSignedIn(origin, next, searchParams);
+}
+
+/**
+ * What has to happen on every path that produces a session, whichever link it
+ * came from. Written once because the second path through this route — an email
+ * link carrying `token_hash` — would otherwise have signed somebody in without
+ * a consent record and past the door below.
+ */
+async function onceSignedIn(
+  origin: string,
+  next: string,
+  searchParams: URLSearchParams,
+): Promise<NextResponse> {
   /*
    * The acceptance a provider sign-up would otherwise never record.
    *

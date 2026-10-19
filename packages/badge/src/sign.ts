@@ -28,6 +28,23 @@ export function signBadge(payload: BadgePayload, key: SigningKey): SignedBadge {
 
 export type VerificationFailure =
   | 'no_published_keys'
+  /**
+   * We publish the key this badge names, and we cannot read it.
+   *
+   * Separate from `bad_signature`, which is a statement about the badge, and
+   * this is a statement about us. The two used to arrive as one: building the
+   * key happened inside the `try` around the signature check, so a published
+   * key with a malformed `x` — a truncated paste, a wrapped line, one wrong
+   * character in an environment variable — came out as a signature that did
+   * not match, and the page told a stranger "either the badge was altered, or
+   * VibefyCode did not issue it" about a badge we did issue.
+   *
+   * `/verify` has had a third answer for exactly this since the row lookup was
+   * corrected — "We cannot tell you right now" — and this is the same defect
+   * one layer down, in the one file whose whole job is to say whether we
+   * signed something.
+   */
+  | 'key_unusable'
   | 'unknown_key'
   | 'bad_signature'
   | 'malformed_payload'
@@ -119,15 +136,44 @@ export function verifyBadge(
     };
   }
 
+  /*
+   * The key first, and on its own.
+   *
+   * `publicKeyFromJwk` throws for an unsupported curve and `createPublicKey`
+   * throws for an `x` that is not a key — and `loadPublishedKeys` cannot catch
+   * that, because its check is on the shape of the entry and any non-empty
+   * string passes it. Inside the signature's `try`, both became
+   * `signatureValid = false`, which this file then explains as "either the
+   * badge was altered, or VibefyCode did not issue it".
+   */
+  let publicKey;
+  try {
+    publicKey = publicKeyFromJwk(jwk);
+  } catch {
+    return {
+      signatureValid: false,
+      withinValidity: false,
+      payload,
+      kid: payload.kid,
+      failures: ['key_unusable'],
+      explanation:
+        `VibefyCode publishes signing key "${payload.kid}", and this deployment cannot read it, so ` +
+        'this badge cannot be checked here. That is a fault on our side and says nothing about the ' +
+        'badge or the application.',
+    };
+  }
+
   let signatureValid = false;
   try {
     signatureValid = nodeVerify(
       null,
       Buffer.from(canonicalise(payload), 'utf8'),
-      publicKeyFromJwk(jwk),
+      publicKey,
       Buffer.from(raw.signature, 'base64url'),
     );
   } catch {
+    // A readable key and a signature this cannot even parse. That is a
+    // statement about the badge, and `bad_signature` is the right one.
     signatureValid = false;
   }
   if (!signatureValid) failures.push('bad_signature');

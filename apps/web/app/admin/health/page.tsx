@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { loadPublishedKeys } from '@vibefycode/badge';
+import { loadPublishedKeys, publicKeyFromJwk } from '@vibefycode/badge';
 import { providerLabel } from '@vibefycode/shared';
 import { enabledProviders } from '@/lib/providers-enabled';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
@@ -162,9 +162,43 @@ function signingKeys(): Check {
       then: 'Copy the VIBEFYCODE_BADGE_PUBLIC_KEYS line out of the worker’s log into Vercel, then redeploy. docs/DOEN.md section 1c.',
     };
   }
+  /*
+   * Published, and readable are two questions.
+   *
+   * `loadPublishedKeys` checks the shape of each entry — `kty`, `crv`, a
+   * non-empty `x`, a `kid` — and any non-empty string passes as `x`. A line
+   * truncated or wrapped on its way into an environment variable keeps its
+   * shape and stops being a key, so the set reads as published while every
+   * badge signed with that key is uncheckable.
+   *
+   * It is built here, which is the only way to know. Until `key_unusable`
+   * existed, `/verify` reported exactly this as a signature that did not match
+   * — "either the badge was altered, or VibefyCode did not issue it" — about a
+   * badge we did issue.
+   */
+  const unreadable = keys
+    .filter((key) => {
+      try {
+        publicKeyFromJwk(key);
+        return false;
+      } catch {
+        return true;
+      }
+    })
+    .map((key) => key.kid);
+
+  if (unreadable.length > 0) {
+    return {
+      question,
+      answer: `${keys.length} key${keys.length === 1 ? '' : 's'} published, and ${unreadable.length} of them cannot be read as a key (${unreadable.join(', ')}). Any badge naming one of those cannot be checked, and /verify says so rather than calling it a forgery.`,
+      tone: 'bad',
+      then: 'Paste the VIBEFYCODE_BADGE_PUBLIC_KEYS line into Vercel again, whole and on one line, then redeploy. A character lost in the paste is enough to do this.',
+    };
+  }
+
   return {
     question,
-    answer: `${keys.length} key${keys.length === 1 ? '' : 's'} published${
+    answer: `${keys.length} key${keys.length === 1 ? '' : 's'} published and readable${
       unusable > 0
         ? `, and ${unusable} entr${unusable === 1 ? 'y' : 'ies'} that could not be read`
         : ''

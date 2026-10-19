@@ -34,8 +34,18 @@ export interface WhatTheReaderGot {
   readonly [key: string]: unknown;
 }
 
-export function couldNot(subject: string, got: WhatTheReaderGot, error: unknown): void {
-  const detail = error instanceof Error ? error.message : String(error);
+export function couldNot(subject: string, got: WhatTheReaderGot, error?: unknown): void {
+  /*
+   * Optional, because not every one of these is a thrown thing.
+   *
+   * Two of them are states the page can simply be in — no signing key is
+   * published, or the key a badge names cannot be read — and they belong here
+   * for the same reasons the caught ones do: they are our fault, the visitor is
+   * told something weaker than the truth, and nothing else in the system sees
+   * it. Requiring an error would have sent those two back to a hand-written
+   * `console.error` on a public page, which is a line per pageview.
+   */
+  const detail = error === undefined ? '' : error instanceof Error ? error.message : String(error);
   if (!sayItAgain(`could-not:${subject}:${detail}`)) return;
   // The explanation travels beside the message rather than replacing it: a
   // tripped pooler breaker reads exactly like our own bad password and is not
@@ -43,7 +53,7 @@ export function couldNot(subject: string, got: WhatTheReaderGot, error: unknown)
   const means = whyTheDatabaseRefused(detail);
   console.error(`could not ${subject}`, {
     ...got,
-    error: detail,
+    ...(detail === '' ? {} : { error: detail }),
     ...(means === null ? {} : { means }),
   });
 }

@@ -54,15 +54,44 @@ export default async function VerifyPage({
    * were missing, and the only record of it would have been in the memory of
    * whoever read the answer and believed it.
    */
-  const couldNotCheck = result?.failures.includes('no_published_keys') ?? false;
-  if (couldNotCheck) {
-    console.error('a badge could not be verified because we publish no signing keys', {
+  /*
+   * Two ways this page can fail at its own job, and both are ours.
+   *
+   * `no_published_keys` is the deployment having nothing to check with.
+   * `key_unusable` is newer and narrower: we publish the key the badge names
+   * and this deployment cannot read it — one wrong character in an environment
+   * variable is enough, and `loadPublishedKeys` cannot catch that, because its
+   * check is on the shape of the entry.
+   *
+   * Both answer "We cannot tell you right now." Without the second, a corrupted
+   * key line made `verifyBadge` return a signature that did not match, and this
+   * page told a stranger "No." about a badge we did issue — the accusation the
+   * third answer exists to prevent, arriving through the key rather than
+   * through the row.
+   */
+  const couldNotCheck =
+    result?.failures.includes('no_published_keys') ||
+    result?.failures.includes('key_unusable') ||
+    false;
+  if (result?.failures.includes('no_published_keys')) {
+    couldNot('check a badge, because we publish no signing keys', {
       badgeId,
+      shown: 'the page saying it cannot check any badge just now',
       means:
         'VIBEFYCODE_BADGE_PUBLIC_KEYS is not set for this deployment, and no retired key ' +
-        'survived. Until one is, this page tells every visitor that it cannot check any badge. ' +
-        'The signing key is not what is missing and must not be added here: paste the ' +
+        'survived. The signing key is not what is missing and must not be added here: paste the ' +
         'public-only line the worker prints at start-up.',
+    });
+  }
+  if (result?.failures.includes('key_unusable')) {
+    couldNot('read the signing key a badge names', {
+      badgeId,
+      kid: result.kid,
+      shown: 'the page saying it cannot check this badge just now',
+      means:
+        'The key is published and cannot be read as an Ed25519 public key — usually a line ' +
+        'truncated or wrapped on its way into the environment variable. Every badge signed with ' +
+        'it is uncheckable until the line is pasted again. /admin/health names it.',
     });
   }
 
