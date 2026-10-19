@@ -22,7 +22,19 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(`${origin}/sign-in?error=${encodeURIComponent(error.message)}`);
+    /*
+     * A code we choose, and the real message in the log.
+     *
+     * This put `error.message` into the address bar, where it was read by
+     * nobody — `/sign-in` took `next` and ignored everything else — and where,
+     * the day somebody rendered it, it would have been text an attacker could
+     * choose by sending a link. The sentence the customer sees is now ours;
+     * the provider's is ours to debug with.
+     */
+    console.error('the sign-in code could not be exchanged for a session', {
+      error: error.message,
+    });
+    return NextResponse.redirect(`${origin}/sign-in?error=exchange_failed`);
   }
 
   /*
