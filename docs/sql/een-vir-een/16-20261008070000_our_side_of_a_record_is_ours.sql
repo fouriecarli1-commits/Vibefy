@@ -1,4 +1,4 @@
--- BLOK 16 VAN 19 · 20261008070000_our_side_of_a_record_is_ours.sql
+-- BLOK 16 VAN 20 · 20261008070000_our_side_of_a_record_is_ours.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -117,4 +117,4 @@ drop policy organisations_insert_own on public.organisations;
 drop policy organisations_update_admins on public.organisations;
 revoke insert, update on public.organisations from authenticated;
 
--- BLOK 17 VAN 19
+-- BLOK 17 VAN 20

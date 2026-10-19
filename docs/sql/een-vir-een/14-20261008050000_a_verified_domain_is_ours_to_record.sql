@@ -1,4 +1,4 @@
--- BLOK 14 VAN 19 · 20261008050000_a_verified_domain_is_ours_to_record.sql
+-- BLOK 14 VAN 20 · 20261008050000_a_verified_domain_is_ours_to_record.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -83,4 +83,4 @@ comment on function public.an_sso_domain_is_verified_by_us is
   'A workspace may claim a domain and may enforce one we have verified. Whether '
   'the DNS record was there is ours to record.';
 
--- BLOK 15 VAN 19
+-- BLOK 15 VAN 20

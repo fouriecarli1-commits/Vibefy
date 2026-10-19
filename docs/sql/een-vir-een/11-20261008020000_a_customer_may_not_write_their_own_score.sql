@@ -1,4 +1,4 @@
--- BLOK 11 VAN 19 · 20261008020000_a_customer_may_not_write_their_own_score.sql
+-- BLOK 11 VAN 20 · 20261008020000_a_customer_may_not_write_their_own_score.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -97,4 +97,4 @@ comment on table public.assessments is
   'connection; customers read their own and reviewers update status. No role '
   'reachable through PostgREST may write a score.';
 
--- BLOK 12 VAN 19
+-- BLOK 12 VAN 20

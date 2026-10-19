@@ -277,6 +277,7 @@ export async function runAssessmentJob(
       authorisationId: record.id,
       depth: job.depth,
       requestedBy: job.requestedBy,
+      log,
       engineVersion: ENGINE_VERSION,
     });
     return {

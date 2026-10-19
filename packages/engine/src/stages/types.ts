@@ -6,6 +6,7 @@
  * outside it. A stage cannot open its own network connection, spend money the
  * meter did not authorise, or publish a finding without attaching evidence.
  */
+import type { ProvenanceObservation } from './provenance.ts';
 import type { RubricDimensionId, FindingSeverity, ConfidenceLevel } from '@vibefycode/rubric';
 import type { ScopeGuard } from '../runtime/scope.ts';
 import type { CostMeter } from '../runtime/cost.ts';
@@ -125,6 +126,16 @@ interface StageResultFields {
    * one the rubric defines and this particular run did not reach.
    */
   readonly notTested?: readonly { readonly criterion: string; readonly because: string }[];
+  /**
+   * What the repository says about where its code came from.
+   *
+   * Carried out of the stage rather than turned into findings, for the same
+   * reason the exit measurement is: these are not defects against a published
+   * criterion, and the rubric has none about licensing. They are observations
+   * with their own section in the report, and nothing that reads a score can
+   * see them.
+   */
+  readonly provenance?: readonly ProvenanceObservation[];
   readonly error?: string;
   readonly promptSha256?: string;
 }

@@ -1,4 +1,4 @@
--- BLOK 8 VAN 19 · 20261006210000_a_refusal_is_written_down.sql
+-- BLOK 8 VAN 20 · 20261006210000_a_refusal_is_written_down.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -86,4 +86,4 @@ comment on function public.record_a_refusal_at_intake is
   'creating the row already refused. The other two are updates and write their '
   'own entries, so this fires on insert only and overlaps neither.';
 
--- BLOK 9 VAN 19
+-- BLOK 9 VAN 20

@@ -70,7 +70,14 @@ export const LICENCE_FILENAMES: readonly string[] = [
 ];
 
 const FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2', '.eot'];
-const VENDOR_DIRECTORIES = ['vendor', 'vendored', 'third_party', 'third-party', '3rdparty'];
+/** Directories whose contents are somebody else's work, kept in the repository. */
+export const VENDOR_DIRECTORY_NAMES: readonly string[] = [
+  'vendor',
+  'vendored',
+  'third_party',
+  'third-party',
+  '3rdparty',
+];
 
 /** What a reader is shown, in the order a reader should meet it. */
 export type ProvenanceId =
@@ -286,7 +293,9 @@ export function observeProvenance(view: RepositoryView): ProvenanceObservation[]
   for (const path of files) {
     if (path.startsWith('node_modules/')) continue;
     if (
-      VENDOR_DIRECTORIES.some((name) => path.startsWith(`${name}/`) || path.includes(`/${name}/`))
+      VENDOR_DIRECTORY_NAMES.some(
+        (name) => path.startsWith(`${name}/`) || path.includes(`/${name}/`),
+      )
     ) {
       if (isSource(path)) vendored.push(path);
     }

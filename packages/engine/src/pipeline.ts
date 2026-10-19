@@ -37,6 +37,7 @@ import {
 } from './stages/model-stages.ts';
 import { synthesise, type ReportNarrative } from './stages/synthesis.ts';
 import { unasked, withoutACheck } from './stages/coverage.ts';
+import type { ProvenanceObservation } from './stages/provenance.ts';
 import type { EvidenceArtefact } from './runtime/evidence.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './stages/types.ts';
 
@@ -86,6 +87,8 @@ export interface AssessmentOutcome {
    * define; this covers one this particular run could not test.
    */
   readonly notTestedCriteria: readonly { readonly criterion: string; readonly because: string }[];
+  /** Observations about licensing and where the code came from. Never scored. */
+  readonly provenance: readonly ProvenanceObservation[];
   /**
    * How hard it was to find the way out, or null where nothing measured it.
    *
@@ -506,6 +509,15 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     ]),
     exitMeasurement:
       stageResults.find((result) => result.exitMeasurement !== undefined)?.exitMeasurement ?? null,
+    /*
+     * Where the code came from, which is reported and not scored.
+     *
+     * Flattened from the stages rather than found in one of them, because the
+     * question is about the repository and more than one stage may come to
+     * have something to say about it. Nothing on the scoring path can reach
+     * this: `scoreAssessment` takes findings, and these are not findings.
+     */
+    provenance: stageResults.flatMap((result) => result.provenance ?? []),
   };
 }
 

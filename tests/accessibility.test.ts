@@ -96,6 +96,25 @@ const source: ReportSource = {
     notAssessed: ['Anything behind the paywall, which the authorised scope did not cover.'],
   },
   notTested: [],
+  /*
+   * Included so the scan covers the section too. It renders only when there is
+   * something to say, so a fixture that leaves it out scans a page the markup
+   * never appears on — and this is the newest markup in the document.
+   */
+  provenance: [
+    {
+      id: 'no_licence',
+      title: 'No licence file was found in the repository',
+      detail: 'Nothing named LICENSE, LICENCE or COPYING is present at the root of the checkout.',
+      paths: [],
+    },
+    {
+      id: 'vendored_code',
+      title: 'Code from somewhere else is kept inside the repository',
+      detail: 'vendor/slider.js is checked in rather than installed as a dependency.',
+      paths: ['vendor/slider.js'],
+    },
+  ],
   stages: [{ stage: 'deterministic', status: 'completed', notes: ['12 checks run'] }],
   scopeStatement:
     'This assessment covered the web application at kettle.example on 2026-08-22, within the scope its owner authorised. It is point-in-time and scope-limited.',

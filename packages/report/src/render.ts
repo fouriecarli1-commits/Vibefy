@@ -359,6 +359,55 @@ export function renderReport(source: ReportSource, tier: ReportTier): RenderedRe
       }),
   ];
 
+  /*
+   * Where the code came from.
+   *
+   * Report-only and unscored: the engine's provenance stage writes
+   * observations, the rubric does not have a criterion for them yet, and
+   * nothing here touches the number. That is deliberate — a score that moved
+   * for a reason the published rubric does not name would be a score nobody
+   * could reproduce from the rubric.
+   *
+   * Shown on both tiers, and shown whatever it says, for the same reason "what
+   * was not assessed" is: these are facts about the run, and a fact withheld
+   * from the free copy of a document that a stranger can read beside the paid
+   * one is the kind of difference that costs us our word.
+   *
+   * Absent means absent. There is no "nothing was found" fallback sentence,
+   * because this section cannot tell "the stage looked and found nothing" from
+   * "the database has no column to store what it found". Either way the honest
+   * output is no section at all.
+   *
+   * The wording names what was seen and not what it means in law. "This file
+   * carries somebody else's copyright line" is something we observed. "You are
+   * in breach" is a legal conclusion about a licence we have not read on terms
+   * we do not know, and it is not ours to state.
+   */
+  const provenance = source.provenance ?? [];
+  const provenanceHtml =
+    provenance.length === 0
+      ? ''
+      : `<section>
+  <h2>Where this code came from</h2>
+  <p class="muted">Observations about licence files, copyright lines and copied-in code. They are not scored, and they are not a legal opinion on whether any licence is being met — that depends on terms and intentions this assessment cannot see.</p>
+  <ul class="plain">
+    ${provenance
+      .map(
+        (observation) => `<li>
+        <strong>${escapeHtml(observation.title)}</strong>
+        <p class="muted">${escapeHtml(observation.detail)}</p>
+        ${
+          observation.paths.length > 0
+            ? `<p class="muted">Seen at: ${observation.paths.map((path) => `<code>${escapeHtml(path)}</code>`).join(', ')}</p>`
+            : ''
+        }
+      </li>`,
+      )
+      .join('')}
+  </ul>
+  <p class="muted">Where a licence asks something of you, the licence text is the authority on what it asks. Read it, or ask somebody who can.</p>
+</section>`;
+
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -465,6 +514,8 @@ ${
 </section>`
     : ''
 }
+
+${provenanceHtml}
 
 <section>
   <h2>What was not assessed</h2>

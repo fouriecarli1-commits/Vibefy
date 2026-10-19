@@ -58,6 +58,14 @@ export interface ReportStage {
   readonly notes: readonly string[];
 }
 
+/** One observation about licensing or provenance, as the engine wrote it. */
+export interface ReportProvenance {
+  readonly id: string;
+  readonly title: string;
+  readonly detail: string;
+  readonly paths: readonly string[];
+}
+
 export interface ReportSource {
   readonly assessmentId: string;
   readonly appName: string;
@@ -91,6 +99,22 @@ export interface ReportSource {
    * could open listed four things nobody had looked at.
    */
   readonly notTested: readonly { readonly criterion: string; readonly because: string }[];
+  /**
+   * Where the code came from, and what its licence asks.
+   *
+   * Written by `packages/engine/src/stages/provenance.ts` and stored on the
+   * assessment; this is the same shape read back out of jsonb, which is why it
+   * is declared again rather than imported — a report package that depended on
+   * the engine would drag a browser automation library into a renderer.
+   * `tests/where-the-code-came-from.test.ts` holds the two shapes together.
+   *
+   * Optional because the column arrives in a migration the founder runs by
+   * hand: a database without it yields nothing here, and the section is not
+   * rendered. No section is no claim, which is the honest reading of both
+   * "nothing was found" and "this database cannot store them yet". What must
+   * never happen is a sentence saying the licensing was fine.
+   */
+  readonly provenance?: readonly ReportProvenance[];
   readonly stages: readonly ReportStage[];
   readonly scopeStatement: string;
   readonly promptBundleSha256: string;

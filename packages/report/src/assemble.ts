@@ -12,7 +12,7 @@
 import { getRubric } from '@vibefycode/rubric';
 import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefycode/policy';
 import { compareToPeers } from './comparison.ts';
-import type { ReportSource } from './types.ts';
+import type { ReportProvenance, ReportSource } from './types.ts';
 
 /** The smallest database surface this needs. `pg.PoolClient` satisfies it. */
 export interface SqlExecutor {
@@ -40,6 +40,16 @@ interface AssessmentRow {
   // Already returned by the `a.*` in the query below; it was simply never
   // declared here, so nothing downstream could see it and nothing complained.
   not_tested: { criterion: string; because: string }[] | null;
+  /*
+   * Absent on a database that has not run `20261019120000`, which is why it is
+   * optional here and not in `CLAIM_COLUMNS`. A renamed `not_tested` has to
+   * stop every report, because its absence would make each one claim nothing
+   * went unanswered. This column claims nothing by being absent: no
+   * observations means no section, and no section means no sentence about
+   * licensing either way. Refusing on it would instead take every report in
+   * the product offline until a migration the founder runs by hand had run.
+   */
+  provenance?: ReportProvenance[] | null;
   completed_at: string | null;
   created_at: string;
   reviewed_at: string | null;
@@ -368,6 +378,17 @@ export async function assembleReportSource(
      * assurance report misleads somebody.
      */
     notTested: row.not_tested ?? [],
+    /*
+     * What the run saw about licences, when the column exists to hold it.
+     *
+     * `?? []` would be wrong here in a way it is not wrong above: an empty
+     * array and a missing column are the same value to the renderer, and the
+     * renderer prints nothing for either, so the distinction costs nothing
+     * today. It is kept anyway, because the first thing anybody will want to
+     * add is a line reading "no licensing problems were found" — and that line
+     * must be impossible to print on a database that was never able to look.
+     */
+    ...(row.provenance === undefined ? {} : { provenance: row.provenance ?? [] }),
     stages: runs.rows.map((run) => ({
       stage: run.stage,
       status: run.status,

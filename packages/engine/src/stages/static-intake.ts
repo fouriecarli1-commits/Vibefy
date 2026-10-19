@@ -26,9 +26,15 @@
  * like a statement about the whole repository.
  */
 import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
-import { basename, extname, join, relative } from 'node:path';
+import { basename, extname, join, relative, sep } from 'node:path';
 import advisoryData from '../data/advisories.json' with { type: 'json' };
-import { LICENCE_FILENAMES, isCopyleft } from './provenance.ts';
+import {
+  LICENCE_FILENAMES,
+  VENDOR_DIRECTORY_NAMES,
+  isCopyleft,
+  observeProvenance,
+  type RepositoryView,
+} from './provenance.ts';
 import type { RawFinding, Stage, StageContext, StageResult } from './types.ts';
 
 interface Advisory {
@@ -513,6 +519,15 @@ export const staticIntakeStage: Stage = {
     findings.push(...checkLicence(root, context, notes));
     findings.push(...checkIgnoreHygiene(root, files, context, credentials.filesWithHits));
 
+    /*
+     * And where the code came from, which is not a finding about a criterion.
+     *
+     * The rubric has no question about licensing — forty-nine criteria and not
+     * one — so these are carried out of the stage as observations and rendered
+     * in their own section. Nothing that computes a score can see them.
+     */
+    const provenance = observeProvenance(repositoryView(root, walked));
+
     context.meter.recordCompute('static_intake', (Date.now() - startedAt) / 1000);
 
     // Every file we collected turned out to be unopenable: the checks below ran
@@ -527,6 +542,9 @@ export const staticIntakeStage: Stage = {
           ...notes,
           'Every file found under the repository path failed to open, so the secret scan read nothing.',
         ],
+        // The names were still read, and a bundled font or a vendored
+        // directory is a name rather than a body.
+        ...(provenance.length === 0 ? {} : { provenance }),
       };
     }
 
@@ -536,12 +554,22 @@ export const staticIntakeStage: Stage = {
       findings,
       notes,
       ...(notTested.length === 0 ? {} : { notTested }),
+      ...(provenance.length === 0 ? {} : { provenance }),
     };
   },
 };
 
 interface Walk {
   readonly files: string[];
+  /**
+   * Every file the walk saw, including the ones it will not read.
+   *
+   * `files` is what the secret scan opens, which is text under a megabyte. A
+   * font, an image or a compiled asset is dropped from that list and counted
+   * by extension — and a bundled font is exactly the sort of thing the licence
+   * questions are about, so the names are kept even where the bytes are not.
+   */
+  readonly everyPath: string[];
   /** Counted, never followed. A link can point out of the repository, or at itself. */
   readonly symlinks: number;
   readonly tooLarge: number;
@@ -553,6 +581,7 @@ interface Walk {
 
 function walk(root: string): Walk {
   const files: string[] = [];
+  const everyPath: string[] = [];
   let symlinks = 0;
   let tooLarge = 0;
   let unreadableDirectories = 0;
@@ -590,6 +619,7 @@ function walk(root: string): Walk {
         continue;
       }
       if (!stats.isFile()) continue;
+      if (everyPath.length < MAX_FILES) everyPath.push(full);
       if (!scannable(entry)) {
         // Dropped on its type. Counted here so the notes can say so; an image
         // or a font is set aside, because naming every asset is noise.
@@ -609,7 +639,92 @@ function walk(root: string): Walk {
   };
 
   visit(root);
-  return { files, symlinks, tooLarge, unreadableDirectories, truncated, skippedTypes };
+  return { files, everyPath, symlinks, tooLarge, unreadableDirectories, truncated, skippedTypes };
+}
+
+/**
+ * Names under one directory, reading nothing.
+ *
+ * The walk above deliberately never enters `node_modules`, `vendor` and the
+ * other build directories: it is there to read source, and those are neither
+ * source nor small. The licence questions need to know they exist — a vendored
+ * copy of somebody's library, an installed tree with a licence in every
+ * package — so this lists names in them and opens nothing.
+ *
+ * Same discipline as the walk, for the same reason: `lstat`, never `stat`, so
+ * a link pointing out of the repository is counted and not followed.
+ */
+function listNames(root: string, cap: number, keep?: (name: string) => boolean): string[] {
+  const found: string[] = [];
+  const visit = (dir: string, depth: number): void => {
+    if (found.length >= cap || depth > 6) return;
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (found.length >= cap) return;
+      if (entry === '.git') continue;
+      const full = join(dir, entry);
+      let stats;
+      try {
+        stats = lstatSync(full);
+      } catch {
+        continue;
+      }
+      if (stats.isSymbolicLink()) continue;
+      if (stats.isDirectory()) {
+        visit(full, depth + 1);
+        continue;
+      }
+      if (!stats.isFile()) continue;
+      if (keep && !keep(entry)) continue;
+      found.push(full);
+    }
+  };
+  visit(root, 0);
+  return found;
+}
+
+/** How much of a skipped directory is worth listing by name. */
+const MAX_VENDORED_NAMES = 2_000;
+const MAX_INSTALLED_MANIFESTS = 1_000;
+
+/**
+ * The clone as `observeProvenance` reads it: names, and text on request.
+ *
+ * Three listings, because the walk's own exclusions are right for reading
+ * source and wrong for asking where the code came from. Nothing is read until
+ * the observation asks for it, and anything unreadable answers null rather
+ * than throwing — one unopenable file has taken this stage down before.
+ */
+function repositoryView(root: string, walked: Walk): RepositoryView {
+  const names = new Set(walked.everyPath);
+  for (const name of VENDOR_DIRECTORY_NAMES) {
+    for (const path of listNames(join(root, name), MAX_VENDORED_NAMES)) names.add(path);
+  }
+  for (const path of listNames(
+    join(root, 'node_modules'),
+    MAX_INSTALLED_MANIFESTS,
+    (entry) => entry === 'package.json',
+  )) {
+    names.add(path);
+  }
+
+  return {
+    files: [...names].map((path) => relative(root, path).split(sep).join('/')),
+    read: (path) => {
+      const full = join(root, path);
+      try {
+        if (lstatSync(full).size > MAX_FILE_BYTES) return null;
+        return readFileSync(full, 'utf8');
+      } catch {
+        return null;
+      }
+    },
+  };
 }
 
 function scannable(name: string): boolean {

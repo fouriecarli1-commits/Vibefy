@@ -11,6 +11,7 @@ export * from './model/client.ts';
 export * from './model/scripted.ts';
 export * from './stages/types.ts';
 export * from './stages/deterministic.ts';
+export * from './stages/provenance.ts';
 export * from './stages/static-intake.ts';
 export * from './stages/tools.ts';
 export * from './stages/model-stage.ts';

@@ -1,4 +1,4 @@
--- BLOK 15 VAN 19 · 20261008060000_only_an_owner_grants_ownership.sql
+-- BLOK 15 VAN 20 · 20261008060000_only_an_owner_grants_ownership.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -112,4 +112,4 @@ comment on policy memberships_only_an_owner_grants_ownership on public.membershi
 comment on policy memberships_only_an_owner_keeps_granting_ownership on public.memberships is
   'Only an owner may promote anybody to owner. The update half of the same rule.';
 
--- BLOK 16 VAN 19
+-- BLOK 16 VAN 20

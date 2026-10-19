@@ -1,4 +1,4 @@
--- BLOK 6 VAN 19 · 20260924110000_what_a_provider_told_us_stays_told.sql
+-- BLOK 6 VAN 20 · 20260924110000_what_a_provider_told_us_stays_told.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -78,4 +78,4 @@ begin
 end;
 $$;
 
--- BLOK 7 VAN 19
+-- BLOK 7 VAN 20

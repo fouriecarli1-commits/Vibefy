@@ -1,4 +1,4 @@
--- BLOK 9 VAN 19 · 20261008000000_a_statutory_record_is_not_cascaded_away.sql
+-- BLOK 9 VAN 20 · 20261008000000_a_statutory_record_is_not_cascaded_away.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -49,4 +49,4 @@ alter table public.cost_records
 
 
 
--- BLOK 10 VAN 19
+-- BLOK 10 VAN 20

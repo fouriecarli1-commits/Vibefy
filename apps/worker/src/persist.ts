@@ -38,6 +38,14 @@ export interface PersistInput {
   readonly storage: Pick<ArtefactStorage, 'put' | 'remove'>;
   readonly appId: string;
   readonly organisationId: string;
+  /**
+   * Where a line goes that is not an error.
+   *
+   * Optional, because every caller already has one and a test that is about a
+   * row does not need to hear about it. The one thing said through it is a
+   * column this database does not have yet.
+   */
+  readonly log?: (message: string, detail?: Record<string, unknown>) => void;
   readonly authorisationId: string;
   readonly depth: 'limited' | 'full' | 'continuous';
   readonly requestedBy: string | null;
@@ -144,6 +152,37 @@ export async function recordUnattributedCost(
   return written;
 }
 
+/**
+ * Whether this database carries `assessments.provenance` yet.
+ *
+ * Asked of the schema rather than assumed, and cached for the life of the
+ * process. The column arrives in a migration that the founder runs by hand
+ * from `docs/sql/OUTSTANDING.sql`, so there is a window — possibly a long one
+ * — where the code knows about a column the database does not have. Writing to
+ * it blindly would abort the transaction, and with it the whole assessment:
+ * every finding, every piece of evidence, over a section of a report.
+ *
+ * The other direction is the one to be careful about. Silently dropping the
+ * observations would be this codebase's favourite defect, so the caller says
+ * so once, and `resetProvenanceColumn` exists for the tests that need to ask
+ * again.
+ */
+let provenanceColumn: boolean | null = null;
+
+export function resetProvenanceColumn(): void {
+  provenanceColumn = null;
+}
+
+async function databaseCarriesProvenance(client: Pick<PoolClient, 'query'>): Promise<boolean> {
+  if (provenanceColumn !== null) return provenanceColumn;
+  const { rows } = await client.query(
+    `select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'assessments' and column_name = 'provenance'`,
+  );
+  provenanceColumn = rows.length > 0;
+  return provenanceColumn;
+}
+
 export async function persistOutcome(client: PoolClient, input: PersistInput): Promise<string> {
   const { outcome } = input;
 
@@ -175,13 +214,25 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
     );
     if (!stillAuthorised.rows[0]?.ok) throw new AuthorisationWithdrawnError(input.appId);
 
+    const carriesProvenance = await databaseCarriesProvenance(client);
+    if (!carriesProvenance && outcome.provenance.length > 0) {
+      // Said rather than dropped. The run is worth keeping; the section it
+      // cannot store is worth a line somebody will read.
+      input.log?.('this database has no provenance column, so those observations were not stored', {
+        assessmentId: outcome.assessmentId,
+        observations: outcome.provenance.length,
+        means:
+          'Run the pending migration in docs/sql/OUTSTANDING.sql. Everything else about this assessment was stored.',
+      });
+    }
+
     const assessment = await client.query<{ id: string }>(
       `insert into public.assessments (
          id, app_id, organisation_id, authorisation_id, rubric_version, depth, status,
          overall_score, dimension_scores, certification_eligible, gate_failures,
          scope_statement, prompt_bundle_sha256, engine_version, requested_by,
-         report_narrative, exit_measurement, not_tested, started_at, completed_at
-       ) values ($1, $2, $3, $4, $5, $6, 'running', $7, $8, false, $9, $10, $11, $12, $13, $14, $15, $16, now(), now())
+         report_narrative, exit_measurement, not_tested${carriesProvenance ? ', provenance' : ''}, started_at, completed_at
+       ) values ($1, $2, $3, $4, $5, $6, 'running', $7, $8, false, $9, $10, $11, $12, $13, $14, $15, $16${carriesProvenance ? ', $17' : ''}, now(), now())
        returning id`,
       [
         outcome.assessmentId,
@@ -200,6 +251,7 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
         outcome.narrative ? JSON.stringify(outcome.narrative) : null,
         outcome.exitMeasurement ? JSON.stringify(outcome.exitMeasurement) : null,
         JSON.stringify(outcome.notTestedCriteria),
+        ...(carriesProvenance ? [JSON.stringify(outcome.provenance)] : []),
       ],
     );
     const assessmentId = assessment.rows[0]!.id;

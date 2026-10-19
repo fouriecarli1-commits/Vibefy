@@ -1,4 +1,4 @@
--- BLOK 19 VAN 19 · 20261010073000_listed_badges_discloses_paid_relationships.sql
+-- BLOK 19 VAN 20 · 20261010073000_listed_badges_discloses_paid_relationships.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -56,3 +56,5 @@ comment on view public.listed_badges is
   'rating appears.';
 
 grant select on public.listed_badges to anon, authenticated;
+
+-- BLOK 20 VAN 20

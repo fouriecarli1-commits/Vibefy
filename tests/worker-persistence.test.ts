@@ -7,7 +7,7 @@
  * report.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { Client, Pool } from 'pg';
+import { Client, Pool, type PoolClient } from 'pg';
 import {
   CostMeter,
   DEFAULT_CEILING,
@@ -17,6 +17,7 @@ import {
   ScriptedTransport,
   runPipeline,
   type AssessmentOutcome,
+  type ProvenanceObservation,
   type StageContext,
   type TransportRequest,
   fetchRepository,
@@ -26,6 +27,7 @@ import {
   DanglingEvidenceError,
   NotAuthorisedError,
   persistOutcome,
+  resetProvenanceColumn,
   runAssessmentJob,
 } from '../apps/worker/src/index.ts';
 import { bodiesFor, memoryStorage, type MemoryStorage } from './setup/artefacts.ts';
@@ -709,5 +711,119 @@ describe('a rollback whose cleanup also failed', () => {
     const { appId } = await withdrawnRun(memoryStorage());
     expect(appId).toBeTruthy();
     expect((await orphanRows(appId)).length).toBe(before);
+  }, 120_000);
+});
+
+/**
+ * Where the code came from, on a database that may not have the column yet.
+ *
+ * `provenance` arrives in a migration the founder runs by hand, so for a while
+ * the code knows about a column the database does not have. Writing to it
+ * blindly aborts the transaction and takes the whole assessment with it — every
+ * finding, every piece of evidence — over a section of a report. So the insert
+ * asks first.
+ *
+ * Which leaves the failure this codebase keeps producing: asking, finding the
+ * answer is no, and dropping the observations without a word. The run is worth
+ * keeping and the loss is worth a line, so the caller is told once. These two
+ * cases are the two answers, and `resetProvenanceColumn` is here because the
+ * answer is cached for the life of the process and a test that does not clear
+ * it measures the previous test.
+ */
+describe('the column the migration has not added yet', () => {
+  const OBSERVED: ProvenanceObservation[] = [
+    {
+      id: 'copyleft_in_source',
+      title: 'A copied-in file carries a copyleft licence header',
+      detail: 'vendor/slider.js carries a GPL-3.0 header and is bundled into the application.',
+      paths: ['vendor/slider.js'],
+    },
+  ];
+
+  /** The same client, answering "no such column" the way an un-migrated database would. */
+  function withoutTheColumn(client: PoolClient): PoolClient {
+    return new Proxy(client, {
+      get(target, property, receiver) {
+        if (property !== 'query') return Reflect.get(target, property, receiver);
+        return async (text: string, values?: unknown[]) =>
+          /information_schema\.columns/.test(text) ? { rows: [] } : target.query(text, values);
+      },
+    }) as PoolClient;
+  }
+
+  async function persist(
+    wrap: (client: PoolClient) => PoolClient,
+    observed: ProvenanceObservation[] = OBSERVED,
+  ): Promise<{ assessmentId: string; lines: string[] }> {
+    resetProvenanceColumn();
+    const appId = await seedApp(db, owner, `Provenance App ${crypto.randomUUID().slice(0, 8)}`);
+    await seedAuthorisation(db, owner, appId);
+    const lines: string[] = [];
+    const client = await pool.connect();
+    try {
+      const assessmentId = await persistOutcome(wrap(client), {
+        outcome: { ...outcome, assessmentId: crypto.randomUUID(), provenance: observed },
+        evidenceBodies: bodiesFor(outcome),
+        storage: memoryStorage(),
+        appId,
+        organisationId: owner.organisationId,
+        authorisationId: (
+          await db.query<{ id: string }>('select id from public.current_authorisation($1)', [appId])
+        ).rows[0]!.id,
+        depth: 'full',
+        requestedBy: owner.userId,
+        engineVersion: '1.0.0',
+        log: (message) => lines.push(message),
+      });
+      return { assessmentId, lines };
+    } finally {
+      client.release();
+      resetProvenanceColumn();
+    }
+  }
+
+  it('stores the observations when there is a column to store them in', async () => {
+    const { assessmentId, lines } = await persist((client) => client);
+    const stored = await db.query<{ provenance: unknown }>(
+      'select provenance from public.assessments where id = $1',
+      [assessmentId],
+    );
+    expect(stored.rows[0]!.provenance, 'the observations the run made were not written').toEqual(
+      OBSERVED,
+    );
+    expect(lines, 'a database that can store them was told it could not').toEqual([]);
+  }, 120_000);
+
+  it('says so, and writes the assessment anyway, when there is not', async () => {
+    const { assessmentId, lines } = await persist(withoutTheColumn);
+    // The assessment survives. That is the whole reason the insert asks first.
+    const row = await db.query<{ n: number }>(
+      'select count(*)::int as n from public.assessments where id = $1',
+      [assessmentId],
+    );
+    expect(row.rows[0]!.n, 'the assessment was lost over a column it could not write').toBe(1);
+    // And the loss is said out loud rather than swallowed.
+    expect(lines.join('\n'), 'the observations were dropped without a word').toMatch(
+      /no provenance column/i,
+    );
+    expect(lines.length, 'the same line was said more than once').toBe(1);
+    /*
+     * And the row carries the column's default rather than the observations,
+     * which is what makes the line above true. An insert that wrote them
+     * anyway would pass every assertion before this one.
+     */
+    const stored = await db.query<{ provenance: unknown }>(
+      'select provenance from public.assessments where id = $1',
+      [assessmentId],
+    );
+    expect(stored.rows[0]!.provenance).toEqual([]);
+  }, 120_000);
+
+  it('says nothing when there was nothing to drop', async () => {
+    // The other half of the line. A run that observed nothing loses nothing,
+    // and telling the founder to run a migration over an empty array is how a
+    // useful line becomes one nobody reads.
+    const { lines } = await persist(withoutTheColumn, []);
+    expect(lines, 'a run with no observations reported a loss').toEqual([]);
   }, 120_000);
 });

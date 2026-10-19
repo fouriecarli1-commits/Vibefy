@@ -1,4 +1,4 @@
--- BLOK 3 VAN 19 · 20260923130000_create_workspace.sql
+-- BLOK 3 VAN 20 · 20260923130000_create_workspace.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -136,4 +136,4 @@ comment on function public.create_workspace is
 revoke all on function public.create_workspace(text, text, public.account_type) from public, anon;
 grant execute on function public.create_workspace(text, text, public.account_type) to authenticated;
 
--- BLOK 4 VAN 19
+-- BLOK 4 VAN 20

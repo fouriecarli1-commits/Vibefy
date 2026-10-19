@@ -1,4 +1,4 @@
--- BLOK 1 VAN 19 · 20260923110000_second_step_at_the_action.sql
+-- BLOK 1 VAN 20 · 20260923110000_second_step_at_the_action.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -153,4 +153,4 @@ create policy memberships_need_second_step_update on public.memberships
   for update to authenticated
   with check (public.session_passed_second_step());
 
--- BLOK 2 VAN 19
+-- BLOK 2 VAN 20

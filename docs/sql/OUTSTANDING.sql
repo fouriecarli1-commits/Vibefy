@@ -11,10 +11,10 @@
 -- in een keer in, en die volgorde is reeds reg. Moenie dit in stukke breek nie:
 -- 'n blok wat na 'n vroeëre een se tabel verwys, misluk as jy spring.
 --
--- Negentien migrasies, in hierdie volgorde. Gegenereer 2026-09-24, aangevul
--- 2026-10-11.
+-- Twintig migrasies, in hierdie volgorde. Gegenereer 2026-09-24, aangevul
+-- 2026-10-11 en 2026-10-19.
 --
--- Getoets soos jy dit gaan hardloop: al negentien blokke in een plak, teen 'n
+-- Getoets soos jy dit gaan hardloop: al twintig blokke in een plak, teen 'n
 -- databasis wat hulle nog nie het nie. Dit loop deur sonder 'n fout, en die
 -- skema wat oorbly is presies dié waarteen die toetse loop.
 --
@@ -23,14 +23,14 @@
 --
 -- As dit wél ergens stop: die reël "BLOK n VAN 19" bo elke blok sê waar jy is.
 -- Sê vir my die nommer, dan weet ek presies waarna om te kyk. In
--- docs/sql/een-vir-een/ staan dieselfde negentien blokke as negentien aparte
+-- docs/sql/een-vir-een/ staan dieselfde twintig blokke as twintig aparte
 -- lêers, genommer 01 tot 19, as jy van daar af een-vir-een wil aangaan.
 --
 -- Onseker wat jou databasis al het? node tools/migration-audit.mjs > audit.sql,
 -- en plak daardie navraag in die SQL-venster. Dit lees net; dit skryf en sluit
 -- niks.
 
--- BLOK 1 VAN 19
+-- BLOK 1 VAN 20
 -- =============================================================================
 -- 20260923110000_second_step_at_the_action.sql
 -- =============================================================================
@@ -182,7 +182,7 @@ create policy memberships_need_second_step_update on public.memberships
   for update to authenticated
   with check (public.session_passed_second_step());
 
--- BLOK 2 VAN 19
+-- BLOK 2 VAN 20
 -- =============================================================================
 -- 20260923120000_accept_invitation.sql
 -- =============================================================================
@@ -349,7 +349,7 @@ comment on function public.accept_invitation is
 revoke all on function public.accept_invitation(text) from public, anon;
 grant execute on function public.accept_invitation(text) to authenticated;
 
--- BLOK 3 VAN 19
+-- BLOK 3 VAN 20
 -- =============================================================================
 -- 20260923130000_create_workspace.sql
 -- =============================================================================
@@ -484,7 +484,7 @@ comment on function public.create_workspace is
 revoke all on function public.create_workspace(text, text, public.account_type) from public, anon;
 grant execute on function public.create_workspace(text, text, public.account_type) to authenticated;
 
--- BLOK 4 VAN 19
+-- BLOK 4 VAN 20
 -- =============================================================================
 -- 20260923140000_name_the_role.sql
 -- =============================================================================
@@ -521,7 +521,7 @@ grant execute on function public.create_workspace(text, text, public.account_typ
 alter policy remediation_engagements_own on public.remediation_engagements to authenticated;
 alter policy remediation_workers_admin on public.remediation_workers to authenticated;
 
--- BLOK 5 VAN 19
+-- BLOK 5 VAN 20
 -- =============================================================================
 -- 20260924100000_a_review_authorises_its_own_transition.sql
 -- =============================================================================
@@ -622,7 +622,7 @@ begin
 end;
 $$;
 
--- BLOK 6 VAN 19
+-- BLOK 6 VAN 20
 -- =============================================================================
 -- 20260924110000_what_a_provider_told_us_stays_told.sql
 -- =============================================================================
@@ -699,7 +699,7 @@ begin
 end;
 $$;
 
--- BLOK 7 VAN 19
+-- BLOK 7 VAN 20
 -- =============================================================================
 -- 20261006200000_one_score_wherever_it_is_read.sql
 -- =============================================================================
@@ -854,7 +854,7 @@ comment on function public.assert_score_is_not_pulled_from_under_a_badge() is
   'reissuing silently would hide the correction, so this refuses instead and '
   'names the three steps that are the published process anyway.';
 
--- BLOK 8 VAN 19
+-- BLOK 8 VAN 20
 -- =============================================================================
 -- 20261006210000_a_refusal_is_written_down.sql
 -- =============================================================================
@@ -939,7 +939,7 @@ comment on function public.record_a_refusal_at_intake is
   'creating the row already refused. The other two are updates and write their '
   'own entries, so this fires on insert only and overlaps neither.';
 
--- BLOK 9 VAN 19
+-- BLOK 9 VAN 20
 -- =============================================================================
 -- 20261008000000_a_statutory_record_is_not_cascaded_away.sql
 -- =============================================================================
@@ -987,7 +987,7 @@ alter table public.cost_records
 
 
 
--- BLOK 10 VAN 19
+-- BLOK 10 VAN 20
 -- =============================================================================
 -- 20261008010000_a_grant_nobody_wrote.sql
 -- =============================================================================
@@ -1101,7 +1101,7 @@ revoke all on function public.seats_used(uuid) from public, anon, authenticated;
 revoke all on function public.seats_for_organisation(uuid) from public, anon, authenticated;
 revoke all on function public.platform_role_of(uuid) from public, anon, authenticated;
 
--- BLOK 11 VAN 19
+-- BLOK 11 VAN 20
 -- =============================================================================
 -- 20261008020000_a_customer_may_not_write_their_own_score.sql
 -- =============================================================================
@@ -1197,7 +1197,7 @@ comment on table public.assessments is
   'connection; customers read their own and reviewers update status. No role '
   'reachable through PostgREST may write a score.';
 
--- BLOK 12 VAN 19
+-- BLOK 12 VAN 20
 -- =============================================================================
 -- 20261008030000_the_acceptable_use_verdict_is_ours.sql
 -- =============================================================================
@@ -1376,7 +1376,7 @@ comment on function public.record_intake_screening is
   'What the intake screen read, written by our server and never by the account '
   'it is about. Clears, refuses or leaves pending, and only from pending.';
 
--- BLOK 13 VAN 19
+-- BLOK 13 VAN 20
 -- =============================================================================
 -- 20261008040000_a_verified_authorisation_is_ours_to_record.sql
 -- =============================================================================
@@ -1549,7 +1549,7 @@ alter table public.authorisations
 comment on constraint authorisations_scope_within_verified_target on public.authorisations is
   'A verified authorisation covers the host it proved, its subdomains, and its apex. Nothing else.';
 
--- BLOK 14 VAN 19
+-- BLOK 14 VAN 20
 -- =============================================================================
 -- 20261008050000_a_verified_domain_is_ours_to_record.sql
 -- =============================================================================
@@ -1631,7 +1631,7 @@ comment on function public.an_sso_domain_is_verified_by_us is
   'A workspace may claim a domain and may enforce one we have verified. Whether '
   'the DNS record was there is ours to record.';
 
--- BLOK 15 VAN 19
+-- BLOK 15 VAN 20
 -- =============================================================================
 -- 20261008060000_only_an_owner_grants_ownership.sql
 -- =============================================================================
@@ -1742,7 +1742,7 @@ comment on policy memberships_only_an_owner_grants_ownership on public.membershi
 comment on policy memberships_only_an_owner_keeps_granting_ownership on public.memberships is
   'Only an owner may promote anybody to owner. The update half of the same rule.';
 
--- BLOK 16 VAN 19
+-- BLOK 16 VAN 20
 -- =============================================================================
 -- 20261008070000_our_side_of_a_record_is_ours.sql
 -- =============================================================================
@@ -1858,7 +1858,7 @@ drop policy organisations_insert_own on public.organisations;
 drop policy organisations_update_admins on public.organisations;
 revoke insert, update on public.organisations from authenticated;
 
--- BLOK 17 VAN 19
+-- BLOK 17 VAN 20
 -- =============================================================================
 -- 20261008080000_the_plan_is_not_the_customers_to_declare.sql
 -- =============================================================================
@@ -1927,7 +1927,7 @@ drop policy assessment_requests_insert_members on public.assessment_requests;
 revoke insert on public.assessment_requests from authenticated;
 
 
--- BLOK 18 VAN 19
+-- BLOK 18 VAN 20
 -- =============================================================================
 -- 20261009210000_badge_expired_alert.sql
 -- =============================================================================
@@ -1979,7 +1979,7 @@ begin
 end
 $$;
 
--- BLOK 19 VAN 19
+-- BLOK 19 VAN 20
 -- =============================================================================
 -- 20261010073000_listed_badges_discloses_paid_relationships.sql
 -- =============================================================================
@@ -2034,3 +2034,50 @@ comment on view public.listed_badges is
   'rating appears.';
 
 grant select on public.listed_badges to anon, authenticated;
+
+-- BLOK 20 VAN 20
+-- =============================================================================
+-- 20261019120000_where_the_code_came_from.sql
+-- =============================================================================
+
+-- Where the code came from, stored beside the assessment that looked.
+--
+-- GitHub made open-source licence compliance generally available on
+-- 2026-10-16, for Enterprise Cloud repositories with Code Security on,
+-- enforced by a ruleset that blocks a pull request. Anré asked for the same
+-- question to be part of this product two days later, and the people it is for
+-- are the ones furthest from an enterprise security budget: an assistant was
+-- asked to build something, and what came back carries a starter template, a
+-- snippet with somebody's copyright header on it, and a font that was dropped
+-- into `public/` because it looked right.
+--
+-- `packages/engine/src/stages/provenance.ts` reads a clone and reports what is
+-- there. This column is where those observations are kept.
+--
+-- ## Why this is not a finding
+--
+-- A finding needs a criterion the published rubric defines, and rubric 1.1.0
+-- has forty-nine of them and not one about licensing. Attaching these to a
+-- criterion would mean a new published version of the standard, and whether a
+-- licence answer should cost a score is a decision about what we sell rather
+-- than about code — it is in `docs/OPEN_ITEMS.md` and it is the founder's.
+--
+-- So the observations are stored, rendered in their own section of the report,
+-- and are structurally unreachable from anything that computes a score:
+-- `scoreAssessment` takes findings, and these are not findings.
+--
+-- ## Why the default matters
+--
+-- Every assessment written before this column existed has no observations, and
+-- an empty array is the honest value for "nobody looked" here — the engine
+-- that would have looked did not exist when those rows were written. The
+-- report renders the section only where the array has something in it, so an
+-- old assessment reads exactly as it did before.
+
+alter table public.assessments
+  add column if not exists provenance jsonb not null default '[]'::jsonb;
+
+comment on column public.assessments.provenance is
+  'Observations about licensing and where the code came from: what is in the '
+  'repository and what the licence asks, never whether the owner is in breach. '
+  'Reported and never scored — nothing on the scoring path can read this.';
