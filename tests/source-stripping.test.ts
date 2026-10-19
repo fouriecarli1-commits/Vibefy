@@ -6,7 +6,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { withoutComments } from './setup/source.ts';
+import { commentsBlanked, withoutComments } from './setup/source.ts';
 
 describe('what it removes', () => {
   it('takes out a line comment', () => {
@@ -68,6 +68,42 @@ describe('where the line it keeps and the line it cuts differ', () => {
   });
 });
 
+describe('the variant that keeps the lines where they were', () => {
+  /*
+   * Two assertions in this suite report a line number, and `withoutComments`
+   * collapses a block comment to one space, which moves every line after it. A
+   * message pointing at the wrong line is worse than one pointing at none.
+   *
+   * Both of them had their own copy until 2026-10-19, and the one that was
+   * excused here stripped blocks first and matched only a line comment that
+   * begins a line — the two faults the shared function exists to settle.
+   */
+  it('removes the comment and keeps the line count', () => {
+    const source = ['/* a', ' * note', ' */', 'const a = 1; // why'].join('\n');
+    const blanked = commentsBlanked(source);
+    expect(blanked).not.toContain('note');
+    expect(blanked).not.toContain('why');
+    expect(blanked).toContain('const a = 1;');
+    expect(blanked.split('\n')).toHaveLength(source.split('\n').length);
+  });
+
+  it('keeps the column a line of code starts at', () => {
+    // The other half of "where they were": a failure message that quotes the
+    // line has to quote it as it is written.
+    const blanked = commentsBlanked('/* why */ const a = 1;');
+    expect(blanked).toBe('          const a = 1;');
+  });
+
+  it('keeps a line a commented-out mention was meant to hide', () => {
+    const source = ['// removed the call /*', 'dangerous();', '// */'].join('\n');
+    expect(commentsBlanked(source)).toContain('dangerous();');
+  });
+
+  it('keeps the rest of a line that contains a URL', () => {
+    expect(commentsBlanked("const url = 'https://vibefycode.com/x.svg';")).toContain('x.svg');
+  });
+});
+
 describe('who strips comments', () => {
   /*
    * One function, and nothing beside it.
@@ -117,8 +153,6 @@ describe('who strips comments', () => {
   const ALLOWED: Readonly<Record<string, string>> = {
     'tests/source-stripping.test.ts':
       'This file. Its positive control has to contain the pattern to prove the sweep can see one, which is the whole reason the control exists.',
-    'tests/the-score-nobody-may-publish-unmeasured.test.ts':
-      'A different function: it replaces every comment character with a space so that line and column numbers survive, because its failure message points at a line in the file it read. Stripping to nothing would move every line after the first comment.',
   };
 
   it('is nobody but the shared function', () => {

@@ -29,6 +29,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { commentsBlanked } from './setup/source.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const SKIP = new Set([
@@ -57,11 +58,15 @@ function sources(): string[] {
   return found;
 }
 
-/** Comments quote the defect while explaining it. Fifth time tonight. */
-const strip = (text: string) =>
-  text
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
-    .replace(/^([ \t]*)\/\/.*$/gm, (line) => line.replace(/[^\n\t ]/g, ' '));
+/**
+ * Comments quote the defect while explaining it. Fifth time tonight.
+ *
+ * Through the shared function since 2026-10-19. The copy that was here stripped
+ * block comments first, which is the order that can delete the code an
+ * assertion is looking for, and matched only a line comment that begins a line
+ * — so a trailing one survived and was searched as though it were code.
+ */
+const strip = commentsBlanked;
 
 const callers = sources()
   .filter((f) => !f.startsWith('tests/') && !/\.test\.tsx?$/.test(f))

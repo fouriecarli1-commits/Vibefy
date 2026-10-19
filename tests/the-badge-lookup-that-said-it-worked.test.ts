@@ -171,8 +171,12 @@ describe('the verification page', () => {
     const page = withoutComments(readFileSync('apps/web/app/verify/page.tsx', 'utf8'));
     const lookup = page.slice(page.indexOf('async function lookUpBadge'));
     expect(lookup, 'the catch swallows the failure again').toMatch(/catch \(error\)/);
-    expect(lookup).toMatch(/console\.error\(/);
-    expect(lookup, 'a public page logging per request is its own fault').toMatch(/sayItAgain\(/);
+    // Through `couldNot`, which rate limits itself and requires the page to say
+    // what the visitor got instead. A public page logging per request is its
+    // own fault, and four pages each deciding that separately is how three of
+    // them came to decide nothing.
+    expect(lookup).toMatch(/couldNot\(/);
+    expect(lookup).toMatch(/shown:/);
   });
 });
 

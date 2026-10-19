@@ -14,6 +14,7 @@ import { AssuranceList, VerificationSteps } from '@/components/assurance-list';
 import { ExitPanel, type ExitMeasurement } from '@/components/exit-panel';
 import { readAsAnon, writeAsService } from '@/lib/sql';
 import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
+import { couldNot } from '@/lib/what-we-could-not-do';
 
 /**
  * The verification page.
@@ -140,7 +141,19 @@ async function loadAssurance(slug: string): Promise<AssuranceLoad> {
       },
     };
     return { kind: 'ready', input };
-  }).catch(() => ({ kind: 'unavailable' }) as const);
+  }).catch((error: unknown) => {
+    // The third answer, said out loud. The page keeps its shape; the log is the
+    // only place anybody can learn that it is standing without its answers.
+    couldNot(
+      'read the assurance answers behind a badge',
+      {
+        slug,
+        shown: 'the page without the plain-language answers, which is what it exists for',
+      },
+      error,
+    );
+    return { kind: 'unavailable' } as const;
+  });
 }
 
 interface TrustPage {
@@ -190,7 +203,17 @@ async function loadTrustPage(slug: string): Promise<TrustPageLoad> {
     );
     const row = rows[0];
     return row ? ({ kind: 'ready', page: row } as const) : ({ kind: 'none' } as const);
-  }).catch(() => ({ kind: 'unavailable' }) as const);
+  }).catch((error: unknown) => {
+    couldNot(
+      'read what the owner of an application published',
+      {
+        slug,
+        shown: 'the page without the owner’s section, which holds their route to a human',
+      },
+      error,
+    );
+    return { kind: 'unavailable' } as const;
+  });
 }
 
 async function loadBadge(slug: string): Promise<BadgeRecord | null> {
@@ -226,7 +249,17 @@ export async function generateMetadata({
    * the only honest thing available here, because this function has no way to
    * tell the reader anything.
    */
-  const badge = await loadBadge(slug).catch(() => 'unreadable' as const);
+  const badge = await loadBadge(slug).catch((error: unknown) => {
+    couldNot(
+      'read a badge for the title of a shared link',
+      {
+        slug,
+        shown: 'a neutral title that is not indexed',
+      },
+      error,
+    );
+    return 'unreadable' as const;
+  });
   if (badge === 'unreadable') {
     return { title: 'Verified by VibefyCode', robots: { index: false, follow: false } };
   }

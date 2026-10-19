@@ -7,6 +7,7 @@ import {
   type SponsorshipPlacement,
 } from '@vibefycode/sponsorship';
 import { readAsAnon } from '@/lib/sql';
+import { couldNot } from '@/lib/what-we-could-not-do';
 
 /**
  * A paid placement, on the three surfaces permitted to carry one.
@@ -49,7 +50,24 @@ export async function SponsorSlot({ placement }: { placement: SponsorshipPlaceme
       [placement],
     );
     return rows[0] ?? null;
-  }).catch(() => null);
+  }).catch((error: unknown) => {
+    /*
+     * An advertiser is paying for this space. "Nobody bought this placement"
+     * and "we could not read who did" render identically — nothing — and the
+     * second one is a bill we would have to refund and an impression count that
+     * quietly understates what ran. The visitor is owed nothing here; the
+     * advertiser is.
+     */
+    couldNot(
+      'read the sponsorship for a placement',
+      {
+        placement,
+        shown: 'the page with no sponsorship in this slot, as though none were sold',
+      },
+      error,
+    );
+    return null;
+  });
 
   if (!sponsor) return null;
 

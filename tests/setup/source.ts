@@ -55,3 +55,29 @@
 export function withoutComments(source: string): string {
   return source.replace(/(^|\s)\/\/.*$/gm, '$1').replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
+
+/**
+ * The same removal, with the lines kept where they were.
+ *
+ * Two assertions in this suite report a line number — the one that points at an
+ * unmeasured score and the one that points at a handler which swallows a
+ * failure and says nothing — and `withoutComments` collapses a block comment to
+ * a single space, which moves every line after it. A message pointing at the
+ * wrong line is worse than one pointing at none, because somebody reads that
+ * line and concludes the test is wrong.
+ *
+ * Both had their own copy. One of them stripped blocks first, which is the
+ * order the paragraph above says can delete the code an assertion looks for,
+ * and matched only a line comment that begins a line, so a trailing one
+ * survived and its text was searched as though it were code. One function in
+ * the one place the order is decided, as above: the character of every comment
+ * becomes a space and every newline stays.
+ */
+export function commentsBlanked(source: string): string {
+  return source
+    .replace(
+      /(^|\s)\/\/.*$/gm,
+      (match, before: string) => before + ' '.repeat(match.length - before.length),
+    )
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '));
+}

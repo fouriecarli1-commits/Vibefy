@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { loadPublishedKeys, verifyBadge } from '@vibefycode/badge';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
-import { sayItAgain } from '@/lib/said-recently';
+import { couldNot } from '@/lib/what-we-could-not-do';
 
 export const metadata: Metadata = {
   title: 'Check a badge',
@@ -273,16 +273,14 @@ async function lookUpBadge(badgeId: string): Promise<BadgeLookup> {
      * Once a minute, keyed on the message: this page is public and a bad state
      * here lasts until somebody fixes it.
      */
-    const detail = error instanceof Error ? error.message : String(error);
-    if (sayItAgain(`verify-unavailable:${detail}`)) {
-      console.error('a badge could not be looked up', {
+    couldNot(
+      'look up a badge',
+      {
         badgeId,
-        error: detail,
-        means:
-          'Neither the direct connection nor the published view over HTTPS could answer, so this ' +
-          'page is telling visitors it cannot establish anything about any badge.',
-      });
-    }
+        shown: 'the page saying it could not establish anything about this badge',
+      },
+      error,
+    );
     return { kind: 'unavailable' };
   }
 }

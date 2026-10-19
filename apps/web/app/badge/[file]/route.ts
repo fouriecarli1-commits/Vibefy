@@ -4,6 +4,7 @@ import { whyTheDatabaseRefused } from '@/lib/connection-string';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { writeAsService } from '@/lib/sql';
 import { verifyOriginForRequest } from '@/lib/verify-origin';
+import { couldNot } from '@/lib/what-we-could-not-do';
 
 /**
  * The badge image.
@@ -256,7 +257,23 @@ async function serveBadge(
           request.headers.get('user-agent'),
         ],
       );
-    }).catch(() => undefined);
+    }).catch((error: unknown) => {
+      /*
+       * Fire and forget, not fail and forget. The image is already served and
+       * nothing here may change that — but `badge_events` is where an
+       * `origin_mismatch` is recorded, which is how a mark displayed on a
+       * domain nobody authorised is ever noticed. Dropping that silently turns
+       * a detection into a number nobody can explain.
+       */
+      couldNot(
+        'record that a badge was served',
+        {
+          publicId: id,
+          shown: 'the badge, which was already served; only the record was lost',
+        },
+        error,
+      );
+    });
   }
 
   return new NextResponse(svg, {
