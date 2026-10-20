@@ -178,10 +178,19 @@ export function verifyBadge(
   }
   if (!signatureValid) failures.push('bad_signature');
 
+  /*
+   * Written so that a date which cannot be read counts as expired.
+   *
+   * `parsePayload` refuses one of those now, so this is unreachable — and it is
+   * written this way anyway, because `Invalid Date <= now` is false and the
+   * failure mode on the other side of that `false` is a badge that never
+   * expires. Two statements of one rule, in the two files that would each have
+   * to be wrong for a stale badge to read as current.
+   */
   const expiresAt = new Date(payload.expiresAt);
   const issuedAt = new Date(payload.issuedAt);
-  if (signatureValid && expiresAt <= now) failures.push('expired');
-  if (signatureValid && issuedAt > now) failures.push('not_yet_valid');
+  if (signatureValid && !(expiresAt.getTime() > now.getTime())) failures.push('expired');
+  if (signatureValid && !(issuedAt.getTime() <= now.getTime())) failures.push('not_yet_valid');
 
   const withinValidity = signatureValid && failures.length === 0;
 

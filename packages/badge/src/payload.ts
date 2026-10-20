@@ -108,6 +108,32 @@ export function canonicalise(payload: BadgePayload): string {
     throw new PayloadError('Badge score must be a number between 0 and 100.');
   }
 
+  /*
+   * The three dates, checked the way the score is.
+   *
+   * Nothing read them. `verifyBadge` then does `new Date(payload.expiresAt)`
+   * and asks `expiresAt <= now`, and a date that does not parse is `Invalid
+   * Date`, whose every comparison is false — so a payload whose `expiresAt` is
+   * not a date is never expired, and its `issuedAt` is never in the future. The
+   * badge reads as genuine and current, for ever, with no failure recorded
+   * anywhere.
+   *
+   * It takes our own signature to reach that state, so it is not a forgery
+   * route: it is the one shape of our own mistake that a signature would make
+   * permanent. The expiry is the only thing standing between an assessment of a
+   * product as it was and a claim about the product as it is, which is the
+   * distinction this whole scheme exists to hold.
+   */
+  for (const key of ['assessedOn', 'issuedAt', 'expiresAt'] as const) {
+    if (Number.isNaN(new Date(payload[key]).getTime())) {
+      throw new PayloadError(
+        `Badge payload field "${key}" is not a date (${JSON.stringify(payload[key])}). ` +
+          `A date that cannot be read compares false against every moment, which would make this ` +
+          `badge one that never expires.`,
+      );
+    }
+  }
+
   const ordered = REQUIRED_KEYS.map((key) => `${JSON.stringify(key)}:${serialise(payload[key])}`);
   return `{${ordered.join(',')}}`;
 }
