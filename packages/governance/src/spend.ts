@@ -41,7 +41,28 @@ export type SpendActionKind = 'pause' | 'alert' | 'none';
  * rather than every five minutes needs something stable to compare, and a
  * dollar amount that moves is not it.
  */
-export type SpendTrigger = 'daily_ceiling' | 'daily_warning' | 'free_tier_weekly';
+export type SpendTrigger =
+  | 'daily_ceiling'
+  | 'daily_warning'
+  | 'free_tier_weekly'
+  /**
+   * The figure itself could not be read.
+   *
+   * Every comparison below is `observed >= ceiling`, and `NaN >= 100` is false,
+   * so a figure that arrives unreadable produced no pause, no warning and no
+   * action of any kind — the one state in which this file does nothing is the
+   * state in which nobody can see what is being spent. The ceilings this guards
+   * are the ones the whole business rests on, and the failure they exist for is
+   * "a thousand cheap runs started by a loop nobody is watching at three in the
+   * morning". A loop like that, with the meter unreadable, met silence.
+   *
+   * An alert rather than a pause, deliberately: stopping every customer's work
+   * over one malformed figure is an outage we would have caused ourselves, and
+   * whether an unreadable number should stop the platform is the founder's
+   * call — it is in `docs/OPEN_ITEMS.md`. What is not her call is whether
+   * anybody is told, and that is this.
+   */
+  | 'spend_unreadable';
 
 export interface SpendAction {
   readonly kind: SpendActionKind;
@@ -63,6 +84,29 @@ export function evaluateSpend(
   ceilings: SpendCeilings = CEILINGS,
 ): SpendAction[] {
   const actions: SpendAction[] = [];
+
+  /*
+   * Before any comparison, because a comparison against a figure that is not a
+   * number is not a comparison. Both windows are checked: the daily one decides
+   * whether the platform pauses, and the weekly one is the only sight anybody
+   * has of what the free tier costs.
+   */
+  const unreadable = (['todayUsd', 'freeTierThisWeekUsd'] as const).filter(
+    (field) => !Number.isFinite(observation[field]),
+  );
+  if (unreadable.length > 0) {
+    actions.push({
+      kind: 'alert',
+      trigger: 'spend_unreadable',
+      reason:
+        `Spending could not be measured (${unreadable.join(' and ')}), so the daily ceiling of ` +
+        `$${ceilings.globalDailyUsd.toFixed(2)} cannot be enforced against it. Work is still ` +
+        `starting. This is a fault in the figures, not a spend.`,
+      observedUsd: 0,
+      ceilingUsd: ceilings.globalDailyUsd,
+    });
+    return actions;
+  }
 
   if (!observation.alreadyPaused && observation.todayUsd >= ceilings.globalDailyUsd) {
     actions.push({

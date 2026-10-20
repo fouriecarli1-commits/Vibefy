@@ -82,6 +82,42 @@ export class CostCeilingExceededError extends Error {
   }
 }
 
+/**
+ * A call whose cost cannot be established.
+ *
+ * The sibling of the refusal in `priceFor`, and for the same sentence: an
+ * unpriced model is an unmetered bill, and so is a call whose token counts
+ * arrive as anything other than finite numbers. The ceiling is this product's
+ * last line against a runaway loop, and the one way to get past it is to make
+ * the total stop being a number.
+ */
+export class UnmeteredCallError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnmeteredCallError';
+  }
+}
+
+/**
+ * A count that can be billed, or a refusal to pretend it is nought.
+ *
+ * Absent is refused along with NaN and negative, for the two fields that are
+ * not optional. A missing token count is the commonest way this arrives — a
+ * transport that forgets one, a response shape that changed — and nought is
+ * precisely the wrong reading of it: it is the only value that both passes
+ * every check and hides the call from the ceiling.
+ */
+function billable(value: number | undefined, field: string, stage: string): number {
+  const number = value as number;
+  if (typeof number !== 'number' || !Number.isFinite(number) || number < 0) {
+    throw new UnmeteredCallError(
+      `The ${stage} stage reported ${field} as ${String(value)}, which cannot be costed. ` +
+        `Nothing is recorded: a call counted as nought is a call the ceiling cannot see.`,
+    );
+  }
+  return number;
+}
+
 export function priceFor(model: string): ModelPricing {
   const pricing = MODEL_PRICING[model];
   if (!pricing) {
@@ -155,7 +191,22 @@ export class CostMeter {
    * is the difference between a ceiling and a report of what we already spent.
    */
   assertHeadroom(estimatedUsd = 0): void {
-    if (this.totalUsd + estimatedUsd > this.limits.maxRunCostUsd) {
+    /*
+     * Written as the negation of the safe case, not as the unsafe one.
+     *
+     * `total > limit` is false when `total` is NaN, so a single unmeasurable
+     * figure anywhere in the ledger turned a hard ceiling into no ceiling at
+     * all — every later call waved through, for the rest of the run, with the
+     * meter reading NaN and nothing saying so. The copilot route carries this
+     * lesson in a comment of its own ("`NaN >= 2` is false, so a spend figure
+     * that came back malformed also permitted the call") and the meter that
+     * guards the much larger spend did not.
+     *
+     * `!(total <= limit)` fails closed on NaN: the run stops and says the
+     * ceiling was reached, which is the right answer when the truth is "we
+     * cannot tell how much this has cost".
+     */
+    if (!(this.totalUsd + estimatedUsd <= this.limits.maxRunCostUsd)) {
       throw new CostCeilingExceededError(
         `Run would exceed its cost ceiling of $${this.limits.maxRunCostUsd.toFixed(2)}`,
         {
@@ -168,13 +219,35 @@ export class CostMeter {
   }
 
   recordModelCall(stage: string, model: string, usage: TokenUsage): CostRecord {
+    /*
+     * Checked before it is stored, because one bad record poisons the total
+     * for the rest of the run and the total is the ceiling.
+     *
+     * `TokenUsage` says these are numbers and the SDK's own types agree, which
+     * is exactly why nothing looked: every transport that is not the real
+     * client — the scripted one in tests, anything written next year — supplies
+     * them by hand, and `undefined` through an arithmetic expression is NaN
+     * rather than an error.
+     */
+    const counted: TokenUsage = {
+      inputTokens: billable(usage.inputTokens, 'input tokens', stage),
+      outputTokens: billable(usage.outputTokens, 'output tokens', stage),
+      // The two optional ones default, because the API omits them when no
+      // cache was involved and that genuinely is nought.
+      cacheCreationInputTokens: billable(
+        usage.cacheCreationInputTokens ?? 0,
+        'cache creation tokens',
+        stage,
+      ),
+      cacheReadInputTokens: billable(usage.cacheReadInputTokens ?? 0, 'cache read tokens', stage),
+    };
     const record: CostRecord = {
       model,
       stage,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      cacheReadTokens: usage.cacheReadInputTokens ?? 0,
-      aiCostUsd: costOfCall(model, usage),
+      inputTokens: counted.inputTokens,
+      outputTokens: counted.outputTokens,
+      cacheReadTokens: counted.cacheReadInputTokens ?? 0,
+      aiCostUsd: costOfCall(model, counted),
       computeSeconds: 0,
       computeCostUsd: 0,
       storageBytes: 0,
@@ -187,6 +260,12 @@ export class CostMeter {
   }
 
   recordCompute(stage: string, seconds: number, storageBytes = 0, thirdPartyCalls = 0): CostRecord {
+    // The same rule for the same reason. A clock that goes backwards over a
+    // long stage is the way this one arrives: a negative duration is not a
+    // refund, and a NaN one is not free.
+    seconds = billable(seconds, 'compute seconds', stage);
+    storageBytes = billable(storageBytes, 'stored bytes', stage);
+    thirdPartyCalls = billable(thirdPartyCalls, 'third-party calls', stage);
     const record: CostRecord = {
       model: null,
       stage,
