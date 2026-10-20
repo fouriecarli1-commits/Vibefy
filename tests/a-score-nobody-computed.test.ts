@@ -80,6 +80,36 @@ async function approvedAssessment(fields: {
 }
 
 describe('what a report may be assembled from', () => {
+  it('cannot be given a score that is not a number, because the column refuses it', async () => {
+    /*
+     * "No score" has two spellings — null, and a figure that is not a number —
+     * and `assembleReportSource` checked one of them. The second is the one
+     * that travels: it is not null, so it passes, and `Number('NaN')` is NaN
+     * all the way to the cover of the document.
+     *
+     * It cannot get there, and the reason is not in the report package.
+     * `overall_score` is `numeric(5,2) check (overall_score between 0 and 100)`
+     * and Postgres numeric holds `NaN` as a value greater than every other, so
+     * the upper bound refuses it. That is the protection; this is the test of
+     * it, written because nothing stated it anywhere and a later migration
+     * relaxing that bound would have been a quiet change to what a report can
+     * say.
+     *
+     * `assembleReportSource` refuses a non-finite score too, for the reason the
+     * file gives for its other unreachable refusal: the next caller will not be
+     * the careful one.
+     */
+    const assessmentId = await approvedAssessment({ score: 71, scope: SCOPE });
+    await expect(
+      db.query(`update public.assessments set overall_score = 'NaN' where id = $1`, [assessmentId]),
+      'the column accepted a score that is not a number',
+    ).rejects.toThrow(/overall_score/);
+
+    // And the figure that was there is still the one a report would state.
+    const source = await assembleReportSource(db, assessmentId);
+    expect(source.overallScore).toBe(71);
+  });
+
   it('refuses an assessment with no score rather than printing nought', async () => {
     const assessmentId = await approvedAssessment({ score: null, scope: SCOPE });
     await expect(

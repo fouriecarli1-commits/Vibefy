@@ -203,7 +203,25 @@ export async function assembleReportSource(
     );
   }
 
-  if (row.overall_score === null) {
+  /*
+   * Null, and anything else that is not a number.
+   *
+   * The second half is unreachable through this column and is written anyway.
+   * `overall_score` is `numeric(5,2) check (overall_score between 0 and 100)`,
+   * and Postgres numeric does hold `NaN` — it is greater than every other
+   * numeric, so the upper bound of that constraint refuses it. The database is
+   * what makes this unreachable, in a migration from 2026-08-22, and nothing in
+   * this file knew that.
+   *
+   * Which is the reason for the line rather than an argument against it. The
+   * refusal above it is kept for exactly the same reason — "not reachable
+   * today… the next caller will not be the careful one" — and the cost of being
+   * wrong here is not an exception: it is `Number('NaN')` travelling to the
+   * cover of a document somebody hands an investor, printed as NaN, under a
+   * band that matches nothing and is labelled "Unbanded", beside a comparison
+   * that places them nowhere.
+   */
+  if (row.overall_score === null || !Number.isFinite(Number(row.overall_score))) {
     throw new Error(
       `Assessment ${assessmentId} has no score, so there is no report to assemble. ` +
         'Printing 0 would read as "Not ready", which is a finding about the application ' +
