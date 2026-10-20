@@ -80,6 +80,25 @@ export async function GET(request: NextRequest) {
 
   if (link.kind === 'nothing') {
     /*
+     * Already signed in, and sent to the sign-in page anyway.
+     *
+     * This address ends up in a browser's history and its autocomplete, so it
+     * is opened again — after a sign-in that worked, from a second tab, from
+     * the bar. There is nothing on it, so the only answer this route had was
+     * "that link arrived with nothing on it to exchange", shown to somebody
+     * who is signed in and could simply have been let through. Every one of
+     * those looks, to the person, exactly like the failure they have been
+     * fighting.
+     *
+     * Asked of the session cookie rather than the URL, which is the one source
+     * that can tell the two apart.
+     */
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) return NextResponse.redirect(`${origin}${next}`);
+
+    /*
      * Nothing to exchange, and now it is written down.
      *
      * The page has always said this plainly; the log said nothing, so a
@@ -90,8 +109,10 @@ export async function GET(request: NextRequest) {
     console.error('a sign-in callback arrived with nothing to exchange', {
       parameters: [...searchParams.keys()].sort(),
       means:
-        'No code, no token_hash and no error. A link opened from a different browser than the ' +
-        'one that asked for it, or a redirect that dropped the query string.',
+        'No code, no token_hash, no error and no session. A link opened in a different browser ' +
+        'from the one that asked for it, a redirect that dropped the query string, this address ' +
+        'reopened from history, or a Supabase Site URL pointing at this path instead of at the ' +
+        'origin — which sends every fallback here with nothing on it.',
     });
     return NextResponse.redirect(`${origin}/sign-in?error=missing_code`);
   }

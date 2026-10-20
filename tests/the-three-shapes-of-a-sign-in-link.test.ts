@@ -187,8 +187,38 @@ describe('the route that decides from it', () => {
     for (const branch of ['refused', 'email_link_unknown_type', 'nothing']) {
       const at = route.indexOf(`'${branch}'`);
       expect(at, `${branch} is not handled`).toBeGreaterThan(-1);
-      expect(route.slice(at, at + 900), `${branch} fails silently`).toMatch(/console\.error\(/);
+      // Wide enough to hold the branch. The empty one grew a session check in
+      // front of its line, and a window that stops short reads as silence.
+      expect(route.slice(at, at + 2000), `${branch} fails silently`).toMatch(/console\.error\(/);
     }
+  });
+
+  it('lets somebody who is already signed in through, rather than alarming them', () => {
+    /*
+     * This address lands in a browser's history and its autocomplete, so it
+     * gets opened again — after a sign-in that worked, from a second tab, from
+     * the bar. There is nothing on it, and the only answer this route had was
+     * the one written for a link that failed, shown to somebody who is signed
+     * in and could have been let through. To the person, every one of those
+     * looks exactly like the failure they have been fighting.
+     *
+     * The session cookie is the one source that can tell the two apart, so it
+     * is asked before the error is chosen.
+     */
+    const nothing = route.slice(route.indexOf("'nothing'"));
+    const asked = nothing.indexOf('getUser()');
+    const refused = nothing.indexOf('missing_code');
+    expect(asked, 'the empty callback never asks whether there is a session').toBeGreaterThan(-1);
+    expect(asked, 'it decides before it asks').toBeLessThan(refused);
+    expect(nothing.slice(0, refused)).toMatch(/if \(user\) return NextResponse\.redirect/);
+  });
+
+  it('names the setting that sends every fallback here empty', () => {
+    // A Site URL pointing at this path rather than at the origin produces
+    // exactly this, for every flow, and it is the one cause on the list that
+    // nobody would guess from the symptom.
+    const nothing = route.slice(route.indexOf("'nothing'"));
+    expect(nothing).toMatch(/Site URL/);
   });
 
   it('never puts a token or an address in the log', () => {
