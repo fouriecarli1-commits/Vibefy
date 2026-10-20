@@ -28,7 +28,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { EMAIL_LINK_TYPES, readSignInLink } from '../apps/web/lib/sign-in-link.ts';
+import {
+  EMAIL_LINK_TYPES,
+  PROVIDER_REFUSALS,
+  readSignInLink,
+} from '../apps/web/lib/sign-in-link.ts';
 import { signInProblem } from '../apps/web/lib/sign-in-problem.ts';
 import { commentsBlanked } from './setup/source.ts';
 
@@ -55,14 +59,49 @@ describe('what a confirmation link is carrying', () => {
 
   it('reads an expired or already-used link as refused, not as a missing code', () => {
     const spent = read('error=access_denied&error_code=otp_expired&error_description=Email+link');
-    expect(spent).toEqual({ kind: 'refused', spent: true });
-    expect(read('error_code=otp_expired')).toEqual({ kind: 'refused', spent: true });
+    expect(spent).toEqual({ kind: 'refused', refusal: 'otp_expired' });
+    expect(read('error_code=otp_expired')).toEqual({ kind: 'refused', refusal: 'otp_expired' });
   });
 
-  it('separates a refusal that is not about a spent link', () => {
-    expect(read('error=server_error&error_code=unexpected_failure')).toEqual({
+  it('tells a spent link apart from a consent screen somebody closed', () => {
+    /*
+     * Supabase sends `error=access_denied&error_code=otp_expired` for the
+     * first and a bare `error=access_denied` for the second. Read loosely they
+     * both say access denied, and the first draft of this matched on that — so
+     * somebody who changed their mind at Google was told their confirmation
+     * link had expired, which is advice about a thing they were not doing.
+     */
+    expect(read('error=access_denied')).toEqual({ kind: 'refused', refusal: 'access_denied' });
+    expect(read('error=access_denied&error_code=otp_expired')).toEqual({
       kind: 'refused',
-      spent: false,
+      refusal: 'otp_expired',
+    });
+  });
+
+  it('names the refusals it has a sentence for', () => {
+    for (const code of PROVIDER_REFUSALS) {
+      expect(read(`error_code=${code}`), code).toEqual({ kind: 'refused', refusal: code });
+      // And every one of them reaches a sentence, rather than the neutral one.
+      expect(signInProblem(code), code).not.toBe(signInProblem('something-nobody-wrote'));
+    }
+  });
+
+  it('refuses to carry a code it does not know, which is the whole safety of it', () => {
+    // Anybody can send a link with any `error_code` on it. What the page
+    // renders has to be one of our sentences, so an unknown code is no code.
+    expect(read('error=call+0800+555+now&error_code=ring+this+number')).toEqual({
+      kind: 'refused',
+      refusal: null,
+    });
+    // A known `error` beside an invented `error_code` still carries the known
+    // half: the signal is real, and only the unrecognised part is dropped.
+    expect(read('error=access_denied&error_code=call+0800+555+now')).toEqual({
+      kind: 'refused',
+      refusal: 'access_denied',
+    });
+    expect(read('error_code=<script>alert(1)</script>')).toEqual({
+      kind: 'refused',
+      refusal: null,
     });
   });
 
@@ -72,7 +111,7 @@ describe('what a confirmation link is carrying', () => {
     // ours rather than as the provider's.
     expect(read('code=abc&error=access_denied&error_code=otp_expired')).toEqual({
       kind: 'refused',
-      spent: true,
+      refusal: 'otp_expired',
     });
   });
 
@@ -85,25 +124,48 @@ describe('what a confirmation link is carrying', () => {
 
 describe('what the person is told', () => {
   it('has a sentence for a link that was expired or already spent', () => {
-    const sentence = signInProblem('link_expired');
+    const sentence = signInProblem('otp_expired');
     expect(sentence).toBeTruthy();
     // The part that matters: it says this is often not their doing, because the
     // alternative sends them round the same loop blaming themselves.
     expect(sentence).toMatch(/scanners|before you do|not something you did/i);
-    expect(sentence, 'the code itself must never be echoed').not.toContain('link_expired');
+    expect(sentence, 'the code itself must never be echoed').not.toContain('otp_expired');
   });
 
   it('no longer blames a missing code on opening a link twice', () => {
-    // That sentence belongs to `link_expired` now, and saying it here is how a
+    // That sentence belongs to `otp_expired` now, and saying it here is how a
     // browser mismatch gets diagnosed as carelessness.
     expect(signInProblem('missing_code')).not.toMatch(/opened twice/i);
   });
 
   it('keeps the sentence for each code distinct', () => {
-    const sentences = ['missing_code', 'link_expired', 'exchange_failed', 'provider_refused'].map(
+    const sentences = ['missing_code', 'otp_expired', 'exchange_failed', 'provider_refused'].map(
       (code) => signInProblem(code),
     );
     expect(new Set(sentences).size).toBe(sentences.length);
+  });
+
+  it('says something different for a closed consent screen and a spent link', () => {
+    // The two the first draft gave one sentence to.
+    expect(signInProblem('access_denied')).not.toBe(signInProblem('otp_expired'));
+    expect(signInProblem('access_denied')).toMatch(/consent screen|did not finish/i);
+  });
+
+  it('says which failures are ours, where they are', () => {
+    // A person who cannot sign in has one question: is this me or them. A
+    // provider that is switched off, or a failure between us, is not something
+    // they can fix by trying harder, and saying so is the difference between
+    // five more attempts and one email to us.
+    for (const code of ['provider_disabled', 'server_error', 'validation_failed']) {
+      expect(signInProblem(code), code).toMatch(/ours to (fix|look at)/i);
+    }
+  });
+
+  it('tells somebody whose browser lost the other half what to do', () => {
+    for (const code of ['bad_oauth_state', 'flow_state_not_found']) {
+      expect(signInProblem(code), code).toMatch(/same|one window/i);
+      expect(signInProblem(code), code).toMatch(/cookies/i);
+    }
   });
 });
 

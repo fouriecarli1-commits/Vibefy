@@ -97,6 +97,34 @@ describe('what it prints', () => {
     expect(page).toContain('badgeError');
   });
 
+  it('asks whether the platform has stopped itself', () => {
+    /*
+     * `sweepSpendCap` writes a `spend_pauses` row when the day's spend crosses
+     * the global ceiling, and the worker claims no new work while one is live.
+     * From outside that is indistinguishable from an assessment nobody
+     * requested, and the only sign of it was a line in the worker's log once a
+     * day — a log on a different service from the one this founder reads.
+     *
+     * The remedy belongs on the page too, because nothing in the product lifts
+     * a pause: the grant on that table is `select` only, so even an
+     * administrator cannot clear it through the console. Until that changes,
+     * the page carries the one statement that does.
+     */
+    expect(page).toMatch(/spend_pauses/);
+    expect(page).toMatch(/is\('lifted_at', null\)/);
+    expect(page, 'the page does not say what to do about a stopped platform').toMatch(
+      /update public\.spend_pauses set lifted_at = now\(\)/,
+    );
+  });
+
+  it('reports a pause it could not read as that, not as “not paused”', () => {
+    // The same rule as the counts below it, on the check where getting it wrong
+    // means a stopped platform looks like a running one.
+    const pause = page.slice(page.indexOf('pauseError'));
+    expect(pause).toMatch(/Cannot tell/);
+    expect(pause).toMatch(/'unknown'/);
+  });
+
   it('says a private key in a public variable is a thing to fix', () => {
     // `loadPublishedKeys` separates this case already; the page must not fold
     // it in with "no keys published", which has a different remedy.

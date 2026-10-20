@@ -26,8 +26,37 @@ import type { EmailOtpType } from '@supabase/supabase-js';
  * Separated from the route because a route handler needs a Next request to run
  * and this is the part worth proving: the deciding, not the redirecting.
  */
+/**
+ * The refusals this product has a sentence for.
+ *
+ * A code from the provider, matched against this list and never rendered. What
+ * the page shows is our own sentence, chosen by the match; a code that is not
+ * here gets the general one. That is the whole safety property: anybody can
+ * send a link with any `error_code=` on it, so the page must be incapable of
+ * printing text an attacker chose.
+ *
+ * Narrow on purpose. These are the ones Supabase actually sends, and each has a
+ * different answer for the person reading it — which is the point. Lumping them
+ * together is how somebody who declined a Google consent screen was told their
+ * confirmation link had expired.
+ */
+export const PROVIDER_REFUSALS = [
+  'otp_expired',
+  'access_denied',
+  'bad_oauth_state',
+  'flow_state_expired',
+  'flow_state_not_found',
+  'provider_disabled',
+  'signup_disabled',
+  'validation_failed',
+  'server_error',
+  'unexpected_failure',
+] as const;
+
+export type ProviderRefusal = (typeof PROVIDER_REFUSALS)[number];
+
 export type SignInLink =
-  | { readonly kind: 'refused'; readonly spent: boolean }
+  | { readonly kind: 'refused'; readonly refusal: ProviderRefusal | null }
   | { readonly kind: 'email_link'; readonly type: EmailOtpType }
   | { readonly kind: 'email_link_unknown_type' }
   | { readonly kind: 'code'; readonly code: string }
@@ -60,7 +89,25 @@ export function readSignInLink(params: URLSearchParams): SignInLink {
   const error = params.get('error');
   const errorCode = params.get('error_code');
   if (error || errorCode) {
-    return { kind: 'refused', spent: /expired|access_denied/i.test(`${error} ${errorCode}`) };
+    /*
+     * `error_code` first, because it is the specific one.
+     *
+     * Supabase sends `error=access_denied&error_code=otp_expired` for a spent
+     * email link and a bare `error=access_denied` when somebody closes a
+     * provider's consent screen. Read loosely, both say "access denied" — and
+     * the first draft of this matched on that, so a person who changed their
+     * mind at Google was told their confirmation link had expired. Each of
+     * these has a different thing for the reader to do next, so each is matched
+     * exactly.
+     */
+    const named = [errorCode, error].find((candidate) =>
+      PROVIDER_REFUSALS.some((known) => known === candidate),
+    );
+    return {
+      kind: 'refused',
+      refusal: (PROVIDER_REFUSALS.find((known) => known === named) ??
+        null) as ProviderRefusal | null,
+    };
   }
 
   const code = params.get('code');

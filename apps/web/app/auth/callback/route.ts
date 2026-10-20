@@ -38,9 +38,16 @@ export async function GET(request: NextRequest) {
         'expired or already-used email link — mail scanners follow links before the recipient ' +
         'does, which spends them.',
     });
-    return NextResponse.redirect(
-      `${origin}/sign-in?error=${link.spent ? 'link_expired' : 'provider_refused'}`,
-    );
+    /*
+     * The code the provider named, when it is one we have a sentence for.
+     *
+     * Not an echo: `readSignInLink` matched it against a fixed list before it
+     * got here, so the parameter below is one of ten strings we chose, and the
+     * page renders a sentence of ours for each. A refusal we do not recognise
+     * falls back to the general sentence, which is also what somebody sending a
+     * link with `error_code=` of their own invention gets.
+     */
+    return NextResponse.redirect(`${origin}/sign-in?error=${link.refusal ?? 'provider_refused'}`);
   }
 
   if (link.kind === 'email_link_unknown_type') {
@@ -60,9 +67,12 @@ export async function GET(request: NextRequest) {
         type: link.type,
         error: otpError.message,
       });
+      // The same sentence a spent link gets from the other path, under the
+      // same code, so the two ways an email link can fail do not read as two
+      // different problems to the person holding one link.
       const spent = /expired|invalid/i.test(otpError.message);
       return NextResponse.redirect(
-        `${origin}/sign-in?error=${spent ? 'link_expired' : 'exchange_failed'}`,
+        `${origin}/sign-in?error=${spent ? 'otp_expired' : 'exchange_failed'}`,
       );
     }
     return await onceSignedIn(origin, next, searchParams);

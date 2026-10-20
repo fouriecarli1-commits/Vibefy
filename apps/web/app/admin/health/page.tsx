@@ -300,6 +300,28 @@ export default async function HealthPage() {
     .from('assessments')
     .select('id', { count: 'exact', head: true })
     .in('status', ['approved', 'published']);
+  /*
+   * And whether the platform has stopped itself.
+   *
+   * `sweepSpendCap` writes a row here when the day's spend crosses the global
+   * ceiling, and the worker claims no new work while one is live. From a
+   * customer's side that looks exactly like an assessment that never starts,
+   * and the only sign of it was a line in the worker's log once a day.
+   *
+   * Read as the signed-in administrator: the row names our numbers rather than
+   * any customer's, so the policy on the table restricts it to platform staff,
+   * and a read that cannot answer is reported as that rather than as "not
+   * paused" — which is the answer that would let a stopped platform look like a
+   * running one.
+   */
+  const { data: livePause, error: pauseError } = await supabase
+    .from('spend_pauses')
+    .select('paused_at, reason, observed_usd, ceiling_usd')
+    .is('lifted_at', null)
+    .order('paused_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { count: appCount, error: appError } = await supabase
     .from('apps')
     .select('id', { count: 'exact', head: true })
@@ -309,12 +331,33 @@ export default async function HealthPage() {
     error ? `cannot tell (${error.message})` : String(count ?? 0);
 
   const badges = badgeCount ?? 0;
+  const spendPause: Check = pauseError
+    ? {
+        question: 'Has the platform stopped itself?',
+        answer: `Cannot tell: ${pauseError.message}`,
+        tone: 'unknown',
+        then: 'Until this answers, "no assessment is starting" and "nothing has been requested" look the same from here.',
+      }
+    : livePause
+      ? {
+          question: 'Has the platform stopped itself?',
+          answer: `Yes. Spending was paused on ${new Date(livePause.paused_at as string).toISOString().slice(0, 16).replace('T', ' ')} UTC and nothing has lifted it, so no new assessment is being claimed. ${String(livePause.reason)}`,
+          tone: 'bad',
+          then: "Lifting one is deliberate and needs a person — and nothing in the product does it yet, so today it is one statement run against the database: update public.spend_pauses set lifted_at = now(), lift_reason = '<why, at least ten characters>' where lifted_at is null. The worker starts claiming again within five minutes.",
+        }
+      : {
+          question: 'Has the platform stopped itself?',
+          answer: 'No. No spend pause is live, so the worker is claiming work.',
+          tone: 'ok',
+        };
+
   const checks: Check[] = [
     connectionString(),
     publicApiKeys(),
     await signInProviders(),
     await badgeLookup(),
     signingKeys(),
+    spendPause,
     {
       question: 'Is there a badge to look at?',
       answer: badgeError

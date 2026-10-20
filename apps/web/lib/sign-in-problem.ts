@@ -23,7 +23,35 @@
 const PROBLEMS: Readonly<Record<string, string>> = {
   missing_code:
     'That sign-in link arrived with nothing on it to exchange. That usually means it was opened in a different browser from the one that asked for it, or that something along the way shortened the address. Signing in below works.',
-  link_expired:
+  /*
+   * One sentence per refusal the provider actually names.
+   *
+   * The codes are matched against a fixed list in `sign-in-link.ts` before they
+   * reach here, so what follows is chosen by a match and never echoed. Each one
+   * is here because its answer is different: a spent link needs a new one, a
+   * declined consent screen needs nothing but another try, a flow state that
+   * has gone needs the sign-in started in the same browser that finishes it,
+   * and a provider that is switched off is ours to fix.
+   */
+  access_denied:
+    'You did not finish signing in with that provider — the consent screen was closed or refused. Trying again works, and an email address and a password will get you in either way.',
+  bad_oauth_state:
+    'The sign-in finished in a different browser or tab from the one that started it, so this deployment could not match the two halves up. Start again in one window, with cookies allowed for this site.',
+  flow_state_expired:
+    'That sign-in took long enough to expire before it came back. Starting again works.',
+  flow_state_not_found:
+    'The sign-in finished in a different browser or tab from the one that started it, so this deployment could not match the two halves up. Start again in one window, with cookies allowed for this site.',
+  provider_disabled:
+    'That way of signing in is switched off for this deployment, so nothing you do on your side will complete it. An email address and a password still work. (This is ours to fix, and it is recorded.)',
+  signup_disabled:
+    'This deployment is not accepting new accounts through that provider at the moment. An email address and a password still work. (This is ours to fix, and it is recorded.)',
+  validation_failed:
+    'The provider sent something back that this deployment could not accept. That is ours to look at, and it is recorded. An email address and a password will get you in meanwhile.',
+  server_error:
+    'Something failed between your provider and us while you were signing in. That is ours to look at, and it is recorded. Trying again often works; an email address and a password will get you in meanwhile.',
+  unexpected_failure:
+    'Something failed between your provider and us while you were signing in. That is ours to look at, and it is recorded. Trying again often works; an email address and a password will get you in meanwhile.',
+  otp_expired:
     'That confirmation link has expired or had already been used. Some mail apps and security scanners open links before you do, which uses them up — so this is often not something you did. Ask for a new one by signing in below; if it keeps happening, an email address and a password will get you in.',
   exchange_failed:
     'Your sign-in could not be completed. Starting again usually works; if it does not, an email address and a password will get you in.',
