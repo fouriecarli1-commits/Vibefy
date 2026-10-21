@@ -259,8 +259,9 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
     for (const stage of outcome.stageResults) {
       await client.query(
         `insert into public.assessment_runs
-           (assessment_id, organisation_id, stage, status, error_message, metadata, started_at, finished_at)
-         values ($1, $2, $3, $4, $5, $6, now(), now())
+           (assessment_id, organisation_id, stage, status, error_message, metadata,
+            enforced_scope, started_at, finished_at)
+         values ($1, $2, $3, $4, $5, $6, $7, now(), now())
          on conflict (assessment_id, stage, attempt) do nothing`,
         [
           assessmentId,
@@ -269,6 +270,23 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
           mapStageStatus(stage.status),
           stage.error ?? null,
           JSON.stringify({ notes: stage.notes, promptSha256: stage.promptSha256 ?? null }),
+          /*
+           * What this run was actually allowed to touch.
+           *
+           * The column has carried its reason since the first migration —
+           * "copied from the authorisation at dispatch so the sandbox
+           * configuration that actually ran is recoverable even if a later
+           * authorisation supersedes it" — and nothing ever wrote to it, so
+           * every run row in this product holds null. It is the record that
+           * answers a customer who says we tested something they did not
+           * authorise, after the authorisation that permitted it has been
+           * superseded: the current one cannot answer that, which is the whole
+           * reason the column is here.
+           *
+           * Written per stage because the rows are per stage, and it is a fact
+           * about the run, like the policy it was copied from.
+           */
+          JSON.stringify(outcome.enforcedScope),
         ],
       );
     }

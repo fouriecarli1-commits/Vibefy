@@ -25,6 +25,7 @@ import {
 } from '@vibefycode/rubric';
 import { scopeStatement, NON_RELIANCE_LEGEND, AI_DISCLOSURE } from '@vibefycode/shared';
 import type { CostRecord } from './runtime/cost.ts';
+import type { ScopePolicy } from './runtime/scope.ts';
 import { classifyStop, stopNote, STOP_LABEL, type StopReason } from './runtime/stop.ts';
 import { promptBundleSha256 } from './model/prompts.ts';
 import { staticIntakeStage } from './stages/static-intake.ts';
@@ -89,6 +90,29 @@ export interface AssessmentOutcome {
   readonly notTestedCriteria: readonly { readonly criterion: string; readonly because: string }[];
   /** Observations about licensing and where the code came from. Never scored. */
   readonly provenance: readonly ProvenanceObservation[];
+  /**
+   * The sandbox this run actually ran inside.
+   *
+   * `assessment_runs.enforced_scope` has carried a comment since the first
+   * migration — "copied from the authorisation at dispatch so the sandbox
+   * configuration that actually ran is recoverable even if a later
+   * authorisation supersedes it" — and nothing ever wrote to it. Every run row
+   * in the product holds null.
+   *
+   * That column is the answer to the one question this company would least
+   * like to be unable to answer: a customer says we tested something they did
+   * not authorise, their authorisation has since been superseded or revoked,
+   * and the record of what was permitted at the time is the thing that settles
+   * it. The current authorisation is not that record — the whole reason the
+   * column exists is that it changes.
+   *
+   * Taken from the guard rather than from the authorisation row, deliberately.
+   * `policyFromAuthorisation` fills in defaults the row does not state, and the
+   * guard normalises again on construction, so what is written here is the
+   * configuration that was actually enforced rather than the configuration
+   * somebody would reconstruct from the record and hope matched.
+   */
+  readonly enforcedScope: ScopePolicy;
   /**
    * How hard it was to find the way out, or null where nothing measured it.
    *
@@ -509,6 +533,8 @@ export async function runPipeline(options: RunPipelineOptions): Promise<Assessme
     ]),
     exitMeasurement:
       stageResults.find((result) => result.exitMeasurement !== undefined)?.exitMeasurement ?? null,
+    // What was actually enforced, from the guard that enforced it.
+    enforcedScope: context.guard.policy,
     /*
      * Where the code came from, which is reported and not scored.
      *
