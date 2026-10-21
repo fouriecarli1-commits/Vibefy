@@ -445,8 +445,10 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
       await client
         .query(
           `insert into public.audit_log
-             (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
-           values ($1, null, 'system', $2, 'evidence', null, $3)`,
+             (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary,
+              after_state)
+           values ($1, null, 'system', $2, 'evidence', null, $3,
+                   jsonb_build_object('storage_path', $4::text))`,
           [
             input.organisationId,
             ARTEFACT_ORPHANED,
@@ -454,6 +456,18 @@ export async function persistOutcome(client: PoolClient, input: PersistInput): P
               `remove the artefact at ${path}. No evidence row points at it, so the retention ` +
               `sweep cannot reach it from the table; it is picked up by that sweep's second pass ` +
               `instead.`,
+            /*
+             * The path in a column as well as in the sentence.
+             *
+             * `entity_id` is null here and must be — there is no evidence row
+             * to name. The retry pass matched a recovery to its orphan on
+             * `entity_id`, and `null = null` is not true in SQL, so it never
+             * saw the recovery row it had written and removed these bytes again
+             * on every sweep for ever, appending an audit row each time. The
+             * path is what identifies an orphan; this is where the pass reads
+             * it.
+             */
+            path,
           ],
         )
         .catch(() => undefined);

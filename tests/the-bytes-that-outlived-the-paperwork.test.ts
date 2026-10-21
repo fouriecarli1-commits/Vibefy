@@ -30,7 +30,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, Pool } from 'pg';
-import { sweepRetention } from '../apps/worker/src/governance.ts';
+import { resetRetentionNotices, sweepRetention } from '../apps/worker/src/governance.ts';
 import { connect } from './setup/client.ts';
 import { memoryStorage } from './setup/artefacts.ts';
 import { seedAccount, seedAssessment, sha256, type SeededAccount } from './setup/seed.ts';
@@ -65,6 +65,39 @@ async function expiredEvidence(path: string): Promise<string> {
     [seeded.assessmentId, owner.organisationId, path, sha256(path)],
   );
   return rows[0]!.id;
+}
+
+/** Recovery rows naming a path, whatever row they claim to resolve. */
+const recoveriesOf = async (path: string) =>
+  (
+    await db.query<{ id: string }>(
+      `select id from public.audit_log
+        where action = 'evidence.artefact_removed_later' and summary like '%' || $1 || '%'`,
+      [path],
+    )
+  ).rows;
+
+/**
+ * An orphan of the kind `persist.ts` writes: no evidence row, so no entity id.
+ *
+ * `withPathColumn: false` is a row written before the path was kept in a
+ * column, which is every such row already in the table — the prose is the only
+ * place it appears, and the sweep still has to find it there.
+ */
+async function rollbackOrphan(path: string, withPathColumn = true): Promise<void> {
+  await db.query(
+    `insert into public.audit_log
+       (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary, after_state)
+     values ($1, null, 'system', 'evidence.artefact_orphaned', 'evidence', null, $2,
+             case when $4::boolean then jsonb_build_object('storage_path', $3::text) end)`,
+    [
+      owner.organisationId,
+      `A run was rolled back after its evidence was written and the object store would not ` +
+        `remove the artefact at ${path}. No evidence row points at it.`,
+      path,
+      withPathColumn,
+    ],
+  );
 }
 
 const auditFor = async (entityId: string, action: string) =>
@@ -220,5 +253,146 @@ describe('an orphan a rolled-back run left behind', () => {
 
     expect(await storage.get(path)).toBeNull();
     expect(result.artefactsRecovered).toBeGreaterThanOrEqual(1);
+  }, 60_000);
+});
+
+describe('an orphan with no evidence row to name', () => {
+  /*
+   * The retry that never stopped retrying.
+   *
+   * `persist.ts` writes every rolled-back orphan with `entity_id` null, because
+   * the evidence row it would have named does not exist. The pass that clears
+   * orphans matched a recovery to its orphan on `entity_id`, and in SQL `null =
+   * null` is not true — so `not exists` never saw the recovery row the previous
+   * sweep had written. Measured on 2026-10-21: the file was removed again on
+   * every sweep for ever, each pass counting `artefactsRecovered: 1` for work
+   * already done and appending another `artefact_removed_later` row to an
+   * append-only table. 288 rows a day, per orphan, with the sweep's own log line
+   * reporting progress.
+   *
+   * The identity of an orphan is its path. These hold that it is matched by one.
+   */
+  it('is cleared once and then left alone', async () => {
+    const path = 'assessments/rolled-back/evidence/once';
+    await rollbackOrphan(path);
+
+    const storage = memoryStorage();
+    await storage.put(path, Buffer.from('a screenshot nobody can find'));
+    const first = await sweepRetention(pool, () => undefined, new Date(), 500, storage);
+    expect(first.artefactsRecovered).toBeGreaterThanOrEqual(1);
+    expect(await storage.get(path)).toBeNull();
+    expect(await recoveriesOf(path)).toHaveLength(1);
+
+    // Second pass. A store that throws on anything it is asked for, so a retry
+    // would both be visible and fail loudly rather than quietly succeeding
+    // against a path that is already gone.
+    const tracker = refusingStorage();
+    const second = await sweepRetention(pool, () => undefined, new Date(), 500, tracker);
+    expect(tracker.attempted).not.toContain(path);
+    expect(await recoveriesOf(path)).toHaveLength(1);
+    // And it is no longer counted as something we are holding.
+    expect(second.artefactsRecovered).toBe(0);
+  }, 60_000);
+
+  it('is matched by its sentence when the path was never put in a column', async () => {
+    // Every orphan row written before today is this row. The path is in the
+    // prose and nowhere else, and both producers word that clause the same way,
+    // which is what this holds.
+    const path = 'assessments/rolled-back/evidence/legacy';
+    await rollbackOrphan(path, false);
+
+    const storage = memoryStorage();
+    await storage.put(path, Buffer.from('bytes'));
+    await sweepRetention(pool, () => undefined, new Date(), 500, storage);
+    expect(await storage.get(path)).toBeNull();
+    expect(await recoveriesOf(path)).toHaveLength(1);
+
+    const tracker = refusingStorage();
+    await sweepRetention(pool, () => undefined, new Date(), 500, tracker);
+    expect(tracker.attempted).not.toContain(path);
+    expect(await recoveriesOf(path)).toHaveLength(1);
+  }, 60_000);
+});
+
+describe('what the sweep says about what it is still holding', () => {
+  beforeAll(() => resetRetentionNotices());
+
+  it('counts an orphan whose path cannot be read, instead of skipping it', async () => {
+    /*
+     * The bare `continue`.
+     *
+     * A row the pass cannot act on was skipped without a word, and it keeps one
+     * of the `limit` places in an ordered page for ever — so enough of them and
+     * the pass stops reaching the orphans a retry would clear, while every
+     * counter still reads zero.
+     */
+    await db.query(
+      `insert into public.audit_log
+         (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+       values ($1, null, 'system', 'evidence.artefact_orphaned', 'evidence', null, $2)`,
+      [owner.organisationId, 'Something went wrong with a file. No path was written down.'],
+    );
+
+    const said: { message: string; detail?: Record<string, unknown> }[] = [];
+    const result = await sweepRetention(
+      pool,
+      (message, detail) => said.push({ message, ...(detail ? { detail } : {}) }),
+      new Date(),
+      500,
+      memoryStorage(),
+    );
+
+    expect(result.artefactsUnreadable).toBeGreaterThanOrEqual(1);
+    const line = said.find((entry) => entry.message === 'orphaned artefact has no readable path');
+    expect(line).toBeDefined();
+    // The audit row's own id, because that is the only thing a person can look
+    // the row up by: there is no path and no entity id.
+    expect(line!.detail?.auditLogId).toBeTruthy();
+  }, 60_000);
+
+  it('says what is outstanding on a sweep where nothing else happened', async () => {
+    /*
+     * All four event counters are zero both on a sweep with nothing to do and on
+     * a sweep whose only remaining work is work the store keeps refusing. The
+     * log line was suppressed on all-zero, so the second case said nothing at
+     * all, for ever, while bytes a deletion record calls deleted sat in a
+     * bucket.
+     */
+    const path = 'assessments/standing/evidence/refused';
+    await rollbackOrphan(path);
+    resetRetentionNotices();
+
+    const said: { message: string; detail?: Record<string, unknown> }[] = [];
+    const result = await sweepRetention(
+      pool,
+      (message, detail) => said.push({ message, ...(detail ? { detail } : {}) }),
+      new Date(),
+      500,
+      refusingStorage(),
+    );
+
+    expect(result.evidenceDeleted).toBe(0);
+    expect(result.artefactsOrphaned).toBe(0);
+    expect(result.artefactsRecovered).toBe(0);
+    expect(result.artefactsOutstanding).toBeGreaterThanOrEqual(1);
+
+    const summary = said.find((entry) => entry.message === 'retention sweep');
+    expect(summary).toBeDefined();
+    expect(summary!.detail?.artefactsOutstanding).toBe(result.artefactsOutstanding);
+  }, 60_000);
+
+  it('says it once a day and not every five minutes', async () => {
+    // The sweep runs 288 times a day. A standing condition repeated that often
+    // is a quieter warning than one sentence, not a louder one.
+    resetRetentionNotices();
+    const lines: string[] = [];
+    const log = (message: string) => lines.push(message);
+    const now = new Date();
+    await sweepRetention(pool, log, now, 500, refusingStorage());
+    const again: string[] = [];
+    await sweepRetention(pool, (message) => again.push(message), now, 500, refusingStorage());
+
+    expect(lines).toContain('retention sweep');
+    expect(again).not.toContain('retention sweep');
   }, 60_000);
 });

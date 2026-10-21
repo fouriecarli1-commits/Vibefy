@@ -168,6 +168,27 @@ export interface RetentionSweepResult {
    */
   readonly artefactsOrphaned: number;
   readonly artefactsRecovered: number;
+  /**
+   * Orphans still standing when this sweep ends, new ones included.
+   *
+   * Every other number here is a thing that happened, and all four of them are
+   * zero on a sweep that found nothing to do — which is also what they read as
+   * when the only work left is work the object store keeps refusing. The log
+   * line was suppressed on all-zero, so a standing pile of bytes that
+   * `retention_deletions` asserts are deleted said nothing at all, for ever,
+   * while a customer's screenshots sat in a bucket past the period the privacy
+   * policy names. This is the state, not an event: counted every sweep, said
+   * once a day.
+   */
+  readonly artefactsOutstanding: number;
+  /**
+   * Of those, the ones no retry can clear: the path could not be read back.
+   *
+   * A subset of `artefactsOutstanding`, counted apart because the remedy is
+   * different — the retry pass will try these for ever and get nowhere, so they
+   * need a person. The skip used to be a bare `continue`.
+   */
+  readonly artefactsUnreadable: number;
 }
 
 /**
@@ -185,6 +206,68 @@ export interface RetentionSweepResult {
  */
 export const ARTEFACT_ORPHANED = 'evidence.artefact_orphaned';
 export const ARTEFACT_REMOVED_LATER = 'evidence.artefact_removed_later';
+
+/**
+ * Standing retention conditions already said out loud today.
+ *
+ * Same reasoning as `spendNotices`, and the rule itself is in `said-once.ts`: a
+ * backlog of bytes we could not delete is a state, not a moment, and a sweep
+ * running every five minutes would otherwise write the same sentence 288 times
+ * a day.
+ */
+const retentionNotices = saidOnceADay();
+
+/** Forgets what has been said. Exported for tests, which share one process. */
+export function resetRetentionNotices(): void {
+  retentionNotices.forget();
+}
+
+/**
+ * What identifies an orphan, for matching a recovery to the row it resolves.
+ *
+ * The path, and not `entity_id`. `entity_id` is null for every orphan
+ * `persist.ts` writes — a run rolled back after its artefacts were stored has
+ * no evidence row to name — and `later.entity_id = l.entity_id` is never true
+ * when both sides are null, so the `not exists` that is supposed to stop the
+ * retry could not see the recovery row it had just written. Measured on
+ * 2026-10-21: a rolled-back orphan was re-removed on every sweep for ever, each
+ * pass counting a recovery that had already happened and appending another
+ * `artefact_removed_later` row — 288 rows a day, per orphan, into an
+ * append-only table, with `artefactsRecovered` reporting work being done.
+ *
+ * `after_state` carries the path for rows written from here on. The `substring`
+ * reads it back out of the summary for rows written before that, which is where
+ * it was the only place it appeared; both producers word that clause the same
+ * way, which is now a thing a test holds rather than a coincidence.
+ */
+const ORPHAN_PATH = `coalesce(after_state->>'storage_path',
+                 substring(summary from 'artefact at ([^ ]+)\\.'))`;
+
+/**
+ * Orphans with no recovery row: bytes we are still holding.
+ *
+ * Shaped as a fragment because two callers need exactly this set — the pass
+ * that retries them and the count that reports what is left. A second,
+ * near-identical predicate is how the two drift apart.
+ */
+const UNRESOLVED_ORPHANS = `
+      with orphan as (
+        select id, entity_id, occurred_at, action, summary, ${ORPHAN_PATH} as storage_path
+          from public.audit_log
+         where action in ($1, $2)
+      )
+      select o.id, o.entity_id, o.storage_path, o.summary
+        from orphan o
+       where o.action = $1
+         and not exists (
+           select 1
+             from orphan later
+            where later.action = $2
+              and (
+                later.storage_path = o.storage_path
+                or (o.entity_id is not null and later.entity_id = o.entity_id)
+              )
+         )`;
 
 /**
  * Deletes what is past its deadline, and records that it did.
@@ -215,6 +298,8 @@ export async function sweepRetention(
     alertsDeleted: 0,
     artefactsOrphaned: 0,
     artefactsRecovered: 0,
+    artefactsOutstanding: 0,
+    artefactsUnreadable: 0,
   };
   try {
     const { rows } = await client.query<{
@@ -297,8 +382,10 @@ export async function sweepRetention(
             await client
               .query(
                 `insert into public.audit_log
-                   (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
-                 values ($1, null, 'system', $2, 'evidence', $3, $4)`,
+                   (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary,
+                    after_state)
+                 values ($1, null, 'system', $2, 'evidence', $3, $4,
+                         jsonb_build_object('storage_path', $5::text))`,
                 [
                   record.organisationId,
                   ARTEFACT_ORPHANED,
@@ -306,6 +393,10 @@ export async function sweepRetention(
                   `The retention sweep deleted the evidence row and recorded the deletion, and the ` +
                     `object store refused to remove the artefact at ${path}. We still hold those ` +
                     `bytes. ${error instanceof Error ? error.message : String(error)}`,
+                  // Also in a column, because the retry pass has to match a
+                  // recovery to the orphan it resolves, and a sentence is a
+                  // poor key.
+                  path,
                 ],
               )
               .catch((writeError: unknown) => {
@@ -342,33 +433,54 @@ export async function sweepRetention(
      * the only place it was written down.
      */
     if (storage) {
-      const orphans = await client.query<{ id: string; entity_id: string; summary: string }>(
-        `select l.id, l.entity_id, l.summary
-           from public.audit_log l
-          where l.action = $1
-            and not exists (
-              select 1 from public.audit_log later
-               where later.action = $2
-                 and later.entity_id = l.entity_id
-            )
-          order by l.occurred_at
-          limit $3`,
-        [ARTEFACT_ORPHANED, ARTEFACT_REMOVED_LATER, limit],
-      );
+      const orphans = await client.query<{
+        id: string;
+        entity_id: string | null;
+        storage_path: string | null;
+        summary: string;
+      }>(`${UNRESOLVED_ORPHANS} order by o.occurred_at limit $3`, [
+        ARTEFACT_ORPHANED,
+        ARTEFACT_REMOVED_LATER,
+        limit,
+      ]);
       for (const orphan of orphans.rows) {
-        const path = /artefact at ([^\s]+)\./.exec(orphan.summary)?.[1];
-        if (!path) continue;
+        const path = orphan.storage_path;
+        if (!path) {
+          /*
+           * A row we cannot act on, said so rather than skipped.
+           *
+           * This was a bare `continue`. The path is the only thing that makes
+           * an orphan actionable, and a row whose path cannot be read back is
+           * both invisible to this pass for ever and holding one of the `limit`
+           * places in it — so enough of them crowd out the orphans a retry
+           * would actually clear, and the sweep stops draining without ever
+           * saying so. Counted every pass; the line is rationed per row,
+           * because the remedy is a person reading the audit row by its id.
+           */
+          result.artefactsUnreadable += 1;
+          if (retentionNotices.due(`unreadable:${orphan.id}`, now)) {
+            log('orphaned artefact has no readable path', {
+              auditLogId: orphan.id,
+              entityId: orphan.entity_id,
+            });
+          }
+          continue;
+        }
         try {
           await storage.remove(path);
           await client.query(
             `insert into public.audit_log
-               (actor_id, actor_role, action, entity_type, entity_id, summary)
-             values (null, 'system', $1, 'evidence', $2, $3)`,
+               (actor_id, actor_role, action, entity_type, entity_id, summary, after_state)
+             values (null, 'system', $1, 'evidence', $2, $3,
+                     jsonb_build_object('storage_path', $4::text))`,
             [
               ARTEFACT_REMOVED_LATER,
               orphan.entity_id,
               `The artefact at ${path}, which an earlier sweep could not remove, has now been ` +
                 `removed. The deletion record for it was always correct; for a time it was early.`,
+              // What makes this row findable from the orphan it resolves.
+              // `entity_id` is null for everything `persist.ts` writes.
+              path,
             ],
           );
           result.artefactsRecovered += 1;
@@ -385,6 +497,21 @@ export async function sweepRetention(
       }
     }
 
+    /*
+     * What is left standing, counted whether or not this sweep could retry it.
+     *
+     * After the retry pass, so a recovery is not reported as a backlog. The
+     * same predicate as the pass above, deliberately sharing one fragment: a
+     * second near-identical one is how the number and the work it describes
+     * come apart. No `limit` — the point is the size of the pile, not a page of
+     * it, and `limit` is why a truncated page could never have told us.
+     */
+    const outstanding = await client.query<{ outstanding: string }>(
+      `select count(*) as outstanding from (${UNRESOLVED_ORPHANS}) unresolved`,
+      [ARTEFACT_ORPHANED, ARTEFACT_REMOVED_LATER],
+    );
+    result.artefactsOutstanding = Number(outstanding.rows[0]?.outstanding ?? 0);
+
     // Alerts are a record of what we told someone, kept a year. No hash: there
     // is no artefact, only a row.
     const alerts = await client.query(
@@ -393,12 +520,25 @@ export async function sweepRetention(
     );
     result.alertsDeleted = alerts.rowCount ?? 0;
 
-    if (
+    /*
+     * Said when something happened, and said while something is standing.
+     *
+     * The second half is the one that was missing. All four event counters are
+     * zero on a sweep that found nothing to do, and also on a sweep whose only
+     * remaining work is work the object store keeps refusing — so the line was
+     * suppressed in exactly the case worth reading. Rationed by the count, so a
+     * pile that is the same size tomorrow is mentioned again tomorrow and a
+     * pile that changes today is mentioned when it changes.
+     */
+    const somethingHappened =
       result.evidenceDeleted > 0 ||
       result.alertsDeleted > 0 ||
       result.artefactsOrphaned > 0 ||
-      result.artefactsRecovered > 0
-    ) {
+      result.artefactsRecovered > 0;
+    const backlogWorthSaying =
+      result.artefactsOutstanding > 0 &&
+      retentionNotices.due(`outstanding:${result.artefactsOutstanding}`, now);
+    if (somethingHappened || backlogWorthSaying) {
       log('retention sweep', { ...result });
     }
     return result;

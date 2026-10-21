@@ -662,8 +662,9 @@ describe('a rollback whose cleanup also failed', () => {
 
   const orphanRows = async (appId: string) =>
     (
-      await db.query<{ summary: string }>(
-        `select summary from public.audit_log
+      await db.query<{ summary: string; storage_path: string | null }>(
+        `select summary, after_state->>'storage_path' as storage_path
+           from public.audit_log
           where action = 'evidence.artefact_orphaned' and organisation_id = $1`,
         [owner.organisationId],
       )
@@ -701,6 +702,18 @@ describe('a rollback whose cleanup also failed', () => {
     expect(rows[0]!.summary).toMatch(/artefact at \S+/);
     // And the sentence that says why this needs its own record at all.
     expect(rows[0]!.summary).toMatch(/retention sweep cannot reach it/i);
+    /*
+     * The path in a column too, which is the contract with `sweepRetention`.
+     *
+     * `entity_id` is null on every row this produces — there is no evidence row
+     * to name — and the sweep's retry pass matched a recovery to its orphan on
+     * `entity_id`, which is never equal when both sides are null. So it removed
+     * these bytes again on every sweep for ever and appended an audit row each
+     * time, counting a recovery. The path is what identifies an orphan, and
+     * this is where the pass reads it.
+     */
+    expect(rows[0]!.storage_path).toBeTruthy();
+    expect(rows[0]!.summary).toContain(rows[0]!.storage_path!);
   }, 120_000);
 
   it('records nothing when the store lets go', async () => {
