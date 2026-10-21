@@ -68,6 +68,46 @@ describe('where the line it keeps and the line it cuts differ', () => {
   });
 });
 
+describe('a comment end inside a string', () => {
+  /*
+   * The failure that took the regexes out. `runtime/http.ts` sends
+   * `accept: '*\/*'` as a header, and the `*\/` in that string closed the
+   * block comment above it while the `/*` opened another — blanking seventy
+   * lines of real code, including the call a test was asserting was there.
+   *
+   * The assertion that looked for it failed honestly. The `.not.toMatch`
+   * beside it had been passing for the wrong reason, which is the exact
+   * failure this file exists to prevent.
+   */
+  const header = `const headers = { accept: '*` + `/*' };\nconst real = compute();`;
+
+  it('does not eat the code after it', () => {
+    expect(commentsBlanked(header)).toContain('const real = compute();');
+    expect(withoutComments(header)).toContain('const real = compute();');
+  });
+
+  it('leaves the string itself alone', () => {
+    expect(commentsBlanked(header)).toContain("accept: '*" + "/*'");
+  });
+
+  it('still removes a real comment on the same kind of line', () => {
+    const mixed = `const a = "*` + `/"; // mentions dangerous()\nkeep();`;
+    expect(commentsBlanked(mixed)).not.toContain('dangerous()');
+    expect(commentsBlanked(mixed)).toContain('keep();');
+    expect(commentsBlanked(mixed)).toContain('"*' + '/"');
+  });
+
+  it('is not confused by an apostrophe in a comment', () => {
+    // The other direction: a quote inside a comment must not open a string
+    // that swallows the code after it.
+    const source = "// somebody's note\nconst real = 1;\n// another's\nconst second = 2;";
+    const blanked = commentsBlanked(source);
+    expect(blanked).toContain('const real = 1;');
+    expect(blanked).toContain('const second = 2;');
+    expect(blanked).not.toContain('note');
+  });
+});
+
 describe('the variant that keeps the lines where they were', () => {
   /*
    * Two assertions in this suite report a line number, and `withoutComments`

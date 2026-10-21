@@ -74,10 +74,88 @@ export function withoutComments(source: string): string {
  * becomes a space and every newline stays.
  */
 export function commentsBlanked(source: string): string {
-  return source
-    .replace(
-      /(^|\s)\/\/.*$/gm,
-      (match, before: string) => before + ' '.repeat(match.length - before.length),
-    )
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '));
+  return scan(source, 'blank');
+}
+
+/**
+ * Comments found by reading the file rather than by pattern.
+ *
+ * The regexes above cannot see a string, and a string can contain the end of a
+ * comment. `packages/engine/src/runtime/http.ts` has `accept: '*\/*'` in a
+ * header literal, which closed the block comment above it and opened another —
+ * blanking seventy lines of real code, including the call a test was asserting
+ * was there. The assertion failed honestly; the one beside it, `.not.toMatch`,
+ * had been passing for the wrong reason, which is the exact failure the shared
+ * stripper exists to prevent and the reason this file's own header says a
+ * stripper that can delete the thing being looked for can make any assertion
+ * pass.
+ *
+ * So this walks the characters once, which is the only way to tell a comment
+ * from text that looks like one: quotes open strings, strings end at their own
+ * quote, and a comment opener inside one is three characters of a header value.
+ *
+ * One shape is still not handled, and saying so is cheaper than pretending
+ * otherwise: a regular expression literal is read as division, so a regex
+ * containing a quote — `/'/` — opens a string that runs to the next quote.
+ * Nothing in this repository is written that way, and the day something is, it
+ * shows up as a test that fails rather than one that passes.
+ */
+function scan(source: string, mode: 'blank' | 'remove'): string {
+  let out = '';
+  let index = 0;
+  const keep = (text: string) => {
+    out += text;
+  };
+  const drop = (text: string) => {
+    out += mode === 'blank' ? text.replace(/[^\n]/g, ' ') : text.replace(/[^\n]/g, '');
+  };
+
+  while (index < source.length) {
+    const char = source[index]!;
+    const next = source[index + 1];
+
+    if (char === '/' && next === '/') {
+      const end = source.indexOf('\n', index);
+      const stop = end === -1 ? source.length : end;
+      drop(source.slice(index, stop));
+      index = stop;
+      continue;
+    }
+
+    if (char === '/' && next === '*') {
+      const end = source.indexOf('*/', index + 2);
+      const stop = end === -1 ? source.length : end + 2;
+      drop(source.slice(index, stop));
+      index = stop;
+      continue;
+    }
+
+    if (char === "'" || char === '"' || char === '`') {
+      let cursor = index + 1;
+      while (cursor < source.length) {
+        if (source[cursor] === '\\') {
+          cursor += 2;
+          continue;
+        }
+        if (source[cursor] === char) {
+          cursor += 1;
+          break;
+        }
+        // A template literal may run over lines; the other two may not, and a
+        // newline inside one means the quote was never closed — an apostrophe
+        // in a comment this scanner has already passed, most likely. Stopping
+        // at the line keeps the damage to that line.
+        if (char !== '`' && source[cursor] === '\n') break;
+        cursor += 1;
+      }
+      keep(source.slice(index, cursor));
+      index = cursor;
+      continue;
+    }
+
+    keep(char);
+    index += 1;
+  }
+
+  return out;
 }

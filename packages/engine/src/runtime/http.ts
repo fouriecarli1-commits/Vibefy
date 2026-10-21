@@ -29,6 +29,7 @@ import {
   ScopeViolationError,
   waitForRateSlot,
 } from './scope.ts';
+import { redactCredentials } from './credentials.ts';
 import { redactHeaders } from './evidence.ts';
 import type { EvidenceStore } from './evidence.ts';
 import { classifyStop } from './stop.ts';
@@ -221,6 +222,7 @@ export class ScopedHttp {
       }
       const elapsedMs = Date.now() - startedAt;
       const keepBody = options.keepBody ?? true;
+      const bodyForStorage = redactCredentials(body.slice(0, 4000));
 
       const artefact = this.evidence.capture({
         kind: 'http_exchange',
@@ -233,7 +235,24 @@ export class ScopedHttp {
             // raw map stays on the `ScopedResponse` below, which is what the
             // header checks read.
             headers: redactHeaders(headers),
-            bodyPreview: keepBody ? body.slice(0, 4000) : null,
+            /*
+             * The body, with any credential in it replaced by its name.
+             *
+             * `redactHeaders` beside this takes a token out of a stored header
+             * under a careful rule and a paragraph explaining it, and the body
+             * was stored raw — in a product whose own copy says the commonest
+             * serious defect in an application built this way is a key that
+             * reaches the browser. That key is in the body. So the finding
+             * about a leaked credential was filed beside an artefact holding
+             * the credential, in our storage, under a retention clock.
+             *
+             * The locations survive, which is what a reviewer confirms a
+             * finding by; the value does not. `redactedCredentials` says what
+             * was taken out, so an empty preview is never mistaken for a page
+             * that returned nothing.
+             */
+            bodyPreview: keepBody ? bodyForStorage.text : null,
+            redactedCredentials: keepBody ? bodyForStorage.redacted : [],
             bodyRetained: keepBody,
             bodyLength: body.length,
             truncated,

@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Request } from 'playwright';
 import { waitForRateSlot, type ScopeGuard } from './scope.ts';
+import { redactCredentials } from './credentials.ts';
 import type { EvidenceStore } from './evidence.ts';
 
 export interface BrowserSessionOptions {
@@ -262,10 +263,27 @@ export class BrowserSession {
     const artefact = this.evidence.capture({
       kind: 'console_log',
       summary,
+      /*
+       * The same rule the stored response body is under.
+       *
+       * An application that logs its own token logs it into our evidence
+       * store, and a console entry is the single most likely place in a
+       * vibe-coded application for a key to appear in plain text — an
+       * assistant writes `console.log(supabaseKey)` while debugging and
+       * nobody takes it out. A page error carries the same risk in a stack
+       * trace, and a blocked request carries it in a URL.
+       */
       body: {
-        entries: this.consoleEntries,
-        pageErrors: this.pageErrors,
-        blocked: this.blockedRequests,
+        entries: this.consoleEntries.map((entry) => ({
+          ...entry,
+          text: redactCredentials(entry.text).text,
+          url: redactCredentials(entry.url).text,
+        })),
+        pageErrors: this.pageErrors.map((error) => redactCredentials(error).text),
+        blocked: this.blockedRequests.map((request) => ({
+          ...request,
+          url: redactCredentials(request.url).text,
+        })),
       },
     });
     return artefact.id;

@@ -34,7 +34,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import { SECRET_PATTERNS, scanText } from '../tools/secret-scan.mjs';
-import { credentialsOnLine } from '../packages/engine/src/stages/static-intake.ts';
+/*
+ * From the runtime since 2026-10-21, not from the stage.
+ *
+ * The patterns lived beside the scan that reports them, which left the capture
+ * paths unable to reach them — so an artefact kept the value a finding is
+ * about. They are in `runtime/credentials.ts` now, where the stage and the
+ * redactor both read them.
+ */
+import { credentialsOnLine } from '../packages/engine/src/runtime/credentials.ts';
 
 /** Long runs of plausible characters, built rather than written. */
 const run = (
