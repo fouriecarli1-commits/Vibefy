@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page, type Request } from 'playwright';
 import { waitForRateSlot, type ScopeGuard } from './scope.ts';
 import { redactCredentials } from './credentials.ts';
+import { redactTrace } from './trace.ts';
 import type { EvidenceStore } from './evidence.ts';
 
 export interface BrowserSessionOptions {
@@ -202,12 +203,26 @@ export class BrowserSession {
     const path = join(tmpdir(), `vibefycode-trace-${randomUUID()}.zip`);
     try {
       await this.context.tracing.stop({ path });
-      const body = await readFile(path);
+      /*
+       * Read, redacted, and written back as a zip.
+       *
+       * Measured on 2026-10-21 by driving a browser through a sign-in and
+       * opening the archive: the trace held the value typed into the password
+       * field — twice, in the call's parameters and in the log line beside it —
+       * and every `authorization`, `cookie`, `set-cookie` and `x-api-key` the
+       * run saw. So the artefact that evidences a sign-in carried the test
+       * account's password and a live session token for the application being
+       * assessed, in our storage, under a retention clock.
+       *
+       * `redactHeaders` has guarded the stored HTTP exchange beside it since
+       * the day evidence was built. This was the hole next to it.
+       */
+      const { zip, redacted } = redactTrace(await readFile(path));
       return this.evidence.capture({
         kind: 'playwright_trace',
-        summary,
+        summary: redacted.length === 0 ? summary : `${summary} (redacted: ${redacted.join(', ')})`,
         contentType: 'application/zip',
-        body,
+        body: zip,
       }).id;
     } catch {
       return null;
