@@ -155,6 +155,9 @@ body::before {
 .nav-cta:hover {
   background: var(--vibefycode-accent);
   color: var(--vibefycode-on-accent);
+  /* The same glow as `.button`, at the smaller size this one is. One product,
+     one idea of what a pressable thing does when you reach for it. */
+  box-shadow: 0 8px 22px -12px color-mix(in srgb, var(--vibefycode-accent) 80%, transparent);
 }
 
 /*
@@ -179,6 +182,34 @@ body::before {
     text-wrap: balance;
     letter-spacing: -0.02em;
     line-height: 1.15;
+  }
+
+  /*
+   * The biggest heading gets the tighter setting, and only it.
+   *
+   * One tracking value across four levels is what makes a page look typeset by
+   * nobody: at 3rem, -0.02em is loose, and at 1.1rem the same figure closes the
+   * letters up. Optical sizing does the rest where the typeface offers it.
+   */
+  h1 {
+    letter-spacing: -0.035em;
+    font-optical-sizing: auto;
+  }
+
+  h2 {
+    letter-spacing: -0.025em;
+  }
+
+  /*
+   * Prose that is read rather than scanned.
+   *
+   * A measure beyond about seventy-five characters costs the eye the start of
+   * the next line, which is the one thing a page of findings cannot afford.
+   * `max-w-prose` is applied by hand in a dozen places and missing from a
+   * dozen more; this is the floor under both.
+   */
+  p {
+    text-wrap: pretty;
   }
 
   code,
@@ -216,6 +247,179 @@ body::before {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ===========================================================================
+   Entrances
+   ---------------------------------------------------------------------------
+   A page that assembles itself in front of somebody reads as a product that is
+   doing something. A page that slides every element in reads as a slideshow,
+   so this is one movement, on the things that lead a page: a few pixels of
+   rise and a fade, once, fast.
+
+   `@media (prefers-reduced-motion: no-preference)` rather than a reset
+   afterwards: the rule above neutralises durations, and an element whose
+   starting state is `opacity: 0` would then stay invisible rather than
+   stopping still. Nothing here may hide content from somebody who asked for
+   less motion.
+   =========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  .rises {
+    animation: rise-in 420ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+
+  .rises-later {
+    animation: rise-in 420ms cubic-bezier(0.2, 0.7, 0.3, 1) 90ms both;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ===========================================================================
+   Buttons
+   ---------------------------------------------------------------------------
+   There was no button class. `ActionForm` carried four utilities inline, the
+   navigation had its own `.nav-cta`, and two buttons written this week said
+   `className="button"` against nothing at all and rendered as the browser's
+   default. Three answers to "what does a button look like here", one of them
+   being "it does not".
+
+   So: one class, and the look lives here. The glow is the accent colour at low
+   alpha behind the shape rather than a border that thickens — a border that
+   changes width on hover moves the text inside it, which reads as a flinch.
+
+   Motion is behaviour rather than decoration. The lift says the thing is
+   pressable, the press says it took the press, and both sit under the
+   reduced-motion rule above: somebody who has asked their machine to stop
+   moving things has asked this too.
+   =========================================================================== */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 0.7rem 1.15rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  background: var(--vibefycode-accent);
+  color: var(--vibefycode-on-accent);
+  /* The resting glow. Low enough that a page of buttons does not hum, present
+     enough that the shape sits above the surface rather than on it. */
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, #ffffff 18%, transparent) inset,
+    0 6px 18px -10px color-mix(in srgb, var(--vibefycode-accent) 70%, transparent);
+  transition:
+    transform 140ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 180ms ease,
+    filter 140ms ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, #ffffff 24%, transparent) inset,
+    0 10px 28px -12px color-mix(in srgb, var(--vibefycode-accent) 85%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--vibefycode-accent) 35%, transparent);
+}
+
+/* It took the press. Without this a button that is working feels like one that
+   did not register. */
+.button:active {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+  box-shadow:
+    0 2px 6px -4px color-mix(in srgb, var(--vibefycode-accent) 60%, transparent),
+    0 1px 2px 0 color-mix(in srgb, #000000 40%, transparent) inset;
+}
+
+.button:disabled,
+.button[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+}
+
+/* The sheen: a narrow band of light that crosses the face once on hover.
+   `::after` rather than a background animation, so the label is never
+   repainted and the text stays exactly where it is. */
+.button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    color-mix(in srgb, #ffffff 28%, transparent) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button:hover::after,
+  .button:focus-visible::after {
+    animation: button-sheen 620ms ease-out;
+  }
+}
+
+@keyframes button-sheen {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* The second kind. Same shape and the same motion, no fill: used where a
+   button is a way out rather than the thing to do. */
+.button-quiet {
+  background: transparent;
+  color: var(--vibefycode-text);
+  border-color: var(--vibefycode-border-interactive);
+  box-shadow: none;
+}
+
+.button-quiet:hover {
+  border-color: var(--vibefycode-accent);
+  color: var(--vibefycode-accent);
+  filter: none;
+  box-shadow: 0 8px 24px -16px color-mix(in srgb, var(--vibefycode-accent) 80%, transparent);
+}
+
+/* And the third, which is not a colour but a warning: used where pressing it
+   takes something away. */
+.button-destructive {
+  background: transparent;
+  color: var(--vibefycode-danger);
+  border-color: color-mix(in srgb, var(--vibefycode-danger) 55%, transparent);
+  box-shadow: none;
+}
+
+.button-destructive:hover {
+  border-color: var(--vibefycode-danger);
+  filter: none;
+  box-shadow: 0 8px 24px -16px color-mix(in srgb, var(--vibefycode-danger) 70%, transparent);
 }
 
 .vibefycode-gradient-text {
@@ -413,6 +617,9 @@ body::before {
 .nav-cta:hover {
   background: var(--vibefycode-accent);
   color: var(--vibefycode-on-accent);
+  /* The same glow as `.button`, at the smaller size this one is. One product,
+     one idea of what a pressable thing does when you reach for it. */
+  box-shadow: 0 8px 22px -12px color-mix(in srgb, var(--vibefycode-accent) 80%, transparent);
 }
 
 /* --- Narrow screens ------------------------------------------------------ */

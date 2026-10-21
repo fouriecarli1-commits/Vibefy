@@ -30,9 +30,16 @@ export function ActionForm({
       <button
         type="submit"
         disabled={pending}
-        className={`rounded-lg px-4 py-3 font-medium disabled:opacity-60 ${
-          destructive ? 'border border-line-strong text-bad' : 'bg-accent text-on-accent'
-        }`}
+        /*
+         * The shared class rather than four utilities written here.
+         *
+         * This was the only primary button in the console and it described
+         * itself: the navigation had its own look, and two buttons written in
+         * October said `className="button"` against a class that did not
+         * exist and rendered as the browser's default. One place decides what
+         * a pressable thing looks like now, and it is `globals.css`.
+         */
+        className={`button ${destructive ? 'button-destructive' : ''}`}
       >
         {pending ? (pendingLabel ?? 'Working…') : submitLabel}
       </button>
