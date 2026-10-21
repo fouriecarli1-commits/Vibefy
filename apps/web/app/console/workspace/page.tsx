@@ -50,7 +50,7 @@ export default async function WorkspacesPage() {
           } | null;
           if (!organisation) return null;
           return (
-            <li key={organisation.id} className="rounded-xl border border-line p-5">
+            <li key={organisation.id} className="card">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <h2 className="font-semibold">{organisation.name}</h2>
                 <span className="text-sm text-muted">you are {String(membership.role)}</span>
@@ -73,7 +73,7 @@ export default async function WorkspacesPage() {
         <h2 id="new" className="text-xl font-semibold">
           Create a shared workspace
         </h2>
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <ActionForm action={createWorkspace} submitLabel="Create workspace">
             <Field label="Name" name="name" required placeholder="Acme Digital" />
             <Select

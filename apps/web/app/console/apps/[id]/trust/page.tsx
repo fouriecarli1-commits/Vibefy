@@ -86,7 +86,7 @@ export default async function TrustPageEditor({ params }: { params: Promise<{ id
         </p>
       </section>
 
-      <section aria-labelledby="fields" className="space-y-4 rounded-xl border border-line p-6">
+      <section aria-labelledby="fields" className="space-y-4 card card-roomy">
         <h2 id="fields" className="text-lg font-semibold">
           Your details
         </h2>
@@ -134,7 +134,7 @@ export default async function TrustPageEditor({ params }: { params: Promise<{ id
       </section>
 
       {page && (
-        <section aria-labelledby="publish" className="space-y-4 rounded-xl border border-line p-6">
+        <section aria-labelledby="publish" className="space-y-4 card card-roomy">
           <h2 id="publish" className="text-lg font-semibold">
             {page.published ? 'It is on your verification page' : 'It is not published'}
           </h2>

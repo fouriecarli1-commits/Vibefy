@@ -247,7 +247,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
             const evidence =
               (finding.finding_evidence as unknown as { evidence_id: string }[]) ?? [];
             return (
-              <li key={finding.id as string} className="rounded-xl border border-line p-5">
+              <li key={finding.id as string} className="card">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <h3 className="font-semibold">{finding.title as string}</h3>
                   <span
@@ -320,7 +320,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           independence policy checkable rather than merely stated.
         </p>
 
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <h3 className="font-semibold">Approve</h3>
           <ActionForm action={approveAssessment} submitLabel="Approve">
             <input type="hidden" name="assessmentId" value={id} />
@@ -333,7 +333,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           </ActionForm>
         </div>
 
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <h3 className="font-semibold">Adjust the score</h3>
           <ActionForm action={adjustAssessment} submitLabel="Record adjustment">
             <input type="hidden" name="assessmentId" value={id} />
@@ -354,7 +354,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           </ActionForm>
         </div>
 
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <h3 className="font-semibold">Reject</h3>
           <ActionForm action={rejectAssessment} submitLabel="Reject" destructive>
             <input type="hidden" name="assessmentId" value={id} />

@@ -38,10 +38,7 @@ export default async function SsoPage({ params }: { params: Promise<{ id: string
       </section>
 
       {(connections ?? []).map((connection) => (
-        <section
-          key={connection.id as string}
-          className="space-y-4 rounded-xl border border-line p-5"
-        >
+        <section key={connection.id as string} className="space-y-4 card">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 className="font-semibold">{String(connection.email_domain)}</h2>
             <span className="text-sm text-muted">
@@ -89,7 +86,7 @@ export default async function SsoPage({ params }: { params: Promise<{ id: string
         <h2 id="claim" className="text-xl font-semibold">
           Claim a domain
         </h2>
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <ActionForm action={saveSsoConnection} submitLabel="Claim domain">
             <input type="hidden" name="organisationId" value={id} />
             <Field label="Email domain" name="emailDomain" required placeholder="acme.example" />

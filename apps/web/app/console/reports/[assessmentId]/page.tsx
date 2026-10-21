@@ -138,7 +138,7 @@ export default async function ReportPage({
        * their site without scrolling is exactly the person this is for, and
        * the count is the thing they will notice.
        */}
-      <section aria-labelledby="statement" className="rounded-xl border border-line p-5">
+      <section aria-labelledby="statement" className="card">
         <h2 id="statement" className="font-semibold">
           A draft accessibility statement for {page.source.appName}
         </h2>
@@ -169,7 +169,7 @@ export default async function ReportPage({
         </details>
       </section>
 
-      <section aria-labelledby="appeal" className="rounded-xl border border-line p-5">
+      <section aria-labelledby="appeal" className="card">
         <h2 id="appeal" className="font-semibold">
           Disagree with something here?
         </h2>

@@ -54,7 +54,10 @@ describe('the console overview', () => {
     );
     expect(reader).toContain('whatComesNext(');
     expect(reader).toMatch(/from public\.apps/);
-    expect(overview).toMatch(/Your next step/);
+    // The label is the action and the sentence follows it; the words moved
+    // when the card was restyled, and what is held is that both are there.
+    expect(overview).toMatch(/Next step/);
+    expect(overview).toMatch(/next\.what/);
   });
 
   it('links each application to its own page', () => {

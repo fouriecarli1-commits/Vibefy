@@ -710,9 +710,35 @@ body::before {
     box-shadow 200ms ease;
 }
 
+/*
+ * The outlined card.
+ *
+ * Eighty-six places in this product drew one by hand —
+ * `rounded-xl border border-line p-5`, with nine variations of what followed —
+ * which is the same thing the buttons were doing: a treatment that exists and
+ * has no name, so it is retyped and drifts. `.panel` is the filled one for
+ * grouped content; this is the outlined one for an item in a list, and the
+ * difference between them is now a word rather than four utilities.
+ */
+.card {
+  border: 1px solid var(--vibefycode-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: 0 1px 0 0 color-mix(in srgb, #ffffff 4%, transparent) inset;
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    border-color 160ms ease,
+    box-shadow 200ms ease;
+}
+
+.card-roomy {
+  padding: var(--space-6, 24px);
+}
+
 /* A card you can go into lifts when you reach for it. One that is only text
    does not, because a thing that moves and does nothing is a lie about what a
    click would do. */
+.card:has(a):hover,
 .panel:has(a):hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--vibefycode-accent) 35%, var(--vibefycode-border));

@@ -109,7 +109,7 @@ export default async function CostsPage() {
         */}
         <dl className="grid gap-4 sm:grid-cols-3">
           {ceilingPanel.map((item) => (
-            <div key={item.label} className="rounded-xl border border-line p-5">
+            <div key={item.label} className="card">
               <dt className="text-sm text-muted">{item.label}</dt>
               <dd className="mt-1 text-2xl font-bold tracking-tight">
                 ${item.valueUsd.toFixed(2)}

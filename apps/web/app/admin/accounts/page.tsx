@@ -141,7 +141,7 @@ export default async function AccountsPage() {
         <section
           key={row.organisationId}
           aria-labelledby={`org-${row.organisationId}`}
-          className="space-y-5 rounded-xl border border-line p-6"
+          className="space-y-5 card card-roomy"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 id={`org-${row.organisationId}`} className="text-xl font-bold">

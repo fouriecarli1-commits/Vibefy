@@ -38,7 +38,7 @@ export default async function BrandingPage({ params }: { params: Promise<{ id: s
         </p>
       </section>
 
-      <div className="rounded-xl border border-line p-5">
+      <div className="card">
         <ActionForm action={saveBranding} submitLabel="Save branding">
           <input type="hidden" name="organisationId" value={id} />
           <Field

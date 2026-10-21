@@ -100,7 +100,7 @@ export default async function BadgeRegisterPage() {
           const app = badge.apps as unknown as { name: string } | null;
           const badgeMismatches = mismatchByBadge.get(String(badge.id)) ?? [];
           return (
-            <li key={badge.id as string} className="space-y-4 rounded-xl border border-line p-5">
+            <li key={badge.id as string} className="space-y-4 card">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <div>
                   <h2 className="font-semibold">{app?.name ?? 'Application'}</h2>

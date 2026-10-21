@@ -74,13 +74,13 @@ export default async function ScreeningQueuePage() {
       </header>
 
       {queue.length === 0 ? (
-        <p className="rounded-xl border border-line p-5 text-sm text-muted">
+        <p className="card text-sm text-muted">
           An empty queue here is a claim worth making, because it is a queue and not an inbox.
         </p>
       ) : (
         <ul className="space-y-6">
           {queue.map((app) => (
-            <li key={app.id as string} className="space-y-4 rounded-xl border border-line p-5">
+            <li key={app.id as string} className="space-y-4 card">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <h2 className="font-semibold">{String(app.name)}</h2>
                 <span className="text-sm text-muted">

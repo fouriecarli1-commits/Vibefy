@@ -98,7 +98,7 @@ export default async function NewAppPage({
         />
         <Field label="Who is it for?" name="targetAudience" />
 
-        <fieldset className="space-y-3 rounded-xl border border-line p-5">
+        <fieldset className="space-y-3 card">
           <legend className="px-2 text-sm font-medium">What it handles</legend>
           <p className="text-sm text-muted">
             These are claims we go looking to confirm, not facts we take on trust. Answering

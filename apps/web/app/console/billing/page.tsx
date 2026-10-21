@@ -216,7 +216,7 @@ export default async function BillingPage({
                 : Math.min(1, meter.limit === 0 ? 1 : meter.used / meter.limit);
             const spent = meter.limit !== null && meter.used >= meter.limit;
             return (
-              <div key={meter.label} className="rounded-xl border border-line p-5">
+              <div key={meter.label} className="card">
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className="font-medium">{meter.label}</h3>
                   <p className="text-sm tabular-nums" data-numeric>

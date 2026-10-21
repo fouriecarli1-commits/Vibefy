@@ -440,7 +440,7 @@ export default async function HealthPage() {
         </header>
         <ul className="space-y-4">
           {open.map((check) => (
-            <li key={check.question} className="rounded-xl border border-line p-5">
+            <li key={check.question} className="card">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <h2 className="font-semibold">{check.question}</h2>
                 <span
@@ -586,7 +586,7 @@ export default async function HealthPage() {
 
       <ul className="space-y-4">
         {checks.map((check) => (
-          <li key={check.question} className="rounded-xl border border-line p-5">
+          <li key={check.question} className="card">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
               <h2 className="font-semibold">{check.question}</h2>
               <span

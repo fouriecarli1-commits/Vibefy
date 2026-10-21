@@ -70,7 +70,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               email: string;
             } | null;
             return (
-              <li key={membership.id as string} className="rounded-xl border border-line p-5">
+              <li key={membership.id as string} className="card">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <span className="font-medium">
                     {person?.full_name ?? person?.email ?? 'Member'}
@@ -112,7 +112,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         <h2 id="invite" className="text-xl font-semibold">
           Invite someone
         </h2>
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <p className="mb-4 text-sm text-muted">
             We do not send invitation emails yet. The link is shown to you once, when you create the
             invitation, and we cannot show it again — only its hash is stored. Pass it on yourself.
@@ -136,10 +136,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         {(invitations ?? []).length > 0 && (
           <ul className="space-y-3">
             {(invitations ?? []).map((invitation) => (
-              <li
-                key={invitation.id as string}
-                className="rounded-xl border border-line p-5 text-sm"
-              >
+              <li key={invitation.id as string} className="card text-sm">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <span className="font-medium">{String(invitation.email)}</span>
                   <span className="text-muted">

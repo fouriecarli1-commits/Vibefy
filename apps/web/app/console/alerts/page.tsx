@@ -52,7 +52,7 @@ export default async function AlertsPage() {
       </header>
 
       {error && (
-        <p role="alert" className="rounded-xl border border-line p-5 text-bad">
+        <p role="alert" className="card text-bad">
           Could not load your alerts: {error.message}
         </p>
       )}
@@ -69,7 +69,7 @@ export default async function AlertsPage() {
       )}
 
       {(alerts ?? []).length === 0 ? (
-        <p className="rounded-xl border border-line p-5 text-sm text-muted">
+        <p className="card text-sm text-muted">
           Nothing yet. Alerts appear here once an application of yours is being monitored.
         </p>
       ) : (

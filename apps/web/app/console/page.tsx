@@ -145,13 +145,15 @@ export default async function ConsolePage() {
           <h2 id="applications" className="text-xl font-semibold">
             Your applications
           </h2>
-          <Link href="/console/apps/new" className="nav-cta">
+          {/* The one action this page exists for, as a button rather than a
+              chip in the corner. */}
+          <Link href="/console/apps/new" className="button">
             Add an application
           </Link>
         </div>
 
         {apps === null && (
-          <p role="alert" className="rounded-xl border border-line p-5 text-bad">
+          <p role="alert" className="card text-bad">
             Your applications could not be loaded just now. Nothing has happened to them — this is a
             fault on our side, and it is recorded.
           </p>
@@ -177,12 +179,19 @@ export default async function ConsolePage() {
                       these states already decides what the product will allow;
                       until now it was legible only by opening the page that
                       enforces it. */}
-                  <p className="text-sm">
-                    <span className="font-medium">
-                      {next.yours ? 'Your next step: ' : 'Waiting: '}
-                    </span>
-                    {next.href ? <Link href={next.href}>{next.label}</Link> : next.label}
-                    <span className="text-muted"> — {next.what}</span>
+                  {/* The step reads as the thing to do, not as another line
+                      of text on the card: the label is the action, in the
+                      accent, and the sentence explaining it follows quietly. */}
+                  <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+                    <span className="eyebrow">{next.yours ? 'Next step' : 'Waiting'}</span>
+                    {next.href ? (
+                      <Link href={next.href} className="font-medium">
+                        {next.label}
+                      </Link>
+                    ) : (
+                      <span className="font-medium">{next.label}</span>
+                    )}
+                    <span className="text-muted">{next.what}</span>
                   </p>
                 </li>
               );
@@ -212,7 +221,7 @@ export default async function ConsolePage() {
       <ConsoleCopilot />
 
       {error ? (
-        <p role="alert" className="rounded-xl border border-line p-5 text-bad">
+        <p role="alert" className="card text-bad">
           Could not load your workspaces: {error.message}
         </p>
       ) : (

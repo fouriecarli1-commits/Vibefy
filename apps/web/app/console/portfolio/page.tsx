@@ -92,7 +92,7 @@ export default async function PortfolioPage() {
       </header>
 
       {error && (
-        <p role="alert" className="rounded-xl border border-line p-5 text-bad">
+        <p role="alert" className="card text-bad">
           Could not load your portfolio: {error.message}
         </p>
       )}
@@ -111,7 +111,7 @@ export default async function PortfolioPage() {
               value: String((rows ?? []).filter((row) => row.badge_status === 'active').length),
             },
           ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-line p-5">
+            <div key={item.label} className="card">
               <dt className="text-sm text-muted">{item.label}</dt>
               <dd className="mt-1 text-2xl font-bold tracking-tight">{item.value}</dd>
             </div>
@@ -124,7 +124,7 @@ export default async function PortfolioPage() {
           Applications
         </h2>
         {(rows ?? []).length === 0 ? (
-          <p className="rounded-xl border border-line p-5 text-sm text-muted">
+          <p className="card text-sm text-muted">
             Nothing here yet. <Link href="/console/apps/new">Add an application</Link>.
           </p>
         ) : (
@@ -150,7 +150,7 @@ export default async function PortfolioPage() {
                   : null;
 
               return (
-                <li key={row.app_id} className="rounded-xl border border-line p-5">
+                <li key={row.app_id} className="card">
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <h3 className="font-semibold">
                       <Link href={`/console/apps/${row.app_id}`}>{row.name}</Link>

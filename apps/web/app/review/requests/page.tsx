@@ -51,7 +51,7 @@ export default async function ReviewRequestsPage() {
       </header>
 
       {open.length === 0 ? (
-        <p className="rounded-xl border border-line p-5 text-sm text-muted">
+        <p className="card text-sm text-muted">
           Nothing open. This queue being empty is a claim we can make because it is a queue and not
           an inbox.
         </p>
@@ -61,7 +61,7 @@ export default async function ReviewRequestsPage() {
             const due = new Date(request.due_at as string);
             const overdue = isOverdue(due, String(request.status) as RequestStatus);
             return (
-              <li key={request.id as string} className="rounded-xl border border-line p-5">
+              <li key={request.id as string} className="card">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <h2 className="font-semibold">
                     {String(request.request_type).replace(/_/g, ' ')}

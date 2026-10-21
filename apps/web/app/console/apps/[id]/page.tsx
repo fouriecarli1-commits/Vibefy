@@ -257,7 +257,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
       </header>
 
       {app.screening_status === 'refused' && (
-        <section role="alert" className="rounded-xl border border-line p-5">
+        <section role="alert" className="card">
           <h2 className="font-semibold text-bad">Refused under the Acceptable Use Policy</h2>
           <p className="mt-2 text-sm text-muted">{app.screening_notes}</p>
           <p className="mt-3 text-sm">
@@ -291,7 +291,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
         <p className="max-w-prose text-muted">{copy.meaning}</p>
 
         {status === 'none' && (
-          <div className="rounded-xl border border-line p-6">
+          <div className="card card-roomy">
             <h3 className="font-semibold">Accept the warranty and declare a scope</h3>
             <p className="mt-2 max-w-prose text-sm text-muted">
               Testing a system without authorisation is a criminal offence in every market we
@@ -344,7 +344,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
         )}
 
         {status === 'pending' && current && (
-          <div className="space-y-5 rounded-xl border border-line p-6">
+          <div className="space-y-5 card card-roomy">
             <h3 className="font-semibold">Prove you control {current.verification_target}</h3>
             <p className="max-w-prose text-sm text-muted">
               Pick <strong>one</strong> of these two. The second is usually easier if you can deploy
@@ -450,7 +450,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
         )}
 
         {status === 'verified' && current && (
-          <div className="space-y-5 rounded-xl border border-line p-6">
+          <div className="space-y-5 card card-roomy">
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="font-medium">Verified by</dt>
@@ -493,7 +493,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
         )}
 
         {status === 'revoked' && (
-          <div className="rounded-xl border border-line p-6">
+          <div className="card card-roomy">
             <p className="text-sm text-muted">
               Withdrawn: {current?.revocation_reason}. Submit a new authorisation to run again.
             </p>
@@ -502,10 +502,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
       </section>
 
       {status === 'verified' && (
-        <section
-          aria-labelledby="trust-page"
-          className="space-y-3 rounded-xl border border-line p-6"
-        >
+        <section aria-labelledby="trust-page" className="space-y-3 card card-roomy">
           <h2 id="trust-page" className="text-lg font-semibold">
             What you say about yourself
           </h2>
@@ -536,7 +533,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
               approved it — nothing is published before that.
             </p>
           ) : (
-            <div className="rounded-xl border border-line p-5">
+            <div className="card">
               {waiting && (
                 <p className="mb-4 rounded-lg border border-line bg-surface-muted p-4 text-sm">
                   This application was assessed on {waiting.since.toISOString().slice(0, 10)}. The{' '}
@@ -560,7 +557,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           {(assessments ?? []).length > 0 && (
             <ul className="space-y-3">
               {(assessments ?? []).map((assessment) => (
-                <li key={assessment.id as string} className="rounded-xl border border-line p-5">
+                <li key={assessment.id as string} className="card">
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <span className="font-medium">
                       {assessment.overall_score !== null
@@ -618,7 +615,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           </h2>
 
           {badge ? (
-            <div className="space-y-5 rounded-xl border border-line p-6">
+            <div className="space-y-5 card card-roomy">
               <div className="flex flex-wrap items-center gap-5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {/* The status belongs in the name of the picture, not only in
@@ -797,7 +794,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
               — those are separate gates, and neither can be bought.
             </p>
           ) : (
-            <div className="rounded-xl border border-line p-6">
+            <div className="card card-roomy">
               <h3 className="font-semibold">
                 {licence ? 'Accept the updated Badge Licence' : 'Accept the Badge Licence'}
               </h3>
@@ -837,12 +834,12 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           <h2 id="trend" className="text-2xl font-bold tracking-tight">
             Score over time
           </h2>
-          <div className="rounded-xl border border-line p-5">
+          <div className="card">
             <ScoreTrend points={trend} />
           </div>
 
           {drift && (
-            <div className="rounded-xl border border-line p-5">
+            <div className="card">
               <h3 className="font-semibold">
                 Since the assessment before it, on{' '}
                 {new Date(drift.created_at as string).toISOString().slice(0, 10)}
@@ -900,7 +897,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           <h2 id="monitoring" className="text-2xl font-bold tracking-tight">
             Monitoring
           </h2>
-          <div className="rounded-xl border border-line p-5 text-sm">
+          <div className="card text-sm">
             <p className="text-muted">
               With monitoring on we re-assess this application on your plan’s cadence and check that
               its certified origin is still answering. The check is a single GET request to that
@@ -968,7 +965,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           <h2 id="directory" className="text-2xl font-bold tracking-tight">
             Public directory
           </h2>
-          <div className="rounded-xl border border-line p-5 text-sm">
+          <div className="card text-sm">
             <p className="text-muted">
               The directory lists applications with a live badge. A listing shows the name, the
               certified origin, the score, the score by dimension, the rubric version and the date —
@@ -1024,7 +1021,7 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
           <h2 id="policy" className="text-xl font-semibold">
             Policy profile
           </h2>
-          <div className="rounded-xl border border-line p-5 text-sm">
+          <div className="card text-sm">
             <p className="text-muted">
               Your organisation’s own bar for this application. It is applied over a score that was
               computed without knowing the profile exists: it can fail an application the rubric

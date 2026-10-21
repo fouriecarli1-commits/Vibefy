@@ -43,14 +43,14 @@ export default async function ReviewAppealsPage() {
       </header>
 
       {(appeals ?? []).length === 0 ? (
-        <p className="rounded-xl border border-line p-5 text-sm text-muted">Nothing open.</p>
+        <p className="card text-sm text-muted">Nothing open.</p>
       ) : (
         <ul className="space-y-4">
           {(appeals ?? []).map((appeal) => {
             const due = new Date(appeal.due_at as string);
             const overdue = due.getTime() < Date.now();
             return (
-              <li key={appeal.id as string} className="rounded-xl border border-line p-5">
+              <li key={appeal.id as string} className="card">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <h2 className="font-semibold">
                     <Link href={`/console/reports/${appeal.assessment_id}`}>

@@ -117,7 +117,7 @@ export default async function BuilderProfilePage({
         </p>
       </header>
 
-      <section aria-labelledby="address" className="space-y-4 rounded-xl border border-line p-6">
+      <section aria-labelledby="address" className="space-y-4 card card-roomy">
         <h2 id="address" className="text-lg font-semibold">
           The address and the name
         </h2>
@@ -145,10 +145,7 @@ export default async function BuilderProfilePage({
       </section>
 
       {profile && (
-        <section
-          aria-labelledby="published"
-          className="space-y-4 rounded-xl border border-line p-6"
-        >
+        <section aria-labelledby="published" className="space-y-4 card card-roomy">
           <h2 id="published" className="text-lg font-semibold">
             {profile.published ? 'Your page is live' : 'Your page is not published'}
           </h2>

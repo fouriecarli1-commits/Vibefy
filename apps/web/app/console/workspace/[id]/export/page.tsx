@@ -43,7 +43,7 @@ export default async function ExportPage({ params }: { params: Promise<{ id: str
         </h2>
         <ul className="space-y-3">
           {Object.entries(AUDIT_EXPORT_KINDS).map(([kind, description]) => (
-            <li key={kind} className="rounded-xl border border-line p-5 text-sm">
+            <li key={kind} className="card text-sm">
               <p className="font-medium">{kind.replace(/_/g, ' ')}</p>
               <p className="mt-1 text-muted">{description}</p>
               <p className="mt-3 flex gap-5">

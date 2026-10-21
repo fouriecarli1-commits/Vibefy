@@ -104,10 +104,35 @@ describe('the pages it reaches', () => {
     expect(offenders, `these still describe a button:\n${offenders.join('\n')}`).toEqual([]);
   });
 
+  it('names the outlined card the console draws eighty-six times', () => {
+    /*
+     * The same thing the buttons were doing: a treatment that exists and has no
+     * name, so it is retyped and drifts — `rounded-xl border border-line p-5`
+     * with nine variations of what followed. `.panel` is the filled one for
+     * grouped content; `.card` is the outlined one for an item in a list.
+     *
+     * The surfaces she works in were moved first: the console, the review queue
+     * and the admin pages. The marketing pages still draw their own, which is
+     * written down rather than left as a surprise.
+     */
+    expect(css).toMatch(/^\.card \{/m);
+    const working = execFileSync(
+      'git',
+      ['ls-files', 'apps/web/app/console', 'apps/web/app/review', 'apps/web/app/admin'],
+      { encoding: 'utf8' },
+    )
+      .split('\n')
+      .filter((path) => path.endsWith('.tsx'));
+    const handDrawn = working.filter((path) =>
+      /rounded-xl border border-line p-[56]/.test(readFileSync(path, 'utf8')),
+    );
+    expect(handDrawn, `these still draw their own card:\n${handDrawn.join('\n')}`).toEqual([]);
+  });
+
   it('gives a card you can go into something to do when you reach for it', () => {
     // And gives one that is only text nothing to do, because a thing that
     // moves and does nothing is a lie about what a click would do.
-    expect(css).toMatch(/\.panel:has\(a\):hover \{/);
+    expect(css).toMatch(/\.card:has\(a\):hover,\n\.panel:has\(a\):hover \{/);
     expect(css.slice(css.indexOf('.panel {'), css.indexOf('.panel:has'))).toMatch(/box-shadow:/);
   });
 

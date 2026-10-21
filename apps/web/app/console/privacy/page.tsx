@@ -79,7 +79,7 @@ export default async function PrivacyPage() {
         <h2 id="make" className="text-xl font-semibold">
           Make a request
         </h2>
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <ActionForm action={submitDataRequest} submitLabel="Submit request">
             <Select
               label="What are you asking for?"
@@ -98,7 +98,7 @@ export default async function PrivacyPage() {
 
         <div className="space-y-3">
           {REQUEST_KINDS.map((kind) => (
-            <details key={kind.type} className="rounded-xl border border-line p-5 text-sm">
+            <details key={kind.type} className="card text-sm">
               <summary className="cursor-pointer font-medium">{kind.label}</summary>
               <p className="mt-3 text-muted">{kind.promise}</p>
             </details>
@@ -117,10 +117,7 @@ export default async function PrivacyPage() {
               const due = new Date(request.due_at as string);
               const overdue = isOverdue(due, status);
               return (
-                <li
-                  key={request.id as string}
-                  className="rounded-xl border border-line p-5 text-sm"
-                >
+                <li key={request.id as string} className="card text-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <span className="font-medium">
                       {String(request.request_type).replace(/_/g, ' ')}
@@ -152,7 +149,7 @@ export default async function PrivacyPage() {
         <h2 id="email" className="text-xl font-semibold">
           Alerts by email
         </h2>
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <p className="text-sm text-muted">
             We email you about your own applications — a re-assessment that found something
             different, an application that stopped answering, a badge about to expire. There is no
@@ -181,7 +178,7 @@ export default async function PrivacyPage() {
         </h2>
         <ul className="space-y-3">
           {RETENTION_SCHEDULE.map((rule) => (
-            <li key={rule.dataClass} className="rounded-xl border border-line p-5 text-sm">
+            <li key={rule.dataClass} className="card text-sm">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <span className="font-medium">{rule.dataClass.replace(/_/g, ' ')}</span>
                 <span className="text-muted">{rule.days} days</span>

@@ -44,7 +44,7 @@ export default async function PoliciesPage({ params }: { params: Promise<{ id: s
           </h2>
           <ul className="space-y-3">
             {(profiles ?? []).map((profile) => (
-              <li key={profile.id as string} className="rounded-xl border border-line p-5 text-sm">
+              <li key={profile.id as string} className="card text-sm">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
                   <span className="font-medium">{String(profile.name)}</span>
                   <span className="text-muted">{profile.is_default ? 'default' : ''}</span>
@@ -89,7 +89,7 @@ export default async function PoliciesPage({ params }: { params: Promise<{ id: s
         <h2 id="new" className="text-xl font-semibold">
           Add a profile
         </h2>
-        <div className="rounded-xl border border-line p-5">
+        <div className="card">
           <ActionForm action={savePolicyProfile} submitLabel="Save profile">
             <input type="hidden" name="organisationId" value={id} />
             <Field label="Name" name="name" required placeholder="Internal release bar" />
