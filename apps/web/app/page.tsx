@@ -28,7 +28,10 @@ export default function HomePage() {
   return (
     <div className="space-y-16">
       {/* --- The mark, at the size it deserves ------------------------------ */}
-      <section className="flex flex-col items-center gap-7 pt-4 text-center">
+      {/* The one movement on this page's own content: the lockup, the sentence
+          under it and the row of actions arrive a beat apart. Inside a
+          no-preference query, so a still page is still a whole one. */}
+      <section className="rises flex flex-col items-center gap-7 pt-4 text-center">
         {/*
           The founder's own artwork, served unmodified — mark and wordmark
           together, exactly as he drew them.
@@ -46,7 +49,7 @@ export default function HomePage() {
           <span className="hero-sheen" aria-hidden="true" />
         </div>
 
-        <div className="space-y-4">
+        <div className="rises-later space-y-4">
           <p className="eyebrow">The vibe app rating system</p>
           <h1 className="mx-auto max-w-3xl text-4xl font-bold sm:text-5xl">
             The trust layer for <span className="vibefycode-gradient-text">AI-built apps</span>
@@ -59,10 +62,7 @@ export default function HomePage() {
         </div>
 
         <div className="flex flex-wrap justify-center gap-3">
-          <Link
-            href="/sign-up"
-            className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent"
-          >
+          <Link href="/sign-up" className="button">
             Create an account
           </Link>
           {/* A button, beside the one for people who have never been here.
@@ -77,22 +77,13 @@ export default function HomePage() {
               It sits second, next to the other account action, so the two ways
               into an account are together and the two informational links
               follow. */}
-          <Link
-            href="/sign-in"
-            className="rounded-lg border border-line-strong px-5 py-3 font-medium"
-          >
+          <Link href="/sign-in" className="button button-quiet">
             Sign in
           </Link>
-          <Link
-            href="/how-it-works"
-            className="rounded-lg border border-line-strong px-5 py-3 font-medium"
-          >
+          <Link href="/how-it-works" className="button button-quiet">
             What happens to your app
           </Link>
-          <Link
-            href="/trust-check"
-            className="rounded-lg border border-line-strong px-5 py-3 font-medium"
-          >
+          <Link href="/trust-check" className="button button-quiet">
             Check an app before you pay
           </Link>
         </div>

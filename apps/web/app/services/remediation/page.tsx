@@ -187,16 +187,10 @@ export default function RemediationPage() {
       </section>
 
       <section className="flex flex-wrap gap-3">
-        <Link
-          href="/legal/rating-methodology-and-independence"
-          className="rounded-lg border border-line-strong px-5 py-3 font-medium"
-        >
+        <Link href="/legal/rating-methodology-and-independence" className="button button-quiet">
           The independence policy
         </Link>
-        <Link
-          href="/how-it-works"
-          className="rounded-lg border border-line-strong px-5 py-3 font-medium"
-        >
+        <Link href="/how-it-works" className="button button-quiet">
           What an assessment does
         </Link>
       </section>

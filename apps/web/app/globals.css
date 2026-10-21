@@ -698,6 +698,28 @@ body::before {
      spacing on this site as falling on no scale the first time it ran at
      phone width. The scale has to survive the breakpoints or it is not one. */
   padding: var(--space-4);
+  /* A hairline of light along the top edge and a shadow under the shape.
+     Depth rather than decoration: on a dark surface a card with no edge and no
+     shadow reads as a region of the page rather than as a thing. */
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, #ffffff 5%, transparent) inset,
+    0 10px 30px -24px color-mix(in srgb, #000000 90%, transparent);
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    border-color 160ms ease,
+    box-shadow 200ms ease;
+}
+
+/* A card you can go into lifts when you reach for it. One that is only text
+   does not, because a thing that moves and does nothing is a lie about what a
+   click would do. */
+.panel:has(a):hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--vibefycode-accent) 35%, var(--vibefycode-border));
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, #ffffff 8%, transparent) inset,
+    0 18px 40px -28px color-mix(in srgb, var(--vibefycode-accent) 60%, transparent),
+    0 12px 32px -26px color-mix(in srgb, #000000 90%, transparent);
 }
 
 @media (min-width: 40rem) {

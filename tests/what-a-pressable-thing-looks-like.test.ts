@@ -15,6 +15,7 @@
  * the marks — the brief forbids altering, recolouring or redrawing those, and a
  * facelift is exactly the moment somebody would.
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -83,6 +84,38 @@ describe('the movement', () => {
 
   it('still neutralises everything else for them', () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+  });
+});
+
+describe('the pages it reaches', () => {
+  const read = (path: string) => readFileSync(path, 'utf8');
+
+  it('leaves no page describing a button for itself', () => {
+    /*
+     * Seven files carried the same four utilities — `rounded-lg bg-accent px-5
+     * py-3 font-medium text-on-accent` — which is what a design system looks
+     * like before it is one: the day the accent moves, seven files are the
+     * place to change it and one of them is missed.
+     */
+    const pages = execFileSync('git', ['ls-files', 'apps/web'], { encoding: 'utf8' })
+      .split('\n')
+      .filter((path) => path.endsWith('.tsx'));
+    const offenders = pages.filter((path) => /rounded-lg bg-accent px-5 py-3/.test(read(path)));
+    expect(offenders, `these still describe a button:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  it('gives a card you can go into something to do when you reach for it', () => {
+    // And gives one that is only text nothing to do, because a thing that
+    // moves and does nothing is a lie about what a click would do.
+    expect(css).toMatch(/\.panel:has\(a\):hover \{/);
+    expect(css.slice(css.indexOf('.panel {'), css.indexOf('.panel:has'))).toMatch(/box-shadow:/);
+  });
+
+  it('moves the front page once rather than on every element', () => {
+    const home = read('apps/web/app/page.tsx');
+    expect(home).toMatch(/className="rises /);
+    expect(home).toMatch(/rises-later/);
+    expect((home.match(/\brises\b/g) ?? []).length).toBeLessThan(4);
   });
 });
 

@@ -33,11 +33,7 @@ export function AcceptForm({ next }: { next: string }) {
         Continuing records your acceptance of both documents, with the version, the timestamp and a
         hash of the exact wording as it stands now.
       </p>
-      <button
-        type="submit"
-        disabled={status.kind === 'busy'}
-        className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent disabled:opacity-60"
-      >
+      <button type="submit" disabled={status.kind === 'busy'} className="button">
         {status.kind === 'busy' ? 'Recording…' : 'I accept — continue'}
       </button>
       <div role="status" aria-live="polite" className="min-h-6 text-sm">

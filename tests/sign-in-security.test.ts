@@ -44,10 +44,16 @@ describe('a returning customer', () => {
       page.indexOf('<InShort'),
     );
     expect(hero).toContain('href="/sign-in"');
-    // The same button treatment the other three carry, so it reads as one.
-    expect(hero).toMatch(
-      /href="\/sign-in"\s*\n?\s*className="rounded-lg border border-line-strong px-5 py-3 font-medium"/,
-    );
+    /*
+     * The same button treatment the other three carry, so it reads as one.
+     *
+     * Asserted by the class rather than by the four utilities it used to carry:
+     * since 2026-10-21 there is one place that decides what a pressable thing
+     * looks like, and seven files describing a button for themselves was what
+     * that change removed. What this holds is unchanged — that the way back in
+     * is a button and not a footnote.
+     */
+    expect(hero).toMatch(/href="\/sign-in"\s*\n?\s*className="button button-quiet"/);
     // Beside the other account action rather than at the end of the row.
     expect(hero.indexOf('/sign-in')).toBeLessThan(hero.indexOf('/how-it-works'));
   });

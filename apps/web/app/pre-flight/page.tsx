@@ -170,10 +170,7 @@ export default async function PreflightPage({
             </p>
           </div>
 
-          <button
-            type="submit"
-            className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent"
-          >
+          <button type="submit" className="button">
             Look at my app
           </button>
         </form>

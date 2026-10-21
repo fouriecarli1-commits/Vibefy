@@ -176,10 +176,7 @@ export default async function TrustCheckPage({
             </label>
           </div>
 
-          <button
-            type="submit"
-            className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent"
-          >
+          <button type="submit" className="button">
             Check this app
           </button>
         </form>

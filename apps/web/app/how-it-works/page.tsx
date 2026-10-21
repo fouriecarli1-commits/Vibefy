@@ -292,16 +292,13 @@ export default function HowItWorksPage() {
       </section>
 
       <section className="flex flex-wrap gap-3">
-        <Link href="/sign-up" className="rounded-lg bg-accent px-5 py-3 font-medium text-on-accent">
+        <Link href="/sign-up" className="button">
           Create an account
         </Link>
-        <Link
-          href="/methodology"
-          className="rounded-lg border border-line-strong px-5 py-3 font-medium"
-        >
+        <Link href="/methodology" className="button button-quiet">
           How the score is worked out
         </Link>
-        <Link href="/legal" className="rounded-lg border border-line-strong px-5 py-3 font-medium">
+        <Link href="/legal" className="button button-quiet">
           The terms, in full
         </Link>
       </section>
