@@ -35,6 +35,7 @@ import { ScoreTrend, type TrendPoint } from '@/components/score-trend';
 import { currentVersionOf } from '@/lib/legal';
 import { Disclosure } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
+import { howToProve } from '@/lib/prove-the-domain';
 import { isPlaceholderOrigin } from '@/lib/verify-origin';
 import { resolveVerifyOriginWithSource } from '@/lib/verify-origin.server';
 
@@ -345,38 +346,102 @@ export default async function AppPage({ params }: { params: Promise<{ id: string
         {status === 'pending' && current && (
           <div className="space-y-5 rounded-xl border border-line p-6">
             <h3 className="font-semibold">Prove you control {current.verification_target}</h3>
-            <p className="text-sm text-muted">Do either of these, then verify.</p>
+            <p className="max-w-prose text-sm text-muted">
+              Pick <strong>one</strong> of these two. The second is usually easier if you can deploy
+              the site; the first is easier if you cannot.
+            </p>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Option 1 — a DNS TXT record</h4>
-              <pre
-                className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm"
-                tabIndex={0}
-                role="region"
-                aria-label="The DNS TXT record to publish"
-              >
-                {DNS_RECORD_PREFIX}
-                {current.verification_token}
-              </pre>
-            </div>
+            {(() => {
+              /*
+               * The instruction as the things somebody types.
+               *
+               * This block used to show the value of a DNS record and the
+               * contents of a file — the half anybody already has — and never
+               * where either goes. A registrar asks for a type, a name and a
+               * value, and "a DNS TXT record" names none of them. The founder
+               * got stuck here on her own product and asked for exactly this.
+               */
+              const proof = howToProve(
+                String(current.verification_target),
+                String(current.verification_token),
+              );
+              return (
+                <>
+                  <div className="space-y-3 rounded-lg border border-line p-4">
+                    <h4 className="text-sm font-medium">Option 1 — add a DNS record</h4>
+                    <p className="text-sm text-muted">
+                      Wherever the domain’s DNS is managed — the registrar you bought it from, or
+                      the host it points at — add one record with these three fields.
+                    </p>
+                    <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+                      <dt className="font-medium">Type</dt>
+                      <dd>
+                        <code>{proof.dns.type}</code>
+                      </dd>
+                      <dt className="font-medium">Name / Host</dt>
+                      <dd>
+                        <code>{proof.dns.name}</code>
+                        <span className="text-muted">
+                          {' '}
+                          — if your registrar refuses that, or the domain ends in something like{' '}
+                          <code>.co.uk</code>, use the whole thing instead:{' '}
+                          <code>{proof.dns.nameInFull}</code>
+                        </span>
+                      </dd>
+                      <dt className="font-medium">Value</dt>
+                      <dd>
+                        <pre
+                          className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm"
+                          tabIndex={0}
+                          role="region"
+                          aria-label="The value of the DNS TXT record"
+                        >
+                          {proof.dns.value}
+                        </pre>
+                      </dd>
+                    </dl>
+                    <p className="text-sm text-muted">
+                      Leave TTL on whatever it offers. The record is read on{' '}
+                      <code>{proof.host}</code> exactly — a record on a different host, including
+                      the domain without the <code>www</code>, is not this one.
+                    </p>
+                  </div>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">
-                Option 2 — this exact text, and nothing else, at {CHALLENGE_PATH}
-              </h4>
-              <pre
-                className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm"
-                tabIndex={0}
-                role="region"
-                aria-label="The text to serve at the challenge path"
-              >
-                {current.verification_token}
-              </pre>
-              <p className="text-sm text-muted">
-                Served directly over HTTPS, with no redirect. DNS can take a few minutes; the file
-                is usually immediate.
-              </p>
-            </div>
+                  <div className="space-y-3 rounded-lg border border-line p-4">
+                    <h4 className="text-sm font-medium">Option 2 — serve one small file</h4>
+                    <p className="text-sm text-muted">
+                      Put a file in the folder your site serves static files from — in a Next.js,
+                      Vite or Create React App project that is <code>{proof.file.inProject}</code> —
+                      containing this and nothing else, then deploy.
+                    </p>
+                    <pre
+                      className="overflow-x-auto rounded-lg border border-line bg-surface-muted p-3 text-sm"
+                      tabIndex={0}
+                      role="region"
+                      aria-label="The text the file must contain"
+                    >
+                      {proof.file.contents}
+                    </pre>
+                    <p className="text-sm">
+                      It has to answer here, in a browser, as plain text:{' '}
+                      <code className="break-all">{proof.file.url}</code>
+                    </p>
+                    <p className="text-sm text-muted">
+                      No redirect. If opening that address sends the browser anywhere else — the
+                      usual one is <code>www</code> to the domain without it, or the other way round
+                      — the check fails, because a redirect could carry it to a host nobody
+                      authorised.
+                    </p>
+                  </div>
+
+                  <p className="max-w-prose text-sm text-muted">
+                    Then press Verify. DNS can take a few minutes to reach us; a file is usually
+                    immediate. If it refuses, it says which of the two it tried and what it saw, and
+                    nothing is lost by pressing it again.
+                  </p>
+                </>
+              );
+            })()}
 
             <ActionForm action={verifyAuthorisation} submitLabel="Verify" pendingLabel="Checking…">
               <input type="hidden" name="appId" value={id} />

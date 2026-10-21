@@ -36,8 +36,7 @@ describe('the console overview', () => {
      * next with an application live in three other tables, and a join under the
      * caller's own row-level security is one round trip instead of four.
      */
-    expect(overview).toMatch(/from public\.apps/);
-    expect(overview).toContain('readAsUser');
+    expect(overview).toContain('readConsoleApplications(');
     expect(overview).toContain('primary_url');
     expect(overview).toMatch(/apps \?\? \[\]\)\.map/);
   });
@@ -46,7 +45,15 @@ describe('the console overview', () => {
     // Every one of these states already decides what the product will allow.
     // Until this, all of it was legible only by opening the page that enforces
     // it — so an application ready to assess looked like one waiting for DNS.
-    expect(overview).toContain('whatComesNext(');
+    // Through `readConsoleApplications`, which is also what the assistant on
+    // this page is grounded in — one reader, so the card and the chat beside it
+    // cannot describe one application differently.
+    const reader = readFileSync(
+      join(process.cwd(), 'apps/web/lib/console-applications.ts'),
+      'utf8',
+    );
+    expect(reader).toContain('whatComesNext(');
+    expect(reader).toMatch(/from public\.apps/);
     expect(overview).toMatch(/Your next step/);
   });
 

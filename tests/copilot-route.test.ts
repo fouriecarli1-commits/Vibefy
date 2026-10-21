@@ -134,7 +134,10 @@ describe('a ledger write that fails', () => {
   });
 
   it('says which workspace and how much, which is what makes the line usable', () => {
-    expect(ledgerWrite).toContain('organisationId: row.organisation_id');
+    // `organisationId` rather than `row.organisation_id` since the route took a
+    // second grounding: the console's assistant has no assessment row to read a
+    // workspace from, so the shared tail is handed one.
+    expect(ledgerWrite).toMatch(/organisationId,/);
     expect(ledgerWrite).toContain('costUsd');
     expect(ledgerWrite).toMatch(
       /error: error instanceof Error \? error\.message : String\(error\)/,
@@ -157,7 +160,7 @@ describe('the ceiling', () => {
     // The browser decides what conversation to send back, so a per-conversation
     // total is a figure the spender reports about itself.
     expect(route).toContain('COPILOT_CEILING_WINDOW_MINUTES');
-    expect(route).toContain('row.organisation_id');
+    expect(route).toMatch(/assistant_spend_since\(\$1[\s\S]{0,200}\[organisationId/);
   });
 
   it('answers with a sentence rather than a bare refusal', () => {

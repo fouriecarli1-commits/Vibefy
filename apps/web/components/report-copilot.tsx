@@ -28,7 +28,64 @@ const SUGGESTIONS = [
   'What was not tested?',
 ];
 
+/**
+ * What somebody arriving at their own console is actually stuck on.
+ *
+ * Not a tour of the product. Every one of these is a question the state on the
+ * page can answer, which is the test for whether a suggestion belongs here: a
+ * prompt the assistant has not been given the facts for teaches people it
+ * cannot help.
+ */
+const CONSOLE_SUGGESTIONS = [
+  'What is the next step for my application?',
+  'Why can I not request an assessment yet?',
+  'What does my plan include?',
+  'How do I prove I own the domain?',
+];
+
+export function ConsoleCopilot() {
+  return (
+    <Assistant
+      scope="console"
+      heading="Ask about your account"
+      suggestions={CONSOLE_SUGGESTIONS}
+      about="It has been given what this page shows — your plan, your applications and the step each one is on. It explains where something is and what to do next. It cannot change an assessment or tell you what the next one will say."
+    />
+  );
+}
+
 export function ReportCopilot({ assessmentId }: { assessmentId: string }) {
+  return (
+    <Assistant
+      assessmentId={assessmentId}
+      heading="Ask about this assessment"
+      suggestions={SUGGESTIONS}
+      about="It has been given this assessment and nothing else — your findings, your scope statement, your badge snippet. It explains what was found and helps you place the badge. It cannot change a finding or a score, and it will not tell you what the next assessment will say: that is decided by the run, not by us in conversation."
+    />
+  );
+}
+
+/**
+ * One panel for both groundings.
+ *
+ * The limits on it are the same wherever it sits, and so is the handling of a
+ * withheld reply and of the hourly ceiling. Two copies would be two places for
+ * one of those to be dropped, and the one dropped would be on the page nobody
+ * was looking at.
+ */
+function Assistant({
+  assessmentId,
+  scope,
+  heading,
+  about,
+  suggestions,
+}: {
+  assessmentId?: string;
+  scope?: 'console';
+  heading: string;
+  about: string;
+  suggestions: readonly string[];
+}) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
@@ -50,7 +107,8 @@ export function ReportCopilot({ assessmentId }: { assessmentId: string }) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          assessmentId,
+          ...(assessmentId ? { assessmentId } : {}),
+          ...(scope ? { scope } : {}),
           messages: next.map((turn) => ({ role: turn.role, content: turn.content })),
         }),
       });
@@ -94,14 +152,9 @@ export function ReportCopilot({ assessmentId }: { assessmentId: string }) {
     <section aria-labelledby="copilot" className="space-y-4 rounded-xl border border-line p-6">
       <div>
         <h2 id="copilot" className="text-xl font-semibold">
-          Ask about this assessment
+          {heading}
         </h2>
-        <p className="mt-2 max-w-prose text-sm text-muted">
-          It has been given this assessment and nothing else — your findings, your scope statement,
-          your badge snippet. It explains what was found and helps you place the badge. It cannot
-          change a finding or a score, and it will not tell you what the next assessment will say:
-          that is decided by the run, not by us in conversation.
-        </p>
+        <p className="mt-2 max-w-prose text-sm text-muted">{about}</p>
         {/* Said here rather than in a policy, because somebody who assumes a
             transcript exists will ask us for it later — and because "we keep
             nothing" is a claim worth making where it can be checked against
@@ -139,7 +192,7 @@ export function ReportCopilot({ assessmentId }: { assessmentId: string }) {
 
       {turns.length === 0 && (
         <ul className="flex flex-wrap gap-2">
-          {SUGGESTIONS.map((suggestion) => (
+          {suggestions.map((suggestion) => (
             <li key={suggestion}>
               <button
                 type="button"

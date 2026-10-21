@@ -11,12 +11,15 @@ import {
   COPILOT_MODEL,
   COPILOT_WITHHELD,
   checkCopilotReply,
+  consoleSystemPrompt,
   copilotSystemPrompt,
   recentTurns,
   type CopilotContext,
   type CopilotTurn,
 } from '@vibefycode/copilot';
+import { entitlementFor, resolvePlan } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { readConsoleApplications } from '@/lib/console-applications';
 import { readAsUser, writeAsService } from '@/lib/sql';
 import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
 
@@ -47,6 +50,8 @@ export const maxDuration = 60;
 
 interface Body {
   readonly assessmentId?: string;
+  /** `'console'` grounds the same assistant in the caller's own applications. */
+  readonly scope?: string;
   readonly messages?: CopilotTurn[];
 }
 
@@ -59,9 +64,64 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => ({}))) as Body;
   const assessmentId = String(body.assessmentId ?? '');
+  const onTheConsole = body.scope === 'console';
   const turns = Array.isArray(body.messages) ? body.messages : [];
-  if (!assessmentId) return NextResponse.json({ error: 'No assessment named.' }, { status: 400 });
+  if (!assessmentId && !onTheConsole) {
+    return NextResponse.json({ error: 'No assessment named.' }, { status: 400 });
+  }
   if (turns.length === 0) return NextResponse.json({ error: 'Nothing asked.' }, { status: 400 });
+
+  /*
+   * The same assistant, the same rules, a different grounding.
+   *
+   * On the console it is handed what the page in front of the customer already
+   * shows — their plan, their applications, and the step each one is on, from
+   * the same `readConsoleApplications` the page renders from. One reader, so
+   * the card and the chat beside it cannot describe one application
+   * differently.
+   *
+   * Everything below this branch is shared: the hourly ceiling, the model call,
+   * the gate on the way out and the ledger. A second endpoint would have been a
+   * second place for any of those to be forgotten.
+   */
+  if (onTheConsole) {
+    const ground = await readAsUser(user.id, async (client) => {
+      const { rows } = await client.query<{ organisation_id: string }>(
+        `select organisation_id from public.memberships order by created_at limit 1`,
+      );
+      const organisationId = rows[0]?.organisation_id;
+      if (!organisationId) return null;
+      const plan = await resolvePlan(client, { organisationId });
+      return { organisationId, plan: plan.plan };
+    });
+    if (!ground) {
+      return NextResponse.json({ error: 'You are not in a workspace yet.' }, { status: 404 });
+    }
+
+    const applications = await readConsoleApplications(user.id);
+    const entitlement = entitlementFor(ground.plan);
+    return await answer(
+      consoleSystemPrompt({
+        plan: ground.plan,
+        depth: entitlement.depth,
+        badgeEligible: entitlement.badgeEligible,
+        cooldownDays: entitlement.cooldownDays,
+        maxApps: entitlement.maxApps,
+        applications: applications.map((app) => ({
+          name: app.name,
+          url: app.primary_url,
+          screening: app.screening_status,
+          authorised: app.authorised === true,
+          nextStep: app.next.label,
+          nextStepMeans: app.next.what,
+          latestAssessment: app.latest_assessment,
+          latestScore: app.latest_score === null ? null : Number(app.latest_score),
+        })),
+      }),
+      ground.organisationId,
+      turns,
+    );
+  }
 
   const verifyOrigin = await resolveVerifyOrigin();
 
@@ -159,6 +219,22 @@ export async function POST(request: NextRequest) {
     },
   };
 
+  return await answer(copilotSystemPrompt(context), row.organisation_id, turns);
+}
+
+/**
+ * Everything that happens to a question once it has been grounded.
+ *
+ * The ceiling, the model call, the gate on the way out and the ledger, written
+ * once for both groundings. A second endpoint for the console's assistant would
+ * have been a second place to forget any one of them — and the one most easily
+ * forgotten is the ledger, which is what the daily cap is computed from.
+ */
+async function answer(
+  systemPrompt: string,
+  organisationId: string,
+  turns: readonly CopilotTurn[],
+): Promise<NextResponse> {
   /*
    * The ceiling, checked before the money is spent rather than after.
    *
@@ -181,7 +257,7 @@ export async function POST(request: NextRequest) {
   const spentThisHour = await writeAsService(async (client) => {
     const { rows } = await client.query<{ spend: string }>(
       `select public.assistant_spend_since($1, now() - ($2 || ' minutes')::interval) as spend`,
-      [row.organisation_id, String(COPILOT_CEILING_WINDOW_MINUTES)],
+      [organisationId, String(COPILOT_CEILING_WINDOW_MINUTES)],
     );
     const spend = Number(rows[0]?.spend ?? 0);
     return Number.isFinite(spend) ? spend : null;
@@ -192,7 +268,7 @@ export async function POST(request: NextRequest) {
     // answer and says so; permitting costs money nobody agreed to spend, and the
     // first anybody hears of it is an invoice.
     console.error('copilot ceiling unreadable — refusing the call', {
-      organisationId: row.organisation_id,
+      organisationId,
     });
     return NextResponse.json(
       { reply: COPILOT_CEILING_UNREADABLE, ceilingUnreadable: true },
@@ -225,7 +301,7 @@ export async function POST(request: NextRequest) {
       system: [
         {
           type: 'text',
-          text: copilotSystemPrompt(context),
+          text: systemPrompt,
           cache_control: { type: 'ephemeral' },
         },
       ],
@@ -277,7 +353,7 @@ export async function POST(request: NextRequest) {
           cache_read_tokens, ai_cost_usd, purpose)
        values (null, $1, $2, $3, $4, $5, $6, 'assistant')`,
       [
-        row.organisation_id,
+        organisationId,
         COPILOT_MODEL,
         usage.input_tokens,
         usage.output_tokens,
@@ -287,7 +363,7 @@ export async function POST(request: NextRequest) {
     );
   }).catch((error: unknown) => {
     console.error('copilot spend not recorded — the ceiling is short by this call', {
-      organisationId: row.organisation_id,
+      organisationId,
       costUsd: Number(costUsd.toFixed(6)),
       error: error instanceof Error ? error.message : String(error),
     });
