@@ -96,27 +96,74 @@ function stylesheet(): string {
       font-family: 'Poppins', 'Montserrat', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
       line-height: 1.6;
       font-size: 15px;
+      /* Printed and read on a screen, and both want the same thing here: a
+         figure that lines up with the figure above it. A score, a weight and a
+         date are all numbers somebody compares down a column. */
+      font-variant-numeric: tabular-nums;
+      /* Nobody reads a report in a hurry on purpose. Two lines left alone at
+         the top or bottom of a page is where a reader loses the thread, and a
+         document that is handed to an investor is the one place that costs
+         something. */
+      orphans: 3;
+      widows: 3;
     }
     .page { max-width: 46rem; margin: 0 auto; padding: 0 24px; }
-    h1 { font-size: 2rem; letter-spacing: -0.02em; margin: 0 0 8px; }
-    h2 { font-size: 1.35rem; letter-spacing: -0.01em; margin: 40px 0 12px; }
-    h3 { font-size: 1.05rem; margin: 0 0 6px; }
-    p { margin: 0 0 12px; }
+    h1, h2, h3 { text-wrap: balance; }
+    /* One tracking value across three levels is what makes a page look typeset
+       by nobody: at 2rem it is loose and at 1.05rem the same figure closes the
+       letters up. */
+    h1 { font-size: 2.15rem; letter-spacing: -0.035em; line-height: 1.1; margin: 0 0 8px; }
+    h2 { font-size: 1.4rem; letter-spacing: -0.022em; line-height: 1.2; margin: 44px 0 14px; }
+    h3 { font-size: 1.05rem; letter-spacing: -0.012em; margin: 0 0 6px; }
+    p { margin: 0 0 12px; text-wrap: pretty; }
     .muted { color: var(--muted); }
     .lede { font-size: 1.1rem; }
     header.cover { padding: 40px 0 24px; border-bottom: 1px solid var(--line); }
     .score-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: baseline; margin: 24px 0 8px; }
-    .score { font-size: 3.4rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+    .score { font-size: 3.8rem; font-weight: 700; letter-spacing: -0.045em; line-height: 1; }
     .score-of { color: var(--muted); font-size: 1.1rem; }
-    .band { font-weight: 600; }
+    /* The band is the sentence somebody repeats, so it is set like one rather
+       than like a label beside a number. */
+    .band {
+      font-weight: 600;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 0.92rem;
+    }
     table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-    th { text-align: left; font-weight: 600; }
-    td, th { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    /* The header reads as a header rather than as a first row that happens to
+       be bold — which matters most in print, where a reader has no hover, no
+       scroll and no second chance at the structure. */
+    th {
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 2px solid var(--line-strong);
+    }
+    td, th { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr { break-inside: avoid; }
     .bar { height: 8px; border-radius: 4px; background: var(--surface-muted); overflow: hidden; min-width: 120px; }
     .bar > span { display: block; height: 8px; background: var(--accent); }
     .finding { border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 0 0 16px; break-inside: avoid; }
     .finding-head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: baseline; }
-    .sev { font-weight: 600; font-size: 0.9rem; }
+    /* A severity reads in black and white, because a report that matters gets
+       printed and a printed report is usually printed in black and white. The
+       word carries the meaning and the colour agrees with it; the border makes
+       the chip a chip when the colour is gone. */
+    .sev {
+      font-weight: 600;
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      padding: 2px 10px;
+      white-space: nowrap;
+    }
     .sev-critical, .sev-high { color: var(--bad); }
     .sev-medium { color: var(--warn); }
     .sev-low, .sev-info { color: var(--muted); }
@@ -131,8 +178,16 @@ function stylesheet(): string {
     @media print {
       body { font-size: 11pt; }
       .page { max-width: none; padding: 0; }
-      h2 { break-after: avoid; }
+      h1, h2, h3 { break-after: avoid; }
+      /* A heading at the foot of a page with its section overleaf is the
+         commonest way a printed document stops being readable. */
+      h2 + p, h2 + ul, h2 + table, h3 + p { break-before: avoid; }
       a { color: inherit; text-decoration: none; }
+      /* The address behind a link, because paper has no pointer. Only for the
+         ones that go somewhere: an in-page anchor printed as "#evidence"
+         helps nobody. */
+      a[href^='http']::after { content: ' (' attr(href) ')'; font-size: 0.85em; color: var(--muted); word-break: break-all; }
+      .callout, .finding { break-inside: avoid; }
       @page { margin: 18mm 16mm; }
     }
   `;
