@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { loadPublishedKeys, publicKeyFromJwk } from '@vibefycode/badge';
-import { providerLabel } from '@vibefycode/shared';
+import { providerLabel, type SocialProviderId } from '@vibefycode/shared';
 import { enabledProviders } from '@/lib/providers-enabled';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from '@/lib/connection-string';
 import { createClient } from '@/lib/supabase/server';
 import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import { isPlaceholderOrigin } from '@/lib/verify-origin';
+import { projectNumberOf, readAuthorizeRedirect } from '@/lib/which-provider-client';
 
 export const metadata: Metadata = { title: 'What is wrong' };
 
@@ -309,6 +310,73 @@ async function servedOrigin(): Promise<Check> {
       };
 }
 
+/**
+ * Which account at the provider this deployment is actually signing in with.
+ *
+ * Every visible setting can be right and the sign-in still fail, because the
+ * one field nobody can see from outside is the Client ID pasted into Supabase.
+ * A client from a second Google project looks the same at a glance and is not
+ * the same: a redirect address added to one is invisible to the other, and
+ * three days went on exactly that.
+ *
+ * Asked of `/auth/v1/authorize` — the endpoint the sign-in button sends a
+ * browser to. It needs no key and answers with the redirect that carries
+ * `client_id`, which is public by construction: it is in the address bar of
+ * everybody who has ever signed in. Nothing secret is read, printed or
+ * inferred here.
+ *
+ * The failure answer is as useful as the success one. When Supabase refuses
+ * the address we ask it to hand back to, it redirects with an error instead of
+ * to the provider — and that is the allow-list, named.
+ */
+async function providerClient(provider: SocialProviderId): Promise<Check> {
+  const question = `Which ${providerLabel(provider)} account is this deployment signing in with?`;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    return { question, answer: 'Cannot say: NEXT_PUBLIC_SUPABASE_URL is not set.', tone: 'bad' };
+  }
+  const handBack = `${await resolveSiteOrigin()}/auth/callback`;
+  const authorize = `${url.replace(/\/+$/, '')}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(handBack)}`;
+
+  let answered: Response;
+  try {
+    // Never followed: the whole answer is in the redirect itself, and following
+    // it would send this server to the provider for no reason.
+    answered = await fetch(authorize, { redirect: 'manual', cache: 'no-store' });
+  } catch (error) {
+    return {
+      question,
+      answer: `Cannot tell: the ask did not complete (${error instanceof Error ? error.message : String(error)}).`,
+      tone: 'unknown',
+    };
+  }
+
+  const read = readAuthorizeRedirect(answered.status, answered.headers.get('location'));
+  if (read.kind === 'unexpected') {
+    return { question, answer: `Cannot tell: ${read.detail}.`, tone: 'unknown' };
+  }
+  if (read.kind === 'refused') {
+    return {
+      question,
+      answer: `Supabase refused to start it: ${read.error}${read.description ? ` — ${read.description}` : ''}.`,
+      tone: 'bad',
+      then: `It was asked to hand the sign-in back to ${handBack}. Supabase → Authentication → URL Configuration → Redirect URLs has to carry that address, and the Site URL there must be an origin rather than a path.`,
+    };
+  }
+
+  const project = projectNumberOf(read.clientId);
+  return {
+    question,
+    answer: read.clientId
+      ? `Client ${read.clientId}${project ? `, which belongs to Google Cloud project ${project}` : ''}.`
+      : `${read.host}, and the redirect named no client at all.`,
+    tone: read.clientId ? 'ok' : 'bad',
+    then: read.clientId
+      ? `That is the client whose console must list ${url.replace(/\/+$/, '')}/auth/v1/callback, and whose secret must be the one pasted into Supabase. Editing any other client — in another project, or an older one with the same name — changes nothing here. The provider is being told to hand back to ${read.redirectUri ?? 'nothing'}.`
+      : 'Supabase started the sign-in without naming a client, which means its provider panel has no Client ID in it.',
+  };
+}
+
 /** What a provider's own console has to list, which is a public address. */
 function providerCallback(): Check {
   const question = 'What must the provider’s console list as its redirect address?';
@@ -346,7 +414,13 @@ export default async function HealthPage() {
    * been issued is in this list.
    */
   if (!user) {
-    const open: Check[] = [await servedOrigin(), await signInProviders(), providerCallback()];
+    const providers = await enabledProviders();
+    const open: Check[] = [
+      await servedOrigin(),
+      await signInProviders(),
+      providerCallback(),
+      ...(await Promise.all(providers.enabled.map((provider) => providerClient(provider)))),
+    ];
     return (
       <div className="max-w-3xl space-y-8">
         <header className="space-y-2">
@@ -471,6 +545,9 @@ export default async function HealthPage() {
     await servedOrigin(),
     await signInProviders(),
     providerCallback(),
+    ...(await Promise.all(
+      (await enabledProviders()).enabled.map((provider) => providerClient(provider)),
+    )),
     await badgeLookup(),
     signingKeys(),
     spendPause,
