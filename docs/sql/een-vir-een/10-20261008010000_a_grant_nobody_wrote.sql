@@ -1,4 +1,4 @@
--- BLOK 10 VAN 20 · 20261008010000_a_grant_nobody_wrote.sql
+-- BLOK 10 VAN 21 · 20261008010000_a_grant_nobody_wrote.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -115,4 +115,4 @@ revoke all on function public.seats_used(uuid) from public, anon, authenticated;
 revoke all on function public.seats_for_organisation(uuid) from public, anon, authenticated;
 revoke all on function public.platform_role_of(uuid) from public, anon, authenticated;
 
--- BLOK 11 VAN 20
+-- BLOK 11 VAN 21

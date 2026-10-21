@@ -1,4 +1,4 @@
--- BLOK 4 VAN 20 · 20260923140000_name_the_role.sql
+-- BLOK 4 VAN 21 · 20260923140000_name_the_role.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -38,4 +38,4 @@
 alter policy remediation_engagements_own on public.remediation_engagements to authenticated;
 alter policy remediation_workers_admin on public.remediation_workers to authenticated;
 
--- BLOK 5 VAN 20
+-- BLOK 5 VAN 21

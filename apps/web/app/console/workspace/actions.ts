@@ -5,10 +5,15 @@ import { revalidatePath } from 'next/cache';
 import { verifyDnsTxt, DNS_RECORD_PREFIX } from '@vibefycode/engine/authorisation';
 import { createInvitationToken } from '@vibefycode/workspace';
 import { renderInvitationEmail, resendFromEnvironment } from '@vibefycode/notify';
-import { checkClaim } from '@vibefycode/shared';
+import { checkClaim, isKnownCountry } from '@vibefycode/shared';
 import { optionalScore, readably } from '@/lib/typed-score';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser, writeAsService } from '@/lib/sql';
+import {
+  databaseCarriesIdentity,
+  identityFromForm,
+  whyTheIdentityIsRefused,
+} from '@/lib/legal-identity';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import type { ActionState } from '@/app/console/apps/actions';
@@ -671,4 +676,77 @@ export async function setSsoEnforcement(
       ? 'Enforced. Password sign-in is refused for addresses at this domain.'
       : 'No longer enforced. Password sign-in works again for this domain.',
   };
+}
+
+/**
+ * Who this workspace is, in law.
+ *
+ * Written as an owner or an admin of the workspace, and through their own
+ * row-level security: the update below matches nothing for anybody who is not,
+ * which is why the row count is asked for rather than assumed. A member who is
+ * not an administrator changing the party to an agreement is exactly the shape
+ * of authority this table's policies exist to decide.
+ *
+ * The country is the field with the longest reach — it decides which law
+ * governs the agreement and therefore which variant of a document somebody is
+ * shown. Changing it does not change a consent already recorded: those rows are
+ * append-only and carry the hash of the words that were actually accepted.
+ */
+export async function saveLegalIdentity(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { user } = await signedIn();
+  if (!user) return { error: 'You are signed out.' };
+
+  const organisationId = String(formData.get('organisationId') ?? '');
+  if (!organisationId) return { error: 'No workspace named.' };
+
+  const identity = identityFromForm((field) => {
+    const value = formData.get(field);
+    return typeof value === 'string' ? value : null;
+  });
+
+  const refused = whyTheIdentityIsRefused(identity);
+  const first = Object.values(refused)[0];
+  if (first) return { error: first };
+  if (identity.country !== null && !isKnownCountry(identity.country)) {
+    return { error: 'Choose a country from the list.' };
+  }
+
+  const carries = await readAsUser(user.id, (client) => databaseCarriesIdentity(client));
+  if (!carries) {
+    return {
+      error:
+        'This database does not have these columns yet. They arrive with the pending migration in docs/sql/OUTSTANDING.sql, block 21.',
+    };
+  }
+
+  const written = await readAsUser(user.id, async (client) => {
+    const { rowCount } = await client.query(
+      `update public.organisations
+          set country = $2, registration_number = $3, duns_number = $4,
+              billing_email = $5, contact_phone = $6
+        where id = $1`,
+      [
+        organisationId,
+        identity.country,
+        identity.registrationNumber,
+        identity.dunsNumber,
+        identity.contactEmail,
+        identity.contactPhone,
+      ],
+    );
+    return rowCount ?? 0;
+  });
+
+  if (written === 0) {
+    // Not an error message about the database. Row-level security filters the
+    // rows a statement can see rather than refusing it, so nothing changed and
+    // the honest reading is that this person may not change it.
+    return { error: 'Only an owner or an administrator of this workspace can change this.' };
+  }
+
+  revalidatePath(`/console/workspace/${organisationId}/legal`);
+  return { notice: 'Saved.' };
 }

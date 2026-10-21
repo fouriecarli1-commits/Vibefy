@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 
 const TABS = [
   { href: 'team', label: 'Team & seats' },
+  { href: 'legal', label: 'Legal identity' },
   { href: 'policies', label: 'Policy profiles' },
   { href: 'branding', label: 'Report branding' },
   { href: 'sso', label: 'Single sign-on' },

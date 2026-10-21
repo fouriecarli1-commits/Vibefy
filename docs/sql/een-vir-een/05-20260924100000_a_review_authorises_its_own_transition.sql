@@ -1,4 +1,4 @@
--- BLOK 5 VAN 20 · 20260924100000_a_review_authorises_its_own_transition.sql
+-- BLOK 5 VAN 21 · 20260924100000_a_review_authorises_its_own_transition.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -102,4 +102,4 @@ begin
 end;
 $$;
 
--- BLOK 6 VAN 20
+-- BLOK 6 VAN 21

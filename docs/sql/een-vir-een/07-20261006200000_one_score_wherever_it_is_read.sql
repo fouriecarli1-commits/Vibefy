@@ -1,4 +1,4 @@
--- BLOK 7 VAN 20 · 20261006200000_one_score_wherever_it_is_read.sql
+-- BLOK 7 VAN 21 · 20261006200000_one_score_wherever_it_is_read.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -156,4 +156,4 @@ comment on function public.assert_score_is_not_pulled_from_under_a_badge() is
   'reissuing silently would hide the correction, so this refuses instead and '
   'names the three steps that are the published process anyway.';
 
--- BLOK 8 VAN 20
+-- BLOK 8 VAN 21

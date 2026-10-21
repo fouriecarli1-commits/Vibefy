@@ -32,7 +32,7 @@ Laas nagegaan 2026-10-11.
 > **Tweede, en dit is die belangrike een.** Die badge was 'n uitval; hierdie
 > is gate.
 >
-> Daar is twintig migrasies in `docs/sql/OUTSTANDING.sql`. Sewe is van
+> Daar is een-en-twintig migrasies in `docs/sql/OUTSTANDING.sql`. Sewe is van
 > vanaand, en vier van daardie sewe is gate wat iemand vandag kan gebruik:
 >
 > - 'n Kliënt kon hul **eie telling** skryf — 100 uit 100, met nul bevindinge,
@@ -56,7 +56,7 @@ Laas nagegaan 2026-10-11.
 > Supabase se SQL-venster werk ongeag of Vercel die databasis kan bereik, so die
 > badge hoef nie eers reg te wees nie.
 >
-> **Klaar as:** jy het al twintig blokke uit `docs/sql/OUTSTANDING.sql` in
+> **Klaar as:** jy het al een-en-twintig blokke uit `docs/sql/OUTSTANDING.sql` in
 > volgorde geplak en elkeen het sonder 'n fout geloop. Onseker wat jou databasis
 > al het? `node tools/migration-audit.mjs > audit.sql`, plak daardie navraag, en
 > dit sê jou — dit lees net.
@@ -311,7 +311,7 @@ Die vierde is nuut en dit is die grootste van die vier: sonder daardie sleutel
 kan die werker niks uitreik nie, hoeveel beoordelings ook al deurgaan. Afdeling
 1c hierbo is die regmaak.
 
-## 4 · Supabase — twintig migrasies
+## 4 · Supabase — een-en-twintig migrasies
 
 > **Op ys, op jou versoek, 11 Oktober saans.** Jy is op Antigravity besig en
 > daar mag nog blokke bykom. Niks hiervan verval — die vier gate bly oop tot
@@ -336,7 +336,7 @@ Die eerste twintig reëls van die lêer sê dieselfde vyf stappe, as jy dit late
 weer nodig het. Die volgorde is reeds reg, en alles in een keer is veiliger as
 stukke: 'n blok wat na 'n vroeëre een se tabel verwys, misluk as jy spring.
 
-Ek het dit getoets soos jy dit gaan hardloop — al twintig blokke in een plak,
+Ek het dit getoets soos jy dit gaan hardloop — al een-en-twintig blokke in een plak,
 teen 'n databasis wat hulle nog nie het nie. Dit loop deur sonder 'n fout, en
 die skema wat oorbly is presies dié waarteen die toetse loop.
 

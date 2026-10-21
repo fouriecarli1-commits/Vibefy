@@ -1,4 +1,4 @@
--- BLOK 20 VAN 20 · 20261019120000_where_the_code_came_from.sql
+-- BLOK 20 VAN 21 · 20261019120000_where_the_code_came_from.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -47,3 +47,5 @@ comment on column public.assessments.provenance is
   'Observations about licensing and where the code came from: what is in the '
   'repository and what the licence asks, never whether the owner is in breach. '
   'Reported and never scored — nothing on the scoring path can read this.';
+
+-- BLOK 21 VAN 21

@@ -1,4 +1,4 @@
--- BLOK 17 VAN 20 · 20261008080000_the_plan_is_not_the_customers_to_declare.sql
+-- BLOK 17 VAN 21 · 20261008080000_the_plan_is_not_the_customers_to_declare.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -70,4 +70,4 @@ drop policy assessment_requests_insert_members on public.assessment_requests;
 revoke insert on public.assessment_requests from authenticated;
 
 
--- BLOK 18 VAN 20
+-- BLOK 18 VAN 21

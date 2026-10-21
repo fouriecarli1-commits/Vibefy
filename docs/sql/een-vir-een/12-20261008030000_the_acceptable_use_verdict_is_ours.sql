@@ -1,4 +1,4 @@
--- BLOK 12 VAN 20 · 20261008030000_the_acceptable_use_verdict_is_ours.sql
+-- BLOK 12 VAN 21 · 20261008030000_the_acceptable_use_verdict_is_ours.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -180,4 +180,4 @@ comment on function public.record_intake_screening is
   'What the intake screen read, written by our server and never by the account '
   'it is about. Clears, refuses or leaves pending, and only from pending.';
 
--- BLOK 13 VAN 20
+-- BLOK 13 VAN 21

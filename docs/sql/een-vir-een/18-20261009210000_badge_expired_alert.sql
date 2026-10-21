@@ -1,4 +1,4 @@
--- BLOK 18 VAN 20 · 20261009210000_badge_expired_alert.sql
+-- BLOK 18 VAN 21 · 20261009210000_badge_expired_alert.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -53,4 +53,4 @@ begin
 end
 $$;
 
--- BLOK 19 VAN 20
+-- BLOK 19 VAN 21

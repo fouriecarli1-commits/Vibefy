@@ -1,4 +1,5 @@
 export * from './brand.ts';
+export * from './countries.ts';
 export * from './wordmark.generated.ts';
 export * from './mark-outline.generated.ts';
 export * from './tokens.ts';

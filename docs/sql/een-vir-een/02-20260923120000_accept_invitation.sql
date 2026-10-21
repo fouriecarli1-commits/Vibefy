@@ -1,4 +1,4 @@
--- BLOK 2 VAN 20 · 20260923120000_accept_invitation.sql
+-- BLOK 2 VAN 21 · 20260923120000_accept_invitation.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -168,4 +168,4 @@ comment on function public.accept_invitation is
 revoke all on function public.accept_invitation(text) from public, anon;
 grant execute on function public.accept_invitation(text) to authenticated;
 
--- BLOK 3 VAN 20
+-- BLOK 3 VAN 21

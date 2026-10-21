@@ -11,26 +11,26 @@
 -- in een keer in, en die volgorde is reeds reg. Moenie dit in stukke breek nie:
 -- 'n blok wat na 'n vroeëre een se tabel verwys, misluk as jy spring.
 --
--- Twintig migrasies, in hierdie volgorde. Gegenereer 2026-09-24, aangevul
--- 2026-10-11 en 2026-10-19.
+-- Een-en-twintig migrasies, in hierdie volgorde. Gegenereer 2026-09-24,
+-- aangevul 2026-10-11, 2026-10-19 en 2026-10-21.
 --
--- Getoets soos jy dit gaan hardloop: al twintig blokke in een plak, teen 'n
+-- Getoets soos jy dit gaan hardloop: al een-en-twintig blokke in een plak, teen 'n
 -- databasis wat hulle nog nie het nie. Dit loop deur sonder 'n fout, en die
 -- skema wat oorbly is presies dié waarteen die toetse loop.
 --
 -- Klaar as: dit loop deur sonder 'n fout. Loop dit 'n tweede keer en niks
 -- gebeur — elke blok is so geskryf dat dit homself nie twee keer doen nie.
 --
--- As dit wél ergens stop: die reël "BLOK n VAN 19" bo elke blok sê waar jy is.
+-- As dit wél ergens stop: die reël "BLOK n VAN 21" bo elke blok sê waar jy is.
 -- Sê vir my die nommer, dan weet ek presies waarna om te kyk. In
--- docs/sql/een-vir-een/ staan dieselfde twintig blokke as twintig aparte
--- lêers, genommer 01 tot 19, as jy van daar af een-vir-een wil aangaan.
+-- docs/sql/een-vir-een/ staan dieselfde een-en-twintig blokke as een-en-twintig
+-- aparte lêers, genommer 01 tot 21, as jy van daar af een-vir-een wil aangaan.
 --
 -- Onseker wat jou databasis al het? node tools/migration-audit.mjs > audit.sql,
 -- en plak daardie navraag in die SQL-venster. Dit lees net; dit skryf en sluit
 -- niks.
 
--- BLOK 1 VAN 20
+-- BLOK 1 VAN 21
 -- =============================================================================
 -- 20260923110000_second_step_at_the_action.sql
 -- =============================================================================
@@ -182,7 +182,7 @@ create policy memberships_need_second_step_update on public.memberships
   for update to authenticated
   with check (public.session_passed_second_step());
 
--- BLOK 2 VAN 20
+-- BLOK 2 VAN 21
 -- =============================================================================
 -- 20260923120000_accept_invitation.sql
 -- =============================================================================
@@ -349,7 +349,7 @@ comment on function public.accept_invitation is
 revoke all on function public.accept_invitation(text) from public, anon;
 grant execute on function public.accept_invitation(text) to authenticated;
 
--- BLOK 3 VAN 20
+-- BLOK 3 VAN 21
 -- =============================================================================
 -- 20260923130000_create_workspace.sql
 -- =============================================================================
@@ -484,7 +484,7 @@ comment on function public.create_workspace is
 revoke all on function public.create_workspace(text, text, public.account_type) from public, anon;
 grant execute on function public.create_workspace(text, text, public.account_type) to authenticated;
 
--- BLOK 4 VAN 20
+-- BLOK 4 VAN 21
 -- =============================================================================
 -- 20260923140000_name_the_role.sql
 -- =============================================================================
@@ -521,7 +521,7 @@ grant execute on function public.create_workspace(text, text, public.account_typ
 alter policy remediation_engagements_own on public.remediation_engagements to authenticated;
 alter policy remediation_workers_admin on public.remediation_workers to authenticated;
 
--- BLOK 5 VAN 20
+-- BLOK 5 VAN 21
 -- =============================================================================
 -- 20260924100000_a_review_authorises_its_own_transition.sql
 -- =============================================================================
@@ -622,7 +622,7 @@ begin
 end;
 $$;
 
--- BLOK 6 VAN 20
+-- BLOK 6 VAN 21
 -- =============================================================================
 -- 20260924110000_what_a_provider_told_us_stays_told.sql
 -- =============================================================================
@@ -699,7 +699,7 @@ begin
 end;
 $$;
 
--- BLOK 7 VAN 20
+-- BLOK 7 VAN 21
 -- =============================================================================
 -- 20261006200000_one_score_wherever_it_is_read.sql
 -- =============================================================================
@@ -854,7 +854,7 @@ comment on function public.assert_score_is_not_pulled_from_under_a_badge() is
   'reissuing silently would hide the correction, so this refuses instead and '
   'names the three steps that are the published process anyway.';
 
--- BLOK 8 VAN 20
+-- BLOK 8 VAN 21
 -- =============================================================================
 -- 20261006210000_a_refusal_is_written_down.sql
 -- =============================================================================
@@ -939,7 +939,7 @@ comment on function public.record_a_refusal_at_intake is
   'creating the row already refused. The other two are updates and write their '
   'own entries, so this fires on insert only and overlaps neither.';
 
--- BLOK 9 VAN 20
+-- BLOK 9 VAN 21
 -- =============================================================================
 -- 20261008000000_a_statutory_record_is_not_cascaded_away.sql
 -- =============================================================================
@@ -987,7 +987,7 @@ alter table public.cost_records
 
 
 
--- BLOK 10 VAN 20
+-- BLOK 10 VAN 21
 -- =============================================================================
 -- 20261008010000_a_grant_nobody_wrote.sql
 -- =============================================================================
@@ -1101,7 +1101,7 @@ revoke all on function public.seats_used(uuid) from public, anon, authenticated;
 revoke all on function public.seats_for_organisation(uuid) from public, anon, authenticated;
 revoke all on function public.platform_role_of(uuid) from public, anon, authenticated;
 
--- BLOK 11 VAN 20
+-- BLOK 11 VAN 21
 -- =============================================================================
 -- 20261008020000_a_customer_may_not_write_their_own_score.sql
 -- =============================================================================
@@ -1197,7 +1197,7 @@ comment on table public.assessments is
   'connection; customers read their own and reviewers update status. No role '
   'reachable through PostgREST may write a score.';
 
--- BLOK 12 VAN 20
+-- BLOK 12 VAN 21
 -- =============================================================================
 -- 20261008030000_the_acceptable_use_verdict_is_ours.sql
 -- =============================================================================
@@ -1376,7 +1376,7 @@ comment on function public.record_intake_screening is
   'What the intake screen read, written by our server and never by the account '
   'it is about. Clears, refuses or leaves pending, and only from pending.';
 
--- BLOK 13 VAN 20
+-- BLOK 13 VAN 21
 -- =============================================================================
 -- 20261008040000_a_verified_authorisation_is_ours_to_record.sql
 -- =============================================================================
@@ -1549,7 +1549,7 @@ alter table public.authorisations
 comment on constraint authorisations_scope_within_verified_target on public.authorisations is
   'A verified authorisation covers the host it proved, its subdomains, and its apex. Nothing else.';
 
--- BLOK 14 VAN 20
+-- BLOK 14 VAN 21
 -- =============================================================================
 -- 20261008050000_a_verified_domain_is_ours_to_record.sql
 -- =============================================================================
@@ -1631,7 +1631,7 @@ comment on function public.an_sso_domain_is_verified_by_us is
   'A workspace may claim a domain and may enforce one we have verified. Whether '
   'the DNS record was there is ours to record.';
 
--- BLOK 15 VAN 20
+-- BLOK 15 VAN 21
 -- =============================================================================
 -- 20261008060000_only_an_owner_grants_ownership.sql
 -- =============================================================================
@@ -1742,7 +1742,7 @@ comment on policy memberships_only_an_owner_grants_ownership on public.membershi
 comment on policy memberships_only_an_owner_keeps_granting_ownership on public.memberships is
   'Only an owner may promote anybody to owner. The update half of the same rule.';
 
--- BLOK 16 VAN 20
+-- BLOK 16 VAN 21
 -- =============================================================================
 -- 20261008070000_our_side_of_a_record_is_ours.sql
 -- =============================================================================
@@ -1858,7 +1858,7 @@ drop policy organisations_insert_own on public.organisations;
 drop policy organisations_update_admins on public.organisations;
 revoke insert, update on public.organisations from authenticated;
 
--- BLOK 17 VAN 20
+-- BLOK 17 VAN 21
 -- =============================================================================
 -- 20261008080000_the_plan_is_not_the_customers_to_declare.sql
 -- =============================================================================
@@ -1927,7 +1927,7 @@ drop policy assessment_requests_insert_members on public.assessment_requests;
 revoke insert on public.assessment_requests from authenticated;
 
 
--- BLOK 18 VAN 20
+-- BLOK 18 VAN 21
 -- =============================================================================
 -- 20261009210000_badge_expired_alert.sql
 -- =============================================================================
@@ -1979,7 +1979,7 @@ begin
 end
 $$;
 
--- BLOK 19 VAN 20
+-- BLOK 19 VAN 21
 -- =============================================================================
 -- 20261010073000_listed_badges_discloses_paid_relationships.sql
 -- =============================================================================
@@ -2035,7 +2035,7 @@ comment on view public.listed_badges is
 
 grant select on public.listed_badges to anon, authenticated;
 
--- BLOK 20 VAN 20
+-- BLOK 20 VAN 21
 -- =============================================================================
 -- 20261019120000_where_the_code_came_from.sql
 -- =============================================================================
@@ -2081,3 +2081,95 @@ comment on column public.assessments.provenance is
   'Observations about licensing and where the code came from: what is in the '
   'repository and what the licence asks, never whether the owner is in breach. '
   'Reported and never scored — nothing on the scoring path can read this.';
+
+-- BLOK 21 VAN 21
+-- =============================================================================
+-- 20261021090000_who_the_customer_is_in_law.sql
+-- =============================================================================
+
+-- Who the customer is, in law.
+--
+-- The console asked for a name and nothing else, and four things follow from
+-- facts it never held:
+--
+--   · which country's law governs the agreement, and therefore which documents
+--     a person is accepting. The registry carries one `jurisdictionBaseline`
+--     for everybody, which is true only while there is one set of documents;
+--   · who the counterparty is. "Futurebox" is not a party to a contract;
+--     "FUTUREBOXSTUDIO (PTY) LTD (2026/714071/07)" is, and an authorisation
+--     warranty given by a name that identifies nobody is worth less than one
+--     given by a company number;
+--   · how to reach somebody that is not an account login — a badge suspension,
+--     a revocation, a statutory deadline;
+--   · a DUNS number, where an enterprise buyer asks for one. Optional, and
+--     deliberately so: it costs nothing to hold and nobody is kept out for
+--     lacking one.
+--
+-- `billing_email` is left where it is and given a comment rather than a
+-- sibling. The sign-up trigger has filled it with the account's address since
+-- the first migration and nothing has ever read it — a second email column
+-- would be a second answer to "where do we write", and the one nobody updates
+-- would be the one somebody reads.
+
+alter table public.organisations
+  add column if not exists country             text,
+  add column if not exists registration_number text,
+  add column if not exists duns_number         text,
+  add column if not exists contact_phone       text;
+
+-- ISO 3166-1 alpha-2, upper case. Checked rather than trusted: the column
+-- decides which documents apply, and "South Africa", "RSA" and "za" are three
+-- spellings of one country that would not match each other.
+alter table public.organisations
+  drop constraint if exists organisations_country_is_iso;
+alter table public.organisations
+  add constraint organisations_country_is_iso
+  check (country is null or country ~ '^[A-Z]{2}$');
+
+-- Nine digits, as Dun & Bradstreet issues them. Hyphens and spaces are how the
+-- same number arrives in three shapes.
+alter table public.organisations
+  drop constraint if exists organisations_duns_is_nine_digits;
+alter table public.organisations
+  add constraint organisations_duns_is_nine_digits
+  check (duns_number is null or duns_number ~ '^[0-9]{9}$');
+
+comment on column public.organisations.country is
+  'ISO 3166-1 alpha-2 of the country whose law governs this workspace''s '
+  'agreement with us. It decides which variant of a legal document a person '
+  'is shown and accepts; null means the published baseline.';
+comment on column public.organisations.registration_number is
+  'The company or close-corporation number as the register issues it, '
+  'unparsed. The party to an agreement is the registered entity, not a display '
+  'name, and an authorisation warranty is given by that entity.';
+comment on column public.organisations.duns_number is
+  'Optional, for a buyer whose procurement asks for one. Nothing in this '
+  'product requires it and nothing is refused for its absence.';
+comment on column public.organisations.contact_phone is
+  'A number to reach somebody on about this workspace — a suspension, a '
+  'revocation, a statutory deadline — which an account login is not.';
+comment on column public.organisations.billing_email is
+  'Where we write about this workspace. Filled from the account''s own address '
+  'at sign-up and editable in the console; the name is historical.';
+
+-- Which words were accepted, when there is more than one set of them.
+--
+-- `document_version` and `document_sha256` answer "which words" today because
+-- there is one document per type. The moment a document has a South African
+-- variant and a European one, a version and a hash alone cannot say which of
+-- the two a person read — and that is the whole evidentiary value of this
+-- table.
+alter table public.consents
+  add column if not exists document_country text;
+
+alter table public.consents
+  drop constraint if exists consents_document_country_is_iso;
+alter table public.consents
+  add constraint consents_document_country_is_iso
+  check (document_country is null or document_country ~ '^[A-Z]{2}$');
+
+comment on column public.consents.document_country is
+  'The country variant of the document that was shown, or null for the '
+  'published baseline. The hash still pins the exact bytes; this says which '
+  'of several sets of bytes was the one on offer.';
+

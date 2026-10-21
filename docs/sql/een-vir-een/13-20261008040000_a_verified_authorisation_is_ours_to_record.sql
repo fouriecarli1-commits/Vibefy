@@ -1,4 +1,4 @@
--- BLOK 13 VAN 20 · 20261008040000_a_verified_authorisation_is_ours_to_record.sql
+-- BLOK 13 VAN 21 · 20261008040000_a_verified_authorisation_is_ours_to_record.sql
 --
 -- Een blok, op sy eie. Merk alles (Ctrl+A), kopieer, plak in Supabase se
 -- SQL Editor, Run. Loop dit twee keer en niks gebeur die tweede keer.
@@ -174,4 +174,4 @@ alter table public.authorisations
 comment on constraint authorisations_scope_within_verified_target on public.authorisations is
   'A verified authorisation covers the host it proved, its subdomains, and its apex. Nothing else.';
 
--- BLOK 14 VAN 20
+-- BLOK 14 VAN 21
