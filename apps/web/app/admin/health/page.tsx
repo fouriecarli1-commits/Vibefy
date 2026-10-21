@@ -4,6 +4,11 @@ import type { ReactNode } from 'react';
 import { headers } from 'next/headers';
 import { loadPublishedKeys, publicKeyFromJwk } from '@vibefycode/badge';
 import { providerLabel, type SocialProviderId } from '@vibefycode/shared';
+import {
+  ARTEFACT_ORPHANED,
+  ARTEFACT_REMOVED_LATER,
+  unresolvedOrphans,
+} from '@vibefycode/governance';
 import { enabledProviders } from '@/lib/providers-enabled';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from '@/lib/connection-string';
@@ -522,6 +527,57 @@ export default async function HealthPage() {
   const seen = (count: number | null, error: { message: string } | null) =>
     error ? `cannot tell (${error.message})` : String(count ?? 0);
 
+  /*
+   * And whether we are still holding bytes a deletion record says are gone.
+   *
+   * `sweepRetention` deletes an expired artefact's row, records the deletion,
+   * and then asks the object store to remove the file. When the store refuses,
+   * the row is already gone and only an `audit_log` row says where the bytes
+   * are. The sweep retries those, and anything it cannot clear is a promise in
+   * the privacy notice that we are not keeping — which until now was a line in
+   * a worker log once a day and nowhere a person looks.
+   *
+   * Newest first, because a recovery row is always newer than the orphan it
+   * resolves: if an orphan is inside this window its recovery is too, so the
+   * cut can only hide a whole pair and never leave half of one. What the cut
+   * can do is hide older orphans, which is why a full page says so rather than
+   * reporting its count as the whole of it.
+   */
+  const ARTEFACT_ROWS = 1000;
+  const { data: artefactRows, error: artefactError } = await supabase
+    .from('audit_log')
+    .select('id, action, entity_id, summary, after_state')
+    .in('action', [ARTEFACT_ORPHANED, ARTEFACT_REMOVED_LATER])
+    .order('occurred_at', { ascending: false })
+    .limit(ARTEFACT_ROWS);
+  const stillHeld = unresolvedOrphans(artefactRows ?? []);
+  const readTheLot = (artefactRows?.length ?? 0) < ARTEFACT_ROWS;
+  const heldArtefacts: Check = artefactError
+    ? {
+        question: 'Are we holding anything we said we deleted?',
+        answer: `Cannot tell: ${artefactError.message}`,
+        tone: 'unknown',
+        then: 'Until this answers, "nothing is outstanding" and "nobody asked" look the same from here.',
+      }
+    : stillHeld.length === 0
+      ? {
+          question: 'Are we holding anything we said we deleted?',
+          answer: readTheLot
+            ? 'No. Every artefact a deletion record accounts for is gone from the object store.'
+            : `No, among the ${ARTEFACT_ROWS} most recent records. Older ones were not read.`,
+          tone: 'ok',
+        }
+      : {
+          question: 'Are we holding anything we said we deleted?',
+          answer: `${readTheLot ? '' : 'At least '}${stillHeld.length} artefact${
+            stillHeld.length === 1 ? '' : 's'
+          } ${stillHeld.length === 1 ? 'is' : 'are'} still in the object store after a deletion record said ${
+            stillHeld.length === 1 ? 'it' : 'they'
+          } had been removed. The retention sweep retries every five minutes and the store is still refusing.`,
+          tone: 'bad',
+          then: `Each one is an audit row with the path in it: select occurred_at, summary from public.audit_log where action = '${ARTEFACT_ORPHANED}' order by occurred_at desc. A path that no longer exists in the bucket clears itself on the next sweep; one that does needs the store's own permissions looked at.`,
+        };
+
   const badges = badgeCount ?? 0;
   const spendPause: Check = pauseError
     ? {
@@ -556,6 +612,7 @@ export default async function HealthPage() {
     await badgeLookup(),
     signingKeys(),
     spendPause,
+    heldArtefacts,
     {
       question: 'Is there a badge to look at?',
       answer: badgeError

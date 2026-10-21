@@ -19,7 +19,7 @@ import { UnretryableError } from './errors.ts';
 import type { ArtefactStorage } from './report.ts';
 import { STOP_LABEL, type AssessmentOutcome, type StageResult } from '@vibefycode/engine';
 
-import { ARTEFACT_ORPHANED } from './governance.ts';
+import { ARTEFACT_ORPHANED } from '@vibefycode/governance';
 
 export interface PersistInput {
   readonly outcome: AssessmentOutcome;

@@ -12,6 +12,9 @@
 import type { ArtefactStorage } from './report.ts';
 import { saidOnceADay } from './said-once.ts';
 import {
+  ARTEFACT_ORPHANED,
+  ARTEFACT_REMOVED_LATER,
+  UNRESOLVED_ORPHANS_SQL,
   deletionRecordFor,
   dueForDeletion,
   evaluateSpend,
@@ -192,20 +195,14 @@ export interface RetentionSweepResult {
 }
 
 /**
- * Audit actions for bytes we hold that no row accounts for.
+ * Where the orphan rule lives now: `@vibefycode/governance`.
  *
- * Shared with `persist.ts`, which produces the same state from the other
- * direction: a run whose transaction rolled back after the artefacts were
- * written, where the cleanup then failed. One action and one retry rather than
- * two half-overlapping mechanisms — the state is identical and so is the
- * remedy, and an operator should not have to learn which producer left which
- * row behind.
- *
- * Named for the artefact rather than for retention, because in the rolled-back
- * case nothing was ever retained.
+ * Both the actions and the query that pairs them moved there when a second
+ * reader appeared — the administrator's page, which reports how many artefacts
+ * we are still holding. Re-exported here because `persist.ts` and the tests
+ * have always reached for them through this module.
  */
-export const ARTEFACT_ORPHANED = 'evidence.artefact_orphaned';
-export const ARTEFACT_REMOVED_LATER = 'evidence.artefact_removed_later';
+export { ARTEFACT_ORPHANED, ARTEFACT_REMOVED_LATER } from '@vibefycode/governance';
 
 /**
  * Standing retention conditions already said out loud today.
@@ -221,53 +218,6 @@ const retentionNotices = saidOnceADay();
 export function resetRetentionNotices(): void {
   retentionNotices.forget();
 }
-
-/**
- * What identifies an orphan, for matching a recovery to the row it resolves.
- *
- * The path, and not `entity_id`. `entity_id` is null for every orphan
- * `persist.ts` writes — a run rolled back after its artefacts were stored has
- * no evidence row to name — and `later.entity_id = l.entity_id` is never true
- * when both sides are null, so the `not exists` that is supposed to stop the
- * retry could not see the recovery row it had just written. Measured on
- * 2026-10-21: a rolled-back orphan was re-removed on every sweep for ever, each
- * pass counting a recovery that had already happened and appending another
- * `artefact_removed_later` row — 288 rows a day, per orphan, into an
- * append-only table, with `artefactsRecovered` reporting work being done.
- *
- * `after_state` carries the path for rows written from here on. The `substring`
- * reads it back out of the summary for rows written before that, which is where
- * it was the only place it appeared; both producers word that clause the same
- * way, which is now a thing a test holds rather than a coincidence.
- */
-const ORPHAN_PATH = `coalesce(after_state->>'storage_path',
-                 substring(summary from 'artefact at ([^ ]+)\\.'))`;
-
-/**
- * Orphans with no recovery row: bytes we are still holding.
- *
- * Shaped as a fragment because two callers need exactly this set — the pass
- * that retries them and the count that reports what is left. A second,
- * near-identical predicate is how the two drift apart.
- */
-const UNRESOLVED_ORPHANS = `
-      with orphan as (
-        select id, entity_id, occurred_at, action, summary, ${ORPHAN_PATH} as storage_path
-          from public.audit_log
-         where action in ($1, $2)
-      )
-      select o.id, o.entity_id, o.storage_path, o.summary
-        from orphan o
-       where o.action = $1
-         and not exists (
-           select 1
-             from orphan later
-            where later.action = $2
-              and (
-                later.storage_path = o.storage_path
-                or (o.entity_id is not null and later.entity_id = o.entity_id)
-              )
-         )`;
 
 /**
  * Deletes what is past its deadline, and records that it did.
@@ -436,9 +386,10 @@ export async function sweepRetention(
       const orphans = await client.query<{
         id: string;
         entity_id: string | null;
+        organisation_id: string | null;
         storage_path: string | null;
         summary: string;
-      }>(`${UNRESOLVED_ORPHANS} order by o.occurred_at limit $3`, [
+      }>(`${UNRESOLVED_ORPHANS_SQL} order by o.occurred_at limit $3`, [
         ARTEFACT_ORPHANED,
         ARTEFACT_REMOVED_LATER,
         limit,
@@ -470,8 +421,9 @@ export async function sweepRetention(
           await storage.remove(path);
           await client.query(
             `insert into public.audit_log
-               (actor_id, actor_role, action, entity_type, entity_id, summary, after_state)
-             values (null, 'system', $1, 'evidence', $2, $3,
+               (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary,
+                after_state)
+             values ($5, null, 'system', $1, 'evidence', $2, $3,
                      jsonb_build_object('storage_path', $4::text))`,
             [
               ARTEFACT_REMOVED_LATER,
@@ -481,6 +433,18 @@ export async function sweepRetention(
               // What makes this row findable from the orphan it resolves.
               // `entity_id` is null for everything `persist.ts` writes.
               path,
+              /*
+               * The orphan's own organisation, which this row used to leave
+               * null.
+               *
+               * The audit trail exists to be inspectable by the customer, and
+               * the policy on the table shows them their own organisation's
+               * rows. So the row saying "we still hold your artefact" was
+               * visible to them and the row saying "it is gone now" was not:
+               * from their side the first notice stood for ever. Platform staff
+               * could see both, which is how it went unnoticed.
+               */
+              orphan.organisation_id,
             ],
           );
           result.artefactsRecovered += 1;
@@ -507,7 +471,7 @@ export async function sweepRetention(
      * it, and `limit` is why a truncated page could never have told us.
      */
     const outstanding = await client.query<{ outstanding: string }>(
-      `select count(*) as outstanding from (${UNRESOLVED_ORPHANS}) unresolved`,
+      `select count(*) as outstanding from (${UNRESOLVED_ORPHANS_SQL}) unresolved`,
       [ARTEFACT_ORPHANED, ARTEFACT_REMOVED_LATER],
     );
     result.artefactsOutstanding = Number(outstanding.rows[0]?.outstanding ?? 0);

@@ -31,6 +31,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, Pool } from 'pg';
 import { resetRetentionNotices, sweepRetention } from '../apps/worker/src/governance.ts';
+import {
+  ARTEFACT_ORPHANED,
+  ARTEFACT_REMOVED_LATER,
+  UNRESOLVED_ORPHANS_SQL,
+  unresolvedOrphans,
+} from '../packages/governance/src/index.ts';
 import { connect } from './setup/client.ts';
 import { memoryStorage } from './setup/artefacts.ts';
 import { seedAccount, seedAssessment, sha256, type SeededAccount } from './setup/seed.ts';
@@ -394,5 +400,69 @@ describe('what the sweep says about what it is still holding', () => {
 
     expect(lines).toContain('retention sweep');
     expect(again).not.toContain('retention sweep');
+  }, 60_000);
+});
+
+describe('who can see that the bytes are gone', () => {
+  it('writes the recovery against the organisation the orphan belonged to', async () => {
+    /*
+     * The customer's half of the audit trail.
+     *
+     * The log exists to be inspectable by the customer whose assessment it
+     * describes, and the policy on the table shows them their own
+     * organisation's rows. The recovery row was written with no organisation at
+     * all — so the row saying "we still hold your artefact" was visible to them
+     * and the row saying "it is gone now" was not, and from their side the
+     * first notice stood for ever. Platform staff could see both, which is how
+     * it went unnoticed.
+     */
+    const path = 'assessments/whose-bytes/evidence/one';
+    await rollbackOrphan(path);
+
+    const storage = memoryStorage();
+    await storage.put(path, Buffer.from('bytes'));
+    await sweepRetention(pool, () => undefined, new Date(), 500, storage);
+
+    const { rows } = await db.query<{ organisation_id: string | null }>(
+      `select organisation_id from public.audit_log
+        where action = $1 and summary like '%' || $2 || '%'`,
+      [ARTEFACT_REMOVED_LATER, path],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.organisation_id).toBe(owner.organisationId);
+  }, 60_000);
+});
+
+describe('the two spellings of one rule', () => {
+  it('agree about which orphans are still outstanding', async () => {
+    /*
+     * The sweep asks Postgres and the administrator's page asks TypeScript, and
+     * both are reading the same rule: an orphan is identified by its path, and a
+     * recovery row resolves it. Two spellings of one predicate is how a number
+     * and the work it describes come apart, so they are held to the same answer
+     * here — over whatever this whole file has left in the table, which is a
+     * wider set of shapes than either could be given on purpose.
+     */
+    const bySql = await db.query<{ id: string }>(`${UNRESOLVED_ORPHANS_SQL}`, [
+      ARTEFACT_ORPHANED,
+      ARTEFACT_REMOVED_LATER,
+    ]);
+    const everything = await db.query(
+      `select id, action, entity_id, summary, after_state
+         from public.audit_log where action in ($1, $2)`,
+      [ARTEFACT_ORPHANED, ARTEFACT_REMOVED_LATER],
+    );
+
+    // Both actions are in the table by now, and orphans of every shape this
+    // file produces: with an entity id and without, resolved by path and
+    // unresolvable for want of one.
+    expect(everything.rowCount).toBeGreaterThan(6);
+    const byCode = unresolvedOrphans(everything.rows);
+    expect(byCode.map((row) => String(row.id)).sort()).toEqual(
+      bySql.rows.map((row) => String(row.id)).sort(),
+    );
+    // And not vacuously: something is outstanding and something is not.
+    expect(byCode.length).toBeGreaterThan(0);
+    expect(byCode.length).toBeLessThan(everything.rowCount!);
   }, 60_000);
 });

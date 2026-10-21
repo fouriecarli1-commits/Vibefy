@@ -151,6 +151,37 @@ describe('what it prints', () => {
     expect(pause).toMatch(/'unknown'/);
   });
 
+  it('asks whether we are still holding bytes a deletion record calls deleted', () => {
+    /*
+     * The other sweep whose only reader was a worker log.
+     *
+     * `sweepRetention` deletes an expired artefact's row, records the deletion,
+     * and then asks the object store to remove the file. When the store
+     * refuses, the row is gone and an `audit_log` row is the only thing that
+     * says where the bytes are. Anything the retry cannot clear is a promise in
+     * the privacy notice we are not keeping, and the privacy notice is a
+     * document this founder publishes under their own name.
+     */
+    expect(page).toContain('ARTEFACT_ORPHANED');
+    expect(page, 'the page asks the question').toMatch(/said we deleted/);
+    // The shared predicate, not a second spelling of it on this page: the sweep
+    // asks Postgres the same question and the two must not drift.
+    expect(page).toContain('unresolvedOrphans(');
+    expect(page, 'the page does not say how to find them').toMatch(
+      /from public\.audit_log where action/,
+    );
+  });
+
+  it('does not report a page of the records as the whole of them', () => {
+    // The read is capped, and a count that is really "at least this many" said
+    // as a flat number is the same defect as a count it could not read at all
+    // reported as a zero.
+    const held = page.slice(page.indexOf('ARTEFACT_ROWS'));
+    expect(held).toMatch(/At least /);
+    expect(held).toMatch(/artefactError/);
+    expect(held).toMatch(/Cannot tell/);
+  });
+
   it('says a private key in a public variable is a thing to fix', () => {
     // `loadPublishedKeys` separates this case already; the page must not fold
     // it in with "no keys published", which has a different remedy.

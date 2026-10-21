@@ -99,3 +99,102 @@ export function deletionRecordFor(record: RetainedRecord): DeletionRecord {
     retentionUntil: record.retentionUntil,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Artefacts we could not delete
+// ---------------------------------------------------------------------------
+
+/**
+ * Bytes a deletion record says are gone, that we are still holding.
+ *
+ * Two producers write this state. `sweepRetention` writes one when the object
+ * store refuses to remove an artefact whose row it has already deleted, and
+ * `persist.ts` writes one when a run rolls back after its artefacts were stored
+ * and the cleanup then fails. One action for both, because the state is
+ * identical and so is the remedy: ask the store again.
+ *
+ * The second action resolves the first. `audit_log` is append-only, so an
+ * orphan cannot be marked cleared; a later row records the recovery and is what
+ * stops the retry.
+ */
+export const ARTEFACT_ORPHANED = 'evidence.artefact_orphaned';
+export const ARTEFACT_REMOVED_LATER = 'evidence.artefact_removed_later';
+
+/** An `audit_log` row carrying one of those two actions. */
+export interface OrphanAuditRow {
+  readonly action: string;
+  readonly entity_id?: string | null;
+  readonly summary?: string | null;
+  readonly after_state?: { readonly storage_path?: string | null } | null;
+}
+
+/**
+ * What identifies an orphan: its path, and not `entity_id`.
+ *
+ * `entity_id` is null for every orphan a rolled-back run leaves — there is no
+ * evidence row to name — and `null = null` is not true in SQL, so a recovery
+ * row matched on `entity_id` could never be seen by the query meant to find it.
+ * Measured on 2026-10-21: those artefacts were removed again on every sweep for
+ * ever, each pass counting a recovery and appending another audit row.
+ *
+ * The path lives in `after_state` for rows written from 2026-10-21 on. For the
+ * rows written before that it appears only in the sentence, which both
+ * producers word the same way — a thing a test holds rather than a coincidence.
+ */
+export const ORPHAN_PATH_SQL = `coalesce(after_state->>'storage_path',
+                 substring(summary from 'artefact at ([^ ]+)\\.'))`;
+
+/**
+ * Orphans with no recovery row: the bytes we are still holding, right now.
+ *
+ * Two readers need exactly this set — the sweep that retries them and the
+ * administrator's page that reports how many there are — and a second,
+ * near-identical predicate is how a number and the work it describes come
+ * apart. `$1` is the orphan action and `$2` the recovery action.
+ */
+export const UNRESOLVED_ORPHANS_SQL = `
+      with orphan as (
+        select id, entity_id, organisation_id, occurred_at, action, summary,
+               ${ORPHAN_PATH_SQL} as storage_path
+          from public.audit_log
+         where action in ($1, $2)
+      )
+      select o.id, o.entity_id, o.organisation_id, o.storage_path, o.summary
+        from orphan o
+       where o.action = $1
+         and not exists (
+           select 1
+             from orphan later
+            where later.action = $2
+              and (
+                later.storage_path = o.storage_path
+                or (o.entity_id is not null and later.entity_id = o.entity_id)
+              )
+         )`;
+
+/** The same reading of a row as `ORPHAN_PATH_SQL`, for a caller holding rows. */
+export function orphanPath(row: OrphanAuditRow): string | null {
+  const stored = row.after_state?.storage_path;
+  if (typeof stored === 'string' && stored.length > 0) return stored;
+  return /artefact at ([^ ]+)\./.exec(row.summary ?? '')?.[1] ?? null;
+}
+
+/**
+ * The same predicate as `UNRESOLVED_ORPHANS_SQL`, for a caller holding rows.
+ *
+ * Here rather than in the page that needs it so that the two spellings of one
+ * rule sit beside each other and a test can hold them to the same answer.
+ */
+export function unresolvedOrphans<T extends OrphanAuditRow>(rows: readonly T[]): T[] {
+  const recovered = rows.filter((row) => row.action === ARTEFACT_REMOVED_LATER);
+  const paths = new Set(recovered.map(orphanPath).filter((path): path is string => path !== null));
+  const entities = new Set(
+    recovered.map((row) => row.entity_id).filter((id): id is string => typeof id === 'string'),
+  );
+  return rows.filter((row) => {
+    if (row.action !== ARTEFACT_ORPHANED) return false;
+    const path = orphanPath(row);
+    if (path !== null && paths.has(path)) return false;
+    return !(typeof row.entity_id === 'string' && entities.has(row.entity_id));
+  });
+}
