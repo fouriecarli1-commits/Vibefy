@@ -27,6 +27,7 @@ import { decideAssessmentRequest, resolvePlan } from '@vibefycode/billing';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser, writeAsService } from '@/lib/sql';
+import { couldNot } from '@/lib/what-we-could-not-do';
 
 /**
  * The version and exact bytes of a legal document, at the moment it is accepted.
@@ -312,7 +313,24 @@ export async function startAuthorisation(
 
   if (error) return { error: error.message };
 
-  await supabase.from('consents').insert({
+  /*
+   * The ledger copy of the same acceptance, and the one write here that was
+   * discarded.
+   *
+   * The badge-licence action twelve hundred lines down does the identical
+   * insert into the identical append-only table and returns its error; this one
+   * returned "Authorisation recorded." whatever happened. The table is
+   * append-only because the record is evidence, and evidence that exists for
+   * most authorisations is not a rule.
+   *
+   * It does not fail the action, because the authorisation itself is already
+   * written and it carries `warranty_text_version` and `warranty_text_sha256` —
+   * the version and the exact bytes of the words they accepted. So what the
+   * person was told is true and nothing about the wording is lost; what is
+   * missing is the consents-ledger row, which is ours to notice and not
+   * something they can do anything about.
+   */
+  const { error: unrecordedConsent } = await supabase.from('consents').insert({
     user_id: user.id,
     organisation_id: app.organisation_id,
     document_type: 'authorisation_to_test',
@@ -322,6 +340,19 @@ export async function startAuthorisation(
     ip,
     user_agent: userAgent,
   });
+  if (unrecordedConsent) {
+    couldNot(
+      'record the authorisation warranty in the consents ledger',
+      {
+        shown:
+          'Authorisation recorded, which is true: the authorisation row carries the version and hash of the words they accepted.',
+        appId: app.id,
+        userId: user.id,
+        documentVersion: warranty.version,
+      },
+      unrecordedConsent,
+    );
+  }
 
   revalidatePath(`/console/apps/${appId}`);
   return {

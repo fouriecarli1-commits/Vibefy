@@ -3,6 +3,45 @@
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { CONSENT_AT_SIGN_UP, consentPayload } from '@/lib/legal';
+import { couldNot } from '@/lib/what-we-could-not-do';
+
+/**
+ * A write to this table that did not happen, said out loud.
+ *
+ * `acceptDocuments` — the form somebody fills in when they reach the wall —
+ * already carries this rule beside its own insert: "said rather than swallowed.
+ * An acceptance we failed to write is an account that carries on looking
+ * accepted, which is the thing this whole path exists to prevent." The two
+ * functions below are the same insert into the same append-only table, and both
+ * discarded the result.
+ *
+ * What the person gets is covered: every door into the console asks
+ * `missingConsents` and sends them to the acceptance wall, so a failed write
+ * here costs them one extra screen rather than letting them past. What was not
+ * covered is us. A systematic failure — a policy changed, the enum extended, the
+ * table unreachable — would send every new account to that wall with no sign
+ * anywhere of why, and the console calls one of these on every visit, swallowing
+ * it again each time, for ever.
+ *
+ * The attempt is still made when the "has it already been recorded" question is
+ * the thing that failed. A duplicate row in an append-only log of acceptances is
+ * a second acceptance, which is harmless and arguably true; a missing one is
+ * evidence we do not have.
+ */
+function consentWriteFailed(
+  subject: string,
+  detail: { readonly userId: string; readonly documentType: string; readonly version: string },
+  error: unknown,
+): void {
+  couldNot(
+    subject,
+    {
+      shown: 'the acceptance wall, because the database still has nothing on record for them',
+      ...detail,
+    },
+    error,
+  );
+}
 
 /**
  * Materialises the acceptance recorded at sign-up into the append-only consents
@@ -46,14 +85,21 @@ export async function recordSignUpConsents(): Promise<void> {
     // be a consent record nobody can reproduce.
     if (!current.some((entry) => entry.sha256 === record.sha256)) continue;
 
-    const { data: alreadyRecorded } = await supabase.rpc('has_current_consent', {
+    const { data: alreadyRecorded, error: askFailed } = await supabase.rpc('has_current_consent', {
       target_user: user.id,
       document: record.documentType,
       required_version: record.version,
     });
+    if (askFailed) {
+      consentWriteFailed(
+        'ask whether a sign-up acceptance was already recorded',
+        { userId: user.id, documentType: record.documentType, version: record.version },
+        askFailed,
+      );
+    }
     if (alreadyRecorded) continue;
 
-    await supabase.from('consents').insert({
+    const { error: writeFailed } = await supabase.from('consents').insert({
       user_id: user.id,
       document_type: record.documentType,
       document_version: record.version,
@@ -63,6 +109,13 @@ export async function recordSignUpConsents(): Promise<void> {
       ip,
       user_agent: userAgent,
     });
+    if (writeFailed) {
+      consentWriteFailed(
+        'record the acceptance this account signed up with',
+        { userId: user.id, documentType: record.documentType, version: record.version },
+        writeFailed,
+      );
+    }
   }
 }
 
@@ -107,14 +160,21 @@ export async function recordProviderConsents(declared: string | null): Promise<v
     if (!declared.split('|').includes(`${entry.documentType}:${entry.version}:${entry.sha256}`)) {
       continue;
     }
-    const { data: alreadyRecorded } = await supabase.rpc('has_current_consent', {
+    const { data: alreadyRecorded, error: askFailed } = await supabase.rpc('has_current_consent', {
       target_user: user.id,
       document: entry.documentType,
       required_version: entry.version,
     });
+    if (askFailed) {
+      consentWriteFailed(
+        'ask whether a provider sign-up acceptance was already recorded',
+        { userId: user.id, documentType: entry.documentType, version: entry.version },
+        askFailed,
+      );
+    }
     if (alreadyRecorded) continue;
 
-    await supabase.from('consents').insert({
+    const { error: writeFailed } = await supabase.from('consents').insert({
       user_id: user.id,
       document_type: entry.documentType,
       document_version: entry.version,
@@ -123,6 +183,13 @@ export async function recordProviderConsents(declared: string | null): Promise<v
       ip,
       user_agent: userAgent,
     });
+    if (writeFailed) {
+      consentWriteFailed(
+        'record the acceptance a provider sign-up declared',
+        { userId: user.id, documentType: entry.documentType, version: entry.version },
+        writeFailed,
+      );
+    }
   }
 }
 

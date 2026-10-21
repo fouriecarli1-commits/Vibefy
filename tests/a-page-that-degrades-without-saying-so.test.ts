@@ -79,6 +79,59 @@ describe('a handler that swallows a failure', () => {
   });
 });
 
+/**
+ * The other shape of the same silence, which the sweep above cannot see.
+ *
+ * `.catch(` is not how this product usually ignores a failure. Supabase returns
+ * its refusal in the result — `const { data, error } = await supabase...` — so
+ * leaving `error` out of the destructuring discards it with no `catch` anywhere
+ * for a reader or for the gate above to notice. Measured on 2026-10-21: a
+ * hundred and fifty-four such reads in the web app, and among the writes one
+ * that mattered. `recordAuthorisation` inserted the consent row pinning the
+ * warranty text somebody had just accepted, dropped the result, and returned
+ * "Authorisation recorded." The badge-licence action in the same file does the
+ * identical insert into the identical append-only table and returns its error.
+ *
+ * Writes, and for now not reads. A write's fallback is a claim that something
+ * happened — the whole reason that table is append-only is that the row is
+ * evidence — while a dropped read fallback is a different question on each of a
+ * hundred and fifty pages, and `auth.getUser()` alone accounts for sixty-nine
+ * of them with one uniform meaning. That is a sweep of its own and it is
+ * written down in `docs/OPEN_ITEMS.md` rather than left as a thing somebody
+ * might notice.
+ */
+describe('a write whose refusal is never read', () => {
+  const WRITE = /\.(?:insert|update|upsert|delete)\(/;
+  /** Where a statement begins, in a file Prettier has formatted. */
+  const STATEMENT_START = /^\s*(?:const|let|var|await|return)\b/;
+
+  it('reads the error on every Supabase write in the web app', () => {
+    const quiet: string[] = [];
+    for (const path of webSources()) {
+      const lines = commentsBlanked(readFileSync(path, 'utf8')).split('\n');
+      lines.forEach((line, index) => {
+        if (!WRITE.test(line)) return;
+        let start = index;
+        while (start >= 0 && !STATEMENT_START.test(lines[start]!)) start -= 1;
+        if (start < 0) return;
+        let end = index;
+        while (end < lines.length && !lines[end]!.trimEnd().endsWith(';')) end += 1;
+        const statement = lines.slice(start, end + 1).join('\n');
+        // `createHash().update()` is a write to nothing.
+        if (!statement.includes('supabase')) return;
+        if (/\berror\b/.test(statement)) return;
+        // Or bound whole and asked afterwards, which is how the two-branch
+        // writes in this codebase read their refusal.
+        const named = /^\s*const\s+([A-Za-z_$][\w$]*)\s*=/.exec(lines[start]!);
+        const after = lines.slice(end + 1, end + 12).join('\n');
+        if (named && after.includes(`${named[1]!}.error`)) return;
+        quiet.push(`${path}:${index + 1}  ${line.trim()}`);
+      });
+    }
+    expect(quiet, `these write and never ask whether it worked:\n${quiet.join('\n')}`).toEqual([]);
+  });
+});
+
 describe('the line itself', () => {
   let said: { message: string; detail: Record<string, unknown> }[];
 

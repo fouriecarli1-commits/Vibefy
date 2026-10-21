@@ -80,6 +80,25 @@ describe('the acceptance page', () => {
     expect(action).toMatch(/if \(error\) return \{ error:/);
   });
 
+  it('says so when the materialising writes fail, too', () => {
+    /*
+     * The same rule as the form's, on the two functions that write the
+     * acceptance an account arrived with.
+     *
+     * `acceptDocuments` carries it beside its own insert: an acceptance we
+     * failed to write is an account that carries on looking accepted. Both
+     * functions in `lib/consent.ts` do the identical insert into the identical
+     * append-only table and discarded the result — so a systematic failure
+     * would send every new account to the wall with no sign anywhere of why,
+     * and the console, which calls one of them on every visit, would swallow it
+     * again each time.
+     */
+    const consent = read('apps/web/lib/consent.ts');
+    expect(consent).toContain('couldNot(');
+    expect((consent.match(/error: writeFailed/g) ?? []).length).toBe(2);
+    expect(consent).toMatch(/error: askFailed/);
+  });
+
   it('is one button, and the button is the acceptance', () => {
     // A checkbox beside a button records that somebody found the checkbox.
     const form = read('apps/web/components/accept-form.tsx');
