@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { loadPublishedKeys, publicKeyFromJwk } from '@vibefycode/badge';
 import { providerLabel } from '@vibefycode/shared';
 import { enabledProviders } from '@/lib/providers-enabled';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from '@/lib/connection-string';
 import { createClient } from '@/lib/supabase/server';
+import { resolveSiteOrigin } from '@/lib/verify-origin.server';
+import { isPlaceholderOrigin } from '@/lib/verify-origin';
 
 export const metadata: Metadata = { title: 'What is wrong' };
 
@@ -260,12 +262,124 @@ async function signInProviders(): Promise<Check> {
   };
 }
 
+/**
+ * The host this deployment is answering on, against the one it calls its own.
+ *
+ * A deployment reachable at both `vibefycode.com` and `www.vibefycode.com`
+ * sends whichever one the visitor is on to Supabase as the address to hand a
+ * sign-in back to. Supabase refuses one that is not in its allow-list and falls
+ * back to the Site URL, and the PKCE verifier is a cookie on the host that
+ * started the flow and is not sent to the other — so a sign-in can fail twice
+ * over, invisibly, for a visitor who typed the wrong one of two addresses that
+ * both work.
+ *
+ * Public, because every value in it is already: the address bar says which host
+ * answered, and `NEXT_PUBLIC_SITE_URL` is shipped to the browser by name.
+ */
+async function servedOrigin(): Promise<Check> {
+  const question = 'Which address is this deployment answering on?';
+  const headerList = await headers();
+  const host = headerList.get('x-forwarded-host') ?? headerList.get('host');
+  const served = host ? `https://${host}` : null;
+  const configured = await resolveSiteOrigin();
+  const declared = isPlaceholderOrigin(configured) ? null : configured;
+
+  if (!served) {
+    return { question, answer: 'This request carried no host header.', tone: 'unknown' };
+  }
+  if (!declared) {
+    return {
+      question,
+      answer: `${served}, and NEXT_PUBLIC_SITE_URL names no address, so every link and every sign-in hand-back is built from whichever host the visitor arrived at.`,
+      tone: 'warn',
+      then: 'Set NEXT_PUBLIC_SITE_URL to the one address this product calls its own, then redeploy. With two hostnames answering and none declared, a sign-in started on one can be handed back to the other, which fails in a way nobody sees.',
+    };
+  }
+  return served === declared
+    ? {
+        question,
+        answer: `${served}, which is what NEXT_PUBLIC_SITE_URL names.`,
+        tone: 'ok',
+      }
+    : {
+        question,
+        answer: `${served}, while NEXT_PUBLIC_SITE_URL names ${declared}. A sign-in started here is sent to that one.`,
+        tone: 'warn',
+        then: `Both have to be in Supabase → Authentication → URL Configuration → Redirect URLs, or use one address everywhere. The Site URL there is where Supabase sends anybody whose redirect it refuses, and it must be an origin — ${declared} — never a path.`,
+      };
+}
+
+/** What a provider's own console has to list, which is a public address. */
+function providerCallback(): Check {
+  const question = 'What must the provider’s console list as its redirect address?';
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    return {
+      question,
+      answer: 'Cannot say: NEXT_PUBLIC_SUPABASE_URL is not set in this deployment.',
+      tone: 'bad',
+      then: 'Vercel → Settings → Environment Variables → add it, then redeploy.',
+    };
+  }
+  return {
+    question,
+    answer: `${url.replace(/\/+$/, '')}/auth/v1/callback`,
+    tone: 'ok',
+    then: 'That exact string, in Google Cloud → APIs & Services → Credentials → the OAuth client whose ID and secret are pasted into Supabase. Not this site’s address: a provider hands back to Supabase, and Supabase hands back to us.',
+  };
+}
+
 export default async function HealthPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/sign-in?next=/admin/health');
+  /*
+   * The one failure that locks somebody out of this page is a sign-in that
+   * does not work, which is also the failure this page is most needed for.
+   *
+   * So the questions whose answers are already public are answered to anybody:
+   * which host answered — the address bar says that — which providers Supabase
+   * has turned on, which the sign-in page already shows as buttons, and the
+   * address a provider's console must list, which is built from a variable the
+   * browser is sent by name. Nothing about the database, the keys or what has
+   * been issued is in this list.
+   */
+  if (!user) {
+    const open: Check[] = [await servedOrigin(), await signInProviders(), providerCallback()];
+    return (
+      <div className="max-w-3xl space-y-8">
+        <header className="space-y-2">
+          <p className="eyebrow">Anybody</p>
+          <h1 className="text-3xl font-bold tracking-tight">What is wrong</h1>
+          <p className="max-w-prose text-muted">
+            These three answers are already public — the address you typed, the buttons the sign-in
+            page shows, and an address a provider’s console has to carry. They are here without a
+            sign-in because a sign-in that will not work is exactly when somebody needs them.{' '}
+            <Link href="/sign-in?next=/admin/health">Sign in as an administrator</Link> for the
+            rest.
+          </p>
+        </header>
+        <ul className="space-y-4">
+          {open.map((check) => (
+            <li key={check.question} className="rounded-xl border border-line p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 className="font-semibold">{check.question}</h2>
+                <span
+                  className="chip"
+                  data-tone={check.tone === 'ok' ? 'ok' : check.tone === 'bad' ? 'bad' : 'warn'}
+                >
+                  {TONE_LABEL[check.tone]}
+                </span>
+              </div>
+              <p className="mt-2 text-sm">{check.answer}</p>
+              {check.then && <p className="mt-2 text-sm text-muted">{check.then}</p>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   const { data: profile } = await supabase
     .from('users')
@@ -354,7 +468,9 @@ export default async function HealthPage() {
   const checks: Check[] = [
     connectionString(),
     publicApiKeys(),
+    await servedOrigin(),
     await signInProviders(),
+    providerCallback(),
     await badgeLookup(),
     signingKeys(),
     spendPause,

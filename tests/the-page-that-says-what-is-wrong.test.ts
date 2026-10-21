@@ -30,8 +30,34 @@ const page = withoutComments(read('apps/web/app/admin/health/page.tsx'));
 const layout = withoutComments(read('apps/web/app/admin/layout.tsx'));
 
 describe('who may read it', () => {
-  it('sends a stranger to sign in', () => {
-    expect(page).toContain("redirect('/sign-in?next=/admin/health')");
+  it('answers a stranger only the questions that are already public', () => {
+    /*
+     * The one failure that locks somebody out of this page is a sign-in that
+     * will not work, which is also the failure the page is most needed for. It
+     * used to redirect a signed-out visitor to the sign-in page — the page they
+     * had just failed on.
+     *
+     * Three answers are open, and each is already visible without this page:
+     * the host that answered is in the address bar, the enabled providers are
+     * the buttons on the sign-in page, and the provider's redirect address is
+     * built from a variable the browser is sent by name. Everything else stays
+     * behind the role check below, and the test under it is what holds that.
+     */
+    const open = page.slice(page.indexOf('if (!user)'), page.indexOf("platform_role !== 'admin'"));
+    expect(open).toMatch(/servedOrigin\(\)/);
+    expect(open).toMatch(/signInProviders\(\)/);
+    expect(open).toMatch(/providerCallback\(\)/);
+    expect(open).toMatch(/Sign in as an administrator/);
+  });
+
+  it('keeps everything else behind the sign-in', () => {
+    // The checks that describe our own plumbing — the connection string, the
+    // keys, what has been issued, whether the platform stopped itself — are
+    // named only after the role check.
+    const open = page.slice(page.indexOf('if (!user)'), page.indexOf("platform_role !== 'admin'"));
+    for (const check of ['connectionString(', 'publicApiKeys(', 'signingKeys(', 'spend_pauses']) {
+      expect(open, `${check} is answered to anybody`).not.toContain(check);
+    }
   });
 
   it('refuses anybody who is not an administrator', () => {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { isPlaceholderOrigin, siteOriginFor } from '@/lib/verify-origin';
 import { providerLabel, type SocialProviderId } from '@vibefycode/shared';
 
 /**
@@ -49,6 +50,38 @@ export function ProviderButton({
     setBusy(true);
     setError(null);
     const supabase = createClient();
+
+    /*
+     * The hand-back has to come home to the host that started the flow.
+     *
+     * This read `window.location.origin`, which is whichever hostname the
+     * visitor happens to be on. A deployment answering on both `vibefycode.com`
+     * and `www.vibefycode.com` therefore sends one of two different addresses
+     * to Supabase, and the consequences of guessing wrong are not symmetrical:
+     *
+     *   · Supabase refuses a `redirect_to` that is not in its allow-list and
+     *     falls back to the Site URL — so the visitor lands somewhere with
+     *     nothing on the address, which is the "that link arrived with nothing
+     *     on it" page, for a sign-in that never failed as far as they saw;
+     *   · the PKCE verifier is stored in a cookie on the host that starts the
+     *     flow, and a cookie set on `www.` is not sent to the apex. Even a
+     *     redirect that is allowed then arrives at a callback that cannot
+     *     finish it.
+     *
+     * So the flow starts on the host this deployment calls its own. When
+     * `NEXT_PUBLIC_SITE_URL` says nothing, the current origin is the only
+     * answer available and nothing changes — `siteOriginFor` is the same
+     * resolver the console's own links use, and the browser has no request to
+     * read a host from.
+     */
+    const canonical = siteOriginFor(null);
+    if (!isPlaceholderOrigin(canonical) && canonical !== window.location.origin) {
+      // Same page, the other hostname. The sign-in then happens entirely on one
+      // host: the verifier, the hand-back and the session cookie.
+      window.location.replace(`${canonical}${window.location.pathname}${window.location.search}`);
+      return;
+    }
+
     const callback = new URL('/auth/callback', window.location.origin);
     callback.searchParams.set('next', next ?? '/console');
     if (mode === 'sign-up' && accepted) callback.searchParams.set('accepted', accepted);
