@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { headers } from 'next/headers';
 import { loadPublishedKeys, publicKeyFromJwk } from '@vibefycode/badge';
 import { providerLabel, type SocialProviderId } from '@vibefycode/shared';
@@ -7,6 +8,7 @@ import { enabledProviders } from '@/lib/providers-enabled';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from '@/lib/connection-string';
 import { createClient } from '@/lib/supabase/server';
+import { LiftPauseForm } from './lift-pause';
 import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import { isPlaceholderOrigin } from '@/lib/verify-origin';
 import { projectNumberOf, readAuthorizeRedirect } from '@/lib/which-provider-client';
@@ -43,6 +45,8 @@ interface Check {
   readonly tone: Tone;
   /** The next step, where there is one to take. */
   readonly then?: string;
+  /** Where the next step is a thing to do here rather than a thing to read. */
+  readonly act?: ReactNode;
 }
 
 const TONE_LABEL: Readonly<Record<Tone, string>> = {
@@ -531,7 +535,8 @@ export default async function HealthPage() {
           question: 'Has the platform stopped itself?',
           answer: `Yes. Spending was paused on ${new Date(livePause.paused_at as string).toISOString().slice(0, 16).replace('T', ' ')} UTC and nothing has lifted it, so no new assessment is being claimed. ${String(livePause.reason)}`,
           tone: 'bad',
-          then: "Lifting one is deliberate and needs a person — and nothing in the product does it yet, so today it is one statement run against the database: update public.spend_pauses set lifted_at = now(), lift_reason = '<why, at least ten characters>' where lifted_at is null. The worker starts claiming again within five minutes.",
+          then: "Lifting one is deliberate and needs a person, which is the form below — it asks for the second step on your account, because this restarts spending across the whole platform. If it refuses for any reason, the statement that does the same thing is: update public.spend_pauses set lifted_at = now(), lift_reason = '<why, at least ten characters>' where lifted_at is null. Either way the worker starts claiming again within five minutes.",
+          act: <LiftPauseForm />,
         }
       : {
           question: 'Has the platform stopped itself?',
@@ -593,6 +598,7 @@ export default async function HealthPage() {
             </div>
             <p className="mt-2 text-sm">{check.answer}</p>
             {check.then && <p className="mt-2 text-sm text-muted">{check.then}</p>}
+            {check.act}
           </li>
         ))}
       </ul>
