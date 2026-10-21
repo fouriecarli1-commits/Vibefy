@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { readAsUser } from '@/lib/sql';
+import { couldNot } from '@/lib/what-we-could-not-do';
+import { whatComesNext } from '@/lib/what-comes-next';
 import { embedded } from '@/lib/embedded';
 import { recordSignUpConsents } from '@/lib/consent';
 
@@ -52,10 +55,57 @@ export default async function ConsolePage() {
     .select('role, organisations (id, name, slug, account_type, is_personal)')
     .order('organisation_id');
 
-  const { data: apps } = await supabase
-    .from('apps')
-    .select('id, name, primary_url, screening_status')
-    .order('created_at', { ascending: false });
+  /*
+   * One query rather than four, and read as the caller.
+   *
+   * The list used to carry the screening status and nothing else, so an
+   * application that was authorised and ready to assess looked exactly like one
+   * waiting for a DNS record. The three facts that decide what to do next —
+   * whether the gate says it may be tested, whether anything is in flight, and
+   * what the last run came to — live in three other tables, and `readAsUser`
+   * runs the join under the caller's own row-level security rather than
+   * assembling it from four round trips through PostgREST.
+   */
+  const apps = await readAsUser(user.id, async (client) => {
+    const { rows } = await client.query<{
+      id: string;
+      name: string;
+      primary_url: string;
+      screening_status: string;
+      authorisation: string | null;
+      authorised: boolean;
+      open_request: string | null;
+      latest_assessment: string | null;
+      latest_assessment_id: string | null;
+    }>(
+      `select a.id, a.name, a.primary_url, a.screening_status::text as screening_status,
+              (select c.status::text from public.current_authorisation(a.id) c) as authorisation,
+              public.app_is_authorised_for_testing(a.id) as authorised,
+              (select r.status::text from public.assessment_requests r
+                where r.app_id = a.id and r.status in ('queued', 'claimed')
+                order by r.created_at desc limit 1) as open_request,
+              (select s.status::text from public.assessments s
+                where s.app_id = a.id order by s.created_at desc limit 1) as latest_assessment,
+              (select s.id::text from public.assessments s
+                where s.app_id = a.id order by s.created_at desc limit 1) as latest_assessment_id
+         from public.apps a
+        where a.archived_at is null
+        order by a.created_at desc`,
+    );
+    return rows;
+  }).catch((error: unknown) => {
+    // The list is the front door. Losing it to a failed read and saying nothing
+    // is the defect this codebase keeps finding, so the page says it below and
+    // the log says which read it was.
+    couldNot(
+      'read the applications on the console',
+      {
+        shown: 'the console with no applications on it, as though none had been added',
+      },
+      error,
+    );
+    return null;
+  });
 
   /*
    * The plan of one workspace, not of whichever subscription came back first.
@@ -129,10 +179,26 @@ export default async function ConsolePage() {
           </Link>
         </div>
 
+        {apps === null && (
+          <p role="alert" className="rounded-xl border border-line p-5 text-bad">
+            Your applications could not be loaded just now. Nothing has happened to them — this is a
+            fault on our side, and it is recorded.
+          </p>
+        )}
+
         {(apps ?? []).length > 0 ? (
           <ul className="space-y-3">
             {(apps ?? []).map((app) => {
               const screening = String(app.screening_status ?? 'pending');
+              const next = whatComesNext({
+                appId: String(app.id),
+                screening,
+                authorisation: app.authorisation,
+                authorisedForTesting: app.authorised === true,
+                openRequest: app.open_request,
+                latestAssessment: app.latest_assessment,
+                latestAssessmentId: app.latest_assessment_id,
+              });
               return (
                 <li key={String(app.id)} className="panel space-y-2">
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -144,6 +210,17 @@ export default async function ConsolePage() {
                     </span>
                   </div>
                   <p className="text-sm text-muted">{String(app.primary_url)}</p>
+                  {/* The step this application is actually on. Every one of
+                      these states already decides what the product will allow;
+                      until now it was legible only by opening the page that
+                      enforces it. */}
+                  <p className="text-sm">
+                    <span className="font-medium">
+                      {next.yours ? 'Your next step: ' : 'Waiting: '}
+                    </span>
+                    {next.href ? <Link href={next.href}>{next.label}</Link> : next.label}
+                    <span className="text-muted"> — {next.what}</span>
+                  </p>
                 </li>
               );
             })}

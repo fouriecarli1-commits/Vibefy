@@ -12,7 +12,17 @@ import {
   screenIntake,
   verifyOwnership,
 } from '@vibefycode/engine/authorisation';
-import { RepositoryRefusedError, repositoryUrlOrRefuse } from '@vibefycode/engine';
+/*
+ * From the subpath, not from the package root.
+ *
+ * The root export reaches `runtime/browser.ts`, which imports Playwright — so
+ * every page that imports this module was loading a browser automation library
+ * into a web request to read two functions about a repository URL. The report
+ * package refuses the same dependency for the same reason, in its own words:
+ * "a report package that depended on the engine would drag a browser
+ * automation library into a renderer".
+ */
+import { RepositoryRefusedError, repositoryUrlOrRefuse } from '@vibefycode/engine/repository';
 import { decideAssessmentRequest, resolvePlan } from '@vibefycode/billing';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';

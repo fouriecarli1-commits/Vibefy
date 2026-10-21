@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse, type NextRequest } from 'next/server';
-import { priceFor } from '@vibefycode/engine';
+// From the subpath: the package root reaches Playwright, and this is a price table.
+import { priceFor } from '@vibefycode/engine/cost';
 import { badgeEmbedJsx, badgeEmbedSnippet } from '@vibefycode/shared';
 import {
   COPILOT_CEILING_REACHED,

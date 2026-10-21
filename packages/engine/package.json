@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./authorisation": "./src/authorisation/index.ts",
     "./scope": "./src/runtime/scope.ts",
-    "./evidence": "./src/runtime/evidence.ts"
+    "./evidence": "./src/runtime/evidence.ts",
+    "./repository": "./src/runtime/repository.ts",
+    "./cost": "./src/runtime/cost.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

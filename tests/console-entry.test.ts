@@ -26,12 +26,28 @@ describe('the console overview', () => {
   });
 
   it('renders the applications it queries', () => {
-    // The query was there from the start. Reading rows and not drawing them is
-    // the shape of this bug, so the assertion is that the data reaches the page
-    // rather than that a query exists.
-    expect(overview).toContain("from('apps')");
+    /*
+     * The query was there from the start. Reading rows and not drawing them is
+     * the shape of this bug, so the assertion is that the data reaches the page
+     * rather than that a query exists.
+     *
+     * It reads `public.apps` in SQL through `readAsUser` since 2026-10-21,
+     * rather than through PostgREST: the three facts that decide what to do
+     * next with an application live in three other tables, and a join under the
+     * caller's own row-level security is one round trip instead of four.
+     */
+    expect(overview).toMatch(/from public\.apps/);
+    expect(overview).toContain('readAsUser');
     expect(overview).toContain('primary_url');
     expect(overview).toMatch(/apps \?\? \[\]\)\.map/);
+  });
+
+  it('says what each application is waiting on', () => {
+    // Every one of these states already decides what the product will allow.
+    // Until this, all of it was legible only by opening the page that enforces
+    // it — so an application ready to assess looked like one waiting for DNS.
+    expect(overview).toContain('whatComesNext(');
+    expect(overview).toMatch(/Your next step/);
   });
 
   it('links each application to its own page', () => {

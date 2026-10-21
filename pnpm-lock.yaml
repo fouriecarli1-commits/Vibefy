@@ -171,9 +171,6 @@ importers:
       '@vibefycode/trustcheck':
         specifier: workspace:*
         version: link:../../packages/trustcheck
-      '@vibefycode/worker':
-        specifier: workspace:*
-        version: link:../worker
       '@vibefycode/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace

@@ -50,9 +50,33 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = process.cwd();
 
-/** Where a workspace package's barrel lives, or its sub-path export. */
+/**
+ * Where a workspace package's barrel lives, or its sub-path export.
+ *
+ * The manifest's own `exports` map is asked first, because guessing is how this
+ * sweep goes blind. `@vibefycode/engine/repository` is `src/runtime/repository.ts`
+ * and no amount of pattern-matching on the specifier finds it — the guesses
+ * below look for `src/repository.ts` and `src/repository/index.ts`, both miss,
+ * and a module that is reached resolves to nothing. Every variable read beyond
+ * it then looks unreachable, and the exception for it reads as stale.
+ *
+ * Found that way on 2026-10-21, by this file, an hour after a subpath was added
+ * to keep a browser driver out of the console: PATH went quiet and the test
+ * asked to have its excuse deleted.
+ */
 function packageEntry(specifier: string): string | null {
   const [, name = '', sub = ''] = /^@vibefycode\/([^/]+)(?:\/(.*))?$/.exec(specifier) ?? [];
+  const manifest = join(ROOT, `packages/${name}/package.json`);
+  if (existsSync(manifest)) {
+    const exports = (
+      JSON.parse(readFileSync(manifest, 'utf8')) as { exports?: Record<string, string> }
+    ).exports;
+    const declared = exports?.[sub ? `./${sub}` : '.'];
+    if (declared) {
+      const resolved = join(ROOT, `packages/${name}`, declared);
+      if (existsSync(resolved)) return resolved;
+    }
+  }
   const candidates = sub
     ? [`packages/${name}/src/${sub}.ts`, `packages/${name}/src/${sub}/index.ts`]
     : [`packages/${name}/src/index.ts`];
@@ -165,10 +189,6 @@ const NOT_IN_THE_TABLE: Readonly<Record<string, Readonly<Record<string, string>>
       'An override for deployments that serve badges from a second hostname, and the table lists NEXT_PUBLIC_SITE_URL, which is what resolves when it is unset. apps/web/lib/verify-origin.ts is the only reader and falls back on its own; a deployment that needs it knows it does.',
     ALERT_EMAIL_REPLY_TO:
       'Optional on both deployments, which is what the Render table says about it. packages/notify/src/resend.ts omits the header when it is unset, and nothing else reads it.',
-    PLAYWRIGHT_BROWSERS_PATH:
-      'The engine barrel reaches the browser launcher; the console never launches one, which tests/the-console-runs-no-assessment.test.ts asserts by sweeping apps/web for the runner entry points. On the worker it is set by the platform image, not by us.',
-    VIBEFYCODE_BROWSER_EXECUTABLE:
-      'The same override, reached through packages/engine/src/runtime/browser.ts and never used in a request. Documented in the runbook prose where somebody debugging a runner will be, rather than in a table of things to set.',
     PATH: 'The operating system supplies it. packages/engine/src/runtime/repository.ts reads it to find git, and the console never clones anything.',
     NODE_ENV:
       'Set by Next and by Vercel, not by us. apps/web/lib/payments.ts reads it to refuse live payment keys outside production.',
