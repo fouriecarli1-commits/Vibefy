@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { evaluatePolicy, type PolicyProfile, type PolicySubject } from '@vibefycode/policy';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Portfolio' };
 
@@ -43,9 +44,7 @@ const BADGE_LABEL: Record<string, string> = {
  */
 export default async function PortfolioPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/portfolio');
 
   const { data: rows, error } = await supabase

@@ -35,6 +35,7 @@ import { ScoreTrend, type TrendPoint } from '@/components/score-trend';
 import { currentVersionOf } from '@/lib/legal';
 import { Disclosure } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { howToProve } from '@/lib/prove-the-domain';
 import { isPlaceholderOrigin } from '@/lib/verify-origin';
 import { resolveVerifyOriginWithSource } from '@/lib/verify-origin.server';
@@ -73,9 +74,7 @@ const STATUS_COPY: Record<string, { label: string; tone: string; meaning: string
 export default async function AppPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/apps/${id}`);
 
   const { data: app } = await supabase.from('apps').select('*').eq('id', id).single();

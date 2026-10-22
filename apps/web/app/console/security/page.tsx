@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { MfaPanel } from '@/components/mfa-panel';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Sign-in security', robots: { index: false } };
 
@@ -17,9 +18,7 @@ export const metadata: Metadata = { title: 'Sign-in security', robots: { index: 
  */
 export default async function SecurityPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/security');
 
   return (

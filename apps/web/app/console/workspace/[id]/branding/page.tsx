@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { saveBranding } from '../../actions';
 
 export const metadata: Metadata = { title: 'Report branding' };
@@ -9,9 +10,7 @@ export const metadata: Metadata = { title: 'Report branding' };
 export default async function BrandingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/workspace/${id}/branding`);
 
   const { data: branding } = await supabase

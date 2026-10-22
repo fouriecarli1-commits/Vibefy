@@ -5,6 +5,7 @@ import { entitlementFor, priceIn } from '@vibefycode/billing';
 import { publishedCeilings } from '@vibefycode/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { WideTable } from '@/components/wide-table';
 
 export const metadata: Metadata = { title: 'Unit economics' };
@@ -20,9 +21,7 @@ export const metadata: Metadata = { title: 'Unit economics' };
  */
 export default async function CostsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/admin/costs');
 
   const { data: profile } = await supabase

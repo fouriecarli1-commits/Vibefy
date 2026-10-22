@@ -2,15 +2,14 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AUDIT_EXPORT_KINDS } from '@vibefycode/workspace';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Audit export' };
 
 export default async function ExportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/workspace/${id}/export`);
 
   const { data: exports } = await supabase

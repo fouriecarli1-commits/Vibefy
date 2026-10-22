@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { PLACEMENT_LABEL, SPONSOR_LABEL, type SponsorshipPlacement } from '@vibefycode/sponsorship';
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { approveSponsorship, endSponsorship, rejectSponsorship } from './actions';
 
 export const metadata: Metadata = { title: 'Placements' };
@@ -46,9 +47,7 @@ const money = (cents: number, currency: string) =>
 
 export default async function SponsorshipsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/admin/sponsorships');
 
   const { data: profile } = await supabase

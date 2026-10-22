@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { APPEAL_RESPONSE_DAYS, daysRemaining } from '@vibefycode/governance';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { resolveAppeal } from '@/app/console/privacy/actions';
 
 export const metadata: Metadata = { title: 'Appeals' };
@@ -17,9 +18,7 @@ export const metadata: Metadata = { title: 'Appeals' };
  */
 export default async function ReviewAppealsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review/appeals');
 
   const { data: appeals } = await supabase

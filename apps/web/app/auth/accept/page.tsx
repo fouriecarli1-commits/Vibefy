@@ -4,6 +4,7 @@ import { AcceptForm } from '@/components/accept-form';
 import { missingConsents } from '@/lib/consent';
 import { consentPayload } from '@/lib/legal';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Before you continue', robots: { index: false } };
 
@@ -27,9 +28,7 @@ export default async function AcceptPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in');
 
   const { next } = await searchParams;

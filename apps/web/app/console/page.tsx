@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { couldNot } from '@/lib/what-we-could-not-do';
 import { ConsoleCopilot } from '@/components/report-copilot';
 import { readConsoleApplications } from '@/lib/console-applications';
@@ -42,9 +43,7 @@ const SCREENING_TONE: Record<string, string | undefined> = {
  */
 export default async function ConsolePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
 
   if (!user) redirect('/sign-in?next=/console');
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -22,9 +23,7 @@ export async function saveTrustPage(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');
@@ -82,9 +81,7 @@ export async function setTrustPagePublished(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');

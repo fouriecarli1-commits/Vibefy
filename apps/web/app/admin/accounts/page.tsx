@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { PLAN_TIERS, entitlementFor } from '@vibefycode/billing';
 import { ActionForm, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { setPlan, setPlatformRole } from './actions';
 
 export const metadata: Metadata = { title: 'Accounts' };
@@ -36,9 +37,7 @@ interface Row {
 
 export default async function AccountsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/admin/accounts');
 
   const { data: profile } = await supabase

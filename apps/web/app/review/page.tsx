@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { triageAssessment, type Triage, type TriageFinding } from '@vibefycode/governance';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Review queue' };
 
@@ -23,9 +24,7 @@ export const metadata: Metadata = { title: 'Review queue' };
  */
 export default async function ReviewQueuePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review');
 
   const { data: profile } = await supabase

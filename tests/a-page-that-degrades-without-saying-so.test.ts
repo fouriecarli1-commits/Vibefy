@@ -132,6 +132,50 @@ describe('a write whose refusal is never read', () => {
   });
 });
 
+describe('a session the app could not confirm', () => {
+  /*
+   * The third shape of the same silence, and the one this product paid for.
+   *
+   * `auth.getUser()` reaches the auth service over the network and does not
+   * throw when that fails — it answers with an error in the result. Seventy
+   * places destructured only `data.user` and dropped it, so a customer with a
+   * live session whose session could not be confirmed became indistinguishable
+   * from a visitor who had never signed in, and was sent to the page that
+   * implies their password is the problem. The proxy was the worst of them: it
+   * runs before any page, and its own `catch` could never see this because
+   * nothing was thrown.
+   *
+   * `whoIsSignedIn` asks the question in one place, tells a missing session
+   * apart from a failed question, and says the second through `couldNot`. This
+   * is what keeps the raw form from coming back.
+   */
+  it('is asked through the one helper, everywhere in the web app', () => {
+    const raw: string[] = [];
+    for (const path of webSources()) {
+      if (path === 'apps/web/lib/who-is-signed-in.ts') continue;
+      const source = commentsBlanked(readFileSync(path, 'utf8'));
+      source.split('\n').forEach((line, index) => {
+        if (!line.includes('auth.getUser(')) return;
+        raw.push(`${path}:${index + 1}  ${line.trim()}`);
+      });
+    }
+    expect(
+      raw,
+      `these ask the auth service directly and cannot tell a failure from a no:\n${raw.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('and the helper itself reports the failure rather than returning it', () => {
+    const helper = commentsBlanked(readFileSync('apps/web/lib/who-is-signed-in.ts', 'utf8'));
+    expect(helper).toContain('couldNot(');
+    // Both halves: the ordinary signed-out case stays quiet, everything else
+    // is said. One without the other is either a silence or a line per
+    // pageview.
+    expect(helper).toContain('nobodyIsSignedIn');
+    expect(helper).toMatch(/AuthSessionMissingError/);
+  });
+});
+
 describe('the line itself', () => {
   let said: { message: string; detail: Record<string, unknown> }[];
 

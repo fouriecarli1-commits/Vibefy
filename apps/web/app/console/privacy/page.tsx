@@ -11,6 +11,7 @@ import {
 } from '@vibefycode/governance';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { setAlertEmailLevel, submitDataRequest } from './actions';
 
 export const metadata: Metadata = { title: 'Your data' };
@@ -33,9 +34,7 @@ const STATUS_COPY: Record<RequestStatus, string> = {
  */
 export default async function PrivacyPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/privacy');
 
   const { data: requests } = await supabase

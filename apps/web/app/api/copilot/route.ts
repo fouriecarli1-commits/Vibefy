@@ -19,6 +19,7 @@ import {
 } from '@vibefycode/copilot';
 import { entitlementFor, resolvePlan } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readConsoleApplications } from '@/lib/console-applications';
 import { readAsUser, writeAsService } from '@/lib/sql';
 import { resolveVerifyOrigin } from '@/lib/verify-origin.server';
@@ -57,9 +58,7 @@ interface Body {
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
   const body = (await request.json().catch(() => ({}))) as Body;

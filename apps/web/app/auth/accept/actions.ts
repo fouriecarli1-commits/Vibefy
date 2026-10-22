@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { consentPayload } from '@/lib/legal';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 /**
  * Records the acceptance, for an account that reached us without one.
@@ -13,9 +14,7 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function acceptDocuments(): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const headerList = await headers();

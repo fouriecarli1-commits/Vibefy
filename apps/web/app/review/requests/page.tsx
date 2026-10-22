@@ -9,6 +9,7 @@ import {
 } from '@vibefycode/governance';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { resolveDataRequest } from '@/app/console/privacy/actions';
 
 export const metadata: Metadata = { title: 'Data requests' };
@@ -21,9 +22,7 @@ export const metadata: Metadata = { title: 'Data requests' };
  */
 export default async function ReviewRequestsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review/requests');
 
   const { data: requests } = await supabase

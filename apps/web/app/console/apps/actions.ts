@@ -26,6 +26,7 @@ import { RepositoryRefusedError, repositoryUrlOrRefuse } from '@vibefycode/engin
 import { decideAssessmentRequest, resolvePlan } from '@vibefycode/billing';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readAsUser, writeAsService } from '@/lib/sql';
 import { couldNot } from '@/lib/what-we-could-not-do';
 
@@ -62,9 +63,7 @@ export interface ActionState {
  */
 export async function createApp(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const name = String(formData.get('name') ?? '').trim();
@@ -221,9 +220,7 @@ export async function startAuthorisation(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');
@@ -369,9 +366,7 @@ export async function verifyAuthorisation(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');
@@ -490,9 +485,7 @@ export async function revokeAuthorisation(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');
@@ -562,9 +555,7 @@ export async function requestAssessment(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');
@@ -791,9 +782,7 @@ export async function acceptBadgeLicence(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');
@@ -860,9 +849,7 @@ export async function setDirectoryListing(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');

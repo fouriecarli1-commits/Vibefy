@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { createWorkspace } from './actions';
 
 export const metadata: Metadata = { title: 'Workspaces' };
@@ -16,9 +17,7 @@ export const metadata: Metadata = { title: 'Workspaces' };
  */
 export default async function WorkspacesPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/workspace');
 
   const { data: memberships } = await supabase

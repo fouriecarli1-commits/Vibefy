@@ -206,7 +206,10 @@ describe('the route that decides from it', () => {
      * is asked before the error is chosen.
      */
     const nothing = route.slice(route.indexOf("'nothing'"));
-    const asked = nothing.indexOf('getUser()');
+    // Asked through `whoIsSignedIn`, which is where the question lives now:
+    // the same call, with a failure to reach the auth service told apart from
+    // nobody being signed in.
+    const asked = nothing.indexOf('whoIsSignedIn(');
     const refused = nothing.indexOf('missing_code');
     expect(asked, 'the empty callback never asks whether there is a session').toBeGreaterThan(-1);
     expect(asked, 'it decides before it asks').toBeLessThan(refused);

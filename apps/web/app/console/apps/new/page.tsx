@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createApp } from '../actions';
 import { ActionForm, Checkbox, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Submit an application' };
 
@@ -17,9 +18,7 @@ export default async function NewAppPage({
   const { kind } = await searchParams;
   const isGame = kind === 'game';
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/apps/new');
 
   const { data: memberships } = await supabase

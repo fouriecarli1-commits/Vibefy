@@ -5,6 +5,7 @@ import { andTheRecordOfIt } from '@/lib/audit';
 import { headers } from 'next/headers';
 import { PLAN_TIERS, entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -50,9 +51,7 @@ async function requestContext() {
  */
 async function requireAdmin() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'Sign in first.' } as const;
 
   const { data: profile } = await supabase

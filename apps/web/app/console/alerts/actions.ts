@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -17,9 +18,7 @@ export async function markAlertRead(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const alertId = String(formData.get('alertId') ?? '');
@@ -44,9 +43,7 @@ export async function markAllAlertsRead(
   _formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   // no-op-is-fine: nothing unread is exactly what "All caught up." describes.
@@ -72,9 +69,7 @@ export async function setMonitoring(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appId = String(formData.get('appId') ?? '');

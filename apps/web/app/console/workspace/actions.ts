@@ -8,6 +8,7 @@ import { renderInvitationEmail, resendFromEnvironment } from '@vibefycode/notify
 import { checkClaim, isKnownCountry } from '@vibefycode/shared';
 import { optionalScore, readably } from '@/lib/typed-score';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readAsUser, writeAsService } from '@/lib/sql';
 import {
   databaseCarriesIdentity,
@@ -20,9 +21,7 @@ import type { ActionState } from '@/app/console/apps/actions';
 
 async function signedIn() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   return { supabase, user };
 }
 

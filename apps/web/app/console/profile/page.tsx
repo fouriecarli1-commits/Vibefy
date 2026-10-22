@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { saveBuilderProfile, setAppOnProfile, setBuilderProfilePublished } from './actions';
 
 export const metadata: Metadata = { title: 'Your public page' };
@@ -27,9 +28,7 @@ export default async function BuilderProfilePage({
 }) {
   const params = await searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/profile');
 
   const { data: memberships } = await supabase

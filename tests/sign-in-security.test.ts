@@ -92,7 +92,11 @@ describe('a returning customer', () => {
   it('cannot reach the new-password page without following the link', () => {
     const page = read('apps/web/app/auth/new-password/page.tsx');
     expect(page).toContain("redirect('/forgot-password')");
-    expect(page).toContain('getUser()');
+    // `whoIsSignedIn` rather than `getUser()`: the question moved into one
+    // helper so that a failure to reach the auth service stops reading as "no
+    // session", which on this page would mean sending somebody who followed a
+    // live link back to ask for another one.
+    expect(page).toContain('whoIsSignedIn(');
   });
 });
 

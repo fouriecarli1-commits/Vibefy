@@ -11,6 +11,7 @@ import { ActionForm, Field } from '@/components/action-form';
 import { submitAppeal } from '@/app/console/privacy/actions';
 import { ReportCopilot } from '@/components/report-copilot';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readAsUser } from '@/lib/sql';
 import { couldNot } from '@/lib/what-we-could-not-do';
 
@@ -69,9 +70,7 @@ export default async function ReportPage({
 }) {
   const { assessmentId } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/reports/${assessmentId}`);
 
   /*

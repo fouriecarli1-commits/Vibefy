@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { seatVerdict } from '@vibefycode/workspace';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { changeRole, inviteMember, removeMember, revokeInvitation } from '../../actions';
 
 export const metadata: Metadata = { title: 'Team & seats' };
@@ -10,9 +11,7 @@ export const metadata: Metadata = { title: 'Team & seats' };
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/workspace/${id}/team`);
 
   const { data: members } = await supabase

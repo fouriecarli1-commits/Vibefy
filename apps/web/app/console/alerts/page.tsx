@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ActionForm } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { KIND_LABEL } from '@/lib/alert-kinds';
 import { markAlertRead, markAllAlertsRead } from './actions';
 
@@ -24,9 +25,7 @@ const SEVERITY: Record<string, { label: string; tone: string }> = {
  */
 export default async function AlertsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/alerts');
 
   const { data: alerts, error } = await supabase

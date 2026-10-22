@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { writeAsService } from '@/lib/sql';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import { liftLivePause, whyALiftIsRefused } from '@/lib/spend-pause';
@@ -39,9 +40,7 @@ export async function liftSpendPause(
   const reason = String(formData.get('reason') ?? '');
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const { data: profile } = await supabase

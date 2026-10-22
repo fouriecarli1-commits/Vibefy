@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { CONSENT_AT_SIGN_UP, consentPayload } from '@/lib/legal';
 import { couldNot } from '@/lib/what-we-could-not-do';
 
@@ -56,9 +57,7 @@ function consentWriteFailed(
  */
 export async function recordSignUpConsents(): Promise<void> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return;
 
   const accepted = (user.user_metadata?.accepted_documents ?? []) as {
@@ -143,9 +142,7 @@ export async function recordSignUpConsents(): Promise<void> {
 export async function recordProviderConsents(declared: string | null): Promise<void> {
   if (!declared) return;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return;
 
   const headerList = await headers();
@@ -225,9 +222,7 @@ export async function declaredConsents(): Promise<string> {
  */
 export async function missingConsents(): Promise<string[]> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return [];
 
   const missing: string[] = [];

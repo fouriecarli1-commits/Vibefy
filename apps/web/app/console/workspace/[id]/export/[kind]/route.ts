@@ -6,6 +6,7 @@ import {
   type AuditExportFormat,
 } from '@vibefycode/workspace';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readAsUser, writeAsService, writeAsUser } from '@/lib/sql';
 
 /**
@@ -39,9 +40,7 @@ export async function GET(
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return NextResponse.json({ error: 'Sign in first.' }, { status: 401 });
 
   const url = new URL(request.url);

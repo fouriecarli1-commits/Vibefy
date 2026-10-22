@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { RENDER_ABANDONED, RENDER_RECOVERED } from '@vibefycode/report';
 import { resolvePlan } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readAsUser } from '@/lib/sql';
 
 /**
@@ -26,9 +27,7 @@ export async function GET(
 ) {
   const { assessmentId } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
   const context = await readAsUser(user.id, async (client) => {

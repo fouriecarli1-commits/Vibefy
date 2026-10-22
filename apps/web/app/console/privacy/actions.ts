@@ -10,6 +10,7 @@ import {
   type RequestType,
 } from '@vibefycode/governance';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import type { ActionState } from '@/app/console/apps/actions';
 
 const TYPES = new Set(REQUEST_KINDS.map((kind) => kind.type));
@@ -27,9 +28,7 @@ export async function submitDataRequest(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const requestType = String(formData.get('requestType') ?? '') as RequestType;
@@ -107,9 +106,7 @@ export async function submitAppeal(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const assessmentId = String(formData.get('assessmentId') ?? '');
@@ -151,9 +148,7 @@ export async function resolveDataRequest(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const requestId = String(formData.get('requestId') ?? '');
@@ -240,9 +235,7 @@ export async function resolveAppeal(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const appealId = String(formData.get('appealId') ?? '');
@@ -294,9 +287,7 @@ export async function setAlertEmailLevel(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const level = String(formData.get('alertEmailLevel') ?? '');

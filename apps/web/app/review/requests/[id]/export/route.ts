@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { assembleSubjectExport, subjectExportFilename } from '@vibefycode/governance';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { writeAsUser } from '@/lib/sql';
 
 /**
@@ -27,9 +28,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return NextResponse.json({ error: 'Sign in first.' }, { status: 401 });
 
   const { data: profile } = await supabase

@@ -13,6 +13,7 @@ import { enabledProviders } from '@/lib/providers-enabled';
 import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from '@/lib/connection-string';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { LiftPauseForm } from './lift-pause';
 import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import { isPlaceholderOrigin } from '@/lib/verify-origin';
@@ -408,9 +409,7 @@ function providerCallback(): Check {
 
 export default async function HealthPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   /*
    * The one failure that locks somebody out of this page is a sign-in that
    * does not work, which is also the failure this page is most needed for.

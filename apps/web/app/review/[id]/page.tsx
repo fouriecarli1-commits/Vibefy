@@ -6,6 +6,7 @@ import { getRubric } from '@vibefycode/rubric';
 import { adjustAssessment, approveAssessment, rejectAssessment } from '../actions';
 import { ActionForm, Checkbox, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Review' };
 
@@ -21,9 +22,7 @@ const SEVERITY_TONE: Record<string, string> = {
 export default async function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/review/${id}`);
 
   const { data: assessment } = await supabase

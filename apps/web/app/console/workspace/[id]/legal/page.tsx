@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { COUNTRIES, countryName } from '@vibefycode/shared';
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readAsUser } from '@/lib/sql';
 import { readLegalIdentity } from '@/lib/legal-identity';
 import { saveLegalIdentity } from '../../actions';
@@ -27,9 +28,7 @@ export const dynamic = 'force-dynamic';
 export default async function LegalIdentityPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/workspace/${id}/legal`);
 
   const { data: organisation } = await supabase

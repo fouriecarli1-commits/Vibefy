@@ -20,6 +20,7 @@ import { serviceDetailFor } from '@vibefycode/billing';
 import { ActionForm } from '@/components/action-form';
 import { Disclosure, ServiceDetailBody } from '@/components/disclosure';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { embedded } from '@/lib/embedded';
 import { WideTable } from '@/components/wide-table';
 
@@ -65,9 +66,7 @@ export default async function BillingPage({
       maximumFractionDigits: 0,
     }).format(amount);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/console/billing');
 
   const { data: memberships } = await supabase

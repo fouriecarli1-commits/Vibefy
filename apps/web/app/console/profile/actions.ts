@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { checkClaim } from '@vibefycode/shared';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -20,9 +21,7 @@ import type { ActionState } from '@/app/console/apps/actions';
  */
 async function signedIn() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   return { supabase, user };
 }
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ActionForm, Checkbox, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { saveSsoConnection, setSsoEnforcement, verifySsoDomain } from '../../actions';
 
 export const metadata: Metadata = { title: 'Single sign-on' };
@@ -9,9 +10,7 @@ export const metadata: Metadata = { title: 'Single sign-on' };
 export default async function SsoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/workspace/${id}/sso`);
 
   const { data: connections } = await supabase

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { reinstateBadge, revokeBadge, suspendBadge } from '../badge-actions';
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 export const metadata: Metadata = { title: 'Issued badges' };
 
@@ -17,9 +18,7 @@ export const metadata: Metadata = { title: 'Issued badges' };
  */
 export default async function BadgeRegisterPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review/badges');
 
   const { data: profile } = await supabase

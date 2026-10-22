@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { SCREENING_CATEGORIES } from '@vibefycode/engine/authorisation';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { recordScreeningDecision } from './actions';
 
 export const metadata: Metadata = { title: 'Submissions awaiting a check' };
@@ -25,9 +26,7 @@ export const metadata: Metadata = { title: 'Submissions awaiting a check' };
  */
 export default async function ScreeningQueuePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review/screening');
 
   const { data: profile } = await supabase

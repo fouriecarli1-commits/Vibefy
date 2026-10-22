@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 /**
  * Said once a minute rather than once a request.
@@ -97,9 +98,22 @@ async function refreshAndGuard(
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  /*
+   * The question, and what it means when it cannot be answered.
+   *
+   * `getUser` does not throw on an auth failure — it answers with an error in
+   * the result — so the `catch` above never saw this case. A customer with a
+   * live session whose session could not be confirmed was treated as nobody and
+   * sent to the sign-in page: the first thing in the request path, redirecting
+   * to the page that implies their password is the problem, silently. This is
+   * the same defect as in the seventy pages behind it, and this is where it is
+   * felt first.
+   *
+   * `whoIsSignedIn` carries its own saying-once, keyed per message rather than
+   * the single timestamp `sayOnce` above holds, which is what lets a second
+   * fault be heard while the first is still happening.
+   */
+  const user = await whoIsSignedIn(supabase);
 
   if (!user && request.nextUrl.pathname.startsWith('/console')) {
     const signIn = request.nextUrl.clone();

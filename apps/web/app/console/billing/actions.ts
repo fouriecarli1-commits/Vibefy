@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { redirect } from 'next/navigation';
 import { PriceNotSetError, currencyForCountry, type PlanId } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { PaymentsNotConfiguredError, paymentProvider } from '@/lib/payments';
 import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import type { ActionState } from '@/app/console/apps/actions';
@@ -17,9 +18,7 @@ export async function startCheckout(
   formData: FormData,
 ): Promise<ActionState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
   const organisationId = String(formData.get('organisationId') ?? '');

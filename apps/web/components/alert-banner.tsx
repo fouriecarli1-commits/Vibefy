@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ActionForm } from '@/components/action-form';
 import { markAlertRead } from '@/app/console/alerts/actions';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 /**
  * The alerts that should not wait to be found.
@@ -17,9 +18,7 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function AlertBanner() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return null;
 
   const { data: alerts } = await supabase

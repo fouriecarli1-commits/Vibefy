@@ -1,5 +1,6 @@
 import { SiteNav, type Audience } from './site-nav';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 
 /**
  * The navigation, told who is reading it.
@@ -17,9 +18,7 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function SiteNavForViewer() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) return <SiteNav audience="visitor" />;
 
   const { data: profile } = await supabase

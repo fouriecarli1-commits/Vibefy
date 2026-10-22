@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { readSignInLink } from '@/lib/sign-in-link';
 import { missingConsents, recordProviderConsents, recordSignUpConsents } from '@/lib/consent';
 
@@ -93,9 +94,7 @@ export async function GET(request: NextRequest) {
      * Asked of the session cookie rather than the URL, which is the one source
      * that can tell the two apart.
      */
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await whoIsSignedIn(supabase);
     if (user) return NextResponse.redirect(`${origin}${next}`);
 
     /*

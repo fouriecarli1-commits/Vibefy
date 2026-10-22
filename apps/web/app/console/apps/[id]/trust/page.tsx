@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
+import { whoIsSignedIn } from '@/lib/who-is-signed-in';
 import { saveTrustPage, setTrustPagePublished } from './actions';
 
 export const metadata: Metadata = { title: 'What you say about yourself' };
@@ -23,9 +24,7 @@ export const metadata: Metadata = { title: 'What you say about yourself' };
 export default async function TrustPageEditor({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/console/apps/${id}/trust`);
 
   const { data: app } = await supabase
