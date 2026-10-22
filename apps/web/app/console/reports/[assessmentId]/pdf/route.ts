@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { RENDER_ABANDONED, RENDER_RECOVERED } from '@vibefycode/report';
 import { resolvePlan } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser } from '@/lib/sql';
@@ -56,11 +57,28 @@ export async function GET(
       'select platform_role as role from public.users where id = $1',
       [user.id],
     );
+    /*
+     * Whether the sweep has stopped trying to render this one.
+     *
+     * The worker caps its attempts at three and records the abandonment, which
+     * is right. Nothing on this side asked, so the branch below told every
+     * customer in that state that their PDF was "still being prepared" — a
+     * sentence that was never going to stop being false, on the one artefact
+     * they paid for. The recovery row is what takes an assessment off that
+     * list, because `audit_log` cannot be edited.
+     */
+    const renderState = await client.query<{ action: string }>(
+      `select action from public.audit_log
+        where entity_id = $1 and action in ($2, $3)`,
+      [assessmentId, RENDER_ABANDONED, RENDER_RECOVERED],
+    );
+    const actions = renderState.rows.map((entry) => entry.action);
     return {
       plan,
       status: row.status,
       report: report.rows[0] ?? null,
       isStaff: ['reviewer', 'admin'].includes(String(staff.rows[0]?.role)),
+      abandoned: actions.includes(RENDER_ABANDONED) && !actions.includes(RENDER_RECOVERED),
     };
   });
 
@@ -81,6 +99,33 @@ export async function GET(
     );
   }
   if (!context.report) {
+    /*
+     * Three reasons there is no PDF row, and they were one sentence.
+     *
+     * "Still being prepared" is true only of the first. The second is an
+     * assessment the sweep has given up on, where waiting is exactly the wrong
+     * thing to do. The third is reachable only by staff, who pass the
+     * entitlement check above: a plan without PDF export stores the HTML and
+     * nothing else, so there is no PDF to wait for either.
+     */
+    if (context.abandoned) {
+      return NextResponse.json(
+        {
+          error:
+            'The PDF could not be produced. We tried three times, stopped, and recorded it — this is our fault and it is on our list, not yours to chase. Your report is readable on screen in the console, and its findings and score are unaffected.',
+        },
+        { status: 409 },
+      );
+    }
+    if (!context.plan.entitlement.pdfExport) {
+      return NextResponse.json(
+        {
+          error:
+            'No PDF was stored for this assessment: the plan it ran under keeps the report on screen only. A plan change regenerates it.',
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: 'The PDF is still being prepared. It is generated once, after review, and stored.' },
       { status: 409 },

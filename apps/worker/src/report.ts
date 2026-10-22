@@ -16,7 +16,13 @@ import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
 import { resolveBrowserExecutable } from '@vibefycode/engine';
 import { NON_RELIANCE_LEGEND } from '@vibefycode/shared';
-import { assembleReportSource, renderReport, type ReportTier } from '@vibefycode/report';
+import {
+  RENDER_ABANDONED,
+  RENDER_RECOVERED,
+  assembleReportSource,
+  renderReport,
+  type ReportTier,
+} from '@vibefycode/report';
 import { resolvePlan } from '@vibefycode/billing';
 import type { PoolClient } from 'pg';
 
@@ -279,8 +285,14 @@ const renderFailures = new Map<string, number>();
  * `audit_log` empty, and the fact held in a `Map`. The sweep's own log line says
  * "each needs a person", and nothing told a person.
  */
-const RENDER_ABANDONED = 'report.render_abandoned';
-const RENDER_RECOVERED = 'report.render_recovered';
+/**
+ * The two actions live in `@vibefycode/report` now, and are re-exported here
+ * because the tests have always reached for them through this module.
+ *
+ * They moved when the console needed them: the PDF route told a customer whose
+ * report this sweep had given up on that it was "still being prepared".
+ */
+export { RENDER_ABANDONED, RENDER_RECOVERED } from '@vibefycode/report';
 
 /** Forgets the failure counts. Exported for tests, which share one process. */
 export function resetReportFailureCounts(): void {

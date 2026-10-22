@@ -162,3 +162,21 @@ export interface RenderedReport {
   /** What the customer would get by paying, stated plainly on a free report. */
   readonly withheld: readonly string[];
 }
+
+/**
+ * Audit actions for a report that could not be produced, and for one that then
+ * was.
+ *
+ * Here rather than in the worker that writes them, because two other places
+ * have to be able to ask. The worker's sweep caps its attempts at three and
+ * stops trying until the process restarts — a cap that is right, and that until
+ * now was known only to the worker. The PDF route told every customer whose
+ * report had been given up on that it was "still being prepared", which is a
+ * sentence that was never going to stop being false.
+ *
+ * `audit_log` is append-only, so an abandonment cannot be marked resolved: the
+ * recovery row is what takes an assessment off the list of customers still
+ * waiting, and both rows carry the assessment as `entity_id`.
+ */
+export const RENDER_ABANDONED = 'report.render_abandoned';
+export const RENDER_RECOVERED = 'report.render_recovered';

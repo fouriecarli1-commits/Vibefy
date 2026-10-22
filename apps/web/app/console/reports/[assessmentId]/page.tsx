@@ -12,8 +12,46 @@ import { submitAppeal } from '@/app/console/privacy/actions';
 import { ReportCopilot } from '@/components/report-copilot';
 import { createClient } from '@/lib/supabase/server';
 import { readAsUser } from '@/lib/sql';
+import { couldNot } from '@/lib/what-we-could-not-do';
+
+/**
+ * What the reader gets when we cannot put their report together.
+ *
+ * This page assembles and renders live rather than serving what the worker
+ * stored, which is why a customer can read a report the sweep failed to store.
+ * The flip side is that everything that can throw in the worker can throw here
+ * — the assembler on a source row it chokes on, `resolvePlan` on a statement
+ * timeout, the renderer itself — and until now the whole page threw with it. The
+ * reader got the console's generic error card, which names a digest and tells
+ * them nothing, on the one page they paid for.
+ *
+ * So: a page that says what happened, in a sentence that does not blame them,
+ * and a line in our log carrying the assessment and the error. The findings and
+ * the score are untouched by this — the failure is in the putting-together —
+ * and saying so is the difference between a fault and a lost assessment.
+ */
+function couldNotPutItTogether(assessmentId: string) {
+  return (
+    <div className="max-w-2xl space-y-4">
+      <h1 className="text-3xl font-bold tracking-tight">We could not put this report together</h1>
+      <p className="text-muted">
+        The assessment itself is intact: its findings, its evidence and its score are stored and
+        unchanged. What failed is the step that assembles them into the document, and that is our
+        fault rather than anything about your application.
+      </p>
+      <p className="text-muted">
+        It is in our log with the assessment reference, so it is on our list rather than yours to
+        chase. Reference <code>{assessmentId.slice(0, 8)}</code>.
+      </p>
+      <Link href="/console">Back to the console</Link>
+    </div>
+  );
+}
 
 export const metadata: Metadata = { title: 'Report' };
+
+/** Told apart from "no such assessment", which is a 404 and not a fault. */
+const FAILED = Symbol('the report could not be assembled');
 
 /**
  * The report, on screen.
@@ -36,6 +74,11 @@ export default async function ReportPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(`/sign-in?next=/console/reports/${assessmentId}`);
 
+  /*
+   * Caught here rather than left to the error boundary, because the boundary
+   * cannot tell the reader anything: a failed read of the plan and a failed
+   * assembly both arrive there as a digest.
+   */
   const page = await readAsUser(user.id, async (client) => {
     const context = await client.query<{ organisation_id: string; app_id: string; status: string }>(
       'select organisation_id, app_id, status from public.assessments where id = $1',
@@ -50,18 +93,20 @@ export default async function ReportPage({
     });
     const source = await assembleReportSource(client, assessmentId);
     return { source, plan, status: row.status };
+  }).catch((error: unknown): typeof FAILED => {
+    couldNot(
+      'assemble the report for the console',
+      {
+        shown: 'a page saying we could not put the report together',
+        assessmentId,
+      },
+      error,
+    );
+    return FAILED;
   });
 
+  if (page === FAILED) return couldNotPutItTogether(assessmentId);
   if (!page) notFound();
-
-  const statement = draftAccessibilityStatement({
-    appName: page.source.appName,
-    organisationName: page.source.organisationName,
-    assessedOn: page.source.assessedOn,
-    rubricVersion: page.source.rubricVersion,
-    findings: page.source.findings,
-    scopeStatement: page.source.scopeStatement,
-  });
 
   const { data: appeals } = await supabase
     .from('appeals')
@@ -82,7 +127,38 @@ export default async function ReportPage({
     );
   }
 
-  const rendered = renderReport(page.source, page.plan.entitlement.reportTier);
+  /*
+   * The two pure steps, together and caught.
+   *
+   * After the status check rather than before it, because an assessment nobody
+   * has reviewed yet gets the page above and has no business being rendered at
+   * all. Both can throw on the same bad source row, and either one throwing used
+   * to take the whole page with it.
+   */
+  const document = (() => {
+    try {
+      return {
+        statement: draftAccessibilityStatement({
+          appName: page.source.appName,
+          organisationName: page.source.organisationName,
+          assessedOn: page.source.assessedOn,
+          rubricVersion: page.source.rubricVersion,
+          findings: page.source.findings,
+          scopeStatement: page.source.scopeStatement,
+        }),
+        rendered: renderReport(page.source, page.plan.entitlement.reportTier),
+      };
+    } catch (error) {
+      couldNot(
+        'render the report for the console',
+        { shown: 'a page saying we could not put the report together', assessmentId },
+        error,
+      );
+      return null;
+    }
+  })();
+  if (!document) return couldNotPutItTogether(assessmentId);
+  const { statement, rendered } = document;
 
   return (
     <div className="space-y-6">
