@@ -171,6 +171,55 @@ describe('a report the sweep gave up on', () => {
   }, 180_000);
 });
 
+describe('and everybody queued behind it', () => {
+  it('stops filling a place in the window once it has been given up on', async () => {
+    /*
+     * The half of the cap that was missing.
+     *
+     * The comment on `REPORT_RENDER_ATTEMPTS` says a given-up-on row "no longer
+     * takes a slot in the sweep window". That was true of the attempt and not
+     * of the slot: the place is spent by the selecting query, before the cap is
+     * ever consulted, so twenty hopeless rows still meant nobody's report was
+     * generated. Found on 2026-10-22 while giving `sweepDriftDetection` the
+     * same guard, and measured here the same way — with the window one row
+     * wide, which is the same statement as twenty rows and a twentieth of the
+     * fixture.
+     */
+    resetReportFailureCounts();
+    const stuck = await approvedAssessment();
+    const behind = await approvedAssessment();
+
+    // The oldest first, so the one that cannot render is at the front.
+    await db.query(`update public.assessments set reviewed_at = $2 where id = $1`, [
+      stuck,
+      '2026-01-01T00:00:00Z',
+    ]);
+    await db.query(`update public.assessments set reviewed_at = $2 where id = $1`, [
+      behind,
+      '2026-01-02T00:00:00Z',
+    ]);
+
+    const storage = new LocalReportStorage(mkdtempSync(join(tmpdir(), 'vibefy-reports-')));
+    // Three passes with a store that cannot write, so the front row is given
+    // up on. The window is one row wide, so nothing else is even looked at.
+    for (let pass = 0; pass < REPORT_RENDER_ATTEMPTS; pass += 1) {
+      await sweepPendingReports(pool, readOnlyStore as never, () => undefined, 1);
+    }
+    expect(await auditFor(stuck, 'report.render_abandoned')).toHaveLength(1);
+    let reports = await db.query(`select id from public.reports where assessment_id = $1`, [
+      behind,
+    ]);
+    expect(reports.rowCount, 'the premise: it was waiting behind the stuck row').toBe(0);
+
+    // One more pass, with a store that works. The stuck row sorts last now, so
+    // this is the row the window holds.
+    const generated = await sweepPendingReports(pool, storage, () => undefined, 1);
+    expect(generated).toBeGreaterThanOrEqual(1);
+    reports = await db.query(`select id from public.reports where assessment_id = $1`, [behind]);
+    expect(reports.rowCount).toBeGreaterThan(0);
+  }, 180_000);
+});
+
 describe('what it leaves alone', () => {
   it('records nothing for a report that rendered first time', async () => {
     resetReportFailureCounts();

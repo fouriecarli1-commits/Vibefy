@@ -24,6 +24,7 @@ import {
   type ReportTier,
 } from '@vibefycode/report';
 import { resolvePlan } from '@vibefycode/billing';
+import { stuckWindow } from './stuck-window.ts';
 import type { PoolClient } from 'pg';
 
 export interface StoredReport {
@@ -273,7 +274,12 @@ export async function generateReport(
  * the point of the cap is that the log says so once instead of never.
  */
 export const REPORT_RENDER_ATTEMPTS = 3;
-const renderFailures = new Map<string, number>();
+/*
+ * The counting moved to `stuck-window.ts` when the drift sweep turned out to
+ * have the same window and none of this. Two copies of one rule is how a rule
+ * forks, and the copy that forks is the one nobody re-reads.
+ */
+const renderFailures = stuckWindow(REPORT_RENDER_ATTEMPTS);
 
 /**
  * Audit actions for a report the sweep could not produce.
@@ -296,13 +302,22 @@ export { RENDER_ABANDONED, RENDER_RECOVERED } from '@vibefycode/report';
 
 /** Forgets the failure counts. Exported for tests, which share one process. */
 export function resetReportFailureCounts(): void {
-  renderFailures.clear();
+  renderFailures.forget();
 }
 
 export async function sweepPendingReports(
   pool: { connect(): Promise<PoolClient> },
   storage: ReportStorage,
   log: (message: string, detail?: Record<string, unknown>) => void = () => undefined,
+  /**
+   * How wide the window is. Twenty in the worker, as it has always been.
+   *
+   * A parameter because a window that cannot be narrowed cannot be tested: the
+   * thing worth holding is that a row nobody can render stops filling a place,
+   * and demonstrating that with twenty rows is twenty times the fixture for the
+   * same statement. `sweepDriftDetection` has taken one from the start.
+   */
+  limit = 20,
 ): Promise<number> {
   const client = await pool.connect();
   try {
@@ -337,14 +352,40 @@ export async function sweepPendingReports(
              where r.assessment_id = a.id and r.format = 'html'
                and (a.reviewed_at is null or r.generated_at >= a.reviewed_at)
           )
-        order by a.reviewed_at
-        limit 20`,
+        /*
+         * Given-up-on rows last, which is what actually frees the window.
+         *
+         * The cap below stops another attempt being spent on a report that
+         * will not render. It does not stop that row filling one of the twenty
+         * places, because the place is spent by this query before the cap is
+         * consulted — so the comment on the cap, which says such a row "no
+         * longer takes a slot in the sweep window", was true of the attempt
+         * and not of the slot. Twenty of them and nobody's report was
+         * generated, cap or no cap. Found on 2026-10-22 while giving the drift
+         * sweep the same guard, and measured there with a window one row wide.
+         *
+         * Sorted rather than excluded: the audit row outlives the process,
+         * while the cap is deliberately forgotten on restart, so excluding
+         * would make an abandonment permanent and a deploy that fixed the
+         * renderer would never look at the row again.
+         */
+        order by exists (
+                   select 1 from public.audit_log gave
+                    where gave.action = $1 and gave.entity_id = a.id
+                      and not exists (
+                        select 1 from public.audit_log back
+                         where back.action = $2 and back.entity_id = a.id
+                      )
+                 ),
+                 a.reviewed_at
+        limit $3`,
+      [RENDER_ABANDONED, RENDER_RECOVERED, limit],
     );
 
     let generated = 0;
     let blocked = 0;
     for (const row of pending.rows) {
-      if ((renderFailures.get(row.id) ?? 0) >= REPORT_RENDER_ATTEMPTS) {
+      if (renderFailures.stuck(row.id)) {
         blocked += 1;
         continue;
       }
@@ -377,7 +418,7 @@ export async function sweepPendingReports(
           tier: plan.entitlement.reportTier,
           formats: plan.entitlement.pdfExport ? ['html', 'pdf'] : ['html'],
         });
-        renderFailures.delete(row.id);
+        renderFailures.succeeded(row.id);
         generated += 1;
         log('report generated', { assessmentId: row.id, tier: plan.entitlement.reportTier });
         // If this one had been given up on before, say so. The audit log is
@@ -413,8 +454,7 @@ export async function sweepPendingReports(
           });
       } catch (error) {
         // One bad assessment must not stop the others.
-        const failures = (renderFailures.get(row.id) ?? 0) + 1;
-        renderFailures.set(row.id, failures);
+        const failures = renderFailures.failed(row.id);
         log('report generation failed', {
           assessmentId: row.id,
           attempt: failures,

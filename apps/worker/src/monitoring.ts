@@ -55,6 +55,7 @@ import {
 } from '@vibefycode/engine';
 import type { PoolClient } from 'pg';
 import { saidOnceADay } from './said-once.ts';
+import { stuckWindow } from './stuck-window.ts';
 
 type Logger = (message: string, detail?: Record<string, unknown>) => void;
 const noop: Logger = () => undefined;
@@ -513,6 +514,41 @@ export async function recordDriftFor(
   }
 }
 
+/**
+ * How many times one assessment may fail to be compared before the sweep stops.
+ *
+ * The same shape, and the same number, as `REPORT_RENDER_ATTEMPTS` — because it
+ * is the same window. Twenty rows, oldest first, and a row leaves only by
+ * acquiring a `drift_reports` row: an assessment that can never acquire one
+ * sits at the front and takes a place every pass. Twenty of those and drift is
+ * never looked for again, on any application, while the log writes the same
+ * twenty errors every five minutes and the sweep reports itself healthy.
+ *
+ * What that costs is not a missing document. The drift comparison is what finds
+ * a material regression and takes the badge down; a sweep that has quietly
+ * stopped means every badge goes on standing whatever has happened to the
+ * application behind it.
+ */
+export const DRIFT_COMPARISON_ATTEMPTS = 3;
+const driftFailures = stuckWindow(DRIFT_COMPARISON_ATTEMPTS);
+
+/** Forgets the failure counts. Exported for tests, which share one process. */
+export function resetDriftFailureCounts(): void {
+  driftFailures.forget();
+}
+
+/**
+ * Audit actions for a comparison the sweep could not make.
+ *
+ * The cap is in memory on purpose, so a deploy that fixes the cause is a fresh
+ * try. The record is not: an assessment nobody could compare leaves no trace in
+ * the database at all otherwise — `drift_reports` holds no row, which to anyone
+ * reading it is indistinguishable from a comparison about to be made on the
+ * next pass. `audit_log` cannot be edited, so the recovery is a second row.
+ */
+export const DRIFT_ABANDONED = 'drift.comparison_abandoned';
+export const DRIFT_RECOVERED = 'drift.comparison_recovered';
+
 /** Every reviewed assessment that has a predecessor and no comparison yet. */
 export async function sweepDriftDetection(
   pool: Poolish,
@@ -521,8 +557,8 @@ export async function sweepDriftDetection(
 ): Promise<number> {
   const client = await pool.connect();
   try {
-    const { rows } = await client.query<{ id: string }>(
-      `select a.id
+    const { rows } = await client.query<{ id: string; organisation_id: string }>(
+      `select a.id, a.organisation_id
          from public.assessments a
         where a.status in ('approved', 'published')
           and a.overall_score is not null
@@ -536,21 +572,126 @@ export async function sweepDriftDetection(
                and coalesce(prior.completed_at, prior.created_at)
                    < coalesce(a.completed_at, a.created_at)
           )
-        order by coalesce(a.completed_at, a.created_at)
+        /*
+         * Given-up-on rows last, which is what actually frees the window.
+         *
+         * The in-memory cap stops the sweep spending another attempt on a row
+         * that will not succeed. It does not stop that row filling one of the
+         * limit places, because the place is spent by this query before the
+         * cap is ever consulted — so twenty hopeless rows still meant nothing
+         * else was ever selected, cap or no cap. Measured on 2026-10-22: with
+         * the window one row wide, the application behind the stuck one was
+         * never compared even after the sweep had given up on it.
+         *
+         * Sorted rather than excluded, deliberately. An exclusion would make
+         * the abandonment permanent — the audit row outlives the process, so a
+         * restart that fixed the cause would never look at the row again,
+         * which is the opposite of what the in-memory cap is for. Last in the
+         * order means everything with a chance goes first, and an abandoned
+         * row is tried again as soon as nothing else is waiting.
+         */
+        order by exists (
+                   select 1 from public.audit_log gave
+                    where gave.action = $2 and gave.entity_id = a.id
+                      and not exists (
+                        select 1 from public.audit_log back
+                         where back.action = $3 and back.entity_id = a.id
+                      )
+                 ),
+                 coalesce(a.completed_at, a.created_at)
         limit $1`,
-      [limit],
+      [limit, DRIFT_ABANDONED, DRIFT_RECOVERED],
     );
 
     let recorded = 0;
+    let blocked = 0;
     for (const row of rows) {
-      try {
-        if (await recordDriftFor(client, row.id, log)) recorded += 1;
-      } catch (error) {
-        log('drift detection failed', {
-          assessmentId: row.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
+      if (driftFailures.stuck(row.id)) {
+        blocked += 1;
+        continue;
       }
+      try {
+        if (await recordDriftFor(client, row.id, log)) {
+          driftFailures.succeeded(row.id);
+          // If this one had been given up on before, say so. The log is
+          // append-only, so an abandonment cannot be marked resolved; the
+          // second row is what takes it off the list.
+          await client
+            .query(
+              `insert into public.audit_log
+                 (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+               select $1, null, 'system', $2, 'assessment', $3, $4
+                where exists (
+                  select 1 from public.audit_log l
+                   where l.action = $5 and l.entity_id = $3
+                )
+                  and not exists (
+                    select 1 from public.audit_log l
+                     where l.action = $2 and l.entity_id = $3
+                  )`,
+              [
+                row.organisation_id,
+                DRIFT_RECOVERED,
+                row.id,
+                'A comparison the sweep had given up on has now been made. Until it was, nothing ' +
+                  'was looking for a regression behind this badge.',
+                DRIFT_ABANDONED,
+              ],
+            )
+            .catch((error: unknown) => {
+              log('drift recovery not recorded', {
+                assessmentId: row.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            });
+          recorded += 1;
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        const failures = driftFailures.failed(row.id);
+        log('drift detection failed', { assessmentId: row.id, attempt: failures, error: detail });
+        if (failures >= DRIFT_COMPARISON_ATTEMPTS) {
+          // Said once, in the words somebody reading this needs: not "it
+          // failed" — it has been failing all along — but "it is holding a
+          // place that every other application's comparison is queued behind".
+          log('drift comparison given up on until this process restarts', {
+            assessmentId: row.id,
+            attempts: failures,
+            consequence: 'it no longer takes a place in the sweep window',
+          });
+          await client
+            .query(
+              `insert into public.audit_log
+                 (organisation_id, actor_id, actor_role, action, entity_type, entity_id, summary)
+               select $1, null, 'system', $2, 'assessment', $3, $4
+                where not exists (
+                  select 1 from public.audit_log l
+                   where l.action = $2 and l.entity_id = $3
+                )`,
+              [
+                row.organisation_id,
+                DRIFT_ABANDONED,
+                row.id,
+                `This assessment could not be compared with the one before it after ` +
+                  `${DRIFT_COMPARISON_ATTEMPTS} attempts, so the sweep stopped trying until the ` +
+                  `worker restarts. Nothing is looking for a regression behind this badge. Last ` +
+                  `error: ${detail}`,
+              ],
+            )
+            .catch((writeError: unknown) => {
+              log('abandoned comparison not recorded', {
+                assessmentId: row.id,
+                error: writeError instanceof Error ? writeError.message : String(writeError),
+              });
+            });
+        }
+      }
+    }
+    if (blocked > 0) {
+      log('assessments the sweep can no longer compare', {
+        blocked,
+        note: 'each needs a person; a restart makes the sweep try them again',
+      });
     }
     return recorded;
   } finally {
