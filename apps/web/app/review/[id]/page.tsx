@@ -7,6 +7,7 @@ import { adjustAssessment, approveAssessment, rejectAssessment } from '../action
 import { ActionForm, Checkbox, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { couldNot } from '@/lib/what-we-could-not-do';
 
 export const metadata: Metadata = { title: 'Review' };
 
@@ -25,17 +26,82 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   const user = await whoIsSignedIn(supabase);
   if (!user) redirect(`/sign-in?next=/review/${id}`);
 
-  const { data: assessment } = await supabase
+  /*
+   * Every read on this page keeps its error, and the page says so.
+   *
+   * This is the one human gate in the product: nothing is certified without a
+   * person approving it here, and the queue page says in a comment beside its
+   * only button that deciding needs the evidence and the evidence is on this
+   * page. Each of these reads dropped its error and fell back to an empty list
+   * — so a read that failed rendered as an assessment with no findings, no
+   * evidence and no failed stages, and the three decision forms sat at the
+   * bottom of it unchanged. Approving from that screen is approving what you
+   * could not see, and nothing on the page or in the log said a word.
+   */
+  const couldNotRead: { what: string; why: string }[] = [];
+  const read = <T,>(
+    what: string,
+    result: { data: T; error: { message: string } | null },
+    blocking = true,
+  ): T => {
+    if (result.error) {
+      if (blocking) couldNotRead.push({ what, why: result.error.message });
+      couldNot(
+        `read the ${what} for a review`,
+        {
+          shown: blocking
+            ? 'the page with the decision withheld, saying what could not be read'
+            : 'the page without it, and a line saying so',
+          assessmentId: id,
+        },
+        result.error.message,
+      );
+    }
+    return result.data;
+  };
+
+  const assessmentRead = await supabase
     .from('assessments')
     .select('*, apps (name, primary_url, description)')
     .eq('id', id)
     .single();
+  /*
+   * A read that failed is not an assessment that does not exist.
+   *
+   * `if (!assessment) notFound()` told a reviewer the assessment was not there,
+   * which for the one page they cannot do their job without is the least useful
+   * of the two answers it could have given.
+   */
+  if (assessmentRead.error && assessmentRead.error.code !== 'PGRST116') {
+    couldNot(
+      'read the assessment a reviewer opened',
+      { shown: 'a page saying we could not read it, rather than a page saying it does not exist' },
+      assessmentRead.error.message,
+    );
+    return (
+      <div className="max-w-2xl space-y-4">
+        <h1 className="text-3xl font-bold tracking-tight">This assessment could not be read</h1>
+        <p className="text-muted">
+          Not that it does not exist — the read itself failed, and that is ours to fix. It is in our
+          log with the reference. Nothing has been changed, and the queue is unaffected.
+        </p>
+        <p className="text-muted">
+          Reference <code>{id.slice(0, 8)}</code>.
+        </p>
+        <Link href="/review">Back to the queue</Link>
+      </div>
+    );
+  }
+  const assessment = assessmentRead.data;
   if (!assessment) notFound();
 
-  const { data: findings } = await supabase
-    .from('findings')
-    .select('*, finding_evidence (evidence_id)')
-    .eq('assessment_id', id);
+  const findings = read(
+    'findings',
+    await supabase
+      .from('findings')
+      .select('*, finding_evidence (evidence_id)')
+      .eq('assessment_id', id),
+  );
 
   /*
    * What each artefact actually is.
@@ -49,10 +115,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
    * `evidence` is readable by a reviewer under the same policy that lets them
    * read the findings, so this is the row they are already entitled to see.
    */
-  const { data: artefacts } = await supabase
-    .from('evidence')
-    .select('id, kind, byte_size, captured_at, metadata')
-    .eq('assessment_id', id);
+  const artefacts = read(
+    'evidence',
+    await supabase
+      .from('evidence')
+      .select('id, kind, byte_size, captured_at, metadata')
+      .eq('assessment_id', id),
+  );
   const artefactById = new Map(
     (artefacts ?? []).map((artefact) => [
       artefact.id as string,
@@ -65,16 +134,32 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     ]),
   );
 
-  const { data: runs } = await supabase
-    .from('assessment_runs')
-    .select('stage, status, error_message, metadata')
-    .eq('assessment_id', id);
+  const runs = read(
+    'stage log',
+    await supabase
+      .from('assessment_runs')
+      .select('stage, status, error_message, metadata')
+      .eq('assessment_id', id),
+  );
 
-  const { data: reviews } = await supabase
-    .from('reviews')
-    .select('action, reason, created_at')
-    .eq('assessment_id', id)
-    .order('created_at', { ascending: false });
+  /*
+   * Said, and not a bar to deciding.
+   *
+   * The history of earlier decisions and the score a badge is currently
+   * standing on are both worth knowing and neither is what the decision rests
+   * on. The previous score drives one attention rule; without it the rule
+   * simply does not fire, which is also what happens on a first assessment —
+   * so the page has to say which of the two this is.
+   */
+  const reviews = read(
+    'review history',
+    await supabase
+      .from('reviews')
+      .select('action, reason, created_at')
+      .eq('assessment_id', id)
+      .order('created_at', { ascending: false }),
+    false,
+  );
 
   /*
    * The score a badge for this application is currently standing on.
@@ -85,16 +170,20 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
    * `apps/` set it, so the rule could not fire. Approved or published only: a
    * draft or a failed run is not a number anybody relied on.
    */
-  const { data: prior } = await supabase
-    .from('assessments')
-    .select('overall_score')
-    .eq('app_id', assessment.app_id as string)
-    .in('status', ['approved', 'published'])
-    .not('overall_score', 'is', null)
-    .neq('id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const prior = read(
+    'previous score',
+    await supabase
+      .from('assessments')
+      .select('overall_score')
+      .eq('app_id', assessment.app_id as string)
+      .in('status', ['approved', 'published'])
+      .not('overall_score', 'is', null)
+      .neq('id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    false,
+  );
 
   const app = assessment.apps as unknown as {
     name: string;
