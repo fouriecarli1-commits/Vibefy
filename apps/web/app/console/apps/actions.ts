@@ -529,7 +529,20 @@ export async function revokeAuthorisation(
   if (insertError) return { error: insertError.message };
 
   revalidatePath(`/console/apps/${appId}`);
-  return { notice: 'Authorisation withdrawn. Any run in flight stops, and no new run will start.' };
+  /*
+   * What withdrawing actually does, all of it.
+   *
+   * The sentence used to stop at the runs, and the runs were the only part that
+   * was true: nothing asked about the badge again after it was issued, so the
+   * mark went on standing for the rest of its term on a claim we were no longer
+   * permitted to test. The lifecycle sweep suspends it now, and the licence asks
+   * them to take a suspended mark down — which is a thing to say here rather
+   * than to leave them to discover.
+   */
+  return {
+    notice:
+      'Authorisation withdrawn. Any run in flight stops, no new run will start, and the verification mark for this application is suspended within the minute — the licence asks you to remove it from your site while it is. Authorising again inside the same term puts it back.',
+  };
 }
 
 /**

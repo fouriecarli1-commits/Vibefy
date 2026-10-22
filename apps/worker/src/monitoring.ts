@@ -816,6 +816,16 @@ export async function sweepLiveness(
          ) sub on true
          join cadence on cadence.plan = sub.plan
         where app.monitoring_enabled
+          -- The authorisation, which this sweep did not ask about.
+          --
+          -- The re-assessment sweep in this same file asks
+          -- app_is_authorised_for_testing before it queues anything, and this
+          -- one went on issuing a request to the customer's own origin every
+          -- few minutes for the rest of the badge's term after they withdrew
+          -- it. Two sweeps answering the same question differently is the
+          -- difference nobody would think to look for, and here the answer that
+          -- matters is theirs: a withdrawal is the customer saying stop.
+          and public.app_is_authorised_for_testing(app.id)
           -- Due, in SQL, so the limit is spent on the applications actually owed
           -- a check. Measured against the database's clock and not the injected
           -- one, because last_seen_at is written by the database: two clocks

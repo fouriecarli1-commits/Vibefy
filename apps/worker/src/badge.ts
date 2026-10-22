@@ -567,10 +567,40 @@ export async function sweepBadgeIssuance(
 const LAPSED_SUSPENSION_REASON =
   'The subscription that maintains this verification is no longer active, so monitoring has stopped.';
 
+/**
+ * Why a badge went down when the authorisation under it was withdrawn.
+ *
+ * The gap this closes was the widest one left in the lifecycle. Issuance checks
+ * `app_is_authorised_for_testing` on the application rather than on the
+ * assessment, with a comment saying why: "a badge must not issue for an
+ * application whose authorisation has since been withdrawn." Nothing asked the
+ * same question again afterwards. So a customer could withdraw their
+ * authorisation — the console tells them "any run in flight stops, and no new
+ * run will start", and that was true — while the mark went on standing on their
+ * site and on the verification page for the rest of its term, up to a year,
+ * asserting a claim nobody was permitted to test any more. The re-assessment
+ * sweep skips the application, so not even drift was looked for.
+ *
+ * Suspended rather than revoked, because it is reversible and because the
+ * licence already has words for a suspension. The sentence is the one a
+ * stranger reads on the verification page, so it says what happened without
+ * implying the application was found wanting: nothing here is a finding about
+ * their software.
+ */
+const WITHDRAWN_SUSPENSION_REASON =
+  'The authorisation to test this application has been withdrawn, so monitoring has stopped. This is not a finding about the application.';
+
 export async function sweepBadgeLifecycle(
   pool: { connect(): Promise<PoolClient> },
   log: (message: string, detail?: Record<string, unknown>) => void = () => undefined,
-): Promise<{ expired: number; suspended: number }> {
+): Promise<{
+  expired: number;
+  suspended: number;
+  /** Badges taken down because the authorisation under them was withdrawn. */
+  unauthorised: number;
+  /** And put back, for an application authorised again inside its term. */
+  reauthorised: number;
+}> {
   const client = await pool.connect();
   try {
     const expired = await client.query<{
@@ -676,10 +706,85 @@ export async function sweepBadgeLifecycle(
       }
     }
 
-    if (expired.rowCount || suspended.rowCount) {
-      log('badge lifecycle applied', { expired: expired.rowCount, suspended: suspended.rowCount });
+    /*
+     * And the authorisation, asked again rather than only at issuance.
+     *
+     * `app_is_authorised_for_testing` is the same function the issuance query
+     * uses and the one the database's own trigger enforces on an assessment, so
+     * this is not a second opinion about what authorisation means.
+     */
+    const unauthorised = await client.query<{
+      id: string;
+      app_id: string;
+      organisation_id: string;
+      name: string;
+    }>(
+      `update public.badges b
+          set status = 'suspended', suspended_at = now(),
+              suspension_reason = $1
+         from public.apps app
+        where app.id = b.app_id
+          and b.status = 'active'
+          and not public.app_is_authorised_for_testing(b.app_id)
+        returning b.id, b.app_id, b.organisation_id, app.name`,
+      [WITHDRAWN_SUSPENSION_REASON],
+    );
+
+    for (const row of unauthorised.rows) {
+      try {
+        await raiseAlert(
+          client,
+          row.organisation_id,
+          badgeSuspendedAlert(row.name, row.app_id, row.id, WITHDRAWN_SUSPENSION_REASON),
+        );
+      } catch (error) {
+        log('withdrawal suspension raised no notice', {
+          badgeId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-    return { expired: expired.rowCount ?? 0, suspended: suspended.rowCount ?? 0 };
+
+    /*
+     * And back up, if they authorise again.
+     *
+     * Matched on the reason this branch wrote, exactly as the liveness sweep's
+     * restore is, so a suspension a reviewer made or one a liveness failure
+     * caused is left where it was put. Without this a withdrawal made by
+     * mistake would cost the rest of the term with no way back short of staff
+     * reinstating it by hand.
+     *
+     * No notice: both the withdrawal and the re-authorisation are the
+     * customer's own actions, taken minutes apart in their own console. The
+     * liveness restore tells them because the outage was not their doing.
+     */
+    const reauthorised = await client.query(
+      `update public.badges b
+          set status = 'active', suspended_at = null, suspension_reason = null
+         from public.apps app
+        where app.id = b.app_id
+          and b.status = 'suspended'
+          and b.suspension_reason = $1
+          and b.expires_at > now()
+          and public.app_is_authorised_for_testing(b.app_id)
+        returning b.id`,
+      [WITHDRAWN_SUSPENSION_REASON],
+    );
+
+    if (expired.rowCount || suspended.rowCount || unauthorised.rowCount || reauthorised.rowCount) {
+      log('badge lifecycle applied', {
+        expired: expired.rowCount,
+        suspended: suspended.rowCount,
+        unauthorised: unauthorised.rowCount,
+        reauthorised: reauthorised.rowCount,
+      });
+    }
+    return {
+      expired: expired.rowCount ?? 0,
+      suspended: suspended.rowCount ?? 0,
+      unauthorised: unauthorised.rowCount ?? 0,
+      reauthorised: reauthorised.rowCount ?? 0,
+    };
   } finally {
     client.release();
   }
