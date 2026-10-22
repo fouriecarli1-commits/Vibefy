@@ -133,15 +133,15 @@ export async function sweepAlertPush(
         return buildMessage(alert, recipient);
       });
 
-      let tickets;
-      try {
-        tickets = await send(messages);
-      } catch (error) {
-        // The batch is simply not recorded, so the next sweep tries it again —
-        // except for the rows that have been waiting so long they are about to
-        // age out of the query, which are written down as the failures they
-        // have become rather than allowed to vanish unaccounted for.
-        const detail = error instanceof Error ? error.message : String(error);
+      /*
+       * A batch nobody took, and what that must not become.
+       *
+       * The batch is simply not recorded, so the next sweep tries it again —
+       * except for the rows that have been waiting so long they are about to
+       * age out of the query, which are written down as the failures they have
+       * become rather than allowed to vanish unaccounted for.
+       */
+      const notSent = async (detail: string): Promise<void> => {
         for (const row of chunk) {
           const age = now.getTime() - new Date(row.created_at).getTime();
           if (age < PUSH_GIVE_UP_AFTER_DAYS * 86_400_000) {
@@ -157,6 +157,33 @@ export async function sweepAlertPush(
           );
           log('push given up on', { alertId: row.alert_id, error: detail });
         }
+      };
+
+      let tickets;
+      try {
+        tickets = await send(messages);
+      } catch (error) {
+        await notSent(error instanceof Error ? error.message : String(error));
+        continue;
+      }
+
+      /*
+       * Belt and braces, like the `isPushable` refusal above, and for a defect
+       * that was live rather than hypothetical.
+       *
+       * Fewer tickets than messages is the push service telling us nothing
+       * about the tail of the batch. Interpreted positionally, every one of
+       * those rows was written down as a delivery that failed — and the pending
+       * query excludes any alert that has a delivery row, so a problem on our
+       * side of the request became a permanent non-delivery of a notice the
+       * Badge Licence obliges us to give, recorded against the customer's
+       * phone. Whatever sender is injected, a short reply is a batch that was
+       * not sent.
+       */
+      if (tickets.length < chunk.length) {
+        await notSent(
+          `The push service returned ${tickets.length} tickets for ${chunk.length} messages.`,
+        );
         continue;
       }
 

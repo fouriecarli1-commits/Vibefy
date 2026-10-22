@@ -6,11 +6,12 @@
  * are pushed, never the same one twice, never to a device that is not the
  * owner's, and a dead token stops being used rather than being retried for ever.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Client, Pool } from 'pg';
 import {
   batch,
   buildMessage,
+  expoPushSender,
   interpretTicket,
   isPushable,
   type ExpoMessage,
@@ -308,5 +309,121 @@ describe('the delivery sweep', () => {
         [owner.userId],
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('a reply with no tickets in it', () => {
+  /*
+   * Expo answers a request-level problem — bad credentials, a malformed body, a
+   * rejected request — with HTTP 200, an `errors` array and no `data` at all.
+   *
+   * Measured on 2026-10-22. The sender read `payload.data ?? []` and handed the
+   * sweep zero tickets for a full batch; `interpretTicket(undefined)` called
+   * each one undelivered, and the sweep wrote one `alert_deliveries` row per
+   * handset saying the delivery had failed. `findPendingPushes` excludes any
+   * alert that already has a delivery row for that device, so:
+   *
+   *   · a problem on our side of the request became a permanent
+   *     non-delivery, never retried;
+   *   · recorded against the customer's phone, which had done nothing wrong;
+   *   · for a notice the Badge Licence obliges us to give;
+   *   · with `payload.errors` thrown away, so the one sentence saying what was
+   *     actually wrong was the one thing not kept.
+   */
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is refused by the sender, carrying what the service said', async () => {
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(
+          JSON.stringify({
+            errors: [{ code: 'PUSH_TOO_MANY_EXPERIENCE_IDS', message: 'All messages must be...' }],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+
+    await expect(
+      expoPushSender([
+        buildMessage(
+          { alertId: 'a', appId: 'b', severity: 'critical', title: 'T', body: 'B' },
+          { deviceTokenId: 'd', token: token('refused-1') },
+        ),
+      ]),
+    ).rejects.toThrow(/0 tickets for 1 messages: All messages must be/);
+  });
+
+  it('and a short reply too, which would otherwise be read positionally', async () => {
+    // Two messages, one ticket. The tail of the batch is a set of handsets the
+    // service said nothing about.
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(JSON.stringify({ data: [{ status: 'ok', id: 'one' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+    const message = buildMessage(
+      { alertId: 'a', appId: 'b', severity: 'critical', title: 'T', body: 'B' },
+      { deviceTokenId: 'd', token: token('short-1') },
+    );
+    await expect(expoPushSender([message, message])).rejects.toThrow(/1 tickets for 2 messages/);
+  });
+
+  it('is a batch the sweep defers rather than a verdict on the phone', async () => {
+    const owner = await seedAccount(db, 'push-no-tickets');
+    const appId = await seedApp(db, owner, 'Kettle');
+    await registerDevice(owner, 'no-tickets-1');
+    const alertId = await raise(owner, appId, 'critical', `push-none-${Date.now()}`);
+
+    // The shape the old sender produced, whatever sender is injected: the
+    // guard is at the point of use as well as in the one real sender.
+    const silent = async () => [];
+
+    const fresh = await sweepAlertPush(pool, silent, undefined, new Date());
+    expect(fresh.deferred).toBeGreaterThanOrEqual(1);
+    expect(fresh.failed).toBe(0);
+    const delivery = await db.query(
+      `select status from public.alert_deliveries where alert_id = $1 and channel = 'push'`,
+      [alertId],
+    );
+    expect(delivery.rowCount, 'an answer about nothing is not an answer about the phone').toBe(0);
+
+    // And still on the list, which is the whole point: a deferred push is one
+    // the next sweep tries again.
+    const client = await pool.connect();
+    try {
+      const pending = await findPendingPushes(client);
+      expect(pending.map((row) => row.alert_id)).toContain(alertId);
+    } finally {
+      client.release();
+    }
+  });
+
+  it('is written down as never sent once it runs out of days', async () => {
+    const owner = await seedAccount(db, 'push-none-aged');
+    const appId = await seedApp(db, owner, 'Kettle');
+    await registerDevice(owner, 'none-aged-1');
+    const alertId = await raise(owner, appId, 'critical', `push-none-aged-${Date.now()}`);
+    const silent = async () => [];
+
+    const later = new Date(Date.now() + (PUSH_GIVE_UP_AFTER_DAYS + 0.5) * 86_400_000);
+    const gave = await sweepAlertPush(pool, silent, undefined, later);
+    expect(gave.abandoned).toBeGreaterThanOrEqual(1);
+
+    const { rows } = await db.query<{ status: string; detail: string }>(
+      `select status, detail from public.alert_deliveries where alert_id = $1 and channel = 'push'`,
+      [alertId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.status).toBe('failed');
+    // Named as ours: the count, not the handset.
+    expect(rows[0]!.detail).toContain('Never sent');
+    // The count, whatever else is pending in this suite's window alongside it.
+    expect(rows[0]!.detail).toMatch(/0 tickets for \d+ messages/);
   });
 });

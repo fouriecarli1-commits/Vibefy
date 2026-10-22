@@ -88,9 +88,14 @@ export interface DeliveryOutcome {
  */
 export function interpretTicket(ticket: PushTicket | undefined): DeliveryOutcome {
   if (!ticket) {
+    // Said as ours rather than as the handset's: nothing came back about this
+    // message, so nothing is known about the device. The sender refuses a short
+    // reply now, and the sweep defers a batch it has no tickets for, so this is
+    // the last line of defence rather than the ordinary path it used to be.
     return {
       delivered: false,
-      detail: 'No ticket returned for this message.',
+      detail:
+        'The push service returned no ticket for this message, so nothing was learnt about the handset.',
       disableToken: false,
       disableReason: null,
     };
@@ -120,8 +125,38 @@ export const expoPushSender: PushSender = async (messages) => {
   if (!response.ok) {
     throw new Error(`Expo push service returned ${response.status}.`);
   }
-  const payload = (await response.json()) as { data?: PushTicket[] };
-  return payload.data ?? [];
+  /*
+   * A ticket for every message, or nothing.
+   *
+   * This read `payload.data ?? []` and handed the sweep a short array. Expo
+   * answers a request-level problem — bad credentials, a malformed body, a
+   * rejected request — with HTTP 200 and an `errors` array and no `data` at
+   * all, so `response.ok` is true and the sweep got zero tickets for a full
+   * batch. It then wrote one `alert_deliveries` row per handset saying the
+   * delivery failed, and the pending query excludes any alert that has such a
+   * row: a problem on our side of the request became a permanent
+   * non-delivery, attributed to the customer's phone, for a notice the Badge
+   * Licence obliges us to give. `errors` was discarded, so the one sentence
+   * saying what was actually wrong was the one thing not kept.
+   *
+   * Thrown instead, which is what the sweep's own catch is for: the batch is
+   * deferred and tried again, and written down with this detail if it is still
+   * failing when it runs out of days.
+   */
+  const payload = (await response.json()) as {
+    data?: PushTicket[];
+    errors?: { code?: string; message?: string }[];
+  };
+  if (!Array.isArray(payload.data) || payload.data.length < messages.length) {
+    const said = (payload.errors ?? [])
+      .map((entry) => entry.message ?? entry.code ?? 'no reason given')
+      .join('; ');
+    throw new Error(
+      `Expo push service returned ${payload.data?.length ?? 0} tickets for ` +
+        `${messages.length} messages${said === '' ? '.' : `: ${said}`}`,
+    );
+  }
+  return payload.data;
 };
 
 // ---------------------------------------------------------------------------
