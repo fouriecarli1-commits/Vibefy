@@ -5,7 +5,6 @@
 --
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='record_a_refusal_at_intake')
 -- A refusal at intake is written down, by the database.
 --
 -- `apps/web/app/console/apps/actions.ts` carried this, above an insert into
@@ -76,6 +75,7 @@ begin
 end
 $$;
 
+drop trigger if exists apps_refusal_at_intake_is_written_down on public.apps;
 drop trigger if exists apps_refusal_at_intake_is_written_down on public.apps;
 create trigger apps_refusal_at_intake_is_written_down
   after insert on public.apps

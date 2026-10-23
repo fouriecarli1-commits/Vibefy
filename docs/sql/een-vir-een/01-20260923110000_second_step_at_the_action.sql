@@ -6,7 +6,6 @@
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='session_passed_second_step')
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='session_passed_second_step')
 -- =============================================================================
 -- A second step, required at the action rather than at the door.
 --
@@ -94,6 +93,7 @@ comment on function public.session_passed_second_step is
 -- refuses it. So this one policy stands in front of every mark this product
 -- will ever put on somebody's website, which is the reason it is first.
 
+drop policy if exists reviews_need_second_step on public.reviews;
 create policy reviews_need_second_step on public.reviews
   as restrictive
   for insert to authenticated
@@ -103,11 +103,13 @@ create policy reviews_need_second_step on public.reviews
 -- revocation is the one action here that is visible to the public within
 -- minutes. Insert is included because `badges_write_reviewers` is `for all`.
 
+drop policy if exists badges_need_second_step_insert on public.badges;
 create policy badges_need_second_step_insert on public.badges
   as restrictive
   for insert to authenticated
   with check (public.session_passed_second_step());
 
+drop policy if exists badges_need_second_step_update on public.badges;
 create policy badges_need_second_step_update on public.badges
   as restrictive
   for update to authenticated
@@ -121,6 +123,7 @@ create policy badges_need_second_step_update on public.badges
 -- customer comes to read a customer's findings. A role change is the third: an
 -- admin who can promote is an owner with an extra step.
 
+drop policy if exists invitations_need_second_step_insert on public.invitations;
 create policy invitations_need_second_step_insert on public.invitations
   as restrictive
   for insert to authenticated
@@ -133,11 +136,13 @@ create policy invitations_need_second_step_insert on public.invitations
 -- a control that stands between somebody and undoing their own mistake is
 -- working against the thing it is for. A revoked invitation is dead, so a row
 -- that sets `revoked_at` may set anything else with it.
+drop policy if exists invitations_need_second_step_update on public.invitations;
 create policy invitations_need_second_step_update on public.invitations
   as restrictive
   for update to authenticated
   with check (public.session_passed_second_step() or revoked_at is not null);
 
+drop policy if exists memberships_need_second_step_insert on public.memberships;
 create policy memberships_need_second_step_insert on public.memberships
   as restrictive
   for insert to authenticated
@@ -148,6 +153,7 @@ create policy memberships_need_second_step_insert on public.memberships
 -- demotion is the kind of cleverness that is wrong once and silently. An admin
 -- who wants to demote somebody in a hurry is an admin who can scan a QR code
 -- first; the person they are demoting is not going anywhere.
+drop policy if exists memberships_need_second_step_update on public.memberships;
 create policy memberships_need_second_step_update on public.memberships
   as restrictive
   for update to authenticated

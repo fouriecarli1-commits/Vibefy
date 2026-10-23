@@ -5,7 +5,6 @@
 --
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_human_review' and pg_get_functiondef(p.oid) like '%r.action::text = new.status::text%')
 -- =============================================================================
 -- A review row authorises the transition it actually describes.
 --

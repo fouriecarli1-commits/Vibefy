@@ -75,6 +75,7 @@ end
 $$;
 
 drop trigger if exists sso_domains_are_verified_by_us on public.sso_connections;
+drop trigger if exists sso_domains_are_verified_by_us on public.sso_connections;
 create trigger sso_domains_are_verified_by_us
   before insert or update on public.sso_connections
   for each row execute function public.an_sso_domain_is_verified_by_us();

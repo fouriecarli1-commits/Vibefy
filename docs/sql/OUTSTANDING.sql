@@ -12,14 +12,25 @@
 -- 'n blok wat na 'n vroeëre een se tabel verwys, misluk as jy spring.
 --
 -- Een-en-twintig migrasies, in hierdie volgorde. Gegenereer 2026-09-24,
--- aangevul 2026-10-11, 2026-10-19 en 2026-10-21.
+-- aangevul 2026-10-11, 2026-10-19 en 2026-10-21. Elke blok is op 2026-10-23
+-- herskryf sodat 'n tweede loop niks doen.
 --
--- Getoets soos jy dit gaan hardloop: al een-en-twintig blokke in een plak, teen 'n
--- databasis wat hulle nog nie het nie. Dit loop deur sonder 'n fout, en die
--- skema wat oorbly is presies dié waarteen die toetse loop.
+-- Waarom herskryf: op 2026-10-23 het hierdie lêer op blok 1 gaan staan met
+--   ERROR: 42710: policy "reviews_need_second_step" ... already exists
+-- teen 'n databasis wat daardie beleid reeds gehad het. Die paragraaf hier
+-- onder het al die tyd belowe dat 'n tweede loop niks doen, en die blokke was
+-- die migrasies woord vir woord — en 'n migrasie is geskryf vir 'n databasis
+-- wat dit nog nie het nie. Die belofte was dus vals, en niks het dit ooit
+-- nagegaan nie. 'n Plak is boonop een transaksie: daardie een stelling het al
+-- een-en-twintig blokke se werk teruggerol.
+--
+-- Getoets soos jy dit gaan hardloop, in drie toestande en elkeen twee keer:
+-- teen 'n leë databasis, teen een wat agter is, en teen een wat alles reeds
+-- het. Al ses lope gaan deur sonder 'n fout, en die skema wat oorbly is reël
+-- vir reël dieselfde as dié waarteen die toetse loop.
 --
 -- Klaar as: dit loop deur sonder 'n fout. Loop dit 'n tweede keer en niks
--- gebeur — elke blok is so geskryf dat dit homself nie twee keer doen nie.
+-- gebeur — elke blok is nou so geskryf dat dit homself nie twee keer doen nie.
 --
 -- As dit wél ergens stop: die reël "BLOK n VAN 21" bo elke blok sê waar jy is.
 -- Sê vir my die nommer, dan weet ek presies waarna om te kyk. In
@@ -34,7 +45,6 @@
 -- =============================================================================
 -- 20260923110000_second_step_at_the_action.sql
 -- =============================================================================
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='session_passed_second_step')
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='session_passed_second_step')
 -- =============================================================================
 -- A second step, required at the action rather than at the door.
@@ -123,6 +133,7 @@ comment on function public.session_passed_second_step is
 -- refuses it. So this one policy stands in front of every mark this product
 -- will ever put on somebody's website, which is the reason it is first.
 
+drop policy if exists reviews_need_second_step on public.reviews;
 create policy reviews_need_second_step on public.reviews
   as restrictive
   for insert to authenticated
@@ -132,11 +143,13 @@ create policy reviews_need_second_step on public.reviews
 -- revocation is the one action here that is visible to the public within
 -- minutes. Insert is included because `badges_write_reviewers` is `for all`.
 
+drop policy if exists badges_need_second_step_insert on public.badges;
 create policy badges_need_second_step_insert on public.badges
   as restrictive
   for insert to authenticated
   with check (public.session_passed_second_step());
 
+drop policy if exists badges_need_second_step_update on public.badges;
 create policy badges_need_second_step_update on public.badges
   as restrictive
   for update to authenticated
@@ -150,6 +163,7 @@ create policy badges_need_second_step_update on public.badges
 -- customer comes to read a customer's findings. A role change is the third: an
 -- admin who can promote is an owner with an extra step.
 
+drop policy if exists invitations_need_second_step_insert on public.invitations;
 create policy invitations_need_second_step_insert on public.invitations
   as restrictive
   for insert to authenticated
@@ -162,11 +176,13 @@ create policy invitations_need_second_step_insert on public.invitations
 -- a control that stands between somebody and undoing their own mistake is
 -- working against the thing it is for. A revoked invitation is dead, so a row
 -- that sets `revoked_at` may set anything else with it.
+drop policy if exists invitations_need_second_step_update on public.invitations;
 create policy invitations_need_second_step_update on public.invitations
   as restrictive
   for update to authenticated
   with check (public.session_passed_second_step() or revoked_at is not null);
 
+drop policy if exists memberships_need_second_step_insert on public.memberships;
 create policy memberships_need_second_step_insert on public.memberships
   as restrictive
   for insert to authenticated
@@ -177,6 +193,7 @@ create policy memberships_need_second_step_insert on public.memberships
 -- demotion is the kind of cleverness that is wrong once and silently. An admin
 -- who wants to demote somebody in a hurry is an admin who can scan a QR code
 -- first; the person they are demoting is not going anywhere.
+drop policy if exists memberships_need_second_step_update on public.memberships;
 create policy memberships_need_second_step_update on public.memberships
   as restrictive
   for update to authenticated
@@ -186,7 +203,6 @@ create policy memberships_need_second_step_update on public.memberships
 -- =============================================================================
 -- 20260923120000_accept_invitation.sql
 -- =============================================================================
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='accept_invitation')
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='accept_invitation')
 -- =============================================================================
 -- Accepting an invitation, which has never once worked.
@@ -354,7 +370,6 @@ grant execute on function public.accept_invitation(text) to authenticated;
 -- 20260923130000_create_workspace.sql
 -- =============================================================================
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='create_workspace')
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='create_workspace')
 -- =============================================================================
 -- Creating a shared workspace, which has never once worked either.
 --
@@ -489,7 +504,6 @@ grant execute on function public.create_workspace(text, text, public.account_typ
 -- 20260923140000_name_the_role.sql
 -- =============================================================================
 -- audit-marker: not exists (select 1 from pg_policies where schemaname='public' and 'public' = any(roles))
--- audit-marker: not exists (select 1 from pg_policies where schemaname='public' and 'public' = any(roles))
 -- =============================================================================
 -- Two policies that never named the role they apply to.
 --
@@ -525,7 +539,6 @@ alter policy remediation_workers_admin on public.remediation_workers to authenti
 -- =============================================================================
 -- 20260924100000_a_review_authorises_its_own_transition.sql
 -- =============================================================================
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_human_review' and pg_get_functiondef(p.oid) like '%r.action::text = new.status::text%')
 -- =============================================================================
 -- A review row authorises the transition it actually describes.
 --
@@ -626,7 +639,6 @@ $$;
 -- =============================================================================
 -- 20260924110000_what_a_provider_told_us_stays_told.sql
 -- =============================================================================
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='billing_events_only_handled_changes' and pg_get_functiondef(p.oid) like '%new.provider is distinct from old.provider%')
 -- =============================================================================
 -- "Everything else about the event is immutable" made true.
 --
@@ -703,7 +715,6 @@ $$;
 -- =============================================================================
 -- 20261006200000_one_score_wherever_it_is_read.sql
 -- =============================================================================
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_score_is_not_pulled_from_under_a_badge')
 -- One score, wherever it is read.
 --
 -- The product says this in its own words, on the report screen: "Your score is
@@ -844,6 +855,7 @@ end;
 $$;
 
 drop trigger if exists assessments_score_is_not_pulled_from_under_a_badge on public.assessments;
+drop trigger if exists assessments_score_is_not_pulled_from_under_a_badge on public.assessments;
 create trigger assessments_score_is_not_pulled_from_under_a_badge
   before update of overall_score on public.assessments
   for each row execute function public.assert_score_is_not_pulled_from_under_a_badge();
@@ -858,7 +870,6 @@ comment on function public.assert_score_is_not_pulled_from_under_a_badge() is
 -- =============================================================================
 -- 20261006210000_a_refusal_is_written_down.sql
 -- =============================================================================
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='record_a_refusal_at_intake')
 -- A refusal at intake is written down, by the database.
 --
 -- `apps/web/app/console/apps/actions.ts` carried this, above an insert into
@@ -930,6 +941,7 @@ end
 $$;
 
 drop trigger if exists apps_refusal_at_intake_is_written_down on public.apps;
+drop trigger if exists apps_refusal_at_intake_is_written_down on public.apps;
 create trigger apps_refusal_at_intake_is_written_down
   after insert on public.apps
   for each row execute function public.record_a_refusal_at_intake();
@@ -971,21 +983,19 @@ comment on function public.record_a_refusal_at_intake is
 -- rule: the cost record outlives what it describes, with the link removed.
 
 alter table public.cost_records
-  drop constraint cost_records_organisation_id_fkey,
+  drop constraint if exists cost_records_organisation_id_fkey,
   add constraint cost_records_organisation_id_fkey
     foreign key (organisation_id) references public.organisations(id) on delete restrict;
 
 alter table public.cost_records
-  drop constraint cost_records_assessment_id_fkey,
+  drop constraint if exists cost_records_assessment_id_fkey,
   add constraint cost_records_assessment_id_fkey
     foreign key (assessment_id) references public.assessments(id) on delete set null;
 
 alter table public.cost_records
-  drop constraint cost_records_assessment_run_id_fkey,
+  drop constraint if exists cost_records_assessment_run_id_fkey,
   add constraint cost_records_assessment_run_id_fkey
     foreign key (assessment_run_id) references public.assessment_runs(id) on delete set null;
-
-
 
 -- BLOK 10 VAN 21
 -- =============================================================================
@@ -1179,14 +1189,15 @@ revoke all on function public.platform_role_of(uuid) from public, anon, authenti
 -- a select policy and nothing else — so a self-scored row arrives in the queue
 -- with whatever findings the engine filed, or none at all.
 
-drop policy assessments_insert_members on public.assessments;
+drop policy if exists assessments_insert_members on public.assessments;
 revoke insert on public.assessments from authenticated;
 
 -- The reviewer half of the old policy, with the member half removed. Named for
 -- who it is for, so the next reader does not have to work out that "members"
 -- stopped including members.
-drop policy assessments_update_members on public.assessments;
+drop policy if exists assessments_update_members on public.assessments;
 
+drop policy if exists assessments_update_reviewers on public.assessments;
 create policy assessments_update_reviewers on public.assessments
   for update to authenticated
   using (public.is_reviewer())
@@ -1468,6 +1479,7 @@ end
 $$;
 
 drop trigger if exists authorisations_are_verified_by_us on public.authorisations;
+drop trigger if exists authorisations_are_verified_by_us on public.authorisations;
 create trigger authorisations_are_verified_by_us
   before insert or update on public.authorisations
   for each row execute function public.an_authorisation_is_verified_by_us();
@@ -1536,12 +1548,15 @@ $$;
 comment on function public.scope_is_within_verified_target is
   'Whether every domain is the verified host, a subdomain of it, or its apex where the host is a www one. The SQL half of permittedScopeFor.';
 
-alter table public.authorisations
-  add constraint authorisations_scope_within_verified_target
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'authorisations_scope_within_verified_target' and conrelid = 'public.authorisations'::regclass) then
+    alter table public.authorisations add constraint authorisations_scope_within_verified_target
   check (
     status <> 'verified'
     or public.scope_is_within_verified_target(verification_target, scope_domains)
   ) not valid;
+  end if;
+end $guard$;
 
 alter table public.authorisations
   validate constraint authorisations_scope_within_verified_target;
@@ -1622,6 +1637,7 @@ begin
 end
 $$;
 
+drop trigger if exists sso_domains_are_verified_by_us on public.sso_connections;
 drop trigger if exists sso_domains_are_verified_by_us on public.sso_connections;
 create trigger sso_domains_are_verified_by_us
   before insert or update on public.sso_connections
@@ -1719,9 +1735,10 @@ comment on function public.an_sso_domain_is_verified_by_us is
 -- is the sentence somebody will read first when they come to this table, and a
 -- correct rule written twice costs nothing.
 
-drop policy memberships_insert_admins on public.memberships;
-drop policy memberships_update_admins on public.memberships;
+drop policy if exists memberships_insert_admins on public.memberships;
+drop policy if exists memberships_update_admins on public.memberships;
 
+drop policy if exists memberships_only_an_owner_grants_ownership on public.memberships;
 create policy memberships_only_an_owner_grants_ownership on public.memberships
   as restrictive for insert to authenticated
   with check (
@@ -1729,6 +1746,7 @@ create policy memberships_only_an_owner_grants_ownership on public.memberships
     or public.has_org_role(organisation_id, array['owner']::public.org_role[])
   );
 
+drop policy if exists memberships_only_an_owner_keeps_granting_ownership on public.memberships;
 create policy memberships_only_an_owner_keeps_granting_ownership on public.memberships
   as restrictive for update to authenticated
   with check (
@@ -1823,7 +1841,7 @@ grant insert (user_id, organisation_id, request_type, details)
 -- list, and the route records on our own connection instead. The policy goes
 -- with it: a policy permitting an insert nobody may perform is a line that
 -- reads like a control and is not one.
-drop policy audit_exports_insert_admins on public.audit_exports;
+drop policy if exists audit_exports_insert_admins on public.audit_exports;
 revoke insert on public.audit_exports from authenticated;
 
 -- -----------------------------------------------------------------------------
@@ -1854,8 +1872,8 @@ revoke insert on public.audit_exports from authenticated;
 -- page — which does not exist yet — will need a policy written for exactly
 -- what it changes. That is the right way round: the columns here are either
 -- identity or commercial status, and neither should be edited by accident.
-drop policy organisations_insert_own on public.organisations;
-drop policy organisations_update_admins on public.organisations;
+drop policy if exists organisations_insert_own on public.organisations;
+drop policy if exists organisations_update_admins on public.organisations;
 revoke insert, update on public.organisations from authenticated;
 
 -- BLOK 17 VAN 21
@@ -1923,9 +1941,8 @@ revoke insert, update on public.organisations from authenticated;
 -- The monitoring sweep in `apps/worker/src/monitoring.ts` also inserts here,
 -- on the worker's own connection as the owner, and is unaffected.
 
-drop policy assessment_requests_insert_members on public.assessment_requests;
+drop policy if exists assessment_requests_insert_members on public.assessment_requests;
 revoke insert on public.assessment_requests from authenticated;
-
 
 -- BLOK 18 VAN 21
 -- =============================================================================
@@ -2006,7 +2023,8 @@ $$;
 -- `create or replace view` may add columns at the end and nothing else.
 -- =============================================================================
 
-create or replace view public.listed_badges
+drop view if exists public.listed_badges;
+create view public.listed_badges
 with (security_invoker = false) as
 select
   b.public_id,
@@ -2039,7 +2057,6 @@ grant select on public.listed_badges to anon, authenticated;
 -- =============================================================================
 -- 20261019120000_where_the_code_came_from.sql
 -- =============================================================================
-
 -- Where the code came from, stored beside the assessment that looked.
 --
 -- GitHub made open-source licence compliance generally available on
@@ -2086,7 +2103,6 @@ comment on column public.assessments.provenance is
 -- =============================================================================
 -- 20261021090000_who_the_customer_is_in_law.sql
 -- =============================================================================
-
 -- Who the customer is, in law.
 --
 -- The console asked for a name and nothing else, and four things follow from
@@ -2122,17 +2138,23 @@ alter table public.organisations
 -- spellings of one country that would not match each other.
 alter table public.organisations
   drop constraint if exists organisations_country_is_iso;
-alter table public.organisations
-  add constraint organisations_country_is_iso
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'organisations_country_is_iso' and conrelid = 'public.organisations'::regclass) then
+    alter table public.organisations add constraint organisations_country_is_iso
   check (country is null or country ~ '^[A-Z]{2}$');
+  end if;
+end $guard$;
 
 -- Nine digits, as Dun & Bradstreet issues them. Hyphens and spaces are how the
 -- same number arrives in three shapes.
 alter table public.organisations
   drop constraint if exists organisations_duns_is_nine_digits;
-alter table public.organisations
-  add constraint organisations_duns_is_nine_digits
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'organisations_duns_is_nine_digits' and conrelid = 'public.organisations'::regclass) then
+    alter table public.organisations add constraint organisations_duns_is_nine_digits
   check (duns_number is null or duns_number ~ '^[0-9]{9}$');
+  end if;
+end $guard$;
 
 comment on column public.organisations.country is
   'ISO 3166-1 alpha-2 of the country whose law governs this workspace''s '
@@ -2164,12 +2186,14 @@ alter table public.consents
 
 alter table public.consents
   drop constraint if exists consents_document_country_is_iso;
-alter table public.consents
-  add constraint consents_document_country_is_iso
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'consents_document_country_is_iso' and conrelid = 'public.consents'::regclass) then
+    alter table public.consents add constraint consents_document_country_is_iso
   check (document_country is null or document_country ~ '^[A-Z]{2}$');
+  end if;
+end $guard$;
 
 comment on column public.consents.document_country is
   'The country variant of the document that was shown, or null for the '
   'published baseline. The hash still pins the exact bytes; this says which '
   'of several sets of bytes was the one on offer.';
-

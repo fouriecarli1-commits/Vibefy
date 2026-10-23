@@ -79,14 +79,15 @@
 -- a select policy and nothing else — so a self-scored row arrives in the queue
 -- with whatever findings the engine filed, or none at all.
 
-drop policy assessments_insert_members on public.assessments;
+drop policy if exists assessments_insert_members on public.assessments;
 revoke insert on public.assessments from authenticated;
 
 -- The reviewer half of the old policy, with the member half removed. Named for
 -- who it is for, so the next reader does not have to work out that "members"
 -- stopped including members.
-drop policy assessments_update_members on public.assessments;
+drop policy if exists assessments_update_members on public.assessments;
 
+drop policy if exists assessments_update_reviewers on public.assessments;
 create policy assessments_update_reviewers on public.assessments
   for update to authenticated
   using (public.is_reviewer())

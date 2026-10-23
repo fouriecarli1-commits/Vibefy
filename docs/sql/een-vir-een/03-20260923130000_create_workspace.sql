@@ -6,7 +6,6 @@
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
 -- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='create_workspace')
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='create_workspace')
 -- =============================================================================
 -- Creating a shared workspace, which has never once worked either.
 --

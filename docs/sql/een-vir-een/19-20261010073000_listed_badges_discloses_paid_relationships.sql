@@ -28,7 +28,8 @@
 -- `create or replace view` may add columns at the end and nothing else.
 -- =============================================================================
 
-create or replace view public.listed_badges
+drop view if exists public.listed_badges;
+create view public.listed_badges
 with (security_invoker = false) as
 select
   b.public_id,

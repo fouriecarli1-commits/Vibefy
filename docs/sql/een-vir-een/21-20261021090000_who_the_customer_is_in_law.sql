@@ -5,7 +5,6 @@
 --
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
-
 -- Who the customer is, in law.
 --
 -- The console asked for a name and nothing else, and four things follow from
@@ -41,17 +40,23 @@ alter table public.organisations
 -- spellings of one country that would not match each other.
 alter table public.organisations
   drop constraint if exists organisations_country_is_iso;
-alter table public.organisations
-  add constraint organisations_country_is_iso
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'organisations_country_is_iso' and conrelid = 'public.organisations'::regclass) then
+    alter table public.organisations add constraint organisations_country_is_iso
   check (country is null or country ~ '^[A-Z]{2}$');
+  end if;
+end $guard$;
 
 -- Nine digits, as Dun & Bradstreet issues them. Hyphens and spaces are how the
 -- same number arrives in three shapes.
 alter table public.organisations
   drop constraint if exists organisations_duns_is_nine_digits;
-alter table public.organisations
-  add constraint organisations_duns_is_nine_digits
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'organisations_duns_is_nine_digits' and conrelid = 'public.organisations'::regclass) then
+    alter table public.organisations add constraint organisations_duns_is_nine_digits
   check (duns_number is null or duns_number ~ '^[0-9]{9}$');
+  end if;
+end $guard$;
 
 comment on column public.organisations.country is
   'ISO 3166-1 alpha-2 of the country whose law governs this workspace''s '
@@ -83,12 +88,14 @@ alter table public.consents
 
 alter table public.consents
   drop constraint if exists consents_document_country_is_iso;
-alter table public.consents
-  add constraint consents_document_country_is_iso
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'consents_document_country_is_iso' and conrelid = 'public.consents'::regclass) then
+    alter table public.consents add constraint consents_document_country_is_iso
   check (document_country is null or document_country ~ '^[A-Z]{2}$');
+  end if;
+end $guard$;
 
 comment on column public.consents.document_country is
   'The country variant of the document that was shown, or null for the '
   'published baseline. The hash still pins the exact bytes; this says which '
   'of several sets of bytes was the one on offer.';
-

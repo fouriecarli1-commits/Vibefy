@@ -89,9 +89,10 @@
 -- is the sentence somebody will read first when they come to this table, and a
 -- correct rule written twice costs nothing.
 
-drop policy memberships_insert_admins on public.memberships;
-drop policy memberships_update_admins on public.memberships;
+drop policy if exists memberships_insert_admins on public.memberships;
+drop policy if exists memberships_update_admins on public.memberships;
 
+drop policy if exists memberships_only_an_owner_grants_ownership on public.memberships;
 create policy memberships_only_an_owner_grants_ownership on public.memberships
   as restrictive for insert to authenticated
   with check (
@@ -99,6 +100,7 @@ create policy memberships_only_an_owner_grants_ownership on public.memberships
     or public.has_org_role(organisation_id, array['owner']::public.org_role[])
   );
 
+drop policy if exists memberships_only_an_owner_keeps_granting_ownership on public.memberships;
 create policy memberships_only_an_owner_keeps_granting_ownership on public.memberships
   as restrictive for update to authenticated
   with check (

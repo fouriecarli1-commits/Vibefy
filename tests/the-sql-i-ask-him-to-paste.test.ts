@@ -31,6 +31,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { idempotent } from '../tools/idempotent.mjs';
 
 const MIGRATIONS = 'supabase/migrations';
 const DOCUMENT = 'docs/sql/OUTSTANDING.sql';
@@ -101,10 +102,27 @@ describe('the document he pastes', () => {
   });
 
   it('carries each migration’s own SQL, statement for statement', () => {
+    /*
+     * The guarded form of it, since 2026-10-23.
+     *
+     * The blocks used to be the migrations verbatim, and the document's own
+     * header promised a second run would do nothing — which it could not,
+     * because a migration here is written for a database that does not have it
+     * yet. A paste stopped on `policy "reviews_need_second_step" ... already
+     * exists`, block 1 of 21, and took the other twenty with it: a paste is one
+     * implicit transaction.
+     *
+     * `tools/idempotent.mjs` is the one transformation, shared with the
+     * catch-up tool, and `node tools/outstanding-guard.mjs` is what applies it
+     * to this document. Comparing against its output rather than against the
+     * raw migration keeps this test doing what it was written for — catching
+     * drift between the document and `supabase/migrations` — while letting the
+     * document be a thing somebody can paste twice.
+     */
     const wrong: string[] = [];
     for (const [index, name] of names.entries()) {
       if (!onDisk.includes(name)) continue;
-      const expected = statements(readFileSync(join(MIGRATIONS, name), 'utf8'));
+      const expected = statements(idempotent(readFileSync(join(MIGRATIONS, name), 'utf8')));
       const actual = statements(bodies[index] ?? '');
       if (expected.join('\n') !== actual.join('\n')) {
         wrong.push(

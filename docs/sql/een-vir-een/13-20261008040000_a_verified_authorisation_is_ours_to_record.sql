@@ -93,6 +93,7 @@ end
 $$;
 
 drop trigger if exists authorisations_are_verified_by_us on public.authorisations;
+drop trigger if exists authorisations_are_verified_by_us on public.authorisations;
 create trigger authorisations_are_verified_by_us
   before insert or update on public.authorisations
   for each row execute function public.an_authorisation_is_verified_by_us();
@@ -161,12 +162,15 @@ $$;
 comment on function public.scope_is_within_verified_target is
   'Whether every domain is the verified host, a subdomain of it, or its apex where the host is a www one. The SQL half of permittedScopeFor.';
 
-alter table public.authorisations
-  add constraint authorisations_scope_within_verified_target
+do $guard$ begin
+  if not exists (select 1 from pg_constraint where conname = 'authorisations_scope_within_verified_target' and conrelid = 'public.authorisations'::regclass) then
+    alter table public.authorisations add constraint authorisations_scope_within_verified_target
   check (
     status <> 'verified'
     or public.scope_is_within_verified_target(verification_target, scope_domains)
   ) not valid;
+  end if;
+end $guard$;
 
 alter table public.authorisations
   validate constraint authorisations_scope_within_verified_target;

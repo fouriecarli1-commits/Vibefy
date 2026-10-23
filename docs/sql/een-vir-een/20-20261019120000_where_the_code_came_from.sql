@@ -5,7 +5,6 @@
 --
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
-
 -- Where the code came from, stored beside the assessment that looked.
 --
 -- GitHub made open-source licence compliance generally available on

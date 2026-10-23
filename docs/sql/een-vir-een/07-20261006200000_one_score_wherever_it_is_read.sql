@@ -5,7 +5,6 @@
 --
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
--- audit-marker: exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='assert_score_is_not_pulled_from_under_a_badge')
 -- One score, wherever it is read.
 --
 -- The product says this in its own words, on the report screen: "Your score is
@@ -145,6 +144,7 @@ begin
 end;
 $$;
 
+drop trigger if exists assessments_score_is_not_pulled_from_under_a_badge on public.assessments;
 drop trigger if exists assessments_score_is_not_pulled_from_under_a_badge on public.assessments;
 create trigger assessments_score_is_not_pulled_from_under_a_badge
   before update of overall_score on public.assessments

@@ -82,7 +82,7 @@ grant insert (user_id, organisation_id, request_type, details)
 -- list, and the route records on our own connection instead. The policy goes
 -- with it: a policy permitting an insert nobody may perform is a line that
 -- reads like a control and is not one.
-drop policy audit_exports_insert_admins on public.audit_exports;
+drop policy if exists audit_exports_insert_admins on public.audit_exports;
 revoke insert on public.audit_exports from authenticated;
 
 -- -----------------------------------------------------------------------------
@@ -113,8 +113,8 @@ revoke insert on public.audit_exports from authenticated;
 -- page — which does not exist yet — will need a policy written for exactly
 -- what it changes. That is the right way round: the columns here are either
 -- identity or commercial status, and neither should be edited by accident.
-drop policy organisations_insert_own on public.organisations;
-drop policy organisations_update_admins on public.organisations;
+drop policy if exists organisations_insert_own on public.organisations;
+drop policy if exists organisations_update_admins on public.organisations;
 revoke insert, update on public.organisations from authenticated;
 
 -- BLOK 17 VAN 21

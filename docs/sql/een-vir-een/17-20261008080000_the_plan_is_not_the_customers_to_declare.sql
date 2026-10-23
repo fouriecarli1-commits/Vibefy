@@ -66,8 +66,7 @@
 -- The monitoring sweep in `apps/worker/src/monitoring.ts` also inserts here,
 -- on the worker's own connection as the owner, and is unaffected.
 
-drop policy assessment_requests_insert_members on public.assessment_requests;
+drop policy if exists assessment_requests_insert_members on public.assessment_requests;
 revoke insert on public.assessment_requests from authenticated;
-
 
 -- BLOK 18 VAN 21

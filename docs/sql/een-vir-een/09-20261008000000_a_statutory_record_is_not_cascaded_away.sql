@@ -33,20 +33,18 @@
 -- rule: the cost record outlives what it describes, with the link removed.
 
 alter table public.cost_records
-  drop constraint cost_records_organisation_id_fkey,
+  drop constraint if exists cost_records_organisation_id_fkey,
   add constraint cost_records_organisation_id_fkey
     foreign key (organisation_id) references public.organisations(id) on delete restrict;
 
 alter table public.cost_records
-  drop constraint cost_records_assessment_id_fkey,
+  drop constraint if exists cost_records_assessment_id_fkey,
   add constraint cost_records_assessment_id_fkey
     foreign key (assessment_id) references public.assessments(id) on delete set null;
 
 alter table public.cost_records
-  drop constraint cost_records_assessment_run_id_fkey,
+  drop constraint if exists cost_records_assessment_run_id_fkey,
   add constraint cost_records_assessment_run_id_fkey
     foreign key (assessment_run_id) references public.assessment_runs(id) on delete set null;
-
-
 
 -- BLOK 10 VAN 21

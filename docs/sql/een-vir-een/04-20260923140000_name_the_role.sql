@@ -6,7 +6,6 @@
 -- Gegenereer uit docs/sql/OUTSTANDING.sql deur tools/outstanding-split.mjs.
 -- Moenie hierdie lêer met die hand verander nie; verander die migrasie.
 -- audit-marker: not exists (select 1 from pg_policies where schemaname='public' and 'public' = any(roles))
--- audit-marker: not exists (select 1 from pg_policies where schemaname='public' and 'public' = any(roles))
 -- =============================================================================
 -- Two policies that never named the role they apply to.
 --
