@@ -3,7 +3,7 @@
 Alles wat op jou wag, in volgorde. Niks hiervan kan ek vir jou doen nie — ek het
 nie toegang tot Vercel, Supabase, Render of Resend nie.
 
-Laas nagegaan 2026-10-11.
+Laas nagegaan 2026-10-23.
 
 > **Eerste, en dit neem een minuut: Vercel → Deployments → boonste een → ⋯ →
 > Redeploy.**
@@ -193,19 +193,23 @@ die verduideliking, nie na die rou fout nie.
 
 ## 1b · Futurebox — die badge is uit, en hoe dit terugkom
 
-Jy het op 11 Oktober gevra dat dit afkom totdat die badge reg is. Dit is uit
-op die branch `claude/badge-af-vir-nou` in `futurebox-app`. Dit is **nog nie
-live nie** — jou eie briefing (`docs/ANTIGRAVITY.md`) sê geen agent stoot na
-`main` nie, want `main` is direk aan Vercel.
+**Dit is klaar.** Nagegaan op 2026-10-23: `main` op `futurebox-app` dra die
+verwydering al, deur 'n ander commit as die branch. Die voetstuk daar dra 'n
+nota gedateer 12 Oktober wat sê die badge is weg omdat sy gasheer niks antwoord
+nie, en _"put it back the day the host serves it again"_.
 
-**Om dit live te kry:** merge daardie branch op GitHub, of sê vir my "stoot dit
-na main" en ek doen dit.
+**Die branch `claude/badge-af-vir-nou` moet net uitgevee word.** Moenie hom
+merge nie: hy is 3 commits voor en **351 agter**, en 'n merge sou werk wégvat —
+hy haal `*.mzstatic.com` uit die beeldbeleid (iets heeltemal anders) en sit
+ouer teks terug oor `main` se nuwer werk, insluitend die
+`kids.futurebox.studio`-afdeling.
 
-Die branch is bygewerk met `main` soos dit vanaand is — drie nuwe commits het
-intussen op `main` geland en nie een van hulle raak die voetstuk of die
-beeldbeleid nie, so die merge is skoon en daar is niks om op te los nie.
+GitHub → `futurebox-app` →
+[branches/all?query=badge](https://github.com/fouriecarli1-commits/futurebox-app/branches/all?query=badge)
+→ die asblik-ikoon. Of: `git push origin --delete claude/badge-af-vir-nou`.
+Ek kan dit nie self doen nie — my GitHub-toegang in daardie repo is lees-alleen.
 
-**Klaar as:** die voetstuk op futurebox wys niks waar die badge was nie.
+**Klaar as:** die branch is nie meer in die lys nie.
 
 ### Wanneer jy dit terugsit
 
@@ -313,11 +317,19 @@ kan die werker niks uitreik nie, hoeveel beoordelings ook al deurgaan. Afdeling
 
 ## 4 · Supabase — een-en-twintig migrasies
 
-> **Op ys, op jou versoek, 11 Oktober saans.** Jy is op Antigravity besig en
-> daar mag nog blokke bykom. Niks hiervan verval — die vier gate bly oop tot
-> die blokke geloop het — en wanneer jy terugkom hoef jy niks te onthou nie:
-> as daar nuwe migrasies by is, nommer ek die lêer oor (`pnpm sql:blocks`) en
-> hierdie afdeling sê weer hoeveel daar is.
+> **Van ys af, 23 Oktober.** Jy het dit probeer hardloop en dit het op blok 1
+> gaan staan:
+>
+>     ERROR: 42710: policy "reviews_need_second_step" ... already exists
+>
+> Dit was my fout. Die blokke was die migrasies woord vir woord, en 'n migrasie
+> is geskryf vir 'n databasis wat dit nog **nie** het nie — terwyl die lêer se
+> eie kop belowe het dat 'n tweede loop niks doen. 'n Plak is boonop **een
+> transaksie**, so daardie een stelling het al een-en-twintig blokke se werk
+> teruggerol: jy het nie 'n halwe databasis nie, jy het presies niks.
+>
+> Elke blok is nou herskryf sodat 'n tweede loop niks doen. Gebruik die nuwe
+> `docs/sql/OUTSTANDING.sql` en plak dit net weer.
 
 Wanneer jy wel begin: **begin hier, nie by 0 nie.** 0 tot 3 is die badge, en
 die badge is 'n uitval, nie 'n gat nie.
@@ -336,8 +348,10 @@ Die eerste twintig reëls van die lêer sê dieselfde vyf stappe, as jy dit late
 weer nodig het. Die volgorde is reeds reg, en alles in een keer is veiliger as
 stukke: 'n blok wat na 'n vroeëre een se tabel verwys, misluk as jy spring.
 
-Ek het dit getoets soos jy dit gaan hardloop — al een-en-twintig blokke in een plak,
-teen 'n databasis wat hulle nog nie het nie. Dit loop deur sonder 'n fout, en
+Ek het dit getoets soos jy dit gaan hardloop, in drie toestande en elkeen twee
+keer: teen 'n leë databasis, teen een wat agter is, en teen een wat alles reeds
+het — die geval waarop dit op 23 Oktober gaan staan het. Al ses lope gaan deur
+sonder 'n fout, en
 die skema wat oorbly is presies dié waarteen die toetse loop.
 
 **Klaar as:** dit loop deur sonder 'n fout. Loop dit 'n tweede keer en niks
