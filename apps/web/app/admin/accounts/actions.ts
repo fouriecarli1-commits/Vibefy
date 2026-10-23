@@ -6,6 +6,7 @@ import { headers } from 'next/headers';
 import { PLAN_TIERS, entitlementFor, type PlanTier } from '@vibefycode/billing';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom } from '@/lib/what-role-they-have';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -54,13 +55,20 @@ async function requireAdmin() {
   const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'Sign in first.' } as const;
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') {
-    return { error: 'Only a VibefyCode administrator can change accounts.' } as const;
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (role !== 'admin') {
+    // Refused either way; said as what it is. An administrator told only an
+    // administrator may do this, when the read failed, is being told something
+    // about themselves that is not true.
+    return {
+      error:
+        role === 'unknown'
+          ? 'We could not check whether you are a VibefyCode administrator, so nothing was done. It is in our log; reloading is worth trying.'
+          : 'Only a VibefyCode administrator can change accounts.',
+    } as const;
   }
   return { supabase, userId: user.id } as const;
 }

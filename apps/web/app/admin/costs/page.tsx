@@ -6,6 +6,7 @@ import { publishedCeilings } from '@vibefycode/governance';
 import pricing from '../../../../../config/pricing.json' with { type: 'json' };
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom, whyTheyCannotBeLetIn } from '@/lib/what-role-they-have';
 import { WideTable } from '@/components/wide-table';
 
 export const metadata: Metadata = { title: 'Unit economics' };
@@ -24,18 +25,20 @@ export default async function CostsPage() {
   const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/admin/costs');
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') {
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (role !== 'admin') {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Unit economics</h1>
-        <p className="text-muted">
-          This dashboard is for VibefyCode administrators. Row-level security means the underlying
-          rows are unreadable to anyone else in any case.
+        <p className="max-w-prose text-muted">
+          {whyTheyCannotBeLetIn(
+            role,
+            'This dashboard is for VibefyCode administrators. Row-level security means the underlying rows are unreadable to anyone else in any case.',
+            'administrator',
+          )}
         </p>
       </div>
     );

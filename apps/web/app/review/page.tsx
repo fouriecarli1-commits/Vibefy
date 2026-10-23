@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { triageAssessment, type Triage, type TriageFinding } from '@vibefycode/governance';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { isPlatformStaff, roleFrom, whyTheyCannotBeLetIn } from '@/lib/what-role-they-have';
 
 export const metadata: Metadata = { title: 'Review queue' };
 
@@ -27,20 +28,21 @@ export default async function ReviewQueuePage() {
   const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review');
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  const isReviewer = profile?.platform_role === 'reviewer' || profile?.platform_role === 'admin';
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  const isReviewer = isPlatformStaff(role);
 
   if (!isReviewer) {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-bold">Review queue</h1>
-        <p className="text-muted">
-          This queue is for VibefyCode reviewers. Row-level security means you would see nothing
-          here in any case — this message just explains why.
+        <p className="max-w-prose text-muted">
+          {whyTheyCannotBeLetIn(
+            role,
+            'This queue is for VibefyCode reviewers. Row-level security means you would see nothing here in any case \u2014 this message just explains why.',
+          )}
         </p>
       </div>
     );

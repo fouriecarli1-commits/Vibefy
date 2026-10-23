@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { assembleSubjectExport, subjectExportFilename } from '@vibefycode/governance';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom } from '@/lib/what-role-they-have';
 import { writeAsUser } from '@/lib/sql';
 
 /**
@@ -31,12 +32,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const user = await whoIsSignedIn(supabase);
   if (!user) return NextResponse.json({ error: 'Sign in first.' }, { status: 401 });
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') {
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (role !== 'admin') {
     // Not reviewer-or-admin, as elsewhere. `consents` and `data_requests` are
     // readable only by the person themselves or a platform admin, so a reviewer
     // would assemble an export with an empty consents array and nothing saying

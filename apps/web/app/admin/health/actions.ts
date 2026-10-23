@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom } from '@/lib/what-role-they-have';
 import { writeAsService } from '@/lib/sql';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import { liftLivePause, whyALiftIsRefused } from '@/lib/spend-pause';
@@ -43,13 +44,17 @@ export async function liftSpendPause(
   const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' };
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') {
-    return { error: 'Only a VibefyCode administrator can lift a spend pause.' };
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (role !== 'admin') {
+    return {
+      error:
+        role === 'unknown'
+          ? 'We could not check whether you are a VibefyCode administrator, so nothing was done. It is in our log; reloading is worth trying.'
+          : 'Only a VibefyCode administrator can lift a spend pause.',
+    };
   }
   if (!(await sessionPassedSecondStep())) return { error: SECOND_STEP_REQUIRED };
 

@@ -91,9 +91,12 @@ describe('this is presentation, not permission', () => {
   });
 
   it('the queue and the admin screens each check before rendering', () => {
-    expect(reviewPage).toMatch(/platform_role === 'reviewer'|isReviewer/);
-    expect(accountsPage).toContain("platform_role !== 'admin'");
-    expect(costsPage).toContain("platform_role !== 'admin'");
+    // Through `roleFrom` since 2026-10-23, which is where a role we could not
+    // read is told apart from a role that is not staff. The check itself is
+    // unchanged and still fail-closed.
+    expect(reviewPage).toMatch(/isPlatformStaff\(role\)/);
+    expect(accountsPage).toContain("role !== 'admin'");
+    expect(costsPage).toContain("role !== 'admin'");
   });
 
   it('says so where somebody might mistake it for a gate', () => {

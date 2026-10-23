@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { isPlatformStaff, roleFrom } from '@/lib/what-role-they-have';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -21,13 +22,17 @@ async function reviewerClient() {
   const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' as const };
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'reviewer' && profile?.platform_role !== 'admin') {
-    return { error: 'Only a VibefyCode reviewer can act on a badge.' as const };
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (!isPlatformStaff(role)) {
+    return {
+      error:
+        role === 'unknown'
+          ? ('We could not check whether you are a VibefyCode reviewer, so nothing was done to this badge. It is in our log; reloading is worth trying.' as const)
+          : ('Only a VibefyCode reviewer can act on a badge.' as const),
+    };
   }
   // Revocation is the one action in this product that is visible to the public
   // within minutes. A restrictive policy refuses it without a second step; this

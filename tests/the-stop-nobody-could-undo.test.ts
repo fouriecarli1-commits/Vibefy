@@ -150,7 +150,7 @@ describe('who may press it', () => {
   });
 
   it('refuses anybody who is not an administrator', () => {
-    expect(action).toMatch(/platform_role !== 'admin'/);
+    expect(action).toMatch(/role !== 'admin'/);
     const beforeWrite = action.slice(0, action.indexOf('await writeAsService('));
     expect(beforeWrite, 'the write happens before the role is read').toMatch(/platform_role/);
   });

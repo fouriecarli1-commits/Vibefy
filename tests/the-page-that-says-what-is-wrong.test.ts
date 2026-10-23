@@ -43,7 +43,7 @@ describe('who may read it', () => {
      * built from a variable the browser is sent by name. Everything else stays
      * behind the role check below, and the test under it is what holds that.
      */
-    const open = page.slice(page.indexOf('if (!user)'), page.indexOf("platform_role !== 'admin'"));
+    const open = page.slice(page.indexOf('if (!user)'), page.indexOf("role !== 'admin'"));
     expect(open).toMatch(/servedOrigin\(\)/);
     expect(open).toMatch(/signInProviders\(\)/);
     expect(open).toMatch(/providerCallback\(\)/);
@@ -54,7 +54,7 @@ describe('who may read it', () => {
     // The checks that describe our own plumbing — the connection string, the
     // keys, what has been issued, whether the platform stopped itself — are
     // named only after the role check.
-    const open = page.slice(page.indexOf('if (!user)'), page.indexOf("platform_role !== 'admin'"));
+    const open = page.slice(page.indexOf('if (!user)'), page.indexOf("role !== 'admin'"));
     for (const check of ['connectionString(', 'publicApiKeys(', 'signingKeys(', 'spend_pauses']) {
       expect(open, `${check} is answered to anybody`).not.toContain(check);
     }
@@ -62,7 +62,10 @@ describe('who may read it', () => {
 
   it('refuses anybody who is not an administrator', () => {
     // Not a reviewer either: these sentences are about our own plumbing.
-    expect(page).toContain("profile?.platform_role !== 'admin'");
+    // `roleFrom` now, which refuses a role it could not read exactly as it
+    // refuses one that is not an administrator — and says which.
+    expect(page).toContain("role !== 'admin'");
+    expect(page).toContain('roleFrom(');
   });
 });
 

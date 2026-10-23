@@ -5,6 +5,7 @@ import { reinstateBadge, revokeBadge, suspendBadge } from '../badge-actions';
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { isPlatformStaff, roleFrom, whyTheyCannotBeLetIn } from '@/lib/what-role-they-have';
 
 export const metadata: Metadata = { title: 'Issued badges' };
 
@@ -21,19 +22,20 @@ export default async function BadgeRegisterPage() {
   const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review/badges');
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  const isReviewer = profile?.platform_role === 'reviewer' || profile?.platform_role === 'admin';
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  const isReviewer = isPlatformStaff(role);
   if (!isReviewer) {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Issued badges</h1>
-        <p className="text-muted">
-          This register is for VibefyCode reviewers. Row-level security means you would see nothing
-          here in any case.
+        <p className="max-w-prose text-muted">
+          {whyTheyCannotBeLetIn(
+            role,
+            'This register is for VibefyCode reviewers. Row-level security means you would see nothing here in any case.',
+          )}
         </p>
       </div>
     );

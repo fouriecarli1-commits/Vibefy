@@ -5,6 +5,7 @@ import { SCREENING_CATEGORIES } from '@vibefycode/engine/authorisation';
 import { ActionForm, Field, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { isPlatformStaff, roleFrom, whyTheyCannotBeLetIn } from '@/lib/what-role-they-have';
 import { recordScreeningDecision } from './actions';
 
 export const metadata: Metadata = { title: 'Submissions awaiting a check' };
@@ -29,19 +30,20 @@ export default async function ScreeningQueuePage() {
   const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/review/screening');
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  const isReviewer = profile?.platform_role === 'reviewer' || profile?.platform_role === 'admin';
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  const isReviewer = isPlatformStaff(role);
   if (!isReviewer) {
     return (
       <div className="max-w-3xl space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Submissions awaiting a check</h1>
-        <p className="text-muted">
-          This queue is for VibefyCode reviewers. Row-level security means you would see nothing
-          here in any case.
+        <p className="max-w-prose text-muted">
+          {whyTheyCannotBeLetIn(
+            role,
+            'This queue is for VibefyCode reviewers. Row-level security means you would see nothing here in any case.',
+          )}
         </p>
       </div>
     );

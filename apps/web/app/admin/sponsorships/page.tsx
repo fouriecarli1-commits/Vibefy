@@ -5,6 +5,7 @@ import { PLACEMENT_LABEL, SPONSOR_LABEL, type SponsorshipPlacement } from '@vibe
 import { ActionForm, Field } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom } from '@/lib/what-role-they-have';
 import { approveSponsorship, endSponsorship, rejectSponsorship } from './actions';
 
 export const metadata: Metadata = { title: 'Placements' };
@@ -50,12 +51,14 @@ export default async function SponsorshipsPage() {
   const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/admin/sponsorships');
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') redirect('/console');
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  // A redirect either way: this page has no refusal of its own to carry a
+  // reason, and sending somebody to the console is what it has always done.
+  // The line in the log is what changes.
+  if (role !== 'admin') redirect('/console');
 
   const { data } = await supabase
     .from('sponsorships')

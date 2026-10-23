@@ -14,6 +14,7 @@ import { lookUpBadgeVerification } from '@/lib/badge-verification';
 import { whatIsWrongWithTheConnectionString, whyTheDatabaseRefused } from '@/lib/connection-string';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom, whyTheyCannotBeLetIn } from '@/lib/what-role-they-have';
 import { LiftPauseForm } from './lift-pause';
 import { resolveSiteOrigin } from '@/lib/verify-origin.server';
 import { isPlaceholderOrigin } from '@/lib/verify-origin';
@@ -463,18 +464,20 @@ export default async function HealthPage() {
     );
   }
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') {
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (role !== 'admin') {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">What is wrong</h1>
-        <p className="text-muted">
-          This page is for VibefyCode administrators. It describes our own plumbing, which is no
-          customer’s business.
+        <p className="max-w-prose text-muted">
+          {whyTheyCannotBeLetIn(
+            role,
+            'This page is for VibefyCode administrators. It describes our own plumbing, which is no customer’s business.',
+            'administrator',
+          )}
         </p>
       </div>
     );

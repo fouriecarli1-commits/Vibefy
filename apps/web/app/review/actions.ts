@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { isPlatformStaff, roleFrom } from '@/lib/what-role-they-have';
 import { SECOND_STEP_REQUIRED, sessionPassedSecondStep } from '@/lib/second-step-server';
 import type { ActionState } from '@/app/console/apps/actions';
 
@@ -19,13 +20,21 @@ async function reviewerContext() {
   const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'You are signed out.' as const };
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'reviewer' && profile?.platform_role !== 'admin') {
-    return { error: 'Only a VibefyCode reviewer can act on the queue.' as const };
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (!isPlatformStaff(role)) {
+    // Refused either way — a role we could not read has not been proved — but
+    // said as what it is. A reviewer told "only a reviewer can act on the
+    // queue" when the read failed is being told something about themselves
+    // that is not true.
+    return {
+      error:
+        role === 'unknown'
+          ? ('We could not check whether you are a VibefyCode reviewer, so nothing was done. It is in our log; reloading is worth trying.' as const)
+          : ('Only a VibefyCode reviewer can act on the queue.' as const),
+    };
   }
   /*
    * The second step, asked here so it can be explained.

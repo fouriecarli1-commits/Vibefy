@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom } from '@/lib/what-role-they-have';
 import type { ActionState } from '@/app/console/apps/actions';
 
 /**
@@ -24,13 +25,17 @@ async function requireAdmin() {
   const user = await whoIsSignedIn(supabase);
   if (!user) return { error: 'Sign in first.' } as const;
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') {
-    return { error: 'Only a VibefyCode administrator can decide on a placement.' } as const;
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (role !== 'admin') {
+    return {
+      error:
+        role === 'unknown'
+          ? 'We could not check whether you are a VibefyCode administrator, so nothing was done. It is in our log; reloading is worth trying.'
+          : 'Only a VibefyCode administrator can decide on a placement.',
+    } as const;
   }
   return { supabase, userId: user.id } as const;
 }

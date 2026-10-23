@@ -5,6 +5,7 @@ import { PLAN_TIERS, entitlementFor } from '@vibefycode/billing';
 import { ActionForm, Select } from '@/components/action-form';
 import { createClient } from '@/lib/supabase/server';
 import { whoIsSignedIn } from '@/lib/who-is-signed-in';
+import { roleFrom, whyTheyCannotBeLetIn } from '@/lib/what-role-they-have';
 import { setPlan, setPlatformRole } from './actions';
 
 export const metadata: Metadata = { title: 'Accounts' };
@@ -40,19 +41,20 @@ export default async function AccountsPage() {
   const user = await whoIsSignedIn(supabase);
   if (!user) redirect('/sign-in?next=/admin/accounts');
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('platform_role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.platform_role !== 'admin') {
+  const role = roleFrom(
+    await supabase.from('users').select('platform_role').eq('id', user.id).single(),
+    user.id,
+  );
+  if (role !== 'admin') {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Accounts</h1>
-        <p className="text-muted">
-          This screen is for VibefyCode administrators. Row-level security means the underlying rows
-          are unreadable to anyone else in any case — this message only explains why the page is
-          empty.
+        <p className="max-w-prose text-muted">
+          {whyTheyCannotBeLetIn(
+            role,
+            'This screen is for VibefyCode administrators. Row-level security means the underlying rows are unreadable to anyone else in any case — this message only explains why the page is empty.',
+            'administrator',
+          )}
         </p>
       </div>
     );
