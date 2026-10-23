@@ -39,6 +39,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
    * could not see, and nothing on the page or in the log said a word.
    */
   const couldNotRead: { what: string; why: string }[] = [];
+  const alsoMissing = new Set<string>();
   const read = <T,>(
     what: string,
     result: { data: T; error: { message: string } | null },
@@ -46,6 +47,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   ): T => {
     if (result.error) {
       if (blocking) couldNotRead.push({ what, why: result.error.message });
+      else alsoMissing.add(what);
       couldNot(
         `read the ${what} for a review`,
         {
@@ -264,6 +266,49 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         )}
       </header>
 
+      {/*
+       * What could not be read, before anything that was.
+       *
+       * Above the certification blockers deliberately: a blocker is a fact
+       * about the assessment, and this is a statement about whether the page
+       * in front of you is the assessment at all.
+       */}
+      {couldNotRead.length > 0 && (
+        <section
+          role="alert"
+          aria-labelledby="unread"
+          className="rounded-xl border border-line-strong bg-surface-muted p-5"
+        >
+          <h2 id="unread" className="font-semibold">
+            Part of this page did not load
+          </h2>
+          <ul className="mt-2 space-y-1 text-sm text-muted">
+            {couldNotRead.map((entry) => (
+              <li key={entry.what}>
+                The {entry.what} could not be read — {entry.why}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 max-w-prose text-sm">
+            An empty list below is not evidence that there was nothing to show. The decision is
+            withheld at the foot of this page until the page can show what the decision rests on,
+            and this is in our log. Reloading is worth trying: most of these are momentary.
+          </p>
+        </section>
+      )}
+
+      {alsoMissing.size > 0 && (
+        <section role="note" className="rounded-xl border border-line bg-surface-muted p-5">
+          <h2 className="font-semibold">Two things this page would normally also show</h2>
+          <p className="mt-2 max-w-prose text-sm text-muted">
+            {[...alsoMissing].join(' and ')} could not be read. Neither is what the decision rests
+            on, so it is not withheld — but the previous score drives one of the attention rules
+            above, and without it that rule does not fire, which is also what happens on a first
+            assessment. This is the one case where you cannot tell those two apart from the page.
+          </p>
+        </section>
+      )}
+
       {blockers.length > 0 && (
         <section role="note" className="rounded-xl border border-line bg-surface-muted p-5">
           <h2 className="font-semibold">Certification blockers</h2>
@@ -408,53 +453,88 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
           independence policy checkable rather than merely stated.
         </p>
 
-        <div className="card">
-          <h3 className="font-semibold">Approve</h3>
-          <ActionForm action={approveAssessment} submitLabel="Approve">
-            <input type="hidden" name="assessmentId" value={id} />
-            <Checkbox
-              label="Certification-eligible"
-              name="certificationEligible"
-              hint="Leave unticked to approve the report without making the application eligible for a badge."
-            />
-            <Field label="Note (optional)" name="reason" />
-          </ActionForm>
-        </div>
+        {couldNotRead.length > 0 ? (
+          /*
+           * The decision, withheld.
+           *
+           * The three forms used to sit here whatever the page had managed to
+           * read, so a reviewer could approve an assessment whose findings,
+           * evidence or stage log had failed to load — and the screen looked
+           * exactly like an assessment with nothing to find. The promise this
+           * product sells is that a person looked; a person cannot look at
+           * what the page did not fetch.
+           *
+           * Withheld rather than disabled: a greyed-out button invites
+           * clicking it again, and the reason belongs where the button was.
+           * Nothing is lost by waiting — the queue keeps the assessment, and
+           * these reads fail momentarily far more often than permanently.
+           */
+          <div className="card card-roomy">
+            <h3 className="font-semibold">Not from this screen</h3>
+            <p className="mt-2 max-w-prose text-muted">
+              {couldNotRead.length === 1
+                ? `The ${couldNotRead[0]!.what} could not be read, so this page is not the assessment.`
+                : `${couldNotRead.length} parts of this assessment could not be read, so this page is not the assessment.`}{' '}
+              Approving, adjusting or rejecting from here would be deciding about what you cannot
+              see, which is the one thing a human review is for.
+            </p>
+            <p className="mt-3 max-w-prose text-sm text-muted">
+              Reload the page. If it keeps failing, the reason is in our log with this assessment's
+              reference — nothing about the assessment itself has changed, and it stays in the
+              queue.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="card">
+              <h3 className="font-semibold">Approve</h3>
+              <ActionForm action={approveAssessment} submitLabel="Approve">
+                <input type="hidden" name="assessmentId" value={id} />
+                <Checkbox
+                  label="Certification-eligible"
+                  name="certificationEligible"
+                  hint="Leave unticked to approve the report without making the application eligible for a badge."
+                />
+                <Field label="Note (optional)" name="reason" />
+              </ActionForm>
+            </div>
 
-        <div className="card">
-          <h3 className="font-semibold">Adjust the score</h3>
-          <ActionForm action={adjustAssessment} submitLabel="Record adjustment">
-            <input type="hidden" name="assessmentId" value={id} />
-            <Field
-              label="Adjusted overall score"
-              name="overallScore"
-              type="number"
-              required
-              defaultValue={String(assessment.overall_score ?? '')}
-            />
-            <Field
-              label="Why"
-              name="reason"
-              required
-              multiline
-              hint="At least twenty characters. An override without a reason is rejected by the database, not by this form."
-            />
-          </ActionForm>
-        </div>
+            <div className="card">
+              <h3 className="font-semibold">Adjust the score</h3>
+              <ActionForm action={adjustAssessment} submitLabel="Record adjustment">
+                <input type="hidden" name="assessmentId" value={id} />
+                <Field
+                  label="Adjusted overall score"
+                  name="overallScore"
+                  type="number"
+                  required
+                  defaultValue={String(assessment.overall_score ?? '')}
+                />
+                <Field
+                  label="Why"
+                  name="reason"
+                  required
+                  multiline
+                  hint="At least twenty characters. An override without a reason is rejected by the database, not by this form."
+                />
+              </ActionForm>
+            </div>
 
-        <div className="card">
-          <h3 className="font-semibold">Reject</h3>
-          <ActionForm action={rejectAssessment} submitLabel="Reject" destructive>
-            <input type="hidden" name="assessmentId" value={id} />
-            <Field
-              label="Why"
-              name="reason"
-              required
-              multiline
-              hint="The customer sees this, and can appeal it."
-            />
-          </ActionForm>
-        </div>
+            <div className="card">
+              <h3 className="font-semibold">Reject</h3>
+              <ActionForm action={rejectAssessment} submitLabel="Reject" destructive>
+                <input type="hidden" name="assessmentId" value={id} />
+                <Field
+                  label="Why"
+                  name="reason"
+                  required
+                  multiline
+                  hint="The customer sees this, and can appeal it."
+                />
+              </ActionForm>
+            </div>
+          </>
+        )}
       </section>
 
       {reviews && reviews.length > 0 && (
